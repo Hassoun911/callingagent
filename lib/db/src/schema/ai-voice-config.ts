@@ -4,9 +4,10 @@ import { z } from "zod/v4";
 
 export const aiVoiceConfigTable = pgTable("ai_voice_config", {
   id: serial("id").primaryKey(),
-  voice: text("voice").notNull().default("alloy"),
+  voice: text("voice").notNull().default("nova"),
+  language: text("language").notNull().default("en-US"),
   greeting: text("greeting").notNull().default("Hello, thank you for calling. How can I help you today?"),
-  systemPrompt: text("system_prompt").notNull().default("You are a professional and friendly call center assistant. Answer questions helpfully and concisely. If you cannot help with something, offer to take a message."),
+  systemPrompt: text("system_prompt").notNull().default("You are a professional phone agent. Speak naturally and conversationally — not like a script. Use contractions. Keep every response to 1-3 sentences. Ask only one question at a time. Sound warm but professional. If someone asks if you are AI, acknowledge you are a virtual assistant and redirect to helping them. Never use bullet points, lists, or markdown — this is a phone call. Your goal is to understand their need and help them or take a detailed message."),
   maxCallDuration: integer("max_call_duration").notNull().default(300),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

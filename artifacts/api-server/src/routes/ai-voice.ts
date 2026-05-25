@@ -34,6 +34,7 @@ router.patch("/ai-voice/config", async (req, res): Promise<void> => {
   const updateData: any = {};
   const body = parsed.data;
   if (body.voice != null) updateData.voice = body.voice;
+  if (body.language != null) updateData.language = body.language;
   if (body.greeting != null) updateData.greeting = body.greeting;
   if (body.systemPrompt != null) updateData.systemPrompt = body.systemPrompt;
   if (body.maxCallDuration != null) updateData.maxCallDuration = body.maxCallDuration;

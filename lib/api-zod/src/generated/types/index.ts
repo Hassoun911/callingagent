@@ -7,7 +7,9 @@
  */
 
 export * from './aiVoiceConfig';
+export * from './aiVoiceConfigLanguage';
 export * from './aiVoiceConfigUpdate';
+export * from './aiVoiceConfigUpdateLanguage';
 export * from './aiVoiceConfigUpdateVoice';
 export * from './aiVoiceConfigVoice';
 export * from './availableNumber';

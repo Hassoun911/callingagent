@@ -5,11 +5,14 @@
  * Call Center API
  * OpenAPI spec version: 0.1.0
  */
+import type { AiVoiceConfigUpdateLanguage } from './aiVoiceConfigUpdateLanguage';
 import type { AiVoiceConfigUpdateVoice } from './aiVoiceConfigUpdateVoice';
 
 export interface AiVoiceConfigUpdate {
   /** @nullable */
   voice?: AiVoiceConfigUpdateVoice;
+  /** @nullable */
+  language?: AiVoiceConfigUpdateLanguage;
   /** @nullable */
   greeting?: string | null;
   /** @nullable */

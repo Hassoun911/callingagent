@@ -420,6 +420,7 @@ export const GetRecordingUrlResponse = zod.object({
 export const GetAiVoiceConfigResponse = zod.object({
   "id": zod.number(),
   "voice": zod.enum(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']),
+  "language": zod.enum(['en-US', 'ar-SA']),
   "greeting": zod.string(),
   "systemPrompt": zod.string(),
   "maxCallDuration": zod.number().optional()
@@ -428,6 +429,7 @@ export const GetAiVoiceConfigResponse = zod.object({
 
 export const UpdateAiVoiceConfigBody = zod.object({
   "voice": zod.union([zod.literal('alloy'),zod.literal('echo'),zod.literal('fable'),zod.literal('onyx'),zod.literal('nova'),zod.literal('shimmer'),zod.literal(null)]).nullish(),
+  "language": zod.union([zod.literal('en-US'),zod.literal('ar-SA'),zod.literal(null)]).nullish(),
   "greeting": zod.string().nullish(),
   "systemPrompt": zod.string().nullish(),
   "maxCallDuration": zod.number().nullish()
@@ -436,6 +438,7 @@ export const UpdateAiVoiceConfigBody = zod.object({
 export const UpdateAiVoiceConfigResponse = zod.object({
   "id": zod.number(),
   "voice": zod.enum(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']),
+  "language": zod.enum(['en-US', 'ar-SA']),
   "greeting": zod.string(),
   "systemPrompt": zod.string(),
   "maxCallDuration": zod.number().optional()

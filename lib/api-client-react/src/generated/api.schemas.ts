@@ -305,9 +305,18 @@ export const AiVoiceConfigVoice = {
   shimmer: 'shimmer',
 } as const;
 
+export type AiVoiceConfigLanguage = typeof AiVoiceConfigLanguage[keyof typeof AiVoiceConfigLanguage];
+
+
+export const AiVoiceConfigLanguage = {
+  'en-US': 'en-US',
+  'ar-SA': 'ar-SA',
+} as const;
+
 export interface AiVoiceConfig {
   id: number;
   voice: AiVoiceConfigVoice;
+  language: AiVoiceConfigLanguage;
   greeting: string;
   systemPrompt: string;
   maxCallDuration?: number;
@@ -328,9 +337,22 @@ export const AiVoiceConfigUpdateVoice = {
   shimmer: 'shimmer',
 } as const;
 
+/**
+ * @nullable
+ */
+export type AiVoiceConfigUpdateLanguage = typeof AiVoiceConfigUpdateLanguage[keyof typeof AiVoiceConfigUpdateLanguage] | null;
+
+
+export const AiVoiceConfigUpdateLanguage = {
+  'en-US': 'en-US',
+  'ar-SA': 'ar-SA',
+} as const;
+
 export interface AiVoiceConfigUpdate {
   /** @nullable */
   voice?: AiVoiceConfigUpdateVoice;
+  /** @nullable */
+  language?: AiVoiceConfigUpdateLanguage;
   /** @nullable */
   greeting?: string | null;
   /** @nullable */

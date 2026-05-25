@@ -869,13 +869,16 @@ components:
 
     AiVoiceConfig:
       type: object
-      required: [id, voice, greeting, systemPrompt]
+      required: [id, voice, language, greeting, systemPrompt]
       properties:
         id:
           type: integer
         voice:
           type: string
           enum: [alloy, echo, fable, onyx, nova, shimmer]
+        language:
+          type: string
+          enum: [en-US, ar-SA]
         greeting:
           type: string
         systemPrompt:
@@ -889,6 +892,9 @@ components:
         voice:
           type: ["string", "null"]
           enum: [alloy, echo, fable, onyx, nova, shimmer, null]
+        language:
+          type: ["string", "null"]
+          enum: [en-US, ar-SA, null]
         greeting:
           type: ["string", "null"]
         systemPrompt:

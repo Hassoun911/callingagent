@@ -5,11 +5,13 @@
  * Call Center API
  * OpenAPI spec version: 0.1.0
  */
+import type { AiVoiceConfigLanguage } from './aiVoiceConfigLanguage';
 import type { AiVoiceConfigVoice } from './aiVoiceConfigVoice';
 
 export interface AiVoiceConfig {
   id: number;
   voice: AiVoiceConfigVoice;
+  language: AiVoiceConfigLanguage;
   greeting: string;
   systemPrompt: string;
   maxCallDuration?: number;

@@ -22,6 +22,7 @@ interface ConversationState {
   maxDuration: number;
   startedAt: number;
   voice: string;
+  language: string;
   baseUrl: string;
 }
 const conversations = new Map<string, ConversationState>();
@@ -85,10 +86,10 @@ function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function gatherBlock(audioId: string | null, fallbackText: string, baseUrl: string): string {
+function gatherBlock(audioId: string | null, fallbackText: string, baseUrl: string, language = "en-US"): string {
   const audio = playOrSay(audioId, fallbackText, baseUrl);
   return `${audio}
-  <Gather input="speech" timeout="6" speechTimeout="auto" speechModel="experimental_conversations" action="${baseUrl}/api/twilio/ai-gather" method="POST">
+  <Gather input="speech" timeout="6" speechTimeout="auto" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
   </Gather>`;
 }
 
@@ -148,12 +149,18 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
 
   } else if (answerMode === "ai_voice") {
     const [aiConfig] = await db.select().from(aiVoiceConfigTable);
-    const systemPrompt = phoneNumber?.aiSystemPrompt
-      || aiConfig?.systemPrompt
-      || "You are a helpful phone assistant. Keep your answers brief and conversational since you are on a phone call.";
-    const greetingText = aiConfig?.greeting ?? "Hello, thank you for calling. How can I help you today?";
+    const language = aiConfig?.language ?? "en-US";
     const ttsVoice = aiConfig?.voice ?? "nova";
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
+    const greetingText = aiConfig?.greeting ?? "Hello, thank you for calling. How can I help you today?";
+
+    // Build base prompt, adding a language directive if not English
+    const basePrompt = phoneNumber?.aiSystemPrompt || aiConfig?.systemPrompt
+      || "You are a professional phone agent. Speak naturally and conversationally. Keep responses to 1-3 sentences. Ask one question at a time.";
+    const langDirective = language === "ar-SA"
+      ? "\n\nIMPORTANT: You MUST respond entirely in Arabic (العربية). Do not use any English."
+      : "";
+    const systemPrompt = basePrompt + langDirective;
 
     conversations.set(CallSid, {
       systemPrompt,
@@ -161,6 +168,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       maxDuration,
       startedAt: Date.now(),
       voice: ttsVoice,
+      language,
       baseUrl,
     });
 
@@ -180,12 +188,13 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       }
     }, 1500);
 
+    const retryFallback = language === "ar-SA" ? "لم أفهم. هل يمكنك الإعادة؟" : "I didn't catch that. Could you please repeat?";
+    const retryAudioId = await generateTts(retryFallback, ttsVoice);
+
     twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${gatherBlock(greetingAudioId, greetingText, baseUrl)}
-  ${playOrSay(null, "I didn't catch that. Could you please repeat?", baseUrl)}
-  <Gather input="speech" timeout="6" speechTimeout="auto" speechModel="experimental_conversations" action="${baseUrl}/api/twilio/ai-gather" method="POST">
-  </Gather>
+  ${gatherBlock(greetingAudioId, greetingText, baseUrl, language)}
+  ${gatherBlock(retryAudioId, retryFallback, baseUrl, language)}
   <Hangup/>
 </Response>`;
 
@@ -223,28 +232,31 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
     return;
   }
 
-  const { baseUrl, voice } = conv;
+  const { baseUrl, voice, language } = conv;
+  const isArabic = language === "ar-SA";
 
   // Check max duration
   const elapsed = (Date.now() - conv.startedAt) / 1000;
   if (elapsed > conv.maxDuration) {
     conversations.delete(CallSid);
-    const audioId = await generateTts("We've reached the maximum call duration. Thank you for calling. Goodbye!", voice);
+    const byeText = isArabic ? "لقد وصلنا إلى الحد الأقصى لمدة المكالمة. شكرا لاتصالك. مع السلامة!" : "We've reached the maximum call duration. Thank you for calling. Goodbye!";
+    const audioId = await generateTts(byeText, voice);
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${playOrSay(audioId, "We've reached the maximum call duration. Goodbye!", baseUrl)}
+  ${playOrSay(audioId, byeText, baseUrl)}
   <Hangup/>
 </Response>`);
     return;
   }
 
   if (!SpeechResult) {
-    const audioId = await generateTts("I didn't catch that. Could you please repeat?", voice);
+    const retryText = isArabic ? "لم أفهم. هل يمكنك الإعادة؟" : "I didn't catch that. Could you please repeat?";
+    const audioId = await generateTts(retryText, voice);
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${gatherBlock(audioId, "I didn't catch that. Could you please repeat?", baseUrl)}
+  ${gatherBlock(audioId, retryText, baseUrl, language)}
   <Hangup/>
 </Response>`);
     return;
@@ -255,29 +267,29 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   try {
     const openai = getOpenAI();
 
-    // Run LLM + TTS in parallel for minimum latency
-    const completionPromise = openai.chat.completions.create({
+    const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: conv.systemPrompt + "\n\nIMPORTANT: Keep all responses to 1-3 short sentences. You are on a live phone call. Never use markdown, bullet points, or lists — only natural spoken language.",
+          content: conv.systemPrompt + "\n\nIMPORTANT: Keep all responses to 1-3 short sentences. You are on a live phone call. Never use markdown, bullet points, or lists — only natural spoken language. Vary your phrasing — do not start every response the same way.",
         },
         ...conv.messages,
       ],
-      max_tokens: 150,
+      max_tokens: 180,
     });
 
-    const completion = await completionPromise;
-    const aiText = completion.choices[0]?.message?.content ?? "I'm sorry, I couldn't process that. Can you try again?";
+    const aiText = completion.choices[0]?.message?.content ?? (isArabic ? "عذرًا، لم أتمكن من المعالجة. هل يمكنك المحاولة مرة أخرى؟" : "I'm sorry, I couldn't process that. Can you try again?");
     conv.messages.push({ role: "assistant", content: aiText });
 
     // Generate TTS audio
     const audioId = await generateTts(aiText, voice);
 
     // Check if AI naturally wants to end
-    const endPhrases = ["goodbye", "have a great day", "take care", "thank you for calling", "bye"];
-    const wantsToEnd = endPhrases.some(p => aiText.toLowerCase().includes(p)) && conv.messages.length > 4;
+    const endPhrases = isArabic
+      ? ["مع السلامة", "وداعا", "شكرا لاتصالك", "يوم سعيد"]
+      : ["goodbye", "have a great day", "take care", "thank you for calling", "bye", "take care now"];
+    const wantsToEnd = endPhrases.some(p => aiText.toLowerCase().includes(p.toLowerCase())) && conv.messages.length > 4;
 
     if (wantsToEnd) {
       conversations.delete(CallSid);
@@ -293,19 +305,17 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${gatherBlock(audioId, aiText, baseUrl)}
-  ${playOrSay(null, "Is there anything else I can help you with?", baseUrl)}
-  <Gather input="speech" timeout="6" speechTimeout="auto" speechModel="experimental_conversations" action="${baseUrl}/api/twilio/ai-gather" method="POST">
-  </Gather>
+  ${gatherBlock(audioId, aiText, baseUrl, language)}
   <Hangup/>
 </Response>`);
   } catch (err: any) {
     req.log.error({ err }, "OpenAI call failed in ai-gather");
-    const audioId = await generateTts("I'm having a technical issue right now. Please try calling again later.", voice);
+    const errText = isArabic ? "أواجه مشكلة تقنية. يرجى المحاولة مرة أخرى لاحقًا." : "I'm having a technical issue right now. Please try calling again later.";
+    const audioId = await generateTts(errText, voice);
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${playOrSay(audioId, "I'm having a technical issue. Please try again later.", baseUrl)}
+  ${playOrSay(audioId, errText, baseUrl)}
   <Hangup/>
 </Response>`);
   }
