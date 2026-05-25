@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable } from "@workspace/db";
+import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable, contactsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
 import twilio from "twilio";
@@ -191,6 +191,24 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     answerMode: phoneNumber?.answerMode ?? "forward",
   }).onConflictDoNothing();
 
+  // Match inbound caller to a CRM contact by phone number (free, uses our DB).
+  if (From && From !== "Anonymous") {
+    setImmediate(async () => {
+      try {
+        const [contact] = await db.select().from(contactsTable)
+          .where(eq(contactsTable.phone, From));
+        if (contact) {
+          const contactName = `${contact.firstName} ${contact.lastName}`.trim();
+          await db.update(callLogsTable)
+            .set({ contactName })
+            .where(eq(callLogsTable.twilioCallSid, CallSid));
+        }
+      } catch (err: any) {
+        logger.warn({ err: err?.message }, "CRM contact lookup failed");
+      }
+    });
+  }
+
   // If no free CNAM, kick off a Twilio Lookup in the background (non-blocking).
   if (!inboundCallerName && From && From !== "Anonymous") {
     setImmediate(async () => {
@@ -203,8 +221,12 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
           await db.update(callLogsTable)
             .set({ callerIdName: name })
             .where(eq(callLogsTable.twilioCallSid, CallSid));
+        } else {
+          logger.info({ From }, "Twilio CNAM lookup returned no name (add-on may not be enabled)");
         }
-      } catch (_) { /* lookup failed — leave callerIdName null */ }
+      } catch (err: any) {
+        logger.warn({ From, err: err?.message, code: err?.code }, "Twilio CNAM lookup failed");
+      }
     });
   }
 

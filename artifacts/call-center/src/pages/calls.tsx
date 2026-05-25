@@ -277,9 +277,9 @@ export default function Calls() {
                 </TableCell>
                 <TableCell className="text-sm">
                   {(() => {
-                    // callerName = AI-extracted; callerIdName = CNAM from Twilio lookup
+                    // Priority: AI-extracted name > CRM contact name > CNAM
                     // Guard against literal "null" / "undefined" strings stored by older code
-                    const name = [call.callerName, call.callerIdName]
+                    const name = [call.callerName, call.contactName, call.callerIdName]
                       .find(n => n && n !== "null" && n !== "undefined");
                     return name
                       ? <span className="font-medium">{name}</span>
