@@ -49,6 +49,27 @@ function getTwilioClient() {
   return twilio(accountSid, authToken);
 }
 
+/**
+ * Start recording a live call and immediately persist the recording SID.
+ * Fires asynchronously so it never blocks TwiML responses.
+ */
+function startCallRecording(callSid: string, callbackUrl: string): void {
+  const client = getTwilioClient();
+  logger.info({ callSid, callbackUrl }, "Requesting call recording via API");
+  client.calls(callSid).recordings.create({
+    recordingStatusCallback: callbackUrl,
+    recordingStatusCallbackMethod: "POST",
+  }).then(async (rec) => {
+    logger.info({ callSid, recordingSid: rec.sid }, "Call recording started");
+    // Persist SID immediately — callback may be delayed or missed
+    await db.update(callLogsTable)
+      .set({ recordingSid: rec.sid })
+      .where(eq(callLogsTable.twilioCallSid, callSid));
+  }).catch((err: any) => {
+    logger.error({ callSid, err: err?.message ?? String(err), code: err?.code, status: err?.status }, "Failed to start call recording");
+  });
+}
+
 const router: IRouter = Router();
 
 // In-memory conversation store keyed by CallSid
@@ -269,18 +290,8 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     // Generate greeting audio with OpenAI TTS
     const greetingAudioId = await generateTts(greetingText, ttsVoice);
 
-    // Start recording the call (non-blocking)
-    setTimeout(() => {
-      try {
-        const client = getTwilioClient();
-        client.calls(CallSid).recordings.create({
-          recordingStatusCallback: `${baseUrl}/api/twilio/recording`,
-          recordingStatusCallbackMethod: "POST",
-        }).catch((err: any) => logger.error({ err }, "Failed to start call recording"));
-      } catch (err) {
-        logger.error({ err }, "Failed to init call recording");
-      }
-    }, 1500);
+    // Start recording the call immediately (non-blocking)
+    startCallRecording(CallSid, `${baseUrl}/api/twilio/recording`);
 
     const retryFallback = language === "ar-SA" ? "لم أفهم. هل يمكنك الإعادة؟" : "I didn't catch that. Could you please repeat?";
     const retryAudioId = await generateTts(retryFallback, ttsVoice);
@@ -499,18 +510,8 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
     const retryFallback = language.startsWith("ar-") ? "لم أفهم. هل يمكنك الإعادة؟" : "I didn't catch that. Could you please repeat?";
     const retryAudioId = await generateTts(retryFallback, ttsVoice);
 
-    // Start recording the call (non-blocking), same as the main ai_voice path
-    setTimeout(() => {
-      try {
-        const client = getTwilioClient();
-        client.calls(CallSid).recordings.create({
-          recordingStatusCallback: `${baseUrl}/api/twilio/recording`,
-          recordingStatusCallbackMethod: "POST",
-        }).catch((err: any) => logger.error({ err }, "Failed to start call recording (screen-fallback)"));
-      } catch (err) {
-        logger.error({ err }, "Failed to init call recording (screen-fallback)");
-      }
-    }, 1500);
+    // Start recording the call immediately (non-blocking)
+    startCallRecording(CallSid, `${baseUrl}/api/twilio/recording`);
 
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
@@ -602,26 +603,34 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
       }
       conversations.delete(CallSid);
 
-      // If we still don't have a recording, try fetching it from Twilio API
-      // (handles cases where the recording callback fires after the status callback)
-      if (!RecordingUrl && !RecordingSid) {
-        setImmediate(async () => {
-          try {
-            // Wait a moment for Twilio to process the recording
-            await new Promise(r => setTimeout(r, 4000));
-            const client = getTwilioClient();
-            const recordings = await client.recordings.list({ callSid: CallSid, limit: 1 });
-            if (recordings.length > 0) {
-              const rec = recordings[0];
-              await db.update(callLogsTable)
-                .set({
-                  recordingSid: rec.sid,
-                  recordingUrl: `https://api.twilio.com/2010-04-01/Accounts/${rec.accountSid}/Recordings/${rec.sid}.mp3`,
-                })
-                .where(eq(callLogsTable.twilioCallSid, CallSid));
+      // If we still don't have a recording URL, poll Twilio at 5s / 20s / 60s
+      // to catch recordings that finish processing after the status callback.
+      if (!RecordingUrl) {
+        const pollForRecording = async () => {
+          const delays = [5000, 20000, 60000];
+          const client = getTwilioClient();
+          for (const delay of delays) {
+            await new Promise(r => setTimeout(r, delay));
+            try {
+              const recs = await client.recordings.list({ callSid: CallSid, limit: 1 });
+              if (recs.length > 0) {
+                const rec = recs[0];
+                logger.info({ CallSid, recordingSid: rec.sid }, "Recording found via polling");
+                await db.update(callLogsTable)
+                  .set({
+                    recordingSid: rec.sid,
+                    recordingUrl: `https://api.twilio.com/2010-04-01/Accounts/${rec.accountSid}/Recordings/${rec.sid}.mp3`,
+                  })
+                  .where(eq(callLogsTable.twilioCallSid, CallSid));
+                return; // found — stop polling
+              }
+            } catch (err: any) {
+              logger.warn({ CallSid, err: err?.message }, "Recording poll attempt failed");
             }
-          } catch (_) { /* recording may not exist for all calls */ }
-        });
+          }
+          logger.info({ CallSid }, "No recording found after polling (call may not have been recorded)");
+        };
+        setImmediate(() => { pollForRecording().catch(() => {}); });
       }
     }
 
