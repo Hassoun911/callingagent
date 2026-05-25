@@ -1,22 +1,33 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Call Center API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: phone-numbers
+    description: Phone number management
+  - name: contacts
+    description: CRM contacts
+  - name: companies
+    description: CRM companies
+  - name: call-logs
+    description: Call logs and recordings
+  - name: ai-voice
+    description: AI voice configuration
+  - name: dashboard
+    description: Dashboard stats
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +35,838 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /phone-numbers:
+    get:
+      operationId: listPhoneNumbers
+      tags: [phone-numbers]
+      summary: List all provisioned phone numbers
+      responses:
+        "200":
+          description: List of phone numbers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PhoneNumber"
+    post:
+      operationId: provisionPhoneNumber
+      tags: [phone-numbers]
+      summary: Provision a new phone number from Twilio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhoneNumberInput"
+      responses:
+        "201":
+          description: Provisioned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneNumber"
+
+  /phone-numbers/search:
+    get:
+      operationId: searchAvailableNumbers
+      tags: [phone-numbers]
+      summary: Search available Twilio phone numbers
+      parameters:
+        - name: areaCode
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: contains
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: country
+          in: query
+          schema:
+            type: string
+            default: US
+        - name: tollFree
+          in: query
+          schema:
+            type: ["boolean", "null"]
+      responses:
+        "200":
+          description: Available numbers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AvailableNumber"
+
+  /phone-numbers/{id}:
+    get:
+      operationId: getPhoneNumber
+      tags: [phone-numbers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Phone number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneNumber"
+    patch:
+      operationId: updatePhoneNumber
+      tags: [phone-numbers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhoneNumberUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneNumber"
+    delete:
+      operationId: releasePhoneNumber
+      tags: [phone-numbers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Released
+
+  /phone-numbers/{id}/test-call:
+    post:
+      operationId: testCall
+      tags: [phone-numbers]
+      summary: Place a test call to verify forwarding
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestCallInput"
+      responses:
+        "200":
+          description: Call initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestCallResult"
+
+  /contacts:
+    get:
+      operationId: listContacts
+      tags: [contacts]
+      summary: List CRM contacts
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: companyId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Contacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+    post:
+      operationId: createContact
+      tags: [contacts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/{id}:
+    get:
+      operationId: getContact
+      tags: [contacts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+    patch:
+      operationId: updateContact
+      tags: [contacts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+    delete:
+      operationId: deleteContact
+      tags: [contacts]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /companies:
+    get:
+      operationId: listCompanies
+      tags: [companies]
+      responses:
+        "200":
+          description: Companies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Company"
+    post:
+      operationId: createCompany
+      tags: [companies]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+
+  /companies/{id}:
+    get:
+      operationId: getCompany
+      tags: [companies]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Company
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+    patch:
+      operationId: updateCompany
+      tags: [companies]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+    delete:
+      operationId: deleteCompany
+      tags: [companies]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /call-logs:
+    get:
+      operationId: listCallLogs
+      tags: [call-logs]
+      summary: List call logs with optional filters
+      parameters:
+        - name: phoneNumberId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: direction
+          in: query
+          schema:
+            type: ["string", "null"]
+            enum: [inbound, outbound, null]
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Call logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CallLog"
+
+  /call-logs/{id}:
+    get:
+      operationId: getCallLog
+      tags: [call-logs]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Call log
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallLog"
+
+  /call-logs/{id}/recording:
+    get:
+      operationId: getRecordingUrl
+      tags: [call-logs]
+      summary: Get a signed recording URL for a call
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Recording URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordingUrl"
+
+  /ai-voice/config:
+    get:
+      operationId: getAiVoiceConfig
+      tags: [ai-voice]
+      summary: Get global AI voice configuration
+      responses:
+        "200":
+          description: AI voice config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiVoiceConfig"
+    patch:
+      operationId: updateAiVoiceConfig
+      tags: [ai-voice]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiVoiceConfigUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiVoiceConfig"
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /dashboard/recent-calls:
+    get:
+      operationId: getRecentCalls
+      tags: [dashboard]
+      summary: Get recent call activity feed
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Recent calls
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CallLog"
+
+  /twilio/voice:
+    post:
+      operationId: twilioVoiceWebhook
+      tags: [phone-numbers]
+      summary: Twilio voice webhook handler
+      responses:
+        "200":
+          description: TwiML response
+          content:
+            application/xml:
+              schema:
+                type: string
+
+  /twilio/status:
+    post:
+      operationId: twilioStatusWebhook
+      tags: [phone-numbers]
+      summary: Twilio call status callback
+      responses:
+        "200":
+          description: OK
+
+  /twilio/recording:
+    post:
+      operationId: twilioRecordingWebhook
+      tags: [phone-numbers]
+      summary: Twilio recording callback
+      responses:
+        "200":
+          description: OK
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    PhoneNumber:
+      type: object
+      required: [id, number, friendlyName, callerIdName, forwardTo, ringCount, answerMode, isActive, createdAt]
+      properties:
+        id:
+          type: integer
+        number:
+          type: string
+        twilioSid:
+          type: ["string", "null"]
+        friendlyName:
+          type: string
+        callerIdName:
+          type: string
+        companyId:
+          type: ["integer", "null"]
+        forwardTo:
+          type: ["string", "null"]
+        ringCount:
+          type: integer
+        answerMode:
+          type: string
+          enum: [forward, ai_voice, voicemail, reject]
+        aiSystemPrompt:
+          type: ["string", "null"]
+        voicemailGreeting:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+
+    PhoneNumberInput:
+      type: object
+      required: [number, friendlyName, callerIdName, answerMode]
+      properties:
+        number:
+          type: string
+        twilioSid:
+          type: ["string", "null"]
+        friendlyName:
+          type: string
+        callerIdName:
+          type: string
+        companyId:
+          type: ["integer", "null"]
+        forwardTo:
+          type: ["string", "null"]
+        ringCount:
+          type: integer
+          default: 4
+        answerMode:
+          type: string
+          enum: [forward, ai_voice, voicemail, reject]
+        aiSystemPrompt:
+          type: ["string", "null"]
+        voicemailGreeting:
+          type: ["string", "null"]
+
+    PhoneNumberUpdate:
+      type: object
+      properties:
+        friendlyName:
+          type: ["string", "null"]
+        callerIdName:
+          type: ["string", "null"]
+        companyId:
+          type: ["integer", "null"]
+        forwardTo:
+          type: ["string", "null"]
+        ringCount:
+          type: ["integer", "null"]
+        answerMode:
+          type: ["string", "null"]
+          enum: [forward, ai_voice, voicemail, reject, null]
+        aiSystemPrompt:
+          type: ["string", "null"]
+        voicemailGreeting:
+          type: ["string", "null"]
+        isActive:
+          type: ["boolean", "null"]
+
+    AvailableNumber:
+      type: object
+      required: [phoneNumber, friendlyName, locality, region, isoCountry]
+      properties:
+        phoneNumber:
+          type: string
+        friendlyName:
+          type: string
+        locality:
+          type: ["string", "null"]
+        region:
+          type: ["string", "null"]
+        postalCode:
+          type: ["string", "null"]
+        isoCountry:
+          type: string
+        capabilities:
+          type: object
+          properties:
+            voice:
+              type: boolean
+            sms:
+              type: boolean
+            mms:
+              type: boolean
+
+    TestCallInput:
+      type: object
+      required: [toNumber]
+      properties:
+        toNumber:
+          type: string
+
+    TestCallResult:
+      type: object
+      required: [callSid, status]
+      properties:
+        callSid:
+          type: string
+        status:
+          type: string
+
+    Contact:
+      type: object
+      required: [id, firstName, lastName, createdAt]
+      properties:
+        id:
+          type: integer
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        companyId:
+          type: ["integer", "null"]
+        companyName:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        tags:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    ContactInput:
+      type: object
+      required: [firstName, lastName]
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        companyId:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+        tags:
+          type: ["string", "null"]
+
+    ContactUpdate:
+      type: object
+      properties:
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        companyId:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+        tags:
+          type: ["string", "null"]
+
+    Company:
+      type: object
+      required: [id, name, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        industry:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    CompanyInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        industry:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    CompanyUpdate:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        industry:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+
+    CallLog:
+      type: object
+      required: [id, direction, status, fromNumber, toNumber, createdAt]
+      properties:
+        id:
+          type: integer
+        phoneNumberId:
+          type: ["integer", "null"]
+        twilioCallSid:
+          type: ["string", "null"]
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        status:
+          type: string
+        fromNumber:
+          type: string
+        toNumber:
+          type: string
+        duration:
+          type: ["integer", "null"]
+        recordingUrl:
+          type: ["string", "null"]
+        recordingSid:
+          type: ["string", "null"]
+        transcription:
+          type: ["string", "null"]
+        contactId:
+          type: ["integer", "null"]
+        contactName:
+          type: ["string", "null"]
+        callerIdName:
+          type: ["string", "null"]
+        answerMode:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    RecordingUrl:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+        expiresAt:
+          type: ["string", "null"]
+
+    AiVoiceConfig:
+      type: object
+      required: [id, voice, greeting, systemPrompt]
+      properties:
+        id:
+          type: integer
+        voice:
+          type: string
+          enum: [alloy, echo, fable, onyx, nova, shimmer]
+        greeting:
+          type: string
+        systemPrompt:
+          type: string
+        maxCallDuration:
+          type: integer
+
+    AiVoiceConfigUpdate:
+      type: object
+      properties:
+        voice:
+          type: ["string", "null"]
+          enum: [alloy, echo, fable, onyx, nova, shimmer, null]
+        greeting:
+          type: ["string", "null"]
+        systemPrompt:
+          type: ["string", "null"]
+        maxCallDuration:
+          type: ["integer", "null"]
+
+    DashboardStats:
+      type: object
+      required: [totalNumbers, activeNumbers, totalCalls, callsToday, avgDuration, totalContacts, totalCompanies, inboundCalls, outboundCalls, aiAnswered, voicemailCount, forwardedCalls]
+      properties:
+        totalNumbers:
+          type: integer
+        activeNumbers:
+          type: integer
+        totalCalls:
+          type: integer
+        callsToday:
+          type: integer
+        avgDuration:
+          type: integer
+        totalContacts:
+          type: integer
+        totalCompanies:
+          type: integer
+        inboundCalls:
+          type: integer
+        outboundCalls:
+          type: integer
+        aiAnswered:
+          type: integer
+        voicemailCount:
+          type: integer
+        forwardedCalls:
+          type: integer

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Call Center"
+version = "1.0.0"
+id = "artifacts/call-center"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21722
+
+[services.development]
+run = "pnpm --filter @workspace/call-center run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/call-center", "run", "build" ]
+publicDir = "artifacts/call-center/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21722"
+BASE_PATH = "/"
