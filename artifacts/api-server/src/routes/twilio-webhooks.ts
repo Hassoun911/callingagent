@@ -202,12 +202,14 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     const callScreen = phoneNumber?.callScreen ?? false;
     const callScreenFallback = phoneNumber?.callScreenFallback ?? "voicemail";
 
+    const recordAttr = ` record="record-from-answer-dual-channel" recordingStatusCallback="${baseUrl}/api/twilio/recording" recordingStatusCallbackMethod="POST"`;
+
     if (callScreen && phoneNumber?.id) {
       const screenUrl = `${baseUrl}/api/twilio/screen?phoneNumberId=${phoneNumber.id}&amp;fallback=${callScreenFallback}`;
       const fallbackUrl = `${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&amp;mode=${callScreenFallback}`;
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial${callerIdAttr} timeout="${ringCount * 5}">
+  <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}">
     <Number url="${screenUrl}">${forwardTo}</Number>
   </Dial>
   <Redirect method="POST">${fallbackUrl}</Redirect>
@@ -215,7 +217,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     } else {
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial${callerIdAttr} timeout="${ringCount * 5}">
+  <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}">
     <Number>${forwardTo}</Number>
   </Dial>
 </Response>`;
@@ -561,7 +563,7 @@ Return exactly: {"callerName": "...", "callerEmail": "...", "callType": "General
 }
 
 router.post("/twilio/status", async (req, res): Promise<void> => {
-  const { CallSid, CallStatus, CallDuration } = req.body;
+  const { CallSid, CallStatus, CallDuration, RecordingUrl, RecordingSid } = req.body;
   req.log.info({ CallSid, CallStatus, CallDuration }, "Twilio status callback");
 
   const isTerminal = ["completed", "failed", "busy", "no-answer", "canceled"].includes(CallStatus);
@@ -571,6 +573,10 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
       status: CallStatus,
       duration: CallDuration ? parseInt(CallDuration, 10) : null,
     };
+
+    // Capture recording fields if Twilio includes them in the status callback
+    if (RecordingUrl) updateData.recordingUrl = `${RecordingUrl}.mp3`;
+    if (RecordingSid) updateData.recordingSid = RecordingSid;
 
     if (isTerminal) {
       const conv = conversations.get(CallSid);
@@ -582,6 +588,28 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
           .join("\n\n");
       }
       conversations.delete(CallSid);
+
+      // If we still don't have a recording, try fetching it from Twilio API
+      // (handles cases where the recording callback fires after the status callback)
+      if (!RecordingUrl && !RecordingSid) {
+        setImmediate(async () => {
+          try {
+            // Wait a moment for Twilio to process the recording
+            await new Promise(r => setTimeout(r, 4000));
+            const client = getTwilioClient();
+            const recordings = await client.recordings.list({ callSid: CallSid, limit: 1 });
+            if (recordings.length > 0) {
+              const rec = recordings[0];
+              await db.update(callLogsTable)
+                .set({
+                  recordingSid: rec.sid,
+                  recordingUrl: `https://api.twilio.com/2010-04-01/Accounts/${rec.accountSid}/Recordings/${rec.sid}.mp3`,
+                })
+                .where(eq(callLogsTable.twilioCallSid, CallSid));
+            }
+          } catch (_) { /* recording may not exist for all calls */ }
+        });
+      }
     }
 
     await db.update(callLogsTable)
@@ -598,10 +626,11 @@ router.post("/twilio/recording", async (req, res): Promise<void> => {
   req.log.info({ CallSid, RecordingSid }, "Twilio recording callback");
 
   if (CallSid) {
-    const updateData: any = { status: "completed" };
+    const updateData: any = {};
     if (RecordingUrl) updateData.recordingUrl = `${RecordingUrl}.mp3`;
     if (RecordingSid) updateData.recordingSid = RecordingSid;
     if (TranscriptionText) updateData.transcription = TranscriptionText;
+    if (Object.keys(updateData).length === 0) { res.sendStatus(200); return; }
 
     await db.update(callLogsTable)
       .set(updateData)
