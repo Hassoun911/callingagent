@@ -91,6 +91,10 @@ paths:
           in: query
           schema:
             type: ["boolean", "null"]
+        - name: city
+          in: query
+          schema:
+            type: ["string", "null"]
       responses:
         "200":
           description: Available numbers

@@ -20,4 +20,8 @@ country?: string;
  * @nullable
  */
 tollFree?: boolean | null;
+/**
+ * @nullable
+ */
+city?: string | null;
 };

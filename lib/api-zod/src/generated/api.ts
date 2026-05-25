@@ -65,7 +65,8 @@ export const SearchAvailableNumbersQueryParams = zod.object({
   "areaCode": zod.coerce.string().nullish(),
   "contains": zod.coerce.string().nullish(),
   "country": zod.coerce.string().default(searchAvailableNumbersQueryCountryDefault),
-  "tollFree": zod.coerce.boolean().nullish()
+  "tollFree": zod.coerce.boolean().nullish(),
+  "city": zod.coerce.string().nullish()
 })
 
 export const SearchAvailableNumbersResponseItem = zod.object({
