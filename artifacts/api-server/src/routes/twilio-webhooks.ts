@@ -51,6 +51,11 @@ const VOICE_MAP: Record<string, string> = {
   onyx: "onyx",
   nova: "nova",
   shimmer: "shimmer",
+  coral: "coral",
+  ash: "ash",
+  sage: "sage",
+  ballad: "ballad",
+  verse: "verse",
 };
 
 async function generateTts(text: string, voice = "nova"): Promise<string | null> {
@@ -58,7 +63,7 @@ async function generateTts(text: string, voice = "nova"): Promise<string | null>
     const openai = getOpenAI();
     const ttsVoice = (VOICE_MAP[voice] ?? "nova") as any;
     const response = await openai.audio.speech.create({
-      model: "tts-1",
+      model: "tts-1-hd",
       voice: ttsVoice,
       input: text,
     });
@@ -89,7 +94,7 @@ function escapeXml(text: string): string {
 function gatherBlock(audioId: string | null, fallbackText: string, baseUrl: string, language = "en-US"): string {
   const audio = playOrSay(audioId, fallbackText, baseUrl);
   return `${audio}
-  <Gather input="speech" timeout="6" speechTimeout="auto" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
+  <Gather input="speech" timeout="5" speechTimeout="1" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
   </Gather>`;
 }
 

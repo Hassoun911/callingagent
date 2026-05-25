@@ -16,9 +16,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Bot, Save, Mic2, Globe } from "lucide-react";
 
 const VOICES = [
-  { id: "nova",    name: "Nova",    gender: "Female", desc: "Warm, energetic" },
+  { id: "coral",   name: "Coral",   gender: "Female", desc: "Natural, warm — best for calls" },
+  { id: "nova",    name: "Nova",    gender: "Female", desc: "Energetic, bright" },
   { id: "shimmer", name: "Shimmer", gender: "Female", desc: "Soft, clear" },
   { id: "alloy",   name: "Alloy",   gender: "Female", desc: "Neutral, balanced" },
+  { id: "ash",     name: "Ash",     gender: "Male",   desc: "Clear, professional" },
+  { id: "sage",    name: "Sage",    gender: "Male",   desc: "Measured, thoughtful" },
+  { id: "ballad",  name: "Ballad",  gender: "Male",   desc: "Smooth, engaging" },
+  { id: "verse",   name: "Verse",   gender: "Male",   desc: "Dynamic, versatile" },
   { id: "echo",    name: "Echo",    gender: "Male",   desc: "Warm, conversational" },
   { id: "fable",   name: "Fable",   gender: "Male",   desc: "Expressive, rich" },
   { id: "onyx",    name: "Onyx",    gender: "Male",   desc: "Deep, authoritative" },
