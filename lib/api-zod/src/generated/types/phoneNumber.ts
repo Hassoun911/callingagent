@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { PhoneNumberAnswerMode } from './phoneNumberAnswerMode';
+import type { PhoneNumberCallScreenFallback } from './phoneNumberCallScreenFallback';
 import type { PhoneNumberForwardCallerId } from './phoneNumberForwardCallerId';
 
 export interface PhoneNumber {
@@ -22,6 +23,8 @@ export interface PhoneNumber {
   ringCount: number;
   answerMode: PhoneNumberAnswerMode;
   forwardCallerId?: PhoneNumberForwardCallerId;
+  callScreen?: boolean;
+  callScreenFallback?: PhoneNumberCallScreenFallback;
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */

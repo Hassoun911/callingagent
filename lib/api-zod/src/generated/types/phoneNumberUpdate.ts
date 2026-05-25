@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { PhoneNumberUpdateAnswerMode } from './phoneNumberUpdateAnswerMode';
+import type { PhoneNumberUpdateCallScreenFallback } from './phoneNumberUpdateCallScreenFallback';
 import type { PhoneNumberUpdateForwardCallerId } from './phoneNumberUpdateForwardCallerId';
 
 export interface PhoneNumberUpdate {
@@ -23,6 +24,10 @@ export interface PhoneNumberUpdate {
   answerMode?: PhoneNumberUpdateAnswerMode;
   /** @nullable */
   forwardCallerId?: PhoneNumberUpdateForwardCallerId;
+  /** @nullable */
+  callScreen?: boolean | null;
+  /** @nullable */
+  callScreenFallback?: PhoneNumberUpdateCallScreenFallback;
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */

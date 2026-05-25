@@ -27,6 +27,14 @@ export const PhoneNumberForwardCallerId = {
   line: 'line',
 } as const;
 
+export type PhoneNumberCallScreenFallback = typeof PhoneNumberCallScreenFallback[keyof typeof PhoneNumberCallScreenFallback];
+
+
+export const PhoneNumberCallScreenFallback = {
+  ai_voice: 'ai_voice',
+  voicemail: 'voicemail',
+} as const;
+
 export interface PhoneNumber {
   id: number;
   number: string;
@@ -41,6 +49,8 @@ export interface PhoneNumber {
   ringCount: number;
   answerMode: PhoneNumberAnswerMode;
   forwardCallerId?: PhoneNumberForwardCallerId;
+  callScreen?: boolean;
+  callScreenFallback?: PhoneNumberCallScreenFallback;
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */
@@ -67,6 +77,14 @@ export const PhoneNumberInputForwardCallerId = {
   line: 'line',
 } as const;
 
+export type PhoneNumberInputCallScreenFallback = typeof PhoneNumberInputCallScreenFallback[keyof typeof PhoneNumberInputCallScreenFallback];
+
+
+export const PhoneNumberInputCallScreenFallback = {
+  ai_voice: 'ai_voice',
+  voicemail: 'voicemail',
+} as const;
+
 export interface PhoneNumberInput {
   number: string;
   /** @nullable */
@@ -80,6 +98,8 @@ export interface PhoneNumberInput {
   ringCount?: number;
   answerMode: PhoneNumberInputAnswerMode;
   forwardCallerId?: PhoneNumberInputForwardCallerId;
+  callScreen?: boolean;
+  callScreenFallback?: PhoneNumberInputCallScreenFallback;
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */
@@ -110,6 +130,17 @@ export const PhoneNumberUpdateForwardCallerId = {
   line: 'line',
 } as const;
 
+/**
+ * @nullable
+ */
+export type PhoneNumberUpdateCallScreenFallback = typeof PhoneNumberUpdateCallScreenFallback[keyof typeof PhoneNumberUpdateCallScreenFallback] | null;
+
+
+export const PhoneNumberUpdateCallScreenFallback = {
+  ai_voice: 'ai_voice',
+  voicemail: 'voicemail',
+} as const;
+
 export interface PhoneNumberUpdate {
   /** @nullable */
   friendlyName?: string | null;
@@ -125,6 +156,10 @@ export interface PhoneNumberUpdate {
   answerMode?: PhoneNumberUpdateAnswerMode;
   /** @nullable */
   forwardCallerId?: PhoneNumberUpdateForwardCallerId;
+  /** @nullable */
+  callScreen?: boolean | null;
+  /** @nullable */
+  callScreenFallback?: PhoneNumberUpdateCallScreenFallback;
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */

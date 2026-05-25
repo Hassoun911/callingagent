@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -51,6 +51,8 @@ export default function NumberDetail() {
         ringCount: number.ringCount || 4,
         answerMode: number.answerMode || "forward",
         forwardCallerId: number.forwardCallerId || "caller",
+        callScreen: number.callScreen ?? false,
+        callScreenFallback: number.callScreenFallback || "voicemail",
         aiSystemPrompt: number.aiSystemPrompt || "",
         voicemailGreeting: number.voicemailGreeting || ""
       });
@@ -211,6 +213,53 @@ export default function NumberDetail() {
                         onValueChange={([val]) => setFormData({...formData, ringCount: val})}
                       />
                       <p className="text-xs text-muted-foreground">Number of rings before falling back to voicemail.</p>
+                    </div>
+                    <div className="space-y-4 pt-2 border-t border-border">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4 text-primary" />
+                          <Label>Call Screen</Label>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={formData.callScreen}
+                          onClick={() => setFormData({...formData, callScreen: !formData.callScreen})}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.callScreen ? "bg-primary" : "bg-secondary"}`}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.callScreen ? "translate-x-6" : "translate-x-1"}`} />
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">When enabled, you hear "Incoming call — press 1 to answer" before connecting. If you don't press 1, the call is redirected.</p>
+                      {formData.callScreen && (
+                        <div className="space-y-2 animate-in fade-in duration-200">
+                          <Label className="text-xs text-muted-foreground uppercase tracking-wider">If you don't answer, send to</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setFormData({...formData, callScreenFallback: "ai_voice"})}
+                              className={`flex items-center gap-2 p-3 rounded-md border text-left transition-colors ${formData.callScreenFallback === "ai_voice" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}
+                            >
+                              <Bot className="h-4 w-4 shrink-0" />
+                              <div>
+                                <div className="text-sm font-medium">AI Agent</div>
+                                <div className="text-xs opacity-70">AI answers for you</div>
+                              </div>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFormData({...formData, callScreenFallback: "voicemail"})}
+                              className={`flex items-center gap-2 p-3 rounded-md border text-left transition-colors ${formData.callScreenFallback === "voicemail" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}
+                            >
+                              <Voicemail className="h-4 w-4 shrink-0" />
+                              <div>
+                                <div className="text-sm font-medium">Voicemail</div>
+                                <div className="text-xs opacity-70">Caller leaves a message</div>
+                              </div>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

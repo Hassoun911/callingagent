@@ -133,12 +133,27 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
   if (answerMode === "forward" && forwardTo) {
     const forwardCallerId = phoneNumber?.forwardCallerId ?? "caller";
     const dialCallerId = forwardCallerId === "line" ? To : From;
-    twiml = `<?xml version="1.0" encoding="UTF-8"?>
+    const callScreen = phoneNumber?.callScreen ?? false;
+    const callScreenFallback = phoneNumber?.callScreenFallback ?? "voicemail";
+
+    if (callScreen && phoneNumber?.id) {
+      const screenUrl = `${baseUrl}/api/twilio/screen?phoneNumberId=${phoneNumber.id}&fallback=${callScreenFallback}`;
+      const fallbackUrl = `${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&mode=${callScreenFallback}`;
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial callerId="${dialCallerId}" timeout="${ringCount * 5}">
+    <Number url="${screenUrl}">${forwardTo}</Number>
+  </Dial>
+  <Redirect method="POST">${fallbackUrl}</Redirect>
+</Response>`;
+    } else {
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Dial callerId="${dialCallerId}" timeout="${ringCount * 5}">
     <Number>${forwardTo}</Number>
   </Dial>
 </Response>`;
+    }
 
   } else if (answerMode === "voicemail") {
     const greeting = phoneNumber?.voicemailGreeting ?? "Please leave a message after the tone.";
@@ -319,6 +334,101 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
 <Response>
   ${playOrSay(audioId, errText, baseUrl)}
   <Hangup/>
+</Response>`);
+  }
+});
+
+// ─── Call screen whisper (plays to YOU when you answer a forwarded call) ──────
+router.post("/twilio/screen", (req, res): void => {
+  const { phoneNumberId, fallback } = req.query as Record<string, string>;
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : `${req.protocol}://${req.get("host")}`;
+
+  const fallbackLabel = fallback === "ai_voice" ? "AI agent" : "voicemail";
+  req.log.info({ phoneNumberId, fallback }, "Call screen whisper");
+
+  res.set("Content-Type", "text/xml");
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Gather numDigits="1" action="${baseUrl}/api/twilio/screen-accept" method="POST" timeout="8">
+    <Say voice="Polly.Joanna-Neural">Incoming business call. Press 1 to answer, or hang up to send to ${fallbackLabel}.</Say>
+  </Gather>
+  <Hangup/>
+</Response>`);
+});
+
+// ─── Screen accept — pressed key after whisper ───────────────────────────────
+router.post("/twilio/screen-accept", (req, res): void => {
+  const { Digits } = req.body;
+  res.set("Content-Type", "text/xml");
+  if (Digits === "1") {
+    // Empty response = bridge the two call legs
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><Response/>`);
+  } else {
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
+  }
+});
+
+// ─── Screen fallback — caller lands here if screen rejected ──────────────────
+router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
+  const { CallSid, To, From } = req.body;
+  const { phoneNumberId, mode } = req.query as Record<string, string>;
+  req.log.info({ CallSid, phoneNumberId, mode }, "Call screen fallback");
+
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : `${req.protocol}://${req.get("host")}`;
+
+  let phoneNumber = null;
+  if (phoneNumberId) {
+    const rows = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, parseInt(phoneNumberId, 10)));
+    phoneNumber = rows[0] ?? null;
+  }
+
+  if (mode === "ai_voice") {
+    const [aiConfig] = await db.select().from(aiVoiceConfigTable);
+    const language = aiConfig?.language ?? "en-US";
+    const ttsVoice = aiConfig?.voice ?? "nova";
+    const maxDuration = aiConfig?.maxCallDuration ?? 300;
+    const greetingText = aiConfig?.greeting ?? "Hello, thank you for calling. How can I help you today?";
+
+    const basePrompt = phoneNumber?.aiSystemPrompt || aiConfig?.systemPrompt
+      || "You are a professional phone agent. Speak naturally and conversationally. Keep responses to 1-3 sentences. Ask one question at a time.";
+    const langDirective = language.startsWith("ar-")
+      ? "\n\nIMPORTANT: You MUST respond entirely in Arabic (العربية). Do not use any English."
+      : "";
+
+    conversations.set(CallSid, {
+      systemPrompt: basePrompt + langDirective,
+      messages: [],
+      maxDuration,
+      startedAt: Date.now(),
+      voice: ttsVoice,
+      language,
+      baseUrl,
+    });
+
+    const greetingAudioId = await generateTts(greetingText, ttsVoice);
+    const retryFallback = language.startsWith("ar-") ? "لم أفهم. هل يمكنك الإعادة؟" : "I didn't catch that. Could you please repeat?";
+    const retryAudioId = await generateTts(retryFallback, ttsVoice);
+
+    res.set("Content-Type", "text/xml");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  ${gatherBlock(greetingAudioId, greetingText, baseUrl, language)}
+  ${gatherBlock(retryAudioId, retryFallback, baseUrl, language)}
+  <Hangup/>
+</Response>`);
+  } else {
+    // Voicemail
+    const greeting = phoneNumber?.voicemailGreeting ?? "Please leave a message after the tone.";
+    const audioId = await generateTts(greeting);
+    res.set("Content-Type", "text/xml");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  ${playOrSay(audioId, greeting, baseUrl)}
+  <Record maxLength="120" action="${baseUrl}/api/twilio/recording" transcribe="true" transcribeCallback="${baseUrl}/api/twilio/transcription" />
 </Response>`);
   }
 });

@@ -577,6 +577,11 @@ components:
         forwardCallerId:
           type: string
           enum: [caller, line]
+        callScreen:
+          type: boolean
+        callScreenFallback:
+          type: string
+          enum: [ai_voice, voicemail]
         aiSystemPrompt:
           type: ["string", "null"]
         voicemailGreeting:
@@ -611,6 +616,11 @@ components:
         forwardCallerId:
           type: string
           enum: [caller, line]
+        callScreen:
+          type: boolean
+        callScreenFallback:
+          type: string
+          enum: [ai_voice, voicemail]
         aiSystemPrompt:
           type: ["string", "null"]
         voicemailGreeting:
@@ -635,6 +645,11 @@ components:
         forwardCallerId:
           type: ["string", "null"]
           enum: [caller, line, null]
+        callScreen:
+          type: ["boolean", "null"]
+        callScreenFallback:
+          type: ["string", "null"]
+          enum: [ai_voice, voicemail, null]
         aiSystemPrompt:
           type: ["string", "null"]
         voicemailGreeting:
