@@ -13,17 +13,26 @@ function getTwilioClient() {
 async function searchForWatch(watch: any): Promise<any[]> {
   const client = getTwilioClient();
   const country = watch.country || "US";
-  const searchParams: any = { limit: 20 };
+  const searchParams: any = { limit: 50 };
   if (watch.areaCode) searchParams.areaCode = watch.areaCode;
   if (watch.city) searchParams.inLocality = watch.city;
   const results = await client.availablePhoneNumbers(country).local.list(searchParams);
-  return results.map((n: any) => ({
+
+  let mapped = results.map((n: any) => ({
     phoneNumber: n.phoneNumber,
     friendlyName: n.friendlyName,
     locality: n.locality || null,
     region: n.region || null,
     isoCountry: n.isoCountry,
   }));
+
+  // Twilio's inLocality is unreliable — filter strictly by city name
+  if (watch.city) {
+    const cityLower = watch.city.toLowerCase().trim();
+    mapped = mapped.filter(n => n.locality?.toLowerCase().includes(cityLower));
+  }
+
+  return mapped;
 }
 
 export async function pollWatches() {

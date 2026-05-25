@@ -72,7 +72,7 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
       numbers = result;
     }
 
-    const formatted = numbers.map((n: any) => ({
+    let formatted = numbers.map((n: any) => ({
       phoneNumber: n.phoneNumber,
       friendlyName: n.friendlyName,
       locality: n.locality || null,
@@ -85,6 +85,35 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
         mms: n.capabilities?.MMS ?? false,
       },
     }));
+
+    // Twilio's inLocality filter is unreliable (especially for Canada) — enforce it client-side
+    if (city) {
+      const cityLower = city.toLowerCase().trim();
+      formatted = formatted.filter(n =>
+        n.locality?.toLowerCase().includes(cityLower)
+      );
+      // If strict filter yields nothing, widen: fetch more numbers without limit and retry filter
+      if (formatted.length === 0 && !tollFree) {
+        const wider: any = { limit: 50 };
+        if (areaCode) wider.areaCode = areaCode;
+        const widerResult = await client.availablePhoneNumbers(country).local.list(wider);
+        formatted = widerResult
+          .filter((n: any) => n.locality?.toLowerCase().includes(cityLower))
+          .map((n: any) => ({
+            phoneNumber: n.phoneNumber,
+            friendlyName: n.friendlyName,
+            locality: n.locality || null,
+            region: n.region || null,
+            postalCode: n.postalCode || null,
+            isoCountry: n.isoCountry,
+            capabilities: {
+              voice: n.capabilities?.voice ?? false,
+              sms: n.capabilities?.SMS ?? false,
+              mms: n.capabilities?.MMS ?? false,
+            },
+          }));
+      }
+    }
 
     res.json(SearchAvailableNumbersResponse.parse(formatted));
   } catch (err: any) {
