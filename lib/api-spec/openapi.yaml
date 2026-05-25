@@ -899,7 +899,7 @@ components:
           type: integer
         voice:
           type: string
-          enum: [alloy, echo, fable, onyx, nova, shimmer]
+          enum: [alloy, echo, fable, onyx, nova, shimmer, coral, ash, sage, ballad, verse]
         language:
           type: string
           enum: [en-US, ar-SA, ar-LB]
@@ -915,7 +915,7 @@ components:
       properties:
         voice:
           type: ["string", "null"]
-          enum: [alloy, echo, fable, onyx, nova, shimmer, null]
+          enum: [alloy, echo, fable, onyx, nova, shimmer, coral, ash, sage, ballad, verse, null]
         language:
           type: ["string", "null"]
           enum: [en-US, ar-SA, ar-LB, null]

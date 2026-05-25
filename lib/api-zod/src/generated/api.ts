@@ -434,7 +434,7 @@ export const GetRecordingUrlResponse = zod.object({
  */
 export const GetAiVoiceConfigResponse = zod.object({
   "id": zod.number(),
-  "voice": zod.enum(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']),
+  "voice": zod.enum(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer', 'coral', 'ash', 'sage', 'ballad', 'verse']),
   "language": zod.enum(['en-US', 'ar-SA', 'ar-LB']),
   "greeting": zod.string(),
   "systemPrompt": zod.string(),
@@ -443,7 +443,7 @@ export const GetAiVoiceConfigResponse = zod.object({
 
 
 export const UpdateAiVoiceConfigBody = zod.object({
-  "voice": zod.union([zod.literal('alloy'),zod.literal('echo'),zod.literal('fable'),zod.literal('onyx'),zod.literal('nova'),zod.literal('shimmer'),zod.literal(null)]).nullish(),
+  "voice": zod.union([zod.literal('alloy'),zod.literal('echo'),zod.literal('fable'),zod.literal('onyx'),zod.literal('nova'),zod.literal('shimmer'),zod.literal('coral'),zod.literal('ash'),zod.literal('sage'),zod.literal('ballad'),zod.literal('verse'),zod.literal(null)]).nullish(),
   "language": zod.union([zod.literal('en-US'),zod.literal('ar-SA'),zod.literal('ar-LB'),zod.literal(null)]).nullish(),
   "greeting": zod.string().nullish(),
   "systemPrompt": zod.string().nullish(),
@@ -452,7 +452,7 @@ export const UpdateAiVoiceConfigBody = zod.object({
 
 export const UpdateAiVoiceConfigResponse = zod.object({
   "id": zod.number(),
-  "voice": zod.enum(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']),
+  "voice": zod.enum(['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer', 'coral', 'ash', 'sage', 'ballad', 'verse']),
   "language": zod.enum(['en-US', 'ar-SA', 'ar-LB']),
   "greeting": zod.string(),
   "systemPrompt": zod.string(),

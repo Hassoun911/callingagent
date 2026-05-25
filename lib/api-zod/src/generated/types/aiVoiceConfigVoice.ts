@@ -16,4 +16,9 @@ export const AiVoiceConfigVoice = {
   onyx: 'onyx',
   nova: 'nova',
   shimmer: 'shimmer',
+  coral: 'coral',
+  ash: 'ash',
+  sage: 'sage',
+  ballad: 'ballad',
+  verse: 'verse',
 } as const;
