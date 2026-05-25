@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from "react";
 import { 
   useGetAiVoiceConfig, 
   useUpdateAiVoiceConfig,
-  getGetAiVoiceConfigQueryKey 
+  getGetAiVoiceConfigQueryKey,
+  useListPhoneNumbers,
+  useListCompanies,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -13,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Bot, Save, Mic2, Globe } from "lucide-react";
+import { Bot, Save, Mic2, Globe, Eye, EyeOff } from "lucide-react";
 
 const VOICES = [
   { id: "coral",   name: "Coral",   gender: "Female", desc: "Natural, warm — best for calls" },
@@ -30,16 +32,41 @@ const VOICES = [
 ];
 
 const LANGUAGES = [
-  { id: "en-US", label: "English (US)",       flag: "EN" },
-  { id: "ar-LB", label: "Arabic (Lebanon)",   flag: "AR" },
+  { id: "en-US", label: "English (US)",          flag: "EN" },
+  { id: "ar-LB", label: "Arabic (Lebanon)",      flag: "AR" },
   { id: "ar-SA", label: "Arabic (Saudi Arabia)", flag: "AR" },
 ];
 
+/** Mirror of the backend resolvePromptTemplate — keeps preview in sync. */
+function resolvePromptTemplate(
+  prompt: string,
+  vars: { companyName?: string | null; phoneNumber?: string | null; callerNumber?: string | null }
+): string {
+  const normalize = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, "");
+  const normalizedCompany = vars.companyName ? normalize(vars.companyName) : null;
+
+  return prompt.replace(/\{\{([^}]+)\}\}/g, (_match, key: string) => {
+    const raw = key.trim();
+    const k = normalize(raw);
+
+    if (k === "companyname" || k === "company") return vars.companyName ?? raw;
+    if (k === "phonenumber" || k === "phone")   return vars.phoneNumber ?? raw;
+    if (k === "callernumber" || k === "caller")  return vars.callerNumber ?? raw;
+
+    if (normalizedCompany && k === normalizedCompany) return vars.companyName!;
+
+    return raw;
+  });
+}
+
 export default function Settings() {
   const { data: config, isLoading } = useGetAiVoiceConfig();
+  const { data: phoneNumbers } = useListPhoneNumbers();
+  const { data: companies } = useListCompanies();
   const updateMutation = useUpdateAiVoiceConfig();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [showPreview, setShowPreview] = useState(false);
 
   const [formData, setFormData] = useState<any>({
     voice: "",
@@ -62,6 +89,20 @@ export default function Settings() {
       initRef.current = true;
     }
   }, [config]);
+
+  // Resolve template vars for the live preview using the first phone number's company
+  const firstNumber = phoneNumbers?.[0];
+  const linkedCompany = firstNumber?.companyId
+    ? companies?.find((c: any) => c.id === firstNumber.companyId)
+    : null;
+  const previewCompanyName = linkedCompany?.name ?? firstNumber?.callerIdName ?? null;
+  const previewPhoneNumber = firstNumber?.number ?? null;
+
+  const resolvedPrompt = resolvePromptTemplate(formData.systemPrompt ?? "", {
+    companyName: previewCompanyName,
+    phoneNumber: previewPhoneNumber,
+    callerNumber: "<caller number>",
+  });
 
   const handleSave = () => {
     updateMutation.mutate({ data: formData }, {
@@ -190,13 +231,62 @@ export default function Settings() {
           </div>
 
           <div className="space-y-2">
-            <Label>System Prompt (Instructions)</Label>
+            <div className="flex items-center justify-between">
+              <Label>System Prompt (Instructions)</Label>
+              <button
+                type="button"
+                onClick={() => setShowPreview(p => !p)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showPreview ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                {showPreview ? "Hide preview" : "Preview resolved"}
+              </button>
+            </div>
+
             <Textarea 
               value={formData.systemPrompt} 
               onChange={e => setFormData({...formData, systemPrompt: e.target.value})}
               className="min-h-[220px] font-mono text-sm bg-background leading-relaxed"
               dir={formData.language === "ar-SA" ? "rtl" : "ltr"}
             />
+
+            {/* Variable reference chips */}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {[
+                { token: "{{company_name}}", value: previewCompanyName },
+                { token: "{{phone_number}}", value: previewPhoneNumber },
+                { token: "{{caller_number}}", value: "<caller number>" },
+              ].map(({ token, value }) => (
+                <span key={token} className="inline-flex items-center gap-1 text-xs bg-muted/60 border border-border rounded px-2 py-0.5 font-mono">
+                  <span className="text-primary">{token}</span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="text-foreground">{value ?? "not set"}</span>
+                </span>
+              ))}
+              <span className="inline-flex items-center gap-1 text-xs bg-muted/60 border border-border rounded px-2 py-0.5 font-mono">
+                <span className="text-primary">{`{{anything else}}`}</span>
+                <span className="text-muted-foreground">→ literal text</span>
+              </span>
+            </div>
+
+            {/* Resolved preview panel */}
+            {showPreview && (
+              <div className="rounded-md border border-border bg-muted/30 p-3 space-y-1">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  Resolved preview
+                  {previewCompanyName && (
+                    <span className="normal-case font-normal ml-1">
+                      — based on <span className="text-foreground">{firstNumber?.number}</span>
+                      {linkedCompany && <> / <span className="text-foreground">{linkedCompany.name}</span></>}
+                    </span>
+                  )}
+                </p>
+                <pre className="text-sm whitespace-pre-wrap leading-relaxed text-foreground font-mono">
+                  {resolvedPrompt}
+                </pre>
+              </div>
+            )}
+
             <p className="text-xs text-muted-foreground">
               Core instructions that shape the AI's personality, knowledge, and boundaries. Can be overridden per phone number.
             </p>
