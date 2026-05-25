@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PhoneIncoming, PhoneOutgoing, Play, FileText, Search, User, Mail, Tag, AlertCircle, ChevronRight } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Play, FileText, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -37,56 +37,70 @@ function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-2xl bg-card border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            <span className="font-medium">{call?.contactName || call?.callerIdName || call?.fromNumber}</span>
-            {(call?.contactName || call?.callerIdName) && (
-              <span className="font-mono text-sm text-muted-foreground">{call?.fromNumber}</span>
+          <DialogTitle className="flex items-center gap-3 flex-wrap">
+            {(call?.contactName || call?.callerIdName) ? (
+              <>
+                <span className="font-medium">{call.contactName || call.callerIdName}</span>
+                <span className="font-mono text-sm text-muted-foreground">{call?.fromNumber}</span>
+              </>
+            ) : (
+              <span className="font-mono font-medium">{call?.fromNumber}</span>
             )}
             {call?.priority && <PriorityBadge priority={call.priority} />}
           </DialogTitle>
         </DialogHeader>
 
+        {/* Always-visible caller metadata */}
+        <div className="grid grid-cols-2 gap-3">
+          {call?.fromNumber && call.fromNumber !== "Anonymous" && (
+            <div className="flex items-center gap-2 p-3 bg-background border border-border rounded-lg">
+              <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Phone</p>
+                <p className="text-sm font-mono font-medium">{call.fromNumber}</p>
+              </div>
+            </div>
+          )}
+          {call?.callerName && (
+            <div className="flex items-center gap-2 p-3 bg-background border border-border rounded-lg">
+              <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Name</p>
+                <p className="text-sm font-medium">{call.callerName}</p>
+              </div>
+            </div>
+          )}
+          {call?.callerEmail && (
+            <div className="flex items-center gap-2 p-3 bg-background border border-border rounded-lg">
+              <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Email</p>
+                <p className="text-sm font-medium">{call.callerEmail}</p>
+              </div>
+            </div>
+          )}
+          {call?.callType && (
+            <div className="flex items-center gap-2 p-3 bg-background border border-border rounded-lg">
+              <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Call Type</p>
+                <p className="text-sm font-medium">{call.callType}</p>
+              </div>
+            </div>
+          )}
+          {call?.priority && (
+            <div className="flex items-center gap-2 p-3 bg-background border border-border rounded-lg">
+              <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Priority</p>
+                <PriorityBadge priority={call.priority} />
+              </div>
+            </div>
+          )}
+        </div>
+
         {hasSummary && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              {call.callerName && (
-                <div className="flex items-center gap-2 p-3 bg-background border border-border rounded-lg">
-                  <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Name</p>
-                    <p className="text-sm font-medium">{call.callerName}</p>
-                  </div>
-                </div>
-              )}
-              {call.callerEmail && (
-                <div className="flex items-center gap-2 p-3 bg-background border border-border rounded-lg">
-                  <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Email</p>
-                    <p className="text-sm font-medium">{call.callerEmail}</p>
-                  </div>
-                </div>
-              )}
-              {call.callType && (
-                <div className="flex items-center gap-2 p-3 bg-background border border-border rounded-lg">
-                  <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Call Type</p>
-                    <p className="text-sm font-medium">{call.callType}</p>
-                  </div>
-                </div>
-              )}
-              {call.priority && (
-                <div className="flex items-center gap-2 p-3 bg-background border border-border rounded-lg">
-                  <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Priority</p>
-                    <PriorityBadge priority={call.priority} />
-                  </div>
-                </div>
-              )}
-            </div>
-
             {call.callSummary && (
               <div className="p-3 bg-background border border-border rounded-lg space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Summary</p>
@@ -112,10 +126,6 @@ function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose
               {call.transcription}
             </div>
           </div>
-        )}
-
-        {!hasSummary && !call?.transcription && (
-          <p className="text-sm text-muted-foreground text-center py-4">No summary available for this call.</p>
         )}
       </DialogContent>
     </Dialog>
