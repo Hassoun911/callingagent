@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListCallLogs, useGetRecordingUrl } from "@workspace/api-client-react";
+import { useListCallLogs } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -11,11 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
-function RecordingPlayer({ callId }: { callId: number }) {
-  const { data, isLoading } = useGetRecordingUrl(callId, { query: { enabled: true } });
-  if (isLoading) return <Skeleton className="h-8 w-24" />;
-  if (!data?.url) return <span className="text-muted-foreground text-xs">--</span>;
-  return <audio controls src={data.url} className="h-8 w-[180px]" />;
+function RecordingPlayer({ callId, hasRecording }: { callId: number; hasRecording: boolean }) {
+  if (!hasRecording) return <span className="text-muted-foreground text-xs">--</span>;
+  return <audio controls src={`/api/call-logs/${callId}/recording`} className="h-8 w-[180px]" />;
 }
 
 function PriorityBadge({ priority }: { priority: string | null | undefined }) {
@@ -278,7 +276,7 @@ export default function Calls() {
                   <PriorityBadge priority={call.priority} />
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  <RecordingPlayer callId={call.id} />
+                  <RecordingPlayer callId={call.id} hasRecording={!!(call.recordingSid || call.recordingUrl)} />
                 </TableCell>
                 <TableCell>
                   {hasSummaryData(call) && (

@@ -71,21 +71,49 @@ router.get("/call-logs/:id/recording", async (req, res): Promise<void> => {
   }
 
   if (!log.recordingSid && !log.recordingUrl) {
-    res.status(404).json({ error: "No recording available for this call" });
+    res.status(404).send("No recording available for this call");
     return;
   }
 
-  // Build authenticated Twilio recording URL
-  let url = log.recordingUrl || "";
-  if (log.recordingSid) {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID;
-    const authToken = process.env.TWILIO_AUTH_TOKEN;
-    if (accountSid && authToken) {
-      url = `https://${accountSid}:${authToken}@api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${log.recordingSid}.mp3`;
-    }
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!accountSid || !authToken) {
+    res.status(500).send("Twilio credentials not configured");
+    return;
   }
 
-  res.json(GetRecordingUrlResponse.parse({ url, expiresAt: null }));
+  const twilioUrl = log.recordingSid
+    ? `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${log.recordingSid}.mp3`
+    : log.recordingUrl!;
+
+  const fetchHeaders: Record<string, string> = {
+    Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
+  };
+  if (req.headers.range) fetchHeaders["Range"] = req.headers.range;
+
+  const upstream = await fetch(twilioUrl, { headers: fetchHeaders });
+
+  res.status(upstream.status);
+  res.set("Content-Type", upstream.headers.get("content-type") || "audio/mpeg");
+  res.set("Accept-Ranges", "bytes");
+  res.set("Cache-Control", "private, max-age=3600");
+  const contentLength = upstream.headers.get("content-length");
+  if (contentLength) res.set("Content-Length", contentLength);
+  const contentRange = upstream.headers.get("content-range");
+  if (contentRange) res.set("Content-Range", contentRange);
+
+  if (!upstream.body) { res.end(); return; }
+  const reader = upstream.body.getReader();
+  const pump = async () => {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) { res.end(); return; }
+      if (!res.write(Buffer.from(value))) {
+        await new Promise<void>((resolve) => res.once("drain", resolve));
+      }
+    }
+  };
+  await pump();
 });
 
 export default router;
