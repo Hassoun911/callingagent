@@ -237,6 +237,7 @@ router.patch("/phone-numbers/:id", async (req, res): Promise<void> => {
   if (body.aiSystemPrompt !== undefined) updateData.aiSystemPrompt = body.aiSystemPrompt;
   if (body.voicemailGreeting !== undefined) updateData.voicemailGreeting = body.voicemailGreeting;
   if (body.isActive != null) updateData.isActive = body.isActive;
+  if (body.forwardCallerId != null) updateData.forwardCallerId = body.forwardCallerId;
 
   const [updated] = await db.update(phoneNumbersTable)
     .set(updateData)
