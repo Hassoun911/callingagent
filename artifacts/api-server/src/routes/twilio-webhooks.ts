@@ -499,6 +499,19 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
     const retryFallback = language.startsWith("ar-") ? "لم أفهم. هل يمكنك الإعادة؟" : "I didn't catch that. Could you please repeat?";
     const retryAudioId = await generateTts(retryFallback, ttsVoice);
 
+    // Start recording the call (non-blocking), same as the main ai_voice path
+    setTimeout(() => {
+      try {
+        const client = getTwilioClient();
+        client.calls(CallSid).recordings.create({
+          recordingStatusCallback: `${baseUrl}/api/twilio/recording`,
+          recordingStatusCallbackMethod: "POST",
+        }).catch((err: any) => logger.error({ err }, "Failed to start call recording (screen-fallback)"));
+      } catch (err) {
+        logger.error({ err }, "Failed to init call recording (screen-fallback)");
+      }
+    }, 1500);
+
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
