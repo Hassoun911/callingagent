@@ -266,11 +266,15 @@ export default function Calls() {
                   )}
                 </TableCell>
                 <TableCell className="text-sm">
-                  {call.callerName ? (
-                    <span className="font-medium">{call.callerName}</span>
-                  ) : (
-                    <span className="text-muted-foreground text-xs">--</span>
-                  )}
+                  {(() => {
+                    // callerName = AI-extracted; callerIdName = CNAM from Twilio lookup
+                    // Guard against literal "null" / "undefined" strings stored by older code
+                    const name = [call.callerName, call.callerIdName]
+                      .find(n => n && n !== "null" && n !== "undefined");
+                    return name
+                      ? <span className="font-medium">{name}</span>
+                      : <span className="text-muted-foreground text-xs">--</span>;
+                  })()}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {call.callType ?? "--"}
