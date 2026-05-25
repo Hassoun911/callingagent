@@ -38,7 +38,10 @@ function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose
       <DialogContent className="sm:max-w-2xl bg-card border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            <span className="font-mono">{call?.fromNumber}</span>
+            <span className="font-medium">{call?.contactName || call?.callerIdName || call?.fromNumber}</span>
+            {(call?.contactName || call?.callerIdName) && (
+              <span className="font-mono text-sm text-muted-foreground">{call?.fromNumber}</span>
+            )}
             {call?.priority && <PriorityBadge priority={call.priority} />}
           </DialogTitle>
         </DialogHeader>
@@ -137,6 +140,8 @@ export default function Calls() {
     return (
       c.fromNumber.includes(q) ||
       c.toNumber.includes(q) ||
+      c.contactName?.toLowerCase().includes(q) ||
+      c.callerIdName?.toLowerCase().includes(q) ||
       c.callerName?.toLowerCase().includes(q) ||
       c.callerEmail?.toLowerCase().includes(q) ||
       c.callType?.toLowerCase().includes(q)
@@ -250,7 +255,16 @@ export default function Calls() {
                     </Badge>
                   )}
                 </TableCell>
-                <TableCell className="font-mono text-xs">{call.fromNumber}</TableCell>
+                <TableCell>
+                  {(call.contactName || call.callerIdName) ? (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm font-medium">{call.contactName || call.callerIdName}</span>
+                      <span className="font-mono text-xs text-muted-foreground">{call.fromNumber}</span>
+                    </div>
+                  ) : (
+                    <span className="font-mono text-xs">{call.fromNumber}</span>
+                  )}
+                </TableCell>
                 <TableCell className="text-sm">
                   {call.callerName ? (
                     <span className="font-medium">{call.callerName}</span>
