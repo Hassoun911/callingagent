@@ -360,6 +360,12 @@ export const ListCallLogsResponseItem = zod.object({
   "contactName": zod.string().nullish(),
   "callerIdName": zod.string().nullish(),
   "answerMode": zod.string().nullish(),
+  "callerName": zod.string().nullish(),
+  "callerEmail": zod.string().nullish(),
+  "callType": zod.string().nullish(),
+  "callSummary": zod.string().nullish(),
+  "actionRequired": zod.string().nullish(),
+  "priority": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListCallLogsResponse = zod.array(ListCallLogsResponseItem)
@@ -385,6 +391,12 @@ export const GetCallLogResponse = zod.object({
   "contactName": zod.string().nullish(),
   "callerIdName": zod.string().nullish(),
   "answerMode": zod.string().nullish(),
+  "callerName": zod.string().nullish(),
+  "callerEmail": zod.string().nullish(),
+  "callType": zod.string().nullish(),
+  "callSummary": zod.string().nullish(),
+  "actionRequired": zod.string().nullish(),
+  "priority": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -474,6 +486,12 @@ export const GetRecentCallsResponseItem = zod.object({
   "contactName": zod.string().nullish(),
   "callerIdName": zod.string().nullish(),
   "answerMode": zod.string().nullish(),
+  "callerName": zod.string().nullish(),
+  "callerEmail": zod.string().nullish(),
+  "callType": zod.string().nullish(),
+  "callSummary": zod.string().nullish(),
+  "actionRequired": zod.string().nullish(),
+  "priority": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const GetRecentCallsResponse = zod.array(GetRecentCallsResponseItem)

@@ -18,6 +18,12 @@ export const callLogsTable = pgTable("call_logs", {
   contactName: text("contact_name"),
   callerIdName: text("caller_id_name"),
   answerMode: text("answer_mode"),
+  callerName: text("caller_name"),
+  callerEmail: text("caller_email"),
+  callType: text("call_type"),
+  callSummary: text("call_summary"),
+  actionRequired: text("action_required"),
+  priority: text("priority"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

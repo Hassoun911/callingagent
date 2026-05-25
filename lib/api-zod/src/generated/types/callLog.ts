@@ -33,5 +33,17 @@ export interface CallLog {
   callerIdName?: string | null;
   /** @nullable */
   answerMode?: string | null;
+  /** @nullable */
+  callerName?: string | null;
+  /** @nullable */
+  callerEmail?: string | null;
+  /** @nullable */
+  callType?: string | null;
+  /** @nullable */
+  callSummary?: string | null;
+  /** @nullable */
+  actionRequired?: string | null;
+  /** @nullable */
+  priority?: string | null;
   createdAt: string;
 }

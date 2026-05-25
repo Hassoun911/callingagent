@@ -843,6 +843,18 @@ components:
           type: ["string", "null"]
         answerMode:
           type: ["string", "null"]
+        callerName:
+          type: ["string", "null"]
+        callerEmail:
+          type: ["string", "null"]
+        callType:
+          type: ["string", "null"]
+        callSummary:
+          type: ["string", "null"]
+        actionRequired:
+          type: ["string", "null"]
+        priority:
+          type: ["string", "null"]
         createdAt:
           type: string
 

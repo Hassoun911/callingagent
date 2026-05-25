@@ -218,22 +218,93 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   }
 });
 
+async function extractCallSummary(conv: ConversationState): Promise<{
+  callerName: string | null;
+  callerEmail: string | null;
+  callType: string | null;
+  callSummary: string | null;
+  actionRequired: string | null;
+  priority: string | null;
+}> {
+  if (conv.messages.length === 0) {
+    return { callerName: null, callerEmail: null, callType: null, callSummary: null, actionRequired: null, priority: null };
+  }
+
+  try {
+    const openai = getOpenAI();
+    const transcript = conv.messages.map(m => `${m.role === "user" ? "Caller" : "AI"}: ${m.content}`).join("\n");
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are a call data extractor. Given a phone call transcript, extract the following information in JSON format only. If information is not available, use null.
+
+Return ONLY a JSON object with these exact keys:
+{
+  "callerName": "full name or null",
+  "callerEmail": "email or null",
+  "callType": "one of: General Inquiry, Customer Support, New Customer, Appointment Request, Billing, Sales, Emergency, Other — or null",
+  "callSummary": "2-3 sentence summary of the call",
+  "actionRequired": "specific follow-up action needed or null",
+  "priority": "Low, Medium, or High based on urgency"
+}`,
+        },
+        {
+          role: "user",
+          content: `Call transcript:\n\n${transcript}`,
+        },
+      ],
+      max_tokens: 300,
+      response_format: { type: "json_object" },
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw);
+    return {
+      callerName: parsed.callerName ?? null,
+      callerEmail: parsed.callerEmail ?? null,
+      callType: parsed.callType ?? null,
+      callSummary: parsed.callSummary ?? null,
+      actionRequired: parsed.actionRequired ?? null,
+      priority: parsed.priority ?? null,
+    };
+  } catch (err) {
+    logger.error({ err }, "Failed to extract call summary");
+    return { callerName: null, callerEmail: null, callType: null, callSummary: null, actionRequired: null, priority: null };
+  }
+}
+
 router.post("/twilio/status", async (req, res): Promise<void> => {
   const { CallSid, CallStatus, CallDuration } = req.body;
 
   req.log.info({ CallSid, CallStatus, CallDuration }, "Twilio status callback");
 
-  // Clean up conversation state on call end
-  if (["completed", "failed", "busy", "no-answer", "canceled"].includes(CallStatus)) {
-    conversations.delete(CallSid);
-  }
+  const isTerminal = ["completed", "failed", "busy", "no-answer", "canceled"].includes(CallStatus);
 
   if (CallSid) {
+    const updateData: Record<string, any> = {
+      status: CallStatus,
+      duration: CallDuration ? parseInt(CallDuration, 10) : null,
+    };
+
+    // If call ended and we have AI conversation history, extract structured summary
+    if (isTerminal) {
+      const conv = conversations.get(CallSid);
+      if (conv && conv.messages.length > 0) {
+        const summary = await extractCallSummary(conv);
+        Object.assign(updateData, summary);
+        // Store full conversation transcript
+        updateData.transcription = conv.messages
+          .map(m => `${m.role === "user" ? "Caller" : "AI"}: ${m.content}`)
+          .join("\n\n");
+      }
+      conversations.delete(CallSid);
+    }
+
     await db.update(callLogsTable)
-      .set({
-        status: CallStatus,
-        duration: CallDuration ? parseInt(CallDuration, 10) : null,
-      })
+      .set(updateData)
       .where(eq(callLogsTable.twilioCallSid, CallSid));
   }
 
