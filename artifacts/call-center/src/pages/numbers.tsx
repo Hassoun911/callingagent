@@ -129,7 +129,7 @@ export default function Numbers() {
               </div>
 
               {/* Results table */}
-              <div className="border border-border rounded-md bg-background/50 overflow-hidden">
+              <div className="border border-border rounded-md bg-background/50 overflow-hidden max-h-72 overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-border hover:bg-transparent">
