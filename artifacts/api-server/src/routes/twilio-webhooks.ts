@@ -132,7 +132,10 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
 
   if (answerMode === "forward" && forwardTo) {
     const forwardCallerId = phoneNumber?.forwardCallerId ?? "caller";
-    const dialCallerId = forwardCallerId === "line" ? To : From;
+    // When "line" is selected, explicitly set callerId to the Twilio number.
+    // When "caller" is selected, omit callerId — Twilio cannot use an unverified
+    // inbound number as an outbound callerId, so we let Twilio use its account default.
+    const callerIdAttr = forwardCallerId === "line" ? ` callerId="${To}"` : "";
     const callScreen = phoneNumber?.callScreen ?? false;
     const callScreenFallback = phoneNumber?.callScreenFallback ?? "voicemail";
 
@@ -141,7 +144,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       const fallbackUrl = `${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&mode=${callScreenFallback}`;
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${dialCallerId}" timeout="${ringCount * 5}">
+  <Dial${callerIdAttr} timeout="${ringCount * 5}">
     <Number url="${screenUrl}">${forwardTo}</Number>
   </Dial>
   <Redirect method="POST">${fallbackUrl}</Redirect>
@@ -149,7 +152,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     } else {
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${dialCallerId}" timeout="${ringCount * 5}">
+  <Dial${callerIdAttr} timeout="${ringCount * 5}">
     <Number>${forwardTo}</Number>
   </Dial>
 </Response>`;
