@@ -109,7 +109,7 @@ router.get("/twilio/tts/:id", (req, res): void => {
 
 // ─── Inbound call ────────────────────────────────────────────────────────────
 router.post("/twilio/voice", async (req, res): Promise<void> => {
-  const { To, From, CallSid, Direction } = req.body;
+  const { To, From, CallSid, Direction, CallerName } = req.body;
   req.log.info({ To, From, CallSid }, "Incoming Twilio voice webhook");
 
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
@@ -118,6 +118,11 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
 
   const [phoneNumber] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, To));
 
+  // Use Twilio's free CallerName field (broadcast by many carriers).
+  // If not available, attempt an async Lookup after responding so we don't block TwiML.
+  const inboundCallerName: string | null =
+    CallerName && CallerName !== "Anonymous" ? CallerName : null;
+
   await db.insert(callLogsTable).values({
     phoneNumberId: phoneNumber?.id ?? null,
     twilioCallSid: CallSid,
@@ -125,9 +130,26 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     status: "in-progress",
     fromNumber: From,
     toNumber: To,
-    callerIdName: phoneNumber?.callerIdName ?? null,
+    callerIdName: inboundCallerName,
     answerMode: phoneNumber?.answerMode ?? "forward",
   }).onConflictDoNothing();
+
+  // If no free CNAM, kick off a Twilio Lookup in the background (non-blocking).
+  if (!inboundCallerName && From && From !== "Anonymous") {
+    setImmediate(async () => {
+      try {
+        const client = getTwilioClient();
+        const result = await (client.lookups.v2.phoneNumbers(From) as any)
+          .fetch({ fields: "caller_name" });
+        const name: string | null = result?.callerName?.callerName ?? null;
+        if (name) {
+          await db.update(callLogsTable)
+            .set({ callerIdName: name })
+            .where(eq(callLogsTable.twilioCallSid, CallSid));
+        }
+      } catch (_) { /* lookup failed — leave callerIdName null */ }
+    });
+  }
 
   const answerMode = phoneNumber?.answerMode ?? "forward";
   const ringCount = phoneNumber?.ringCount ?? 4;
