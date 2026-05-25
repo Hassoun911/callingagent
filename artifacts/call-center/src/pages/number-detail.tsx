@@ -50,6 +50,7 @@ export default function NumberDetail() {
         forwardTo: number.forwardTo || "",
         ringCount: number.ringCount || 4,
         answerMode: number.answerMode || "forward",
+        forwardCallerId: number.forwardCallerId || "caller",
         aiSystemPrompt: number.aiSystemPrompt || "",
         voicemailGreeting: number.voicemailGreeting || ""
       });
@@ -172,6 +173,30 @@ export default function NumberDetail() {
                         className="font-mono bg-background"
                       />
                       <p className="text-xs text-muted-foreground">Calls will be routed to this number.</p>
+                    </div>
+                    <div className="space-y-4 pt-2 border-t border-border">
+                      <div className="space-y-3">
+                        <Label>Caller ID Shown to You</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFormData({...formData, forwardCallerId: "caller"})}
+                            className={`flex flex-col items-start gap-1 p-3 rounded-md border text-left transition-colors ${formData.forwardCallerId === "caller" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}
+                          >
+                            <span className="text-sm font-medium">Caller's Number</span>
+                            <span className="text-xs opacity-70">See who's actually calling you</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({...formData, forwardCallerId: "line"})}
+                            className={`flex flex-col items-start gap-1 p-3 rounded-md border text-left transition-colors ${formData.forwardCallerId === "line" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}
+                          >
+                            <span className="text-sm font-medium">This Line's Number</span>
+                            <span className="text-xs opacity-70">Always shows your Twilio number</span>
+                          </button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Controls what number appears on your phone when a call is forwarded.</p>
+                      </div>
                     </div>
                     <div className="space-y-4 pt-2 border-t border-border">
                       <div className="flex items-center justify-between">

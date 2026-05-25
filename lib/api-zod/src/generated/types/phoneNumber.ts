@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { PhoneNumberAnswerMode } from './phoneNumberAnswerMode';
+import type { PhoneNumberForwardCallerId } from './phoneNumberForwardCallerId';
 
 export interface PhoneNumber {
   id: number;
@@ -20,6 +21,7 @@ export interface PhoneNumber {
   forwardTo: string | null;
   ringCount: number;
   answerMode: PhoneNumberAnswerMode;
+  forwardCallerId?: PhoneNumberForwardCallerId;
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */

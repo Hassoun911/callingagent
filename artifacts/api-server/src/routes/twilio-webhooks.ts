@@ -131,9 +131,11 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
   let twiml = "";
 
   if (answerMode === "forward" && forwardTo) {
+    const forwardCallerId = phoneNumber?.forwardCallerId ?? "caller";
+    const dialCallerId = forwardCallerId === "line" ? To : From;
     twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${To}" timeout="${ringCount * 5}">
+  <Dial callerId="${dialCallerId}" timeout="${ringCount * 5}">
     <Number>${forwardTo}</Number>
   </Dial>
 </Response>`;

@@ -19,6 +19,14 @@ export const PhoneNumberAnswerMode = {
   reject: 'reject',
 } as const;
 
+export type PhoneNumberForwardCallerId = typeof PhoneNumberForwardCallerId[keyof typeof PhoneNumberForwardCallerId];
+
+
+export const PhoneNumberForwardCallerId = {
+  caller: 'caller',
+  line: 'line',
+} as const;
+
 export interface PhoneNumber {
   id: number;
   number: string;
@@ -32,6 +40,7 @@ export interface PhoneNumber {
   forwardTo: string | null;
   ringCount: number;
   answerMode: PhoneNumberAnswerMode;
+  forwardCallerId?: PhoneNumberForwardCallerId;
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */
@@ -50,6 +59,14 @@ export const PhoneNumberInputAnswerMode = {
   reject: 'reject',
 } as const;
 
+export type PhoneNumberInputForwardCallerId = typeof PhoneNumberInputForwardCallerId[keyof typeof PhoneNumberInputForwardCallerId];
+
+
+export const PhoneNumberInputForwardCallerId = {
+  caller: 'caller',
+  line: 'line',
+} as const;
+
 export interface PhoneNumberInput {
   number: string;
   /** @nullable */
@@ -62,6 +79,7 @@ export interface PhoneNumberInput {
   forwardTo?: string | null;
   ringCount?: number;
   answerMode: PhoneNumberInputAnswerMode;
+  forwardCallerId?: PhoneNumberInputForwardCallerId;
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */
@@ -81,6 +99,17 @@ export const PhoneNumberUpdateAnswerMode = {
   reject: 'reject',
 } as const;
 
+/**
+ * @nullable
+ */
+export type PhoneNumberUpdateForwardCallerId = typeof PhoneNumberUpdateForwardCallerId[keyof typeof PhoneNumberUpdateForwardCallerId] | null;
+
+
+export const PhoneNumberUpdateForwardCallerId = {
+  caller: 'caller',
+  line: 'line',
+} as const;
+
 export interface PhoneNumberUpdate {
   /** @nullable */
   friendlyName?: string | null;
@@ -94,6 +123,8 @@ export interface PhoneNumberUpdate {
   ringCount?: number | null;
   /** @nullable */
   answerMode?: PhoneNumberUpdateAnswerMode;
+  /** @nullable */
+  forwardCallerId?: PhoneNumberUpdateForwardCallerId;
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */
