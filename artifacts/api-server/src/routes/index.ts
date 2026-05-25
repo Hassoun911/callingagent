@@ -7,6 +7,7 @@ import callLogsRouter from "./call-logs";
 import aiVoiceRouter from "./ai-voice";
 import dashboardRouter from "./dashboard";
 import twilioWebhooksRouter from "./twilio-webhooks";
+import watchesRouter from "./watches";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(callLogsRouter);
 router.use(aiVoiceRouter);
 router.use(dashboardRouter);
 router.use(twilioWebhooksRouter);
+router.use(watchesRouter);
 
 export default router;

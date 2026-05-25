@@ -1,13 +1,30 @@
 import { type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { 
-  LayoutDashboard, 
-  Phone, 
-  PhoneCall, 
-  Users, 
-  Building2, 
-  Settings 
+import {
+  LayoutDashboard,
+  Phone,
+  PhoneCall,
+  Users,
+  Building2,
+  Settings,
+  Bell,
 } from "lucide-react";
+import { useWatches } from "@/hooks/use-watches";
+
+function NotificationBell() {
+  const { data: watches } = useWatches();
+  const available = watches?.filter(w => w.status === "available") ?? [];
+  return (
+    <Link href="/numbers" className="relative flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+      <Bell className="h-4 w-4" />
+      {available.length > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
+          {available.length}
+        </span>
+      )}
+    </Link>
+  );
+}
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
@@ -38,12 +55,12 @@ export function Layout({ children }: { children: ReactNode }) {
           {navItems.map((item) => {
             const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
             return (
-              <Link 
-                key={item.href} 
+              <Link
+                key={item.href}
                 href={item.href}
                 className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  isActive 
-                    ? "bg-primary/10 text-primary" 
+                  isActive
+                    ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 }`}
               >
@@ -77,8 +94,11 @@ export function Layout({ children }: { children: ReactNode }) {
             <span className="text-border">|</span>
             <span className="font-mono text-xs">US-EAST-1</span>
           </div>
-          <div className="font-mono text-xs text-muted-foreground">
-            {new Date().toLocaleTimeString()} UTC
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <div className="font-mono text-xs text-muted-foreground">
+              {new Date().toLocaleTimeString()} UTC
+            </div>
           </div>
         </div>
         <div className="flex-1 overflow-auto bg-background p-6">

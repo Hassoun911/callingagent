@@ -3,3 +3,4 @@ export * from "./companies";
 export * from "./contacts";
 export * from "./call-logs";
 export * from "./ai-voice-config";
+export * from "./number-watches";

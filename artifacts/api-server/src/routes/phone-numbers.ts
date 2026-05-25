@@ -53,19 +53,20 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
 
   try {
     const client = getTwilioClient();
-    const { areaCode, contains, country = "US", tollFree } = query.data;
+    const { areaCode, contains, country = "US", tollFree, city } = query.data as any;
 
     let numbers: any[] = [];
 
     if (tollFree) {
-      const result = await client.availablePhoneNumbers(country).tollFree.list({
-        limit: 20,
-      });
+      const searchParams: any = { limit: 20 };
+      if (city) searchParams.inLocality = city;
+      const result = await client.availablePhoneNumbers(country).tollFree.list(searchParams);
       numbers = result;
     } else {
       const searchParams: any = { limit: 20 };
       if (areaCode) searchParams.areaCode = areaCode;
       if (contains) searchParams.contains = contains;
+      if (city) searchParams.inLocality = city;
 
       const result = await client.availablePhoneNumbers(country).local.list(searchParams);
       numbers = result;
