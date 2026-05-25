@@ -186,7 +186,7 @@ export default function NumberDetail() {
                             className={`flex flex-col items-start gap-1 p-3 rounded-md border text-left transition-colors ${formData.forwardCallerId === "caller" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}
                           >
                             <span className="text-sm font-medium">Caller's Number</span>
-                            <span className="text-xs opacity-70">See who's actually calling you</span>
+                            <span className="text-xs opacity-70">Shows caller's number + name if registered</span>
                           </button>
                           <button
                             type="button"
@@ -197,7 +197,7 @@ export default function NumberDetail() {
                             <span className="text-xs opacity-70">Always shows your Twilio number</span>
                           </button>
                         </div>
-                        <p className="text-xs text-muted-foreground">Controls what number appears on your phone when a call is forwarded.</p>
+                        <p className="text-xs text-muted-foreground">Controls what appears on your phone when a call is forwarded. Name display depends on the caller's carrier.</p>
                       </div>
                     </div>
                     <div className="space-y-4 pt-2 border-t border-border">
