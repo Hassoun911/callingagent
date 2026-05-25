@@ -1,10 +1,27 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable } from "@workspace/db";
+import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
 import twilio from "twilio";
 import { randomUUID } from "crypto";
+
+/** Replace template variables in an AI system prompt.
+ *  Supported: {{company_name}}, {{phone_number}}, {{caller_number}}
+ *  Any other {{...}} token also falls back to companyName so custom labels work.
+ */
+function resolvePromptTemplate(
+  prompt: string,
+  vars: { companyName?: string | null; phoneNumber?: string | null; callerNumber?: string | null }
+): string {
+  return prompt.replace(/\{\{([^}]+)\}\}/g, (_match, key: string) => {
+    const k = key.trim().toLowerCase();
+    if (k === "phone_number") return vars.phoneNumber ?? _match;
+    if (k === "caller_number") return vars.callerNumber ?? _match;
+    // company_name and any custom label (e.g. {{solutions}}) → company name
+    return vars.companyName ?? vars.phoneNumber ?? _match;
+  });
+}
 
 function getTwilioClient() {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -201,9 +218,18 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
     const greetingText = aiConfig?.greeting ?? "Hello, thank you for calling. How can I help you today?";
 
+    // Resolve company name for template substitution
+    let companyName: string | null = null;
+    if (phoneNumber?.companyId) {
+      const [co] = await db.select().from(companiesTable).where(eq(companiesTable.id, phoneNumber.companyId));
+      companyName = co?.name ?? null;
+    }
+    companyName = companyName ?? phoneNumber?.callerIdName ?? null;
+
     // Build base prompt, adding a language directive if not English
-    const basePrompt = phoneNumber?.aiSystemPrompt || aiConfig?.systemPrompt
+    const rawPrompt = phoneNumber?.aiSystemPrompt || aiConfig?.systemPrompt
       || "You are a professional phone agent. Speak naturally and conversationally. Keep responses to 1-3 sentences. Ask one question at a time.";
+    const basePrompt = resolvePromptTemplate(rawPrompt, { companyName, phoneNumber: To, callerNumber: From });
     const langDirective = language.startsWith("ar-")
       ? "\n\nIMPORTANT: You MUST respond entirely in Arabic (العربية). Do not use any English."
       : "";
@@ -423,8 +449,17 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
     const greetingText = aiConfig?.greeting ?? "Hello, thank you for calling. How can I help you today?";
 
-    const basePrompt = phoneNumber?.aiSystemPrompt || aiConfig?.systemPrompt
+    // Resolve company name for template substitution
+    let companyName2: string | null = null;
+    if (phoneNumber?.companyId) {
+      const [co] = await db.select().from(companiesTable).where(eq(companiesTable.id, phoneNumber.companyId));
+      companyName2 = co?.name ?? null;
+    }
+    companyName2 = companyName2 ?? phoneNumber?.callerIdName ?? null;
+
+    const rawPrompt2 = phoneNumber?.aiSystemPrompt || aiConfig?.systemPrompt
       || "You are a professional phone agent. Speak naturally and conversationally. Keep responses to 1-3 sentences. Ask one question at a time.";
+    const basePrompt = resolvePromptTemplate(rawPrompt2, { companyName: companyName2, phoneNumber: To, callerNumber: From });
     const langDirective = language.startsWith("ar-")
       ? "\n\nIMPORTANT: You MUST respond entirely in Arabic (العربية). Do not use any English."
       : "";
