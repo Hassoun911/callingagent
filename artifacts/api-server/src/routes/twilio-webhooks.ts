@@ -4,6 +4,7 @@ import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable } from "@works
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
 import twilio from "twilio";
+import { randomUUID } from "crypto";
 
 function getTwilioClient() {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -17,18 +18,62 @@ const router: IRouter = Router();
 // In-memory conversation store keyed by CallSid
 interface ConversationState {
   systemPrompt: string;
-  greeting: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   maxDuration: number;
   startedAt: number;
+  voice: string;
+  baseUrl: string;
 }
 const conversations = new Map<string, ConversationState>();
+
+// TTS audio cache — buffers keyed by UUID, auto-expire after 10 minutes
+const ttsCache = new Map<string, Buffer>();
+function cacheTts(buffer: Buffer): string {
+  const id = randomUUID();
+  ttsCache.set(id, buffer);
+  setTimeout(() => ttsCache.delete(id), 10 * 60 * 1000);
+  return id;
+}
 
 function getOpenAI() {
   return new OpenAI({
     baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
     apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   });
+}
+
+// Map AI Settings voice name to OpenAI TTS voice
+const VOICE_MAP: Record<string, string> = {
+  alloy: "alloy",
+  echo: "echo",
+  fable: "fable",
+  onyx: "onyx",
+  nova: "nova",
+  shimmer: "shimmer",
+};
+
+async function generateTts(text: string, voice = "nova"): Promise<string | null> {
+  try {
+    const openai = getOpenAI();
+    const ttsVoice = (VOICE_MAP[voice] ?? "nova") as any;
+    const response = await openai.audio.speech.create({
+      model: "tts-1",
+      voice: ttsVoice,
+      input: text,
+    });
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return cacheTts(buffer);
+  } catch (err) {
+    logger.error({ err }, "OpenAI TTS failed");
+    return null;
+  }
+}
+
+function playOrSay(audioId: string | null, fallbackText: string, baseUrl: string): string {
+  if (audioId) {
+    return `<Play>${baseUrl}/api/twilio/tts/${audioId}</Play>`;
+  }
+  return `<Say voice="Polly.Joanna-Neural">${escapeXml(fallbackText)}</Say>`;
 }
 
 function escapeXml(text: string): string {
@@ -40,23 +85,30 @@ function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function gatherTwiml(aiText: string): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="Polly.Joanna">${escapeXml(aiText)}</Say>
-  <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/twilio/ai-gather" method="POST">
-  </Gather>
-  <Say voice="Polly.Joanna">I didn't catch that. Is there anything else I can help you with?</Say>
-  <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/twilio/ai-gather" method="POST">
-  </Gather>
-  <Hangup/>
-</Response>`;
+function gatherBlock(audioId: string | null, fallbackText: string, baseUrl: string): string {
+  const audio = playOrSay(audioId, fallbackText, baseUrl);
+  return `${audio}
+  <Gather input="speech" timeout="6" speechTimeout="auto" speechModel="experimental_conversations" action="${baseUrl}/api/twilio/ai-gather" method="POST">
+  </Gather>`;
 }
 
+// ─── Serve TTS audio ────────────────────────────────────────────────────────
+router.get("/twilio/tts/:id", (req, res): void => {
+  const buffer = ttsCache.get(req.params.id);
+  if (!buffer) { res.status(404).end(); return; }
+  res.set("Content-Type", "audio/mpeg");
+  res.set("Cache-Control", "no-store");
+  res.send(buffer);
+});
+
+// ─── Inbound call ────────────────────────────────────────────────────────────
 router.post("/twilio/voice", async (req, res): Promise<void> => {
   const { To, From, CallSid, Direction } = req.body;
-
   req.log.info({ To, From, CallSid }, "Incoming Twilio voice webhook");
+
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : `${req.protocol}://${req.get("host")}`;
 
   const [phoneNumber] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, To));
 
@@ -84,62 +136,69 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     <Number>${forwardTo}</Number>
   </Dial>
 </Response>`;
+
   } else if (answerMode === "voicemail") {
     const greeting = phoneNumber?.voicemailGreeting ?? "Please leave a message after the tone.";
+    const audioId = await generateTts(greeting);
     twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">${escapeXml(greeting)}</Say>
-  <Record maxLength="120" action="/api/twilio/recording" transcribe="true" transcribeCallback="/api/twilio/transcription" />
+  ${playOrSay(audioId, greeting, baseUrl)}
+  <Record maxLength="120" action="${baseUrl}/api/twilio/recording" transcribe="true" transcribeCallback="${baseUrl}/api/twilio/transcription" />
 </Response>`;
+
   } else if (answerMode === "ai_voice") {
     const [aiConfig] = await db.select().from(aiVoiceConfigTable);
-
     const systemPrompt = phoneNumber?.aiSystemPrompt
       || aiConfig?.systemPrompt
-      || "You are a helpful phone assistant. Keep your answers brief and conversational since you are speaking on a phone call.";
-
-    const greeting = aiConfig?.greeting ?? "Hello, thank you for calling. How can I help you today?";
+      || "You are a helpful phone assistant. Keep your answers brief and conversational since you are on a phone call.";
+    const greetingText = aiConfig?.greeting ?? "Hello, thank you for calling. How can I help you today?";
+    const ttsVoice = aiConfig?.voice ?? "nova";
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
 
-    // Store conversation state for subsequent gather callbacks
     conversations.set(CallSid, {
       systemPrompt,
-      greeting,
       messages: [],
       maxDuration,
       startedAt: Date.now(),
+      voice: ttsVoice,
+      baseUrl,
     });
 
-    // Start recording the call via REST API (non-blocking — doesn't interrupt TwiML flow)
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    // Generate greeting audio with OpenAI TTS
+    const greetingAudioId = await generateTts(greetingText, ttsVoice);
+
+    // Start recording the call (non-blocking)
     setTimeout(() => {
-      const client = getTwilioClient();
-      client.calls(CallSid).recordings.create({
-        recordingStatusCallback: `${baseUrl}/api/twilio/recording`,
-        recordingStatusCallbackMethod: "POST",
-      }).catch((err: any) => logger.error({ err }, "Failed to start call recording"));
+      try {
+        const client = getTwilioClient();
+        client.calls(CallSid).recordings.create({
+          recordingStatusCallback: `${baseUrl}/api/twilio/recording`,
+          recordingStatusCallbackMethod: "POST",
+        }).catch((err: any) => logger.error({ err }, "Failed to start call recording"));
+      } catch (err) {
+        logger.error({ err }, "Failed to init call recording");
+      }
     }, 1500);
 
-    // Greet the caller and immediately start listening
     twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">${escapeXml(greeting)}</Say>
-  <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/twilio/ai-gather" method="POST">
-  </Gather>
-  <Say voice="Polly.Joanna">I didn't catch that. Is there anything else I can help you with?</Say>
-  <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/twilio/ai-gather" method="POST">
+  ${gatherBlock(greetingAudioId, greetingText, baseUrl)}
+  ${playOrSay(null, "I didn't catch that. Could you please repeat?", baseUrl)}
+  <Gather input="speech" timeout="6" speechTimeout="auto" speechModel="experimental_conversations" action="${baseUrl}/api/twilio/ai-gather" method="POST">
   </Gather>
   <Hangup/>
 </Response>`;
+
   } else if (answerMode === "reject") {
     twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Reject />
 </Response>`;
+
   } else {
     twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say>Thank you for calling. We are unable to take your call right now.</Say>
+  <Say voice="Polly.Joanna-Neural">Thank you for calling. We are unable to take your call right now.</Say>
 </Response>`;
   }
 
@@ -147,9 +206,9 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
   res.send(twiml);
 });
 
+// ─── AI speech gather callback ───────────────────────────────────────────────
 router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   const { CallSid, SpeechResult } = req.body;
-
   req.log.info({ CallSid, SpeechResult }, "AI gather callback");
 
   const conv = conversations.get(CallSid);
@@ -158,32 +217,34 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">Sorry, I lost track of our conversation. Goodbye.</Say>
+  <Say voice="Polly.Joanna-Neural">Sorry, I lost track of our conversation. Goodbye.</Say>
   <Hangup/>
 </Response>`);
     return;
   }
 
+  const { baseUrl, voice } = conv;
+
   // Check max duration
   const elapsed = (Date.now() - conv.startedAt) / 1000;
   if (elapsed > conv.maxDuration) {
     conversations.delete(CallSid);
+    const audioId = await generateTts("We've reached the maximum call duration. Thank you for calling. Goodbye!", voice);
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">We've reached the maximum call duration. Thank you for calling. Goodbye!</Say>
+  ${playOrSay(audioId, "We've reached the maximum call duration. Goodbye!", baseUrl)}
   <Hangup/>
 </Response>`);
     return;
   }
 
   if (!SpeechResult) {
+    const audioId = await generateTts("I didn't catch that. Could you please repeat?", voice);
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">I didn't catch that. Could you please repeat?</Say>
-  <Gather input="speech" timeout="5" speechTimeout="auto" action="/api/twilio/ai-gather" method="POST">
-  </Gather>
+  ${gatherBlock(audioId, "I didn't catch that. Could you please repeat?", baseUrl)}
   <Hangup/>
 </Response>`);
     return;
@@ -193,49 +254,64 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
 
   try {
     const openai = getOpenAI();
-    const completion = await openai.chat.completions.create({
+
+    // Run LLM + TTS in parallel for minimum latency
+    const completionPromise = openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: conv.systemPrompt + "\n\nIMPORTANT: Keep all responses to 1-3 sentences maximum. You are on a live phone call. Never use markdown, bullet points, or lists.",
+          content: conv.systemPrompt + "\n\nIMPORTANT: Keep all responses to 1-3 short sentences. You are on a live phone call. Never use markdown, bullet points, or lists — only natural spoken language.",
         },
         ...conv.messages,
       ],
       max_tokens: 150,
     });
 
+    const completion = await completionPromise;
     const aiText = completion.choices[0]?.message?.content ?? "I'm sorry, I couldn't process that. Can you try again?";
     conv.messages.push({ role: "assistant", content: aiText });
 
-    // Check if AI wants to end the call (simple heuristic)
+    // Generate TTS audio
+    const audioId = await generateTts(aiText, voice);
+
+    // Check if AI naturally wants to end
     const endPhrases = ["goodbye", "have a great day", "take care", "thank you for calling", "bye"];
-    const wantsToEnd = endPhrases.some(p => aiText.toLowerCase().includes(p)) && conv.messages.length > 2;
+    const wantsToEnd = endPhrases.some(p => aiText.toLowerCase().includes(p)) && conv.messages.length > 4;
 
     if (wantsToEnd) {
       conversations.delete(CallSid);
       res.set("Content-Type", "text/xml");
       res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">${escapeXml(aiText)}</Say>
+  ${playOrSay(audioId, aiText, baseUrl)}
   <Hangup/>
 </Response>`);
       return;
     }
 
     res.set("Content-Type", "text/xml");
-    res.send(gatherTwiml(aiText));
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  ${gatherBlock(audioId, aiText, baseUrl)}
+  ${playOrSay(null, "Is there anything else I can help you with?", baseUrl)}
+  <Gather input="speech" timeout="6" speechTimeout="auto" speechModel="experimental_conversations" action="${baseUrl}/api/twilio/ai-gather" method="POST">
+  </Gather>
+  <Hangup/>
+</Response>`);
   } catch (err: any) {
     req.log.error({ err }, "OpenAI call failed in ai-gather");
+    const audioId = await generateTts("I'm having a technical issue right now. Please try calling again later.", voice);
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna">I'm having a technical issue right now. Please try calling again later.</Say>
+  ${playOrSay(audioId, "I'm having a technical issue. Please try again later.", baseUrl)}
   <Hangup/>
 </Response>`);
   }
 });
 
+// ─── Call status callback ────────────────────────────────────────────────────
 async function extractCallSummary(conv: ConversationState): Promise<{
   callerName: string | null;
   callerEmail: string | null;
@@ -247,39 +323,23 @@ async function extractCallSummary(conv: ConversationState): Promise<{
   if (conv.messages.length === 0) {
     return { callerName: null, callerEmail: null, callType: null, callSummary: null, actionRequired: null, priority: null };
   }
-
   try {
     const openai = getOpenAI();
     const transcript = conv.messages.map(m => `${m.role === "user" ? "Caller" : "AI"}: ${m.content}`).join("\n");
-
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: `You are a call data extractor. Given a phone call transcript, extract the following information in JSON format only. If information is not available, use null.
-
-Return ONLY a JSON object with these exact keys:
-{
-  "callerName": "full name or null",
-  "callerEmail": "email or null",
-  "callType": "one of: General Inquiry, Customer Support, New Customer, Appointment Request, Billing, Sales, Emergency, Other — or null",
-  "callSummary": "2-3 sentence summary of the call",
-  "actionRequired": "specific follow-up action needed or null",
-  "priority": "Low, Medium, or High based on urgency"
-}`,
+          content: `Extract call data from this transcript as JSON only. Use null for missing info.
+Return exactly: {"callerName": "...", "callerEmail": "...", "callType": "General Inquiry|Customer Support|New Customer|Appointment Request|Billing|Sales|Emergency|Other", "callSummary": "2-3 sentences", "actionRequired": "...", "priority": "Low|Medium|High"}`,
         },
-        {
-          role: "user",
-          content: `Call transcript:\n\n${transcript}`,
-        },
+        { role: "user", content: `Transcript:\n\n${transcript}` },
       ],
       max_tokens: 300,
       response_format: { type: "json_object" },
     });
-
-    const raw = completion.choices[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
     return {
       callerName: parsed.callerName ?? null,
       callerEmail: parsed.callerEmail ?? null,
@@ -296,7 +356,6 @@ Return ONLY a JSON object with these exact keys:
 
 router.post("/twilio/status", async (req, res): Promise<void> => {
   const { CallSid, CallStatus, CallDuration } = req.body;
-
   req.log.info({ CallSid, CallStatus, CallDuration }, "Twilio status callback");
 
   const isTerminal = ["completed", "failed", "busy", "no-answer", "canceled"].includes(CallStatus);
@@ -307,13 +366,11 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
       duration: CallDuration ? parseInt(CallDuration, 10) : null,
     };
 
-    // If call ended and we have AI conversation history, extract structured summary
     if (isTerminal) {
       const conv = conversations.get(CallSid);
       if (conv && conv.messages.length > 0) {
         const summary = await extractCallSummary(conv);
         Object.assign(updateData, summary);
-        // Store full conversation transcript
         updateData.transcription = conv.messages
           .map(m => `${m.role === "user" ? "Caller" : "AI"}: ${m.content}`)
           .join("\n\n");
@@ -329,15 +386,13 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
   res.sendStatus(200);
 });
 
+// ─── Recording callback ──────────────────────────────────────────────────────
 router.post("/twilio/recording", async (req, res): Promise<void> => {
   const { CallSid, RecordingUrl, RecordingSid, TranscriptionText } = req.body;
-
   req.log.info({ CallSid, RecordingSid }, "Twilio recording callback");
 
   if (CallSid) {
-    const updateData: any = {
-      status: "completed",
-    };
+    const updateData: any = { status: "completed" };
     if (RecordingUrl) updateData.recordingUrl = `${RecordingUrl}.mp3`;
     if (RecordingSid) updateData.recordingSid = RecordingSid;
     if (TranscriptionText) updateData.transcription = TranscriptionText;
