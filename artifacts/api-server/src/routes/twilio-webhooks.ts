@@ -7,19 +7,38 @@ import twilio from "twilio";
 import { randomUUID } from "crypto";
 
 /** Replace template variables in an AI system prompt.
- *  Supported: {{company_name}}, {{phone_number}}, {{caller_number}}
- *  Any other {{...}} token also falls back to companyName so custom labels work.
+ *
+ * Named variables:
+ *   {{company_name}}   → company name from the linked company (or callerIdName)
+ *   {{phone_number}}   → the Twilio line number (To)
+ *   {{caller_number}}  → the inbound caller's number (From)
+ *
+ * Fuzzy matches (case-insensitive, spaces/underscores ignored):
+ *   Any token whose normalised form matches the company name's normalised form → company name
+ *
+ * Fallback for any other {{token}}: the literal text inside the braces, so that
+ * {{bcard.ca}} → "bcard.ca", {{it services}} → "it services", etc.
  */
 function resolvePromptTemplate(
   prompt: string,
   vars: { companyName?: string | null; phoneNumber?: string | null; callerNumber?: string | null }
 ): string {
+  const normalize = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, "");
+  const normalizedCompany = vars.companyName ? normalize(vars.companyName) : null;
+
   return prompt.replace(/\{\{([^}]+)\}\}/g, (_match, key: string) => {
-    const k = key.trim().toLowerCase();
-    if (k === "phone_number") return vars.phoneNumber ?? _match;
-    if (k === "caller_number") return vars.callerNumber ?? _match;
-    // company_name and any custom label (e.g. {{solutions}}) → company name
-    return vars.companyName ?? vars.phoneNumber ?? _match;
+    const raw = key.trim();
+    const k = normalize(raw);
+
+    if (k === "companyname" || k === "company") return vars.companyName ?? raw;
+    if (k === "phonenumber" || k === "phone") return vars.phoneNumber ?? raw;
+    if (k === "callernumber" || k === "caller") return vars.callerNumber ?? raw;
+
+    // If the token matches the company name (e.g. {{solutions}} when company is "solutions")
+    if (normalizedCompany && k === normalizedCompany) return vars.companyName!;
+
+    // Unknown token: use the literal text inside the braces (what the user typed)
+    return raw;
   });
 }
 
