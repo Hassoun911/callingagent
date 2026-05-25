@@ -3,6 +3,14 @@ import { eq } from "drizzle-orm";
 import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
+import twilio from "twilio";
+
+function getTwilioClient() {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!accountSid || !authToken) throw new Error("Twilio credentials not configured");
+  return twilio(accountSid, authToken);
+}
 
 const router: IRouter = Router();
 
@@ -101,6 +109,16 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       maxDuration,
       startedAt: Date.now(),
     });
+
+    // Start recording the call via REST API (non-blocking — doesn't interrupt TwiML flow)
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    setTimeout(() => {
+      const client = getTwilioClient();
+      client.calls(CallSid).recordings.create({
+        recordingStatusCallback: `${baseUrl}/api/twilio/recording`,
+        recordingStatusCallbackMethod: "POST",
+      }).catch((err: any) => logger.error({ err }, "Failed to start call recording"));
+    }, 1500);
 
     // Greet the caller and immediately start listening
     twiml = `<?xml version="1.0" encoding="UTF-8"?>
