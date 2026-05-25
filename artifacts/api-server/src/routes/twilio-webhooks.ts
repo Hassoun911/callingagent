@@ -140,8 +140,8 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     const callScreenFallback = phoneNumber?.callScreenFallback ?? "voicemail";
 
     if (callScreen && phoneNumber?.id) {
-      const screenUrl = `${baseUrl}/api/twilio/screen?phoneNumberId=${phoneNumber.id}&fallback=${callScreenFallback}`;
-      const fallbackUrl = `${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&mode=${callScreenFallback}`;
+      const screenUrl = `${baseUrl}/api/twilio/screen?phoneNumberId=${phoneNumber.id}&amp;fallback=${callScreenFallback}`;
+      const fallbackUrl = `${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&amp;mode=${callScreenFallback}`;
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Dial${callerIdAttr} timeout="${ringCount * 5}">
