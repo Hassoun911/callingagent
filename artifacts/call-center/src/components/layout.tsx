@@ -97,7 +97,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3">
             <NotificationBell />
             <div className="font-mono text-xs text-muted-foreground">
-              {new Date().toLocaleTimeString()} UTC
+              {new Date().toLocaleTimeString("en-US", { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })} ET
             </div>
           </div>
         </div>
