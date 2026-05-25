@@ -85,6 +85,23 @@ export const SearchAvailableNumbersResponseItem = zod.object({
 export const SearchAvailableNumbersResponse = zod.array(SearchAvailableNumbersResponseItem)
 
 
+/**
+ * @summary Fetch live Twilio status for a provisioned number
+ */
+export const GetPhoneNumberTwilioStatusParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPhoneNumberTwilioStatusResponse = zod.object({
+  "sid": zod.string(),
+  "phoneNumber": zod.string(),
+  "status": zod.string(),
+  "monthlyRentPrice": zod.string().nullable(),
+  "voiceUrl": zod.string().nullable(),
+  "dateCreated": zod.string().nullable()
+})
+
+
 export const GetPhoneNumberParams = zod.object({
   "id": zod.coerce.number()
 })

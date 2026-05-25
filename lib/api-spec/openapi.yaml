@@ -105,6 +105,27 @@ paths:
                 items:
                   $ref: "#/components/schemas/AvailableNumber"
 
+  /phone-numbers/{id}/twilio-status:
+    get:
+      operationId: getPhoneNumberTwilioStatus
+      tags: [phone-numbers]
+      summary: Fetch live Twilio status for a provisioned number
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Twilio status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PhoneNumberTwilioStatus"
+        "404":
+          description: Not found
+
   /phone-numbers/{id}:
     get:
       operationId: getPhoneNumber
@@ -611,6 +632,23 @@ components:
           type: ["string", "null"]
         isActive:
           type: ["boolean", "null"]
+
+    PhoneNumberTwilioStatus:
+      type: object
+      required: [sid, phoneNumber, status, monthlyRentPrice, voiceUrl, dateCreated]
+      properties:
+        sid:
+          type: string
+        phoneNumber:
+          type: string
+        status:
+          type: string
+        monthlyRentPrice:
+          type: ["string", "null"]
+        voiceUrl:
+          type: ["string", "null"]
+        dateCreated:
+          type: ["string", "null"]
 
     AvailableNumber:
       type: object

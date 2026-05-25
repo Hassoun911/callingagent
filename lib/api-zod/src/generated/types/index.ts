@@ -30,6 +30,7 @@ export * from './phoneNumber';
 export * from './phoneNumberAnswerMode';
 export * from './phoneNumberInput';
 export * from './phoneNumberInputAnswerMode';
+export * from './phoneNumberTwilioStatus';
 export * from './phoneNumberUpdate';
 export * from './phoneNumberUpdateAnswerMode';
 export * from './recordingUrl';

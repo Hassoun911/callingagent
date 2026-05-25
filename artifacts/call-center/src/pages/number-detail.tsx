@@ -5,7 +5,8 @@ import {
   useUpdatePhoneNumber, 
   useReleasePhoneNumber, 
   getGetPhoneNumberQueryKey,
-  useTestCall
+  useTestCall,
+  useGetPhoneNumberTwilioStatus,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban } from "lucide-react";
+import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -27,6 +28,7 @@ export default function NumberDetail() {
   const queryClient = useQueryClient();
 
   const { data: number, isLoading } = useGetPhoneNumber(numId);
+  const { data: twilioStatus, isLoading: twilioLoading, isError: twilioError } = useGetPhoneNumberTwilioStatus(numId);
   const updateMutation = useUpdatePhoneNumber();
   const releaseMutation = useReleasePhoneNumber({
     mutation: {
@@ -252,6 +254,59 @@ export default function NumberDetail() {
                 />
                 <p className="text-xs text-muted-foreground">Max 15 characters.</p>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle>Line Status</CardTitle>
+              <CardDescription>Live status from Twilio.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {twilioLoading && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Checking Twilio...
+                </div>
+              )}
+              {twilioError && (
+                <div className="flex items-center gap-2 text-sm text-destructive">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  Could not reach Twilio
+                </div>
+              )}
+              {twilioStatus && (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Status</span>
+                    <span className="flex items-center gap-1.5 font-medium text-emerald-400">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Active
+                    </span>
+                  </div>
+                  {twilioStatus.monthlyRentPrice && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Monthly cost</span>
+                      <span className="font-mono font-semibold">${parseFloat(twilioStatus.monthlyRentPrice).toFixed(2)}/mo</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Webhooks</span>
+                    <span className={`font-medium text-xs ${twilioStatus.voiceUrl ? "text-emerald-400" : "text-amber-400"}`}>
+                      {twilioStatus.voiceUrl ? "Configured" : "Not set"}
+                    </span>
+                  </div>
+                  {twilioStatus.dateCreated && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Purchased</span>
+                      <span className="text-xs font-mono">{new Date(twilioStatus.dateCreated).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  <div className="pt-1 border-t border-border">
+                    <p className="text-xs text-muted-foreground font-mono truncate" title={twilioStatus.sid}>{twilioStatus.sid}</p>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 

@@ -102,6 +102,18 @@ export interface PhoneNumberUpdate {
   isActive?: boolean | null;
 }
 
+export interface PhoneNumberTwilioStatus {
+  sid: string;
+  phoneNumber: string;
+  status: string;
+  /** @nullable */
+  monthlyRentPrice: string | null;
+  /** @nullable */
+  voiceUrl: string | null;
+  /** @nullable */
+  dateCreated: string | null;
+}
+
 export type AvailableNumberCapabilities = {
   voice?: boolean;
   sms?: boolean;

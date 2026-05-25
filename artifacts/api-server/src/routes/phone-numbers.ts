@@ -172,6 +172,31 @@ router.post("/phone-numbers", async (req, res): Promise<void> => {
   }));
 });
 
+router.get("/phone-numbers/:id/twilio-status", async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const [number] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, id));
+  if (!number) { res.status(404).json({ error: "Phone number not found" }); return; }
+  if (!number.twilioSid) { res.status(404).json({ error: "No Twilio SID for this number" }); return; }
+
+  try {
+    const client = getTwilioClient();
+    const n = await client.incomingPhoneNumbers(number.twilioSid).fetch();
+    res.json({
+      sid: n.sid,
+      phoneNumber: n.phoneNumber,
+      status: "active",
+      monthlyRentPrice: (n as any).monthlyRentPrice ?? null,
+      voiceUrl: n.voiceUrl ?? null,
+      dateCreated: n.dateCreated ? n.dateCreated.toISOString() : null,
+    });
+  } catch (err: any) {
+    req.log.error({ err }, "Failed to fetch Twilio status");
+    res.status(500).json({ error: err.message || "Failed to fetch Twilio status" });
+  }
+});
+
 router.get("/phone-numbers/:id", async (req, res): Promise<void> => {
   const params = GetPhoneNumberParams.safeParse(req.params);
   if (!params.success) {

@@ -37,6 +37,7 @@ import type {
   ListContactsParams,
   PhoneNumber,
   PhoneNumberInput,
+  PhoneNumberTwilioStatus,
   PhoneNumberUpdate,
   RecordingUrl,
   SearchAvailableNumbersParams,
@@ -353,6 +354,83 @@ export function useSearchAvailableNumbers<TData = Awaited<ReturnType<typeof sear
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getSearchAvailableNumbersQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPhoneNumberTwilioStatusUrl = (id: number,) => {
+
+
+
+
+  return `/api/phone-numbers/${id}/twilio-status`
+}
+
+/**
+ * @summary Fetch live Twilio status for a provisioned number
+ */
+export const getPhoneNumberTwilioStatus = async (id: number, options?: RequestInit): Promise<PhoneNumberTwilioStatus> => {
+
+  return customFetch<PhoneNumberTwilioStatus>(getGetPhoneNumberTwilioStatusUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPhoneNumberTwilioStatusQueryKey = (id: number,) => {
+    return [
+    `/api/phone-numbers/${id}/twilio-status`
+    ] as const;
+    }
+
+
+export const getGetPhoneNumberTwilioStatusQueryOptions = <TData = Awaited<ReturnType<typeof getPhoneNumberTwilioStatus>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPhoneNumberTwilioStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPhoneNumberTwilioStatusQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPhoneNumberTwilioStatus>>> = ({ signal }) => getPhoneNumberTwilioStatus(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPhoneNumberTwilioStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPhoneNumberTwilioStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getPhoneNumberTwilioStatus>>>
+export type GetPhoneNumberTwilioStatusQueryError = ErrorType<void>
+
+
+/**
+ * @summary Fetch live Twilio status for a provisioned number
+ */
+
+export function useGetPhoneNumberTwilioStatus<TData = Awaited<ReturnType<typeof getPhoneNumberTwilioStatus>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPhoneNumberTwilioStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPhoneNumberTwilioStatusQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
