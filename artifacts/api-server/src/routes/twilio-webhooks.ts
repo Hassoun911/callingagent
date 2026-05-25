@@ -157,7 +157,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     // Build base prompt, adding a language directive if not English
     const basePrompt = phoneNumber?.aiSystemPrompt || aiConfig?.systemPrompt
       || "You are a professional phone agent. Speak naturally and conversationally. Keep responses to 1-3 sentences. Ask one question at a time.";
-    const langDirective = language === "ar-SA"
+    const langDirective = language.startsWith("ar-")
       ? "\n\nIMPORTANT: You MUST respond entirely in Arabic (العربية). Do not use any English."
       : "";
     const systemPrompt = basePrompt + langDirective;
@@ -233,7 +233,7 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   }
 
   const { baseUrl, voice, language } = conv;
-  const isArabic = language === "ar-SA";
+  const isArabic = language.startsWith("ar-");
 
   // Check max duration
   const elapsed = (Date.now() - conv.startedAt) / 1000;

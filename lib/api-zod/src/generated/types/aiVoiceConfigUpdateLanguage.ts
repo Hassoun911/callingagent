@@ -15,4 +15,5 @@ export type AiVoiceConfigUpdateLanguage = typeof AiVoiceConfigUpdateLanguage[key
 export const AiVoiceConfigUpdateLanguage = {
   'en-US': 'en-US',
   'ar-SA': 'ar-SA',
+  'ar-LB': 'ar-LB',
 } as const;

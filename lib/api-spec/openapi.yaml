@@ -878,7 +878,7 @@ components:
           enum: [alloy, echo, fable, onyx, nova, shimmer]
         language:
           type: string
-          enum: [en-US, ar-SA]
+          enum: [en-US, ar-SA, ar-LB]
         greeting:
           type: string
         systemPrompt:
@@ -894,7 +894,7 @@ components:
           enum: [alloy, echo, fable, onyx, nova, shimmer, null]
         language:
           type: ["string", "null"]
-          enum: [en-US, ar-SA, null]
+          enum: [en-US, ar-SA, ar-LB, null]
         greeting:
           type: ["string", "null"]
         systemPrompt:

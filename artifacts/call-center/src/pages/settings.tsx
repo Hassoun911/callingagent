@@ -16,16 +16,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Bot, Save, Mic2, Globe } from "lucide-react";
 
 const VOICES = [
-  { id: "alloy", name: "Alloy — Neutral" },
-  { id: "echo", name: "Echo — Warm" },
-  { id: "fable", name: "Fable — Expressive" },
-  { id: "onyx", name: "Onyx — Deep" },
-  { id: "nova", name: "Nova — Energetic" },
-  { id: "shimmer", name: "Shimmer — Clear" },
+  { id: "nova",    name: "Nova",    gender: "Female", desc: "Warm, energetic" },
+  { id: "shimmer", name: "Shimmer", gender: "Female", desc: "Soft, clear" },
+  { id: "alloy",   name: "Alloy",   gender: "Female", desc: "Neutral, balanced" },
+  { id: "echo",    name: "Echo",    gender: "Male",   desc: "Warm, conversational" },
+  { id: "fable",   name: "Fable",   gender: "Male",   desc: "Expressive, rich" },
+  { id: "onyx",    name: "Onyx",    gender: "Male",   desc: "Deep, authoritative" },
 ];
 
 const LANGUAGES = [
-  { id: "en-US", label: "English (US)", flag: "EN" },
+  { id: "en-US", label: "English (US)",       flag: "EN" },
+  { id: "ar-LB", label: "Arabic (Lebanon)",   flag: "AR" },
   { id: "ar-SA", label: "Arabic (Saudi Arabia)", flag: "AR" },
 ];
 
@@ -105,22 +106,32 @@ export default function Settings() {
               <Select value={formData.voice} onValueChange={(v) => setFormData({...formData, voice: v})}>
                 <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select voice">
-                    {formData.voice && (
-                      <div className="flex items-center gap-2">
-                        <Mic2 className="h-4 w-4 text-muted-foreground" />
-                        {VOICES.find(v => v.id === formData.voice)?.name ?? formData.voice}
-                      </div>
-                    )}
+                    {formData.voice && (() => {
+                      const v = VOICES.find(v => v.id === formData.voice);
+                      return v ? (
+                        <div className="flex items-center gap-2">
+                          <Mic2 className="h-4 w-4 text-muted-foreground" />
+                          <span>{v.name}</span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${v.gender === "Female" ? "bg-pink-500/20 text-pink-400" : "bg-blue-500/20 text-blue-400"}`}>{v.gender}</span>
+                        </div>
+                      ) : null;
+                    })()}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {VOICES.map(v => (
-                    <SelectItem key={v.id} value={v.id}>
-                      <div className="flex items-center gap-2">
-                        <Mic2 className="h-4 w-4 text-muted-foreground" />
-                        {v.name}
-                      </div>
-                    </SelectItem>
+                  {["Female", "Male"].map(gender => (
+                    <div key={gender}>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{gender}</div>
+                      {VOICES.filter(v => v.gender === gender).map(v => (
+                        <SelectItem key={v.id} value={v.id}>
+                          <div className="flex items-center gap-2">
+                            <Mic2 className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{v.name}</span>
+                            <span className="text-muted-foreground text-xs">— {v.desc}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </div>
                   ))}
                 </SelectContent>
               </Select>

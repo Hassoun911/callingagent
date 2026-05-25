@@ -12,4 +12,5 @@ export type AiVoiceConfigLanguage = typeof AiVoiceConfigLanguage[keyof typeof Ai
 export const AiVoiceConfigLanguage = {
   'en-US': 'en-US',
   'ar-SA': 'ar-SA',
+  'ar-LB': 'ar-LB',
 } as const;

@@ -311,6 +311,7 @@ export type AiVoiceConfigLanguage = typeof AiVoiceConfigLanguage[keyof typeof Ai
 export const AiVoiceConfigLanguage = {
   'en-US': 'en-US',
   'ar-SA': 'ar-SA',
+  'ar-LB': 'ar-LB',
 } as const;
 
 export interface AiVoiceConfig {
@@ -346,6 +347,7 @@ export type AiVoiceConfigUpdateLanguage = typeof AiVoiceConfigUpdateLanguage[key
 export const AiVoiceConfigUpdateLanguage = {
   'en-US': 'en-US',
   'ar-SA': 'ar-SA',
+  'ar-LB': 'ar-LB',
 } as const;
 
 export interface AiVoiceConfigUpdate {
