@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useListCallLogs } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PhoneIncoming, PhoneOutgoing, Play, FileText, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Play, Pause, FileText, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone, Volume2, VolumeX, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -26,9 +26,185 @@ function formatPhone(raw: string | null | undefined): string {
   return raw;
 }
 
+function fmtTime(s: number): string {
+  if (!isFinite(s) || isNaN(s)) return "0:00";
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+// Global tracker so only one player plays at a time
+const activeAudio = { current: null as HTMLAudioElement | null };
+
+function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [muted, setMuted] = useState(false);
+
+  useEffect(() => {
+    const audio = new Audio();
+    audioRef.current = audio;
+
+    audio.addEventListener("loadedmetadata", () => {
+      setDuration(audio.duration);
+      setLoading(false);
+    });
+    audio.addEventListener("timeupdate", () => setCurrentTime(audio.currentTime));
+    audio.addEventListener("ended", () => { setPlaying(false); setCurrentTime(0); });
+    audio.addEventListener("error", () => { setError(true); setLoading(false); });
+    audio.addEventListener("waiting", () => setLoading(true));
+    audio.addEventListener("canplay", () => setLoading(false));
+
+    return () => {
+      audio.pause();
+      audio.src = "";
+    };
+  }, [src]);
+
+  const toggle = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (playing) {
+      audio.pause();
+      setPlaying(false);
+    } else {
+      // Stop whatever is currently playing globally
+      if (activeAudio.current && activeAudio.current !== audio) {
+        activeAudio.current.pause();
+      }
+      activeAudio.current = audio;
+
+      if (!audio.src) {
+        audio.src = src;
+        setLoading(true);
+      }
+      audio.play().then(() => setPlaying(true)).catch(() => setError(true));
+    }
+  }, [playing, src]);
+
+  const seek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const audio = audioRef.current;
+    const track = trackRef.current;
+    if (!audio || !track || !duration) return;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    audio.currentTime = ratio * duration;
+    setCurrentTime(audio.currentTime);
+  }, [duration]);
+
+  const toggleMute = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.muted = !audio.muted;
+    setMuted(audio.muted);
+  }, []);
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  if (error) {
+    return (
+      <span className="text-xs text-muted-foreground italic">unavailable</span>
+    );
+  }
+
+  if (large) {
+    return (
+      <div className="flex items-center gap-3 p-3 bg-background border border-border rounded-lg">
+        <button
+          onClick={toggle}
+          className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/20 transition-colors text-primary"
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : playing ? (
+            <Pause className="h-4 w-4" />
+          ) : (
+            <Play className="h-4 w-4 ml-0.5" />
+          )}
+        </button>
+
+        <div className="flex-1 space-y-1.5">
+          <div
+            ref={trackRef}
+            onClick={seek}
+            className="relative h-1.5 w-full bg-muted rounded-full cursor-pointer group"
+          >
+            <div
+              className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
+              style={{ width: `${progress}%` }}
+            />
+            <div
+              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary border-2 border-background shadow opacity-0 group-hover:opacity-100 transition-opacity -ml-1.5"
+              style={{ left: `${progress}%` }}
+            />
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-mono text-muted-foreground">
+              {fmtTime(currentTime)}
+            </span>
+            <span className="text-xs font-mono text-muted-foreground">
+              {duration ? fmtTime(duration) : "--:--"}
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={toggleMute}
+          className="shrink-0 p-1 text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+    );
+  }
+
+  // Compact table row variant
+  return (
+    <div className="flex items-center gap-1.5 w-[200px]">
+      <button
+        onClick={toggle}
+        className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-muted hover:bg-muted/80 border border-border transition-colors text-foreground"
+      >
+        {loading ? (
+          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+        ) : playing ? (
+          <Pause className="h-3 w-3" />
+        ) : (
+          <Play className="h-3 w-3 ml-0.5" />
+        )}
+      </button>
+
+      <div
+        ref={trackRef}
+        onClick={seek}
+        className="relative h-1 flex-1 bg-muted rounded-full cursor-pointer group"
+      >
+        <div
+          className="absolute inset-y-0 left-0 bg-blue-400 rounded-full"
+          style={{ width: `${progress}%` }}
+        />
+        <div
+          className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity -ml-1"
+          style={{ left: `${progress}%` }}
+        />
+      </div>
+
+      <span className="text-xs font-mono text-muted-foreground tabular-nums w-[36px] text-right">
+        {playing || currentTime > 0 ? fmtTime(currentTime) : duration ? fmtTime(duration) : "--:--"}
+      </span>
+    </div>
+  );
+}
+
 function RecordingPlayer({ callId, hasRecording }: { callId: number; hasRecording: boolean }) {
   if (!hasRecording) return <span className="text-muted-foreground text-xs">--</span>;
-  return <audio controls src={`/api/call-logs/${callId}/recording`} className="h-8 w-[180px]" />;
+  return <AudioPlayer src={`/api/call-logs/${callId}/recording`} />;
 }
 
 function PriorityBadge({ priority }: { priority: string | null | undefined }) {
@@ -47,6 +223,7 @@ function PriorityBadge({ priority }: { priority: string | null | undefined }) {
 
 function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose: () => void }) {
   const hasSummary = call?.callSummary || call?.callerName || call?.callerEmail || call?.callType || call?.actionRequired;
+  const hasRecording = !!(call?.recordingSid || call?.recordingUrl);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -113,6 +290,14 @@ function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose
             </div>
           )}
         </div>
+
+        {/* Recording player */}
+        {hasRecording && call?.id && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Recording</p>
+            <AudioPlayer src={`/api/call-logs/${call.id}/recording`} large />
+          </div>
+        )}
 
         {hasSummary && (
           <div className="space-y-4">
@@ -292,8 +477,6 @@ export default function Calls() {
                 </TableCell>
                 <TableCell className="text-sm">
                   {(() => {
-                    // Priority: AI-extracted name > CRM contact name > CNAM > phone number
-                    // Guard against literal "null" / "undefined" strings stored by older code
                     const name = [call.callerName, call.contactName, call.callerIdName]
                       .find(n => n && n !== "null" && n !== "undefined");
                     if (name) return <span className="font-medium">{name}</span>;
