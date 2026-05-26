@@ -238,7 +238,7 @@ router.patch("/phone-numbers/:id", async (req, res): Promise<void> => {
   if (body.voicemailGreeting !== undefined) updateData.voicemailGreeting = body.voicemailGreeting;
   if (body.isActive != null) updateData.isActive = body.isActive;
   if (body.forwardCallerId != null) updateData.forwardCallerId = body.forwardCallerId;
-  if (body.callScreen != null) updateData.callScreen = body.callScreen;
+  if (body.callScreen !== undefined) updateData.callScreen = body.callScreen ?? false;
   if (body.callScreenFallback != null) updateData.callScreenFallback = body.callScreenFallback;
   if ("holdMessage" in body) updateData.holdMessage = body.holdMessage ?? null;
 

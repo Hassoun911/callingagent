@@ -15,11 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck, MessageSquare, Keyboard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+const PRESET_HOLD = "Connecting your call, please hold.";
 
 export default function NumberDetail() {
   const { id } = useParams();
@@ -41,6 +43,10 @@ export default function NumberDetail() {
 
   const [formData, setFormData] = useState<any>({});
   const initRef = useRef(false);
+
+  useEffect(() => {
+    initRef.current = false;
+  }, [numId]);
 
   useEffect(() => {
     if (number && !initRef.current) {
@@ -165,131 +171,158 @@ export default function NumberDetail() {
               </ToggleGroup>
 
               <div className="mt-8 space-y-6">
-                {formData.answerMode === 'forward' && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="space-y-2">
-                      <Label>Destination Number</Label>
-                      <Input 
-                        placeholder="+1 (555) 000-0000" 
-                        value={formData.forwardTo} 
-                        onChange={(e) => setFormData({...formData, forwardTo: e.target.value})}
-                        className="font-mono bg-background"
-                      />
-                      <p className="text-xs text-muted-foreground">Calls will be routed to this number.</p>
-                    </div>
-                    <div className="space-y-4 pt-2 border-t border-border">
-                      <div className="space-y-3">
-                        <Label>Caller ID Shown to You</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setFormData({...formData, forwardCallerId: "caller"})}
-                            className={`flex flex-col items-start gap-1 p-3 rounded-md border text-left transition-colors ${formData.forwardCallerId === "caller" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}
-                          >
-                            <span className="text-sm font-medium">Caller's Number</span>
-                            <span className="text-xs opacity-70">Shows caller's number + name if registered</span>
+                {formData.answerMode === 'forward' && (() => {
+                  const callerExp = !formData.holdMessage
+                    ? "ringing"
+                    : formData.holdMessage === PRESET_HOLD
+                      ? "connecting"
+                      : "custom";
+                  const radioBase = "flex items-start gap-3 w-full p-3 rounded-md border text-left transition-colors cursor-pointer";
+                  const radioOn  = "border-primary bg-primary/10 text-foreground";
+                  const radioOff = "border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground";
+                  const Radio = ({ on }: { on: boolean }) => (
+                    <span className={`mt-0.5 h-4 w-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${on ? "border-primary" : "border-muted-foreground"}`}>
+                      {on && <span className="h-2 w-2 rounded-full bg-primary" />}
+                    </span>
+                  );
+                  return (
+                    <div className="space-y-0 animate-in fade-in slide-in-from-top-2 duration-300">
+
+                      {/* Destination number */}
+                      <div className="space-y-2 pb-6">
+                        <Label>Destination Number</Label>
+                        <Input
+                          placeholder="+1 (555) 000-0000"
+                          value={formData.forwardTo}
+                          onChange={(e) => setFormData({...formData, forwardTo: e.target.value})}
+                          className="font-mono bg-background"
+                        />
+                        <p className="text-xs text-muted-foreground">Calls will be routed to this number.</p>
+                      </div>
+
+                      {/* When someone calls — caller experience */}
+                      <div className="space-y-3 py-6 border-t border-border">
+                        <div>
+                          <Label>When Someone Calls</Label>
+                          <p className="text-xs text-muted-foreground mt-0.5">What does the caller hear while being connected?</p>
+                        </div>
+                        <div className="space-y-2">
+                          <button type="button" onClick={() => setFormData({...formData, holdMessage: ""})} className={`${radioBase} ${callerExp === "ringing" ? radioOn : radioOff}`}>
+                            <Radio on={callerExp === "ringing"} />
+                            <div>
+                              <div className="flex items-center gap-2 text-sm font-medium"><PhoneCall className="h-3.5 w-3.5" /> Ringing only</div>
+                              <div className="text-xs opacity-70 mt-0.5">Caller hears standard ringing directly</div>
+                            </div>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setFormData({...formData, forwardCallerId: "line"})}
-                            className={`flex flex-col items-start gap-1 p-3 rounded-md border text-left transition-colors ${formData.forwardCallerId === "line" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}
-                          >
+                          <button type="button" onClick={() => setFormData({...formData, holdMessage: PRESET_HOLD})} className={`${radioBase} ${callerExp === "connecting" ? radioOn : radioOff}`}>
+                            <Radio on={callerExp === "connecting"} />
+                            <div>
+                              <div className="flex items-center gap-2 text-sm font-medium"><PhoneForwarded className="h-3.5 w-3.5" /> Connecting message then ringing</div>
+                              <div className="text-xs opacity-70 mt-0.5">Plays "Connecting your call, please hold." then rings</div>
+                            </div>
+                          </button>
+                          <button type="button" onClick={() => setFormData({...formData, holdMessage: callerExp === "custom" ? formData.holdMessage : ""})} className={`${radioBase} ${callerExp === "custom" ? radioOn : radioOff}`}>
+                            <Radio on={callerExp === "custom"} />
+                            <div>
+                              <div className="flex items-center gap-2 text-sm font-medium"><MessageSquare className="h-3.5 w-3.5" /> Custom message then ringing</div>
+                              <div className="text-xs opacity-70 mt-0.5">Play your own recorded message before ringing starts</div>
+                            </div>
+                          </button>
+                        </div>
+                        {callerExp === "custom" && (
+                          <input
+                            type="text"
+                            value={formData.holdMessage}
+                            onChange={e => setFormData({...formData, holdMessage: e.target.value})}
+                            placeholder="Type the message the caller will hear..."
+                            className="w-full h-9 rounded-md border border-border bg-background px-3 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                            autoFocus
+                          />
+                        )}
+                      </div>
+
+                      {/* When call routes to you — acceptance mode */}
+                      <div className="space-y-3 py-6 border-t border-border">
+                        <div>
+                          <Label>When Call Routes to You</Label>
+                          <p className="text-xs text-muted-foreground mt-0.5">How should the call be connected to your phone?</p>
+                        </div>
+                        <div className="space-y-2">
+                          <button type="button" onClick={() => setFormData({...formData, callScreen: false})} className={`${radioBase} ${!formData.callScreen ? radioOn : radioOff}`}>
+                            <Radio on={!formData.callScreen} />
+                            <div>
+                              <div className="flex items-center gap-2 text-sm font-medium"><PhoneCall className="h-3.5 w-3.5" /> Connect immediately</div>
+                              <div className="text-xs opacity-70 mt-0.5">Caller connects to you or your voicemail — whichever answers</div>
+                            </div>
+                          </button>
+                          <button type="button" onClick={() => setFormData({...formData, callScreen: true})} className={`${radioBase} ${formData.callScreen ? radioOn : radioOff}`}>
+                            <Radio on={!!formData.callScreen} />
+                            <div>
+                              <div className="flex items-center gap-2 text-sm font-medium"><Keyboard className="h-3.5 w-3.5" /> Require key press to accept</div>
+                              <div className="text-xs opacity-70 mt-0.5">You hear the caller info and press 1 to answer; declined calls go to fallback</div>
+                            </div>
+                          </button>
+                        </div>
+                        {formData.callScreen && (
+                          <div className="space-y-2 pt-1 animate-in fade-in duration-200">
+                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">If you don't answer, send to</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button type="button" onClick={() => setFormData({...formData, callScreenFallback: "ai_voice"})} className={`flex items-center gap-2 p-3 rounded-md border text-left transition-colors ${formData.callScreenFallback === "ai_voice" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}>
+                                <Bot className="h-4 w-4 shrink-0" />
+                                <div>
+                                  <div className="text-sm font-medium">AI Agent</div>
+                                  <div className="text-xs opacity-70">AI answers for you</div>
+                                </div>
+                              </button>
+                              <button type="button" onClick={() => setFormData({...formData, callScreenFallback: "voicemail"})} className={`flex items-center gap-2 p-3 rounded-md border text-left transition-colors ${formData.callScreenFallback === "voicemail" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}>
+                                <Voicemail className="h-4 w-4 shrink-0" />
+                                <div>
+                                  <div className="text-sm font-medium">Voicemail</div>
+                                  <div className="text-xs opacity-70">Caller leaves a message</div>
+                                </div>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Caller ID shown to you */}
+                      <div className="space-y-3 py-6 border-t border-border">
+                        <div>
+                          <Label>Caller ID Shown to You</Label>
+                          <p className="text-xs text-muted-foreground mt-0.5">What number appears on your phone when a call is forwarded?</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button type="button" onClick={() => setFormData({...formData, forwardCallerId: "caller"})} className={`flex flex-col items-start gap-1 p-3 rounded-md border text-left transition-colors ${formData.forwardCallerId === "caller" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}>
+                            <span className="text-sm font-medium">Caller's Number</span>
+                            <span className="text-xs opacity-70">Shows who's calling you</span>
+                          </button>
+                          <button type="button" onClick={() => setFormData({...formData, forwardCallerId: "line"})} className={`flex flex-col items-start gap-1 p-3 rounded-md border text-left transition-colors ${formData.forwardCallerId === "line" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}>
                             <span className="text-sm font-medium">This Line's Number</span>
                             <span className="text-xs opacity-70">Always shows your Twilio number</span>
                           </button>
                         </div>
-                        <p className="text-xs text-muted-foreground">Controls what appears on your phone when a call is forwarded. Name display depends on the caller's carrier.</p>
                       </div>
-                    </div>
-                    <div className="space-y-4 pt-2 border-t border-border">
-                      <div className="flex items-center justify-between">
-                        <Label>Ring Count</Label>
-                        <span className="font-mono text-sm text-muted-foreground">{formData.ringCount} rings</span>
-                      </div>
-                      <Slider 
-                        value={[formData.ringCount]} 
-                        min={1} 
-                        max={10} 
-                        step={1}
-                        onValueChange={([val]) => setFormData({...formData, ringCount: val})}
-                      />
-                      <p className="text-xs text-muted-foreground">Number of rings before falling back to voicemail.</p>
-                    </div>
-                    <div className="space-y-4 pt-2 border-t border-border">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="h-4 w-4 text-primary" />
-                          <Label>Call Screen</Label>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={formData.callScreen}
-                          onClick={() => setFormData({...formData, callScreen: !formData.callScreen})}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${formData.callScreen ? "bg-primary" : "bg-secondary"}`}
-                        >
-                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.callScreen ? "translate-x-6" : "translate-x-1"}`} />
-                        </button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">When enabled, you hear "Incoming call — press 1 to answer" before connecting. If you don't press 1, the call is redirected.</p>
-                      {formData.callScreen && (
-                        <div className="space-y-4 animate-in fade-in duration-200">
 
-                          <div className="space-y-2">
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Hold Message</Label>
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                value={formData.holdMessage}
-                                onChange={e => setFormData({...formData, holdMessage: e.target.value})}
-                                placeholder="Leave blank to play ringing directly"
-                                className="flex-1 h-9 rounded-md border border-border bg-background px-3 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                              />
-                              {formData.holdMessage && (
-                                <button
-                                  type="button"
-                                  onClick={() => setFormData({...formData, holdMessage: ""})}
-                                  className="h-9 px-3 rounded-md border border-border bg-background text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                >
-                                  Clear
-                                </button>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              Spoken to the caller before ringing starts. Leave blank for direct ringing (no message).
-                            </p>
-                          </div>
-
-                          <Label className="text-xs text-muted-foreground uppercase tracking-wider">If you don't answer, send to</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setFormData({...formData, callScreenFallback: "ai_voice"})}
-                              className={`flex items-center gap-2 p-3 rounded-md border text-left transition-colors ${formData.callScreenFallback === "ai_voice" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}
-                            >
-                              <Bot className="h-4 w-4 shrink-0" />
-                              <div>
-                                <div className="text-sm font-medium">AI Agent</div>
-                                <div className="text-xs opacity-70">AI answers for you</div>
-                              </div>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setFormData({...formData, callScreenFallback: "voicemail"})}
-                              className={`flex items-center gap-2 p-3 rounded-md border text-left transition-colors ${formData.callScreenFallback === "voicemail" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}
-                            >
-                              <Voicemail className="h-4 w-4 shrink-0" />
-                              <div>
-                                <div className="text-sm font-medium">Voicemail</div>
-                                <div className="text-xs opacity-70">Caller leaves a message</div>
-                              </div>
-                            </button>
-                          </div>
+                      {/* Ring count */}
+                      <div className="space-y-3 py-6 border-t border-border">
+                        <div className="flex items-center justify-between">
+                          <Label>Ring Count</Label>
+                          <span className="font-mono text-sm text-muted-foreground">{formData.ringCount} rings</span>
                         </div>
-                      )}
+                        <Slider
+                          value={[formData.ringCount]}
+                          min={1}
+                          max={10}
+                          step={1}
+                          onValueChange={([val]) => setFormData({...formData, ringCount: val})}
+                        />
+                        <p className="text-xs text-muted-foreground">Number of rings before falling back to voicemail.</p>
+                      </div>
+
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {formData.answerMode === 'ai_voice' && (
                   <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
