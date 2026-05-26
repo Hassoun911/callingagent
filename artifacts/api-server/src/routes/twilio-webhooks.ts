@@ -587,17 +587,21 @@ router.post("/twilio/name-recorded", async (req, res): Promise<void> => {
 // ─── Name screen whisper — plays caller's name recording to agent before bridge
 router.post("/twilio/name-screen", (req, res): void => {
   const { recordingUrl, fallback } = req.query as Record<string, string>;
+  const parentCallSid: string = req.body.ParentCallSid ?? "";
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : `${req.protocol}://${req.get("host")}`;
 
   const decodedRecUrl = recordingUrl ? decodeURIComponent(recordingUrl) : "";
   const fallbackLabel = fallback === "ai_voice" ? "AI agent" : "voicemail";
+  const acceptUrl = parentCallSid
+    ? `${baseUrl}/api/twilio/screen-accept?parentCallSid=${encodeURIComponent(parentCallSid)}`
+    : `${baseUrl}/api/twilio/screen-accept`;
 
   res.set("Content-Type", "text/xml");
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Gather numDigits="1" action="${baseUrl}/api/twilio/screen-accept" method="POST" timeout="15">
+  <Gather numDigits="1" action="${acceptUrl}" method="POST" timeout="15">
     <Say voice="${TWILIO_FALLBACK_VOICE}">Incoming call. The caller says their name is</Say>
     ${decodedRecUrl ? `<Play>${decodedRecUrl}</Play>` : `<Say voice="${TWILIO_FALLBACK_VOICE}">unknown.</Say>`}
     <Say voice="${TWILIO_FALLBACK_VOICE}">Press 1 to answer, or hang up to send to ${fallbackLabel}.</Say>
@@ -610,7 +614,10 @@ router.post("/twilio/name-screen", (req, res): void => {
 router.post("/twilio/screen", async (req, res): Promise<void> => {
   // callerFrom is passed as a query param from the voice webhook (the real inbound caller).
   // req.body.From here is the Twilio-to-forwardTo outbound leg number, NOT the caller.
+  // req.body.ParentCallSid is the inbound caller's CallSid — we pass it to screen-accept
+  // so it can key on the same CallSid that screen-fallback will check.
   const { phoneNumberId, fallback, callerFrom } = req.query as Record<string, string>;
+  const parentCallSid: string = req.body.ParentCallSid ?? "";
   const From = callerFrom ? decodeURIComponent(callerFrom) : null;
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
@@ -656,10 +663,14 @@ router.post("/twilio/screen", async (req, res): Promise<void> => {
     req.log.warn({ err: err?.message }, "Screen whisper lookup failed — using defaults");
   }
 
+  const acceptUrl = parentCallSid
+    ? `${baseUrl}/api/twilio/screen-accept?parentCallSid=${encodeURIComponent(parentCallSid)}`
+    : `${baseUrl}/api/twilio/screen-accept`;
+
   res.set("Content-Type", "text/xml");
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Gather numDigits="1" action="${baseUrl}/api/twilio/screen-accept" method="POST" timeout="3">
+  <Gather numDigits="1" action="${acceptUrl}" method="POST" timeout="3">
     <Say voice="${TWILIO_FALLBACK_VOICE}">Incoming call for ${escapeXml(lineName)} from ${escapeXml(callerLabel)}. Press 1 to answer, or hang up to send to ${fallbackLabel}.</Say>
   </Gather>
   <Hangup/>
@@ -668,11 +679,14 @@ router.post("/twilio/screen", async (req, res): Promise<void> => {
 
 // ─── Screen accept — pressed key after whisper ───────────────────────────────
 router.post("/twilio/screen-accept", (req, res): void => {
-  const { Digits, CallSid } = req.body;
+  const { Digits } = req.body;
+  // parentCallSid is threaded from the whisper URL — it's the inbound caller's CallSid,
+  // which matches what screen-fallback will check. req.body.CallSid is the outbound leg
+  // (agent's phone) and is a different ID, so we must NOT use that one.
+  const { parentCallSid } = req.query as Record<string, string>;
   res.set("Content-Type", "text/xml");
   if (Digits === "1") {
-    // Mark this call as truly accepted so screen-fallback knows not to start AI/voicemail
-    if (CallSid) acceptedScreenCalls.add(CallSid);
+    if (parentCallSid) acceptedScreenCalls.add(parentCallSid);
     // Empty response = bridge the two call legs
     res.send(`<?xml version="1.0" encoding="UTF-8"?><Response/>`);
   } else {
