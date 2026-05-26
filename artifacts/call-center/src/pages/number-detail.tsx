@@ -386,7 +386,16 @@ export default function NumberDetail() {
                   className="bg-background"
                   maxLength={15}
                 />
-                <p className="text-xs text-muted-foreground">Used in call screen announcement — "Incoming call for <em>Solutions</em>…". Max 15 characters.</p>
+                <p className="text-xs text-muted-foreground">Used in the call screen announcement — "Incoming call for <em>{formData.callerIdName || "Solutions"}</em>." Also synced to Twilio as the line's friendly name. Max 15 characters.</p>
+              </div>
+              <div className="rounded-md border border-border bg-muted/30 p-3 space-y-1.5">
+                <p className="text-xs font-medium text-foreground">About caller name on your phone</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  When a call is forwarded, your phone displays the caller's name via <strong className="text-foreground">CNAM</strong> — a carrier database separate from Twilio's friendly name. To make your phone show <em>{formData.callerIdName || "your line name"}</em> instead of a number, you need CNAM registration for this Twilio number.
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  In Twilio console: <strong className="text-foreground/80">Phone Numbers → Manage → select this number → Properties → Caller Name (CNAM)</strong>. Alternatively, enable "Require key press to accept" — the call screen verbally announces the line name before you pick up.
+                </p>
               </div>
             </CardContent>
           </Card>
