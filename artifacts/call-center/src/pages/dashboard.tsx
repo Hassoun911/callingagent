@@ -274,10 +274,16 @@ export default function Dashboard() {
                               </button>
                               {isOpen && (
                                 <div className="px-3 py-2 space-y-1 bg-card/20 border-t border-border/30">
-                                  {num.breakdown.length > 0 ? num.breakdown.map(r => (
+                                  {num.breakdown.length > 0 ? num.breakdown.map((r: any) => (
                                     <div key={r.category} className="flex items-center justify-between text-[11px]">
-                                      <span className="text-muted-foreground">{r.label}</span>
-                                      <span className="font-mono text-muted-foreground">${r.cost.toFixed(4)}</span>
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="text-muted-foreground truncate">{r.label}</span>
+                                        {r.isFixed
+                                          ? <span className="shrink-0 px-1 py-0.5 rounded text-[9px] font-medium uppercase tracking-wide bg-slate-700/60 text-slate-400 border border-slate-600/40">Fixed</span>
+                                          : <span className="shrink-0 text-[10px] font-bold text-sky-500/70" title="Per-use charge">+</span>
+                                        }
+                                      </div>
+                                      <span className="font-mono text-muted-foreground shrink-0 ml-2">${r.cost.toFixed(4)}</span>
                                     </div>
                                   )) : (
                                     <p className="text-[11px] text-muted-foreground">No charges this month</p>

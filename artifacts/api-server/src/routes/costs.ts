@@ -11,6 +11,9 @@ const TWILIO_LABELS: Record<string, { label: string; unit: string }> = {
   "phonenumbers":             { label: "Phone Numbers",         unit: "numbers"  },
   "phonenumbers-local":       { label: "Local Numbers",         unit: "numbers"  },
   "phonenumbers-tollfree":    { label: "Toll-Free Numbers",     unit: "numbers"  },
+  "phonenumbers-mobile":      { label: "Mobile Numbers",        unit: "numbers"  },
+  "phonenumbers-national":    { label: "National Numbers",      unit: "numbers"  },
+  "phonenumbers-emergency":   { label: "Emergency Calling",     unit: "numbers"  },
   "recordings":               { label: "Recordings",            unit: "minutes" },
   "recordingstorage":         { label: "Recording Storage",     unit: "minutes" },
   "transcriptions":           { label: "Transcriptions",        unit: "transcriptions" },
@@ -20,6 +23,16 @@ const TWILIO_LABELS: Record<string, { label: string; unit: string }> = {
   "tts":                      { label: "Text-to-Speech",        unit: "characters" },
   "voice-insights":           { label: "Voice Insights",        unit: "calls"   },
 };
+
+// Categories billed as flat monthly fees (not per-use)
+const TWILIO_FIXED: Set<string> = new Set([
+  "phonenumbers",
+  "phonenumbers-local",
+  "phonenumbers-tollfree",
+  "phonenumbers-mobile",
+  "phonenumbers-national",
+  "phonenumbers-emergency",
+]);
 
 async function fetchTwilioUsage(accountSid: string, auth: string, phoneNumber?: string) {
   const url = new URL(
@@ -89,6 +102,7 @@ router.get("/costs", async (req, res): Promise<void> => {
           usage:     rec.usage as string,
           usageUnit: TWILIO_LABELS[rec.category]?.unit ?? (rec.usage_unit as string ?? ""),
           count:     rec.count as string,
+          isFixed:   TWILIO_FIXED.has(rec.category as string),
         }))
         .sort((a: any, b: any) => b.cost - a.cost);
 
@@ -108,6 +122,7 @@ router.get("/costs", async (req, res): Promise<void> => {
                   label:    TWILIO_LABELS[rec.category]?.label ?? rec.category,
                   cost:     parseFloat(rec.price ?? "0"),
                   usage:    rec.usage as string,
+                  isFixed:  TWILIO_FIXED.has(rec.category as string),
                 }))
                 .sort((a: any, b: any) => b.cost - a.cost);
 
