@@ -324,26 +324,28 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     } else if (callScreen && phoneNumber?.id) {
       const encodedFrom = encodeURIComponent(From ?? "");
       const screenUrl = `${baseUrl}/api/twilio/screen?phoneNumberId=${phoneNumber.id}&amp;fallback=${callScreenFallback}&amp;callerFrom=${encodedFrom}`;
+      // Use Dial action= so DialCallStatus is posted — lets us detect "completed" (agent answered)
+      // vs "no-answer"/"busy"/"failed" (agent didn't pick up) and skip the fallback when answered.
       const fallbackUrl = `${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&amp;mode=${callScreenFallback}`;
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   ${preDialSay}
-  <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}">
+  <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}" action="${fallbackUrl}" method="POST">
     <Number url="${screenUrl}">${forwardTo}</Number>
   </Dial>
-  <Redirect method="POST">${fallbackUrl}</Redirect>
 </Response>`;
     } else {
       const noAnswerAction = phoneNumber?.forwardNoAnswerAction ?? "personal_voicemail";
-      const noAnswerRedirect = (noAnswerAction === "voicemail" || noAnswerAction === "ai_voice") && phoneNumber?.id
-        ? `\n  <Redirect method="POST">${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&amp;mode=${noAnswerAction}</Redirect>`
+      const hasNoAnswerFallback = (noAnswerAction === "voicemail" || noAnswerAction === "ai_voice") && phoneNumber?.id;
+      const noAnswerActionAttr = hasNoAnswerFallback
+        ? ` action="${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&amp;mode=${noAnswerAction}" method="POST"`
         : "";
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   ${preDialSay}
-  <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}">
+  <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}"${noAnswerActionAttr}>
     <Number>${forwardTo}</Number>
-  </Dial>${noAnswerRedirect}
+  </Dial>
 </Response>`;
     }
 
@@ -674,9 +676,17 @@ router.post("/twilio/screen-accept", (req, res): void => {
 
 // ─── Screen fallback — caller lands here if screen rejected ──────────────────
 router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
-  const { CallSid, To, From } = req.body;
+  const { CallSid, To, From, DialCallStatus } = req.body;
   const { phoneNumberId, mode } = req.query as Record<string, string>;
-  req.log.info({ CallSid, phoneNumberId, mode }, "Call screen fallback");
+  req.log.info({ CallSid, phoneNumberId, mode, DialCallStatus }, "Call screen fallback");
+
+  // If the agent answered and then hung up, DialCallStatus will be "completed".
+  // Do NOT start AI/voicemail — the call was handled. Just end cleanly.
+  if (DialCallStatus === "completed") {
+    res.set("Content-Type", "text/xml");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
+    return;
+  }
 
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
