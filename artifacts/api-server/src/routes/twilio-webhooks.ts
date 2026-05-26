@@ -135,7 +135,7 @@ async function generateTts(text: string, voice = "nova"): Promise<string | null>
   try {
     const ttsVoice = (VOICE_MAP[voice] ?? "nova") as any;
     const response = await openai.audio.speech.create({
-      model: "tts-1-hd",
+      model: "tts-1",
       voice: ttsVoice,
       input: text,
     });
