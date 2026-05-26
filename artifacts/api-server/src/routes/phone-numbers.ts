@@ -243,6 +243,7 @@ router.patch("/phone-numbers/:id", async (req, res): Promise<void> => {
   if (body.callScreenFallback != null) updateData.callScreenFallback = body.callScreenFallback;
   if (body.forwardNoAnswerAction != null) updateData.forwardNoAnswerAction = body.forwardNoAnswerAction;
   if ("holdMessage" in body) updateData.holdMessage = body.holdMessage ?? null;
+  if ("notificationEmail" in body) updateData.notificationEmail = body.notificationEmail || null;
 
   const [updated] = await db.update(phoneNumbersTable)
     .set(updateData)
