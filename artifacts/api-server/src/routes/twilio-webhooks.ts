@@ -464,20 +464,58 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
 });
 
 // ─── Call screen whisper (plays to YOU when you answer a forwarded call) ──────
-router.post("/twilio/screen", (req, res): void => {
+router.post("/twilio/screen", async (req, res): Promise<void> => {
   const { phoneNumberId, fallback } = req.query as Record<string, string>;
+  const { From } = req.body;
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : `${req.protocol}://${req.get("host")}`;
 
   const fallbackLabel = fallback === "ai_voice" ? "AI agent" : "voicemail";
-  req.log.info({ phoneNumberId, fallback }, "Call screen whisper");
+  req.log.info({ phoneNumberId, fallback, From }, "Call screen whisper");
+
+  // Look up the line name and caller identity in parallel
+  let lineName = "your business";
+  let callerLabel = "an unknown caller";
+
+  try {
+    const [numRow, contactRow] = await Promise.all([
+      phoneNumberId
+        ? db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, parseInt(phoneNumberId, 10))).then(r => r[0] ?? null)
+        : Promise.resolve(null),
+      From && From !== "Anonymous"
+        ? db.select().from(contactsTable).where(eq(contactsTable.phone, From)).then(r => r[0] ?? null)
+        : Promise.resolve(null),
+    ]);
+
+    // Line name: callerIdName → company name → fallback
+    if (numRow?.callerIdName) {
+      lineName = numRow.callerIdName;
+    } else if (numRow?.companyId) {
+      const [co] = await db.select().from(companiesTable).where(eq(companiesTable.id, numRow.companyId));
+      if (co?.name) lineName = co.name;
+    }
+
+    // Caller identity: CRM contact name → formatted number → anonymous
+    if (contactRow) {
+      callerLabel = `${contactRow.firstName} ${contactRow.lastName}`.trim() || callerLabel;
+    } else if (From && From !== "Anonymous") {
+      // Format for natural speech: +12267586681 → 226-758-6681
+      const digits = From.replace(/\D/g, "");
+      const local = digits.length === 11 && digits[0] === "1" ? digits.slice(1) : digits;
+      callerLabel = local.length === 10
+        ? `${local.slice(0, 3)}-${local.slice(3, 6)}-${local.slice(6)}`
+        : From;
+    }
+  } catch (err: any) {
+    req.log.warn({ err: err?.message }, "Screen whisper lookup failed — using defaults");
+  }
 
   res.set("Content-Type", "text/xml");
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Gather numDigits="1" action="${baseUrl}/api/twilio/screen-accept" method="POST" timeout="8">
-    <Say voice="Polly.Joanna-Neural">Incoming business call. Press 1 to answer, or hang up to send to ${fallbackLabel}.</Say>
+    <Say voice="${TWILIO_FALLBACK_VOICE}">Incoming call for ${escapeXml(lineName)} from ${escapeXml(callerLabel)}. Press 1 to answer, or hang up to send to ${fallbackLabel}.</Say>
   </Gather>
   <Hangup/>
 </Response>`);

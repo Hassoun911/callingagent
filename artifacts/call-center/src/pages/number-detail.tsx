@@ -319,14 +319,14 @@ export default function NumberDetail() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Caller ID Name (CNAM)</Label>
+                <Label>Display Name</Label>
                 <Input 
                   value={formData.callerIdName} 
                   onChange={(e) => setFormData({...formData, callerIdName: e.target.value})}
                   className="bg-background"
                   maxLength={15}
                 />
-                <p className="text-xs text-muted-foreground">Max 15 characters.</p>
+                <p className="text-xs text-muted-foreground">Used in call screen announcement — "Incoming call for <em>Solutions</em>…". Max 15 characters.</p>
               </div>
             </CardContent>
           </Card>
