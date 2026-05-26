@@ -93,9 +93,11 @@ function cacheTts(buffer: Buffer): string {
   return id;
 }
 
-// Chat completions use the Replit AI proxy; TTS uses a direct OpenAI key (OPENAI_API_KEY)
-// because the proxy does not support /audio/speech.
+// Chat completions: prefer direct OPENAI_API_KEY (much lower latency than the Replit proxy).
+// Fall back to the proxy if no direct key is available.
 function getChatOpenAI() {
+  const directKey = process.env.OPENAI_API_KEY;
+  if (directKey) return new OpenAI({ apiKey: directKey });
   return new OpenAI({
     baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
     apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -411,23 +413,46 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   try {
     const openai = getChatOpenAI();
 
-    const completion = await openai.chat.completions.create({
+    // Stream the completion so we can fire TTS the moment the first sentence is ready,
+    // overlapping LLM generation time with TTS generation time.
+    const stream = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: conv.systemPrompt + "\n\nIMPORTANT: Keep all responses to 1-3 short sentences. You are on a live phone call. Never use markdown, bullet points, or lists — only natural spoken language. Vary your phrasing — do not start every response the same way.",
+          content: conv.systemPrompt + "\n\nIMPORTANT: Keep all responses to 1-2 short sentences MAX. You are on a live phone call — brevity is critical. Never use markdown, bullet points, or lists — only natural spoken language.",
         },
         ...conv.messages,
       ],
-      max_tokens: 180,
+      max_tokens: 100,
+      stream: true,
     });
 
-    const aiText = completion.choices[0]?.message?.content ?? (isArabic ? "عذرًا، لم أتمكن من المعالجة. هل يمكنك المحاولة مرة أخرى؟" : "I'm sorry, I couldn't process that. Can you try again?");
+    let aiText = "";
+    let audioIdPromise: Promise<string | null> | null = null;
+    let ttsTriggeredOn = "";
+
+    for await (const chunk of stream) {
+      aiText += chunk.choices[0]?.delta?.content ?? "";
+
+      // Fire TTS as soon as we have a complete sentence — runs concurrently with remaining tokens
+      if (!audioIdPromise && aiText.length >= 8 && /[.!?]/.test(aiText)) {
+        ttsTriggeredOn = aiText;
+        audioIdPromise = generateTts(aiText, voice);
+      }
+    }
+
+    // If more text arrived after TTS was triggered (rare with short responses) regenerate
+    if (!audioIdPromise) {
+      audioIdPromise = generateTts(aiText, voice);
+    } else if (aiText !== ttsTriggeredOn && aiText.length > ttsTriggeredOn.length + 20) {
+      audioIdPromise = generateTts(aiText, voice);
+    }
+
+    if (!aiText) aiText = isArabic ? "عذرًا، لم أتمكن من المعالجة. هل يمكنك المحاولة مرة أخرى؟" : "I'm sorry, I couldn't process that. Can you try again?";
     conv.messages.push({ role: "assistant", content: aiText });
 
-    // Generate TTS audio
-    const audioId = await generateTts(aiText, voice);
+    const audioId = await audioIdPromise;
 
     // Check if AI naturally wants to end
     const endPhrases = isArabic
