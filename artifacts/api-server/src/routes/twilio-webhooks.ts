@@ -209,17 +209,17 @@ function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function gatherBlock(audioId: string | null, fallbackText: string, baseUrl: string, language = "en-US", speechTimeout = 2.5): string {
-  // Nest the audio INSIDE <Gather> so Twilio only starts speech detection AFTER
-  // the prompt finishes playing, preventing echo/sidetone from triggering a false match.
+function gatherBlock(audioId: string | null, fallbackText: string, baseUrl: string, language = "en-US", _speechTimeout = 2.5): string {
+  // Play OUTSIDE <Gather> so the AI always finishes speaking before Twilio starts
+  // listening. Nesting inside Gather enables barge-in, which caused the AI to be cut
+  // off mid-sentence when the caller spoke or phone echo triggered detection early.
   //
-  // speechTimeout="auto" uses Twilio's ML model to detect natural end-of-speech rather
-  // than a fixed timer. This prevents cutting the caller off mid-sentence during pauses.
-  // We use "auto" whenever the configured value is <= 1.5 s (the old default was 1.0).
-  const stValue = speechTimeout <= 1.5 ? "auto" : speechTimeout.toString();
+  // speechTimeout="auto" uses Twilio's ML model to detect natural end-of-speech
+  // rather than a fixed silence timer, preventing the caller from being cut off
+  // mid-sentence during brief pauses between words.
   const audio = playOrSay(audioId, fallbackText, baseUrl);
-  return `<Gather input="speech" timeout="10" speechTimeout="${stValue}" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
-  ${audio}
+  return `${audio}
+<Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
 </Gather>`;
 }
 
