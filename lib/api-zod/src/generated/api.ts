@@ -440,7 +440,8 @@ export const GetAiVoiceConfigResponse = zod.object({
   "systemPrompt": zod.string(),
   "maxCallDuration": zod.number().optional(),
   "speechTimeout": zod.number().optional().describe('Seconds of silence after caller stops speaking before processing (0.5–3)'),
-  "maxTokens": zod.number().optional().describe('Max tokens per AI response — lower is faster and more concise')
+  "maxTokens": zod.number().optional().describe('Max tokens per AI response — lower is faster and more concise'),
+  "voiceStyle": zod.string().optional().describe('Speaking style instructions passed to the TTS model for a more human sound')
 })
 
 
@@ -451,7 +452,8 @@ export const UpdateAiVoiceConfigBody = zod.object({
   "systemPrompt": zod.string().nullish(),
   "maxCallDuration": zod.number().nullish(),
   "speechTimeout": zod.number().nullish(),
-  "maxTokens": zod.number().nullish()
+  "maxTokens": zod.number().nullish(),
+  "voiceStyle": zod.string().nullish()
 })
 
 export const UpdateAiVoiceConfigResponse = zod.object({
@@ -462,7 +464,8 @@ export const UpdateAiVoiceConfigResponse = zod.object({
   "systemPrompt": zod.string(),
   "maxCallDuration": zod.number().optional(),
   "speechTimeout": zod.number().optional().describe('Seconds of silence after caller stops speaking before processing (0.5–3)'),
-  "maxTokens": zod.number().optional().describe('Max tokens per AI response — lower is faster and more concise')
+  "maxTokens": zod.number().optional().describe('Max tokens per AI response — lower is faster and more concise'),
+  "voiceStyle": zod.string().optional().describe('Speaking style instructions passed to the TTS model for a more human sound')
 })
 
 

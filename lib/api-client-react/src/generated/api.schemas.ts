@@ -396,6 +396,8 @@ export interface AiVoiceConfig {
   speechTimeout?: number;
   /** Max tokens per AI response — lower is faster and more concise */
   maxTokens?: number;
+  /** Speaking style instructions passed to the TTS model for a more human sound */
+  voiceStyle?: string;
 }
 
 /**
@@ -445,6 +447,8 @@ export interface AiVoiceConfigUpdate {
   speechTimeout?: number | null;
   /** @nullable */
   maxTokens?: number | null;
+  /** @nullable */
+  voiceStyle?: string | null;
 }
 
 export interface DashboardStats {

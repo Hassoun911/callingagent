@@ -915,6 +915,9 @@ components:
         maxTokens:
           type: integer
           description: Max tokens per AI response — lower is faster and more concise
+        voiceStyle:
+          type: string
+          description: Speaking style instructions passed to the TTS model for a more human sound
 
     AiVoiceConfigUpdate:
       type: object
@@ -935,6 +938,8 @@ components:
           type: ["number", "null"]
         maxTokens:
           type: ["integer", "null"]
+        voiceStyle:
+          type: ["string", "null"]
 
     DashboardStats:
       type: object

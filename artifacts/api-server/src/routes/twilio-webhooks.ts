@@ -79,6 +79,7 @@ interface ConversationState {
   maxDuration: number;
   startedAt: number;
   voice: string;
+  voiceStyle: string;
   language: string;
   baseUrl: string;
   speechTimeout: number;
@@ -134,7 +135,7 @@ const VOICE_MAP: Record<string, string> = {
 // Best available Twilio <Say> voice — used only when no OPENAI_API_KEY is set
 const TWILIO_FALLBACK_VOICE = "Google.en-US-Neural2-F";
 
-async function generateTts(text: string, voice = "nova"): Promise<string | null> {
+async function generateTts(text: string, voice = "nova", voiceStyle?: string): Promise<string | null> {
   const openai = getTtsOpenAI();
   if (!openai) {
     logger.warn("OPENAI_API_KEY not set — TTS will use Twilio neural voice fallback");
@@ -142,17 +143,18 @@ async function generateTts(text: string, voice = "nova"): Promise<string | null>
   }
   try {
     const ttsVoice = (VOICE_MAP[voice] ?? "nova") as any;
-    const warmKey = `${ttsVoice}:${text}`;
+    const warmKey = `${ttsVoice}:${voiceStyle ?? ""}:${text}`;
 
     // Serve from warm cache if available — zero additional API call
     const warm = ttsWarmCache.get(warmKey);
     if (warm) return cacheTts(warm);
 
     const response = await openai.audio.speech.create({
-      model: "tts-1",
+      model: "gpt-4o-mini-tts",
       voice: ttsVoice,
       input: text,
-    });
+      ...(voiceStyle ? { instructions: voiceStyle } : {}),
+    } as any);
     const buffer = Buffer.from(await response.arrayBuffer());
 
     // Store in warm cache for instant reuse on subsequent calls
@@ -174,11 +176,12 @@ export async function warmTtsCache(): Promise<void> {
   try {
     const [aiConfig] = await db.select().from(aiVoiceConfigTable);
     const voice = aiConfig?.voice ?? "nova";
+    const voiceStyle = aiConfig?.voiceStyle ?? undefined;
     const greeting = aiConfig?.greeting?.trim() || DEFAULT_GREETING;
     await Promise.all([
-      generateTts(greeting, voice),
-      generateTts(DEFAULT_RETRY_EN, voice),
-      generateTts(DEFAULT_RETRY_AR, voice),
+      generateTts(greeting, voice, voiceStyle),
+      generateTts(DEFAULT_RETRY_EN, voice, voiceStyle),
+      generateTts(DEFAULT_RETRY_AR, voice, voiceStyle),
     ]);
     logger.info({ voice, greeting: greeting.slice(0, 60) }, "TTS warm cache ready");
   } catch (err: any) {
@@ -336,6 +339,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     const [aiConfig] = await db.select().from(aiVoiceConfigTable);
     const language = aiConfig?.language ?? "en-US";
     const ttsVoice = aiConfig?.voice ?? "nova";
+    const voiceStyle = aiConfig?.voiceStyle ?? "";
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
     const speechTimeout = aiConfig?.speechTimeout ?? 1.0;
     const maxTokens = aiConfig?.maxTokens ?? 100;
@@ -364,6 +368,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       maxDuration,
       startedAt: Date.now(),
       voice: ttsVoice,
+      voiceStyle,
       language,
       baseUrl,
       speechTimeout,
@@ -374,8 +379,8 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     const retryFallback = language === "ar-SA" ? "لم أفهم. هل يمكنك الإعادة؟" : "I didn't catch that. Could you please repeat?";
     startCallRecording(CallSid, `${baseUrl}/api/twilio/recording`);
     const [greetingAudioId, retryAudioId] = await Promise.all([
-      generateTts(greetingText, ttsVoice),
-      generateTts(retryFallback, ttsVoice),
+      generateTts(greetingText, ttsVoice, voiceStyle),
+      generateTts(retryFallback, ttsVoice, voiceStyle),
     ]);
 
     twiml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -419,7 +424,7 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
     return;
   }
 
-  const { baseUrl, voice, language } = conv;
+  const { baseUrl, voice, voiceStyle, language } = conv;
   const isArabic = language.startsWith("ar-");
 
   // Check max duration
@@ -427,7 +432,7 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   if (elapsed > conv.maxDuration) {
     conversations.delete(CallSid);
     const byeText = isArabic ? "لقد وصلنا إلى الحد الأقصى لمدة المكالمة. شكرا لاتصالك. مع السلامة!" : "We've reached the maximum call duration. Thank you for calling. Goodbye!";
-    const audioId = await generateTts(byeText, voice);
+    const audioId = await generateTts(byeText, voice, voiceStyle);
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -439,7 +444,7 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
 
   if (!SpeechResult) {
     const retryText = isArabic ? "لم أفهم. هل يمكنك الإعادة؟" : "I didn't catch that. Could you please repeat?";
-    const audioId = await generateTts(retryText, voice);
+    const audioId = await generateTts(retryText, voice, voiceStyle);
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -479,15 +484,15 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
       // Fire TTS as soon as we have a complete sentence — runs concurrently with remaining tokens
       if (!audioIdPromise && aiText.length >= 8 && /[.!?]/.test(aiText)) {
         ttsTriggeredOn = aiText;
-        audioIdPromise = generateTts(aiText, voice);
+        audioIdPromise = generateTts(aiText, voice, voiceStyle);
       }
     }
 
     // If more text arrived after TTS was triggered (rare with short responses) regenerate
     if (!audioIdPromise) {
-      audioIdPromise = generateTts(aiText, voice);
+      audioIdPromise = generateTts(aiText, voice, voiceStyle);
     } else if (aiText !== ttsTriggeredOn && aiText.length > ttsTriggeredOn.length + 20) {
-      audioIdPromise = generateTts(aiText, voice);
+      audioIdPromise = generateTts(aiText, voice, voiceStyle);
     }
 
     if (!aiText) aiText = isArabic ? "عذرًا، لم أتمكن من المعالجة. هل يمكنك المحاولة مرة أخرى؟" : "I'm sorry, I couldn't process that. Can you try again?";
@@ -521,7 +526,7 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   } catch (err: any) {
     req.log.error({ err }, "OpenAI call failed in ai-gather");
     const errText = isArabic ? "أواجه مشكلة تقنية. يرجى المحاولة مرة أخرى لاحقًا." : "I'm having a technical issue right now. Please try calling again later.";
-    const audioId = await generateTts(errText, voice);
+    const audioId = await generateTts(errText, voice, voiceStyle);
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -623,6 +628,7 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
     const [aiConfig] = await db.select().from(aiVoiceConfigTable);
     const language = aiConfig?.language ?? "en-US";
     const ttsVoice = aiConfig?.voice ?? "nova";
+    const voiceStyle2 = aiConfig?.voiceStyle ?? "";
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
     const speechTimeout = aiConfig?.speechTimeout ?? 1.0;
     const maxTokens = aiConfig?.maxTokens ?? 100;
@@ -649,6 +655,7 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
       maxDuration,
       startedAt: Date.now(),
       voice: ttsVoice,
+      voiceStyle: voiceStyle2,
       language,
       baseUrl,
       speechTimeout,
@@ -659,8 +666,8 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
     const retryFallback = language.startsWith("ar-") ? "لم أفهم. هل يمكنك الإعادة؟" : "I didn't catch that. Could you please repeat?";
     startCallRecording(CallSid, `${baseUrl}/api/twilio/recording`);
     const [greetingAudioId, retryAudioId] = await Promise.all([
-      generateTts(greetingText, ttsVoice),
-      generateTts(retryFallback, ttsVoice),
+      generateTts(greetingText, ttsVoice, voiceStyle2),
+      generateTts(retryFallback, ttsVoice, voiceStyle2),
     ]);
 
     res.set("Content-Type", "text/xml");

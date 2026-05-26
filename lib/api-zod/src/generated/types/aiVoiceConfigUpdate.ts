@@ -23,4 +23,6 @@ export interface AiVoiceConfigUpdate {
   speechTimeout?: number | null;
   /** @nullable */
   maxTokens?: number | null;
+  /** @nullable */
+  voiceStyle?: string | null;
 }

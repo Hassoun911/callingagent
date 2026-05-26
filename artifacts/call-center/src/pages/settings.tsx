@@ -74,6 +74,7 @@ export default function Settings() {
     language: "en-US",
     greeting: "",
     systemPrompt: "",
+    voiceStyle: "",
     maxCallDuration: 300,
     speechTimeout: 1.0,
     maxTokens: 100,
@@ -87,6 +88,7 @@ export default function Settings() {
         language: config.language ?? "en-US",
         greeting: config.greeting,
         systemPrompt: config.systemPrompt,
+        voiceStyle: config.voiceStyle ?? "",
         maxCallDuration: config.maxCallDuration,
         speechTimeout: config.speechTimeout ?? 1.0,
         maxTokens: config.maxTokens ?? 100,
@@ -222,6 +224,19 @@ export default function Settings() {
                 )}
               </p>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Speaking Style</Label>
+            <Textarea
+              value={formData.voiceStyle}
+              onChange={e => setFormData({...formData, voiceStyle: e.target.value})}
+              className="min-h-[100px] font-mono text-sm bg-background leading-relaxed"
+              placeholder="e.g. Speak with a warm, confident tone. Add natural pauses. Sound professional but approachable — not robotic."
+            />
+            <p className="text-xs text-muted-foreground">
+              Instructions fed directly to the TTS model to shape delivery: pace, tone, emotion, emphasis. Leave blank for the model's default style.
+            </p>
           </div>
 
           <div className="space-y-2">
