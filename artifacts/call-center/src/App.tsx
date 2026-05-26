@@ -12,6 +12,7 @@ import Calls from "@/pages/calls";
 import Contacts from "@/pages/contacts";
 import Companies from "@/pages/companies";
 import Settings from "@/pages/settings";
+import Billing from "@/pages/billing";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -34,6 +35,7 @@ function Router() {
         <Route path="/contacts" component={Contacts} />
         <Route path="/companies" component={Companies} />
         <Route path="/settings" component={Settings} />
+        <Route path="/billing" component={Billing} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
