@@ -640,26 +640,52 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
       }
       conversations.delete(CallSid);
 
-      // If we still don't have a recording URL, poll Twilio at 5s / 20s / 60s
-      // to catch recordings that finish processing after the status callback.
+      // If we still don't have a recording URL, poll Twilio to catch recordings
+      // that finish processing after the status callback fires.
       if (!RecordingUrl) {
         const pollForRecording = async () => {
           const delays = [5000, 20000, 60000];
           const client = getTwilioClient();
+
+          // Check if startCallRecording() already stored a preferred SID.
+          // If so, poll that specific recording rather than grabbing whichever
+          // recording Twilio returns first (which might be the short Dial whisper).
+          const [currentRow] = await db
+            .select({ recordingSid: callLogsTable.recordingSid, recordingUrl: callLogsTable.recordingUrl })
+            .from(callLogsTable)
+            .where(eq(callLogsTable.twilioCallSid, CallSid));
+
+          const preferredSid = currentRow?.recordingSid ?? null;
+
           for (const delay of delays) {
             await new Promise(r => setTimeout(r, delay));
             try {
-              const recs = await client.recordings.list({ callSid: CallSid, limit: 1 });
-              if (recs.length > 0) {
-                const rec = recs[0];
-                logger.info({ CallSid, recordingSid: rec.sid }, "Recording found via polling");
-                await db.update(callLogsTable)
-                  .set({
-                    recordingSid: rec.sid,
-                    recordingUrl: `https://api.twilio.com/2010-04-01/Accounts/${rec.accountSid}/Recordings/${rec.sid}.mp3`,
-                  })
-                  .where(eq(callLogsTable.twilioCallSid, CallSid));
-                return; // found — stop polling
+              if (preferredSid) {
+                // Fetch the specific recording we started via API
+                const rec = await client.recordings(preferredSid).fetch();
+                if (rec && rec.status === "completed") {
+                  const url = `https://api.twilio.com/2010-04-01/Accounts/${rec.accountSid}/Recordings/${rec.sid}.mp3`;
+                  logger.info({ CallSid, recordingSid: rec.sid }, "Preferred recording ready via polling");
+                  await db.update(callLogsTable)
+                    .set({ recordingUrl: url })
+                    .where(eq(callLogsTable.twilioCallSid, CallSid));
+                  return;
+                }
+              } else {
+                // No preferred SID — take the longest available recording for this call
+                const recs = await client.recordings.list({ callSid: CallSid, limit: 10 });
+                if (recs.length > 0) {
+                  // Prefer the longest recording (actual conversation vs short whisper)
+                  const rec = recs.sort((a, b) => (Number(b.duration) || 0) - (Number(a.duration) || 0))[0];
+                  logger.info({ CallSid, recordingSid: rec.sid, duration: rec.duration }, "Recording found via polling");
+                  await db.update(callLogsTable)
+                    .set({
+                      recordingSid: rec.sid,
+                      recordingUrl: `https://api.twilio.com/2010-04-01/Accounts/${rec.accountSid}/Recordings/${rec.sid}.mp3`,
+                    })
+                    .where(eq(callLogsTable.twilioCallSid, CallSid));
+                  return;
+                }
               }
             } catch (err: any) {
               logger.warn({ CallSid, err: err?.message }, "Recording poll attempt failed");
@@ -681,10 +707,29 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
 
 // ─── Recording callback ──────────────────────────────────────────────────────
 router.post("/twilio/recording", async (req, res): Promise<void> => {
-  const { CallSid, RecordingUrl, RecordingSid, TranscriptionText } = req.body;
-  req.log.info({ CallSid, RecordingSid }, "Twilio recording callback");
+  const { CallSid, RecordingUrl, RecordingSid, RecordingDuration, TranscriptionText } = req.body;
+  req.log.info({ CallSid, RecordingSid, RecordingDuration }, "Twilio recording callback");
 
-  if (CallSid) {
+  if (CallSid && (RecordingUrl || RecordingSid || TranscriptionText)) {
+    // If we already have a preferred recording SID (set by startCallRecording()),
+    // don't let a secondary recording (e.g. the short Dial whisper) overwrite it.
+    const [existing] = await db
+      .select({ recordingSid: callLogsTable.recordingSid, recordingUrl: callLogsTable.recordingUrl })
+      .from(callLogsTable)
+      .where(eq(callLogsTable.twilioCallSid, CallSid));
+
+    const preferredSid = existing?.recordingSid ?? null;
+    const isPreferredCallback = !preferredSid || preferredSid === RecordingSid;
+
+    if (!isPreferredCallback) {
+      req.log.info(
+        { CallSid, incomingSid: RecordingSid, preferredSid },
+        "Ignoring recording callback for secondary recording (Dial whisper); preferred SID already set"
+      );
+      res.sendStatus(200);
+      return;
+    }
+
     const updateData: any = {};
     if (RecordingUrl) updateData.recordingUrl = `${RecordingUrl}.mp3`;
     if (RecordingSid) updateData.recordingSid = RecordingSid;
