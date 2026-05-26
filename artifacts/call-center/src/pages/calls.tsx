@@ -4,15 +4,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PhoneIncoming, PhoneOutgoing, Play, Pause, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone, Loader2, Download } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Play, Pause, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone, Loader2, Download, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
-/** Format an E.164 number to a human-readable North American format.
- * +12267586681 → (226) 758-6681 · anything else returned as-is. */
+/** Format an E.164 number to a human-readable North American format. */
 function formatPhone(raw: string | null | undefined): string {
   if (!raw || raw === "Anonymous") return raw ?? "Anonymous";
   const digits = raw.replace(/\D/g, "");
@@ -33,7 +33,6 @@ function fmtTime(s: number): string {
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
-// Global tracker so only one player plays at a time
 const activeAudio = { current: null as HTMLAudioElement | null };
 
 function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
@@ -47,8 +46,6 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
 
   useEffect(() => {
     const audio = new Audio();
-    // Preload just the metadata so real recording duration shows immediately.
-    // The server supports range requests so only the audio header is fetched.
     audio.preload = "metadata";
     audio.src = src;
     audioRef.current = audio;
@@ -123,7 +120,6 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
     );
   }
 
-  // Compact table row variant — fixed 180px so table columns stay stable
   return (
     <div className="flex items-center gap-1.5" style={{ width: 180 }}>
       <button
@@ -200,7 +196,6 @@ function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose
           </DialogTitle>
         </DialogHeader>
 
-        {/* Always-visible caller metadata */}
         <div className="grid grid-cols-2 gap-3">
           {call?.fromNumber && call.fromNumber !== "Anonymous" && (
             <div className="flex items-center gap-2 p-3 bg-background border border-border rounded-lg">
@@ -249,7 +244,6 @@ function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose
           )}
         </div>
 
-        {/* Recording player */}
         {hasRecording && call?.id && (
           <div className="space-y-1.5">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Recording</p>
@@ -265,14 +259,12 @@ function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose
                 <p className="text-sm leading-relaxed">{call.callSummary}</p>
               </div>
             )}
-
             {call.actionRequired && (
               <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-1">
                 <p className="text-xs text-primary uppercase tracking-wide font-medium">Action Required</p>
                 <p className="text-sm">{call.actionRequired}</p>
               </div>
             )}
-
             {call.transcription && <Separator className="bg-border" />}
           </div>
         )}
@@ -295,8 +287,11 @@ export default function Calls() {
   const [direction, setDirection] = useState<"inbound" | "outbound" | "all">("all");
   const [status, setStatus] = useState<string>("all");
   const [selectedCall, setSelectedCall] = useState<any>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [clearConfirm, setClearConfirm] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
-  const { data: calls, isLoading } = useListCallLogs({
+  const { data: calls, isLoading, refetch } = useListCallLogs({
     direction: direction === "all" ? undefined : direction,
     status: status === "all" ? undefined : status,
     limit: 100,
@@ -325,6 +320,30 @@ export default function Calls() {
   const hasSummaryData = (call: any) =>
     call.callSummary || call.callerName || call.callType || call.transcription;
 
+  const handleDelete = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    setDeletingId(id);
+    try {
+      await fetch(`/api/call-logs/${id}`, { method: "DELETE" });
+      if (selectedCall?.id === id) setSelectedCall(null);
+      await refetch();
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleClearAll = async () => {
+    setIsClearing(true);
+    try {
+      await fetch("/api/call-logs", { method: "DELETE" });
+      setSelectedCall(null);
+      await refetch();
+    } finally {
+      setIsClearing(false);
+      setClearConfirm(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -332,6 +351,16 @@ export default function Calls() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Call Logs</h1>
           <p className="text-muted-foreground mt-1">Audit log of all communications with AI-extracted summaries.</p>
         </div>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setClearConfirm(true)}
+          disabled={!calls?.length || isClearing}
+          className="gap-2"
+        >
+          <Trash2 className="h-4 w-4" />
+          Clear All
+        </Button>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 bg-card/50 p-4 border border-border rounded-lg">
@@ -382,27 +411,28 @@ export default function Calls() {
               <TableHead>Priority</TableHead>
               <TableHead>Recording</TableHead>
               <TableHead className="w-8"></TableHead>
+              <TableHead className="w-8"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               [...Array(5)].map((_, i) => (
                 <TableRow key={i} className="border-border">
-                  {[...Array(10)].map((_, j) => (
+                  {[...Array(11)].map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : filtered?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                   No call logs found.
                 </TableCell>
               </TableRow>
             ) : filtered?.map((call) => (
               <TableRow
                 key={call.id}
-                className="border-border cursor-pointer hover:bg-muted/30 transition-colors"
+                className="border-border cursor-pointer hover:bg-muted/30 transition-colors group"
                 onClick={() => setSelectedCall(call)}
               >
                 <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
@@ -468,6 +498,19 @@ export default function Calls() {
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   )}
                 </TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={(e) => handleDelete(e, call.id)}
+                    disabled={deletingId === call.id}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-muted-foreground hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                    title="Delete log"
+                  >
+                    {deletingId === call.id
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Trash2 className="h-3.5 w-3.5" />
+                    }
+                  </button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -479,6 +522,28 @@ export default function Calls() {
         open={!!selectedCall}
         onClose={() => setSelectedCall(null)}
       />
+
+      <AlertDialog open={clearConfirm} onOpenChange={setClearConfirm}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all call logs?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all {calls?.length ?? 0} call log records. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isClearing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleClearAll}
+              disabled={isClearing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
+            >
+              {isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {isClearing ? "Clearing..." : "Clear All"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

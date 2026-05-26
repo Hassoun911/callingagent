@@ -116,4 +116,23 @@ router.get("/call-logs/:id/recording", async (req, res): Promise<void> => {
   await pump();
 });
 
+router.delete("/call-logs", async (req, res): Promise<void> => {
+  await db.delete(callLogsTable);
+  res.json({ deleted: true });
+});
+
+router.delete("/call-logs/:id", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const [deleted] = await db.delete(callLogsTable).where(eq(callLogsTable.id, id)).returning();
+  if (!deleted) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.json({ deleted: true });
+});
+
 export default router;
