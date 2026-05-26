@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startWatchPoller } from "./lib/watch-poller";
+import { warmTtsCache } from "./routes/twilio-webhooks";
 
 const rawPort = process.env["PORT"];
 
@@ -24,4 +25,5 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
   startWatchPoller();
+  warmTtsCache();
 });

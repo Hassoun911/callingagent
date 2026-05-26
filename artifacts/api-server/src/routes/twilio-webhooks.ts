@@ -95,6 +95,10 @@ function cacheTts(buffer: Buffer): string {
   return id;
 }
 
+// Content-addressable warm cache — keyed by "voice:text", never expires during the server session.
+// Greeting and retry phrases are pre-loaded at startup so the first call has zero TTS latency.
+const ttsWarmCache = new Map<string, Buffer>();
+
 // Chat completions: prefer direct OPENAI_API_KEY (much lower latency than the Replit proxy).
 // Fall back to the proxy if no direct key is available.
 function getChatOpenAI() {
@@ -138,16 +142,47 @@ async function generateTts(text: string, voice = "nova"): Promise<string | null>
   }
   try {
     const ttsVoice = (VOICE_MAP[voice] ?? "nova") as any;
+    const warmKey = `${ttsVoice}:${text}`;
+
+    // Serve from warm cache if available — zero additional API call
+    const warm = ttsWarmCache.get(warmKey);
+    if (warm) return cacheTts(warm);
+
     const response = await openai.audio.speech.create({
       model: "tts-1",
       voice: ttsVoice,
       input: text,
     });
     const buffer = Buffer.from(await response.arrayBuffer());
+
+    // Store in warm cache for instant reuse on subsequent calls
+    ttsWarmCache.set(warmKey, buffer);
+
     return cacheTts(buffer);
   } catch (err: any) {
     logger.error({ err: err?.message, code: err?.code }, "OpenAI TTS failed — falling back to Twilio neural voice");
     return null;
+  }
+}
+
+const DEFAULT_GREETING = "Hello, thank you for calling. How can I help you today?";
+const DEFAULT_RETRY_EN = "I didn't catch that. Could you please repeat?";
+const DEFAULT_RETRY_AR = "لم أفهم. هل يمكنك الإعادة؟";
+
+/** Pre-generate TTS for the greeting and retry phrases so the first call has instant audio. */
+export async function warmTtsCache(): Promise<void> {
+  try {
+    const [aiConfig] = await db.select().from(aiVoiceConfigTable);
+    const voice = aiConfig?.voice ?? "nova";
+    const greeting = aiConfig?.greeting?.trim() || DEFAULT_GREETING;
+    await Promise.all([
+      generateTts(greeting, voice),
+      generateTts(DEFAULT_RETRY_EN, voice),
+      generateTts(DEFAULT_RETRY_AR, voice),
+    ]);
+    logger.info({ voice, greeting: greeting.slice(0, 60) }, "TTS warm cache ready");
+  } catch (err: any) {
+    logger.warn({ err: err?.message }, "TTS warm cache pre-load failed — will generate on first call");
   }
 }
 

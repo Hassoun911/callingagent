@@ -6,6 +6,7 @@ import {
   UpdateAiVoiceConfigBody,
   UpdateAiVoiceConfigResponse,
 } from "@workspace/api-zod";
+import { warmTtsCache } from "./twilio-webhooks";
 
 const router: IRouter = Router();
 
@@ -47,6 +48,9 @@ router.patch("/ai-voice/config", async (req, res): Promise<void> => {
     .returning();
 
   res.json(UpdateAiVoiceConfigResponse.parse(updated));
+
+  // Re-warm TTS cache in the background with the new greeting/voice so the next call is instant
+  warmTtsCache().catch(() => {});
 });
 
 export default router;
