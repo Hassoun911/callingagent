@@ -40,7 +40,7 @@ export default function Billing() {
     refetchOnWindowFocus: false,
   });
 
-  const [currency, setCurrency] = useState<"USD" | "CAD">("USD");
+  const [currency, setCurrency] = useState<"USD" | "CAD">("CAD");
   const [expandedLine, setExpandedLine] = useState<string | null>(null);
 
   const fxRate = currency === "CAD" ? (fxData?.rate ?? 1.36) : 1;
