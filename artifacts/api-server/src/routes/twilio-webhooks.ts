@@ -426,7 +426,7 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
       messages: [
         {
           role: "system",
-          content: conv.systemPrompt + "\n\nIMPORTANT: You are on a live phone call. Keep responses concise — 1-2 sentences when possible. Never use markdown, bullet points, or lists — only natural spoken language. ACCURACY IS MANDATORY: always state exact numbers, dates, salaries, and specific facts exactly as provided — never round, estimate, or approximate them.",
+          content: conv.systemPrompt + "\n\nIMPORTANT: You are on a live phone call. Keep responses concise — 1-2 sentences when possible. Never use markdown, bullet points, or lists — only natural spoken language. NUMBERS AND DATES ARE SACRED: reproduce every number, salary, date, and figure character-for-character exactly as written in your instructions — never round, shorten, approximate, paraphrase, or invent any numeric or date value under any circumstances.",
         },
         ...conv.messages,
       ],
