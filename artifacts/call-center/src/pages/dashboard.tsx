@@ -1,13 +1,26 @@
 import { useGetDashboardStats, useGetRecentCalls } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Phone, Users, Building2, Clock, PhoneIncoming, PhoneOutgoing, Voicemail, PhoneForwarded, Activity } from "lucide-react";
+import { Phone, Users, Clock, PhoneIncoming, PhoneOutgoing, Voicemail, Activity, DollarSign, RefreshCw, AlertCircle, ExternalLink } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 
+type CostData = {
+  period: string;
+  twilio: { available: true; totalCost: number; currency: string; breakdown: { category: string; label: string; cost: number; usage: string; usageUnit: string }[] } | { available: false; error: string } | null;
+  openai: { available: true; totalCost: number; currency: string; breakdown: { model: string; cost: number }[] } | { available: false; error: string } | null;
+};
+
 export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: recentCalls, isLoading: callsLoading } = useGetRecentCalls({ limit: 5 });
+  const { data: costs, isLoading: costsLoading, refetch: refetchCosts, isFetching: costsFetching } = useQuery<CostData>({
+    queryKey: ["costs"],
+    queryFn: () => fetch("/api/costs").then(r => r.json()),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
 
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -153,6 +166,143 @@ export default function Dashboard() {
           </div>
         </>
       ) : null}
+
+      {/* ── Usage & Cost ──────────────────────────────────────────────────── */}
+      <Card className="border-border">
+        <CardHeader className="flex flex-row items-center justify-between pb-4">
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-green-400" />
+            <div>
+              <CardTitle className="text-green-400">Usage &amp; Cost</CardTitle>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Current billing period: {costs?.period ?? "loading..."}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => refetchCosts()}
+            disabled={costsFetching}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${costsFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </CardHeader>
+        <CardContent>
+          {costsLoading ? (
+            <div className="grid grid-cols-2 gap-4">
+              <Skeleton className="h-32" />
+              <Skeleton className="h-32" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              {/* Twilio */}
+              <div className="rounded-lg border border-border bg-card/30 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-red-400" />
+                    <span className="text-sm font-semibold text-foreground">Twilio</span>
+                  </div>
+                  {costs?.twilio?.available && (
+                    <a
+                      href="https://console.twilio.com/us1/billing/billing-history"
+                      target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Console <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+
+                {costs?.twilio?.available ? (
+                  <>
+                    <div>
+                      <div className="text-3xl font-bold font-mono text-foreground">
+                        ${costs.twilio.totalCost.toFixed(4)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">{costs.twilio.currency} this month</p>
+                    </div>
+                    {costs.twilio.breakdown.length > 0 ? (
+                      <div className="space-y-1.5 pt-1 border-t border-border/50">
+                        {costs.twilio.breakdown.slice(0, 6).map(row => (
+                          <div key={row.category} className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground truncate mr-2">{row.label}</span>
+                            <span className="font-mono text-foreground shrink-0">${row.cost.toFixed(4)}</span>
+                          </div>
+                        ))}
+                        {costs.twilio.breakdown.length > 6 && (
+                          <p className="text-xs text-muted-foreground pt-0.5">+{costs.twilio.breakdown.length - 6} more categories</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No charges this month</p>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                    <span>{(costs?.twilio as any)?.error ?? "Not available"}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* OpenAI */}
+              <div className="rounded-lg border border-border bg-card/30 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-sm font-semibold text-foreground">OpenAI</span>
+                  </div>
+                  <a
+                    href="https://platform.openai.com/settings/organization/billing/overview"
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Dashboard <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+
+                {costs?.openai?.available ? (
+                  <>
+                    <div>
+                      <div className="text-3xl font-bold font-mono text-foreground">
+                        ${(costs.openai as any).totalCost.toFixed(6)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">USD this month</p>
+                    </div>
+                    {(costs.openai as any).breakdown?.length > 0 && (
+                      <div className="space-y-1.5 pt-1 border-t border-border/50">
+                        {(costs.openai as any).breakdown.slice(0, 6).map((row: any) => (
+                          <div key={row.model} className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground font-mono truncate mr-2">{row.model}</span>
+                            <span className="font-mono text-foreground shrink-0">${row.cost.toFixed(6)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                      <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                      <span>{(costs?.openai as any)?.error ?? "Not available"}</span>
+                    </div>
+                    <a
+                      href="https://platform.openai.com/settings/organization/billing/overview"
+                      target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                      View on OpenAI platform <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="border-border">
         <CardHeader className="flex flex-row items-center justify-between">
