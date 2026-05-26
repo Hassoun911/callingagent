@@ -277,13 +277,14 @@ export default function Calls() {
                 </TableCell>
                 <TableCell className="text-sm">
                   {(() => {
-                    // Priority: AI-extracted name > CRM contact name > CNAM
+                    // Priority: AI-extracted name > CRM contact name > CNAM > phone number
                     // Guard against literal "null" / "undefined" strings stored by older code
                     const name = [call.callerName, call.contactName, call.callerIdName]
                       .find(n => n && n !== "null" && n !== "undefined");
-                    return name
-                      ? <span className="font-medium">{name}</span>
-                      : <span className="text-muted-foreground text-xs">--</span>;
+                    if (name) return <span className="font-medium">{name}</span>;
+                    const num = call.fromNumber;
+                    if (num && num !== "Anonymous") return <span className="font-mono text-xs">{num}</span>;
+                    return <span className="text-muted-foreground text-xs">Anonymous</span>;
                   })()}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
