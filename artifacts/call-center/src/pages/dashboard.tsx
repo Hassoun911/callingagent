@@ -15,6 +15,17 @@ export default function Dashboard() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  const formatPhone = (raw: string | null | undefined): string => {
+    if (!raw || raw === "Anonymous") return raw ?? "Anonymous";
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length === 11 && digits[0] === "1") {
+      const d = digits.slice(1);
+      return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+    }
+    if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    return raw;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -170,7 +181,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <p className="font-mono text-sm font-medium">
-                        {call.direction === 'inbound' ? call.fromNumber : call.toNumber}
+                        {call.direction === 'inbound' ? formatPhone(call.fromNumber) : formatPhone(call.toNumber)}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(call.createdAt).toLocaleString()}

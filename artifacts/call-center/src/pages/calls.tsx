@@ -11,6 +11,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
+/** Format an E.164 number to a human-readable North American format.
+ * +12267586681 → (226) 758-6681 · anything else returned as-is. */
+function formatPhone(raw: string | null | undefined): string {
+  if (!raw || raw === "Anonymous") return raw ?? "Anonymous";
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 11 && digits[0] === "1") {
+    const d = digits.slice(1);
+    return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  return raw;
+}
+
 function RecordingPlayer({ callId, hasRecording }: { callId: number; hasRecording: boolean }) {
   if (!hasRecording) return <span className="text-muted-foreground text-xs">--</span>;
   return <audio controls src={`/api/call-logs/${callId}/recording`} className="h-8 w-[180px]" />;
@@ -41,10 +56,10 @@ function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose
             {(call?.contactName || call?.callerIdName) ? (
               <>
                 <span className="font-medium">{call.contactName || call.callerIdName}</span>
-                <span className="font-mono text-sm text-muted-foreground">{call?.fromNumber}</span>
+                <span className="font-mono text-sm text-muted-foreground">{formatPhone(call?.fromNumber)}</span>
               </>
             ) : (
-              <span className="font-mono font-medium">{call?.fromNumber}</span>
+              <span className="font-mono font-medium">{formatPhone(call?.fromNumber)}</span>
             )}
             {call?.priority && <PriorityBadge priority={call.priority} />}
           </DialogTitle>
@@ -57,7 +72,7 @@ function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose
               <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
               <div>
                 <p className="text-xs text-muted-foreground">Phone</p>
-                <p className="text-sm font-mono font-medium">{call.fromNumber}</p>
+                <p className="text-sm font-mono font-medium">{formatPhone(call.fromNumber)}</p>
               </div>
             </div>
           )}
@@ -269,10 +284,10 @@ export default function Calls() {
                   {(call.contactName || call.callerIdName) ? (
                     <div className="flex flex-col gap-0.5">
                       <span className="text-sm font-medium">{call.contactName || call.callerIdName}</span>
-                      <span className="font-mono text-xs text-muted-foreground">{call.fromNumber}</span>
+                      <span className="font-mono text-xs text-muted-foreground">{formatPhone(call.fromNumber)}</span>
                     </div>
                   ) : (
-                    <span className="font-mono text-xs">{call.fromNumber}</span>
+                    <span className="font-mono text-xs">{formatPhone(call.fromNumber)}</span>
                   )}
                 </TableCell>
                 <TableCell className="text-sm">
@@ -283,7 +298,7 @@ export default function Calls() {
                       .find(n => n && n !== "null" && n !== "undefined");
                     if (name) return <span className="font-medium">{name}</span>;
                     const num = call.fromNumber;
-                    if (num && num !== "Anonymous") return <span className="font-mono text-xs">{num}</span>;
+                    if (num && num !== "Anonymous") return <span className="font-mono text-xs">{formatPhone(num)}</span>;
                     return <span className="text-muted-foreground text-xs">Anonymous</span>;
                   })()}
                 </TableCell>
