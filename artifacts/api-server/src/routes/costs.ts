@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, phoneNumbersTable } from "@workspace/db";
+import { db, phoneNumbersTable, aiVoiceConfigTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -37,12 +37,34 @@ async function fetchTwilioUsage(accountSid: string, auth: string, phoneNumber?: 
   return (body.usage_records ?? []) as any[];
 }
 
+router.patch("/costs/openai-credit", async (req, res): Promise<void> => {
+  const { balance } = req.body;
+  if (typeof balance !== "number" || isNaN(balance) || balance < 0) {
+    res.status(400).json({ error: "balance must be a non-negative number" });
+    return;
+  }
+  const [existing] = await db.select().from(aiVoiceConfigTable);
+  if (!existing) {
+    const [created] = await db.insert(aiVoiceConfigTable).values({ openaiCreditBalance: balance, openaiCreditUpdatedAt: new Date() }).returning();
+    res.json({ openaiCreditBalance: created.openaiCreditBalance, openaiCreditUpdatedAt: created.openaiCreditUpdatedAt });
+    return;
+  }
+  const { eq } = await import("drizzle-orm");
+  const [updated] = await db.update(aiVoiceConfigTable)
+    .set({ openaiCreditBalance: balance, openaiCreditUpdatedAt: new Date() })
+    .where(eq(aiVoiceConfigTable.id, existing.id))
+    .returning();
+  res.json({ openaiCreditBalance: updated.openaiCreditBalance, openaiCreditUpdatedAt: updated.openaiCreditUpdatedAt });
+});
+
 router.get("/costs", async (req, res): Promise<void> => {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken  = process.env.TWILIO_AUTH_TOKEN;
 
   const now = new Date();
   const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  const [aiConfig] = await db.select().from(aiVoiceConfigTable);
 
   // ── Twilio Usage Records ───────────────────────────────────────────────────
   let twilio: any = null;
@@ -170,7 +192,13 @@ router.get("/costs", async (req, res): Promise<void> => {
     openai = { available: false, error: "No OpenAI API key configured" };
   }
 
-  res.json({ twilio, openai, period });
+  res.json({
+    twilio,
+    openai,
+    period,
+    openaiCreditBalance: aiConfig?.openaiCreditBalance ?? null,
+    openaiCreditUpdatedAt: aiConfig?.openaiCreditUpdatedAt ?? null,
+  });
 });
 
 export default router;

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useGetDashboardStats, useGetRecentCalls } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Phone, Users, Clock, PhoneIncoming, PhoneOutgoing, Voicemail, Activity, DollarSign, RefreshCw, AlertCircle, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
+import { Phone, Users, Clock, PhoneIncoming, PhoneOutgoing, Voicemail, Activity, DollarSign, RefreshCw, AlertCircle, ExternalLink, ChevronDown, ChevronRight, Pencil, Check, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 type TwilioPerNumber = { phoneNumber: string; friendlyName: string | null; cost: number; breakdown: { category: string; label: string; cost: number; usage: string }[] };
 type CostData = {
   period: string;
+  openaiCreditBalance: number | null;
+  openaiCreditUpdatedAt: string | null;
   twilio: { available: true; totalCost: number; currency: string; breakdown: { category: string; label: string; cost: number; usage: string; usageUnit: string }[]; perNumber: TwilioPerNumber[] } | { available: false; error: string } | null;
   openai: { available: true; totalCost: number; currency: string; breakdown: { model: string; cost: number }[]; viaProxy: boolean } | { available: false; error: string } | null;
 };
@@ -25,6 +27,26 @@ export default function Dashboard() {
   });
   const [expandedLine, setExpandedLine] = useState<string | null>(null);
   const [openaiExpanded, setOpenaiExpanded] = useState(false);
+  const [editingCredit, setEditingCredit] = useState(false);
+  const [creditInput, setCreditInput] = useState("");
+  const [savingCredit, setSavingCredit] = useState(false);
+
+  const saveCredit = async () => {
+    const val = parseFloat(creditInput);
+    if (isNaN(val) || val < 0) return;
+    setSavingCredit(true);
+    try {
+      await fetch("/api/costs/openai-credit", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ balance: val }),
+      });
+      await refetchCosts();
+      setEditingCredit(false);
+    } finally {
+      setSavingCredit(false);
+    }
+  };
 
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -291,8 +313,55 @@ export default function Dashboard() {
 
                 {costs?.openai?.available ? (
                   <>
+                    {/* Credit Balance Row */}
+                    <div className="flex items-center justify-between rounded-md bg-background/60 border border-border/40 px-3 py-2">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">Credit Balance</p>
+                        {costs.openaiCreditBalance != null ? (
+                          <p className="font-mono text-lg font-bold text-foreground">${costs.openaiCreditBalance.toFixed(2)}</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">Not set</p>
+                        )}
+                        {costs.openaiCreditUpdatedAt && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            updated {new Date(costs.openaiCreditUpdatedAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                      {editingCredit ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm text-muted-foreground">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={creditInput}
+                            onChange={e => setCreditInput(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") saveCredit(); if (e.key === "Escape") setEditingCredit(false); }}
+                            className="w-20 px-2 py-1 text-sm font-mono bg-background border border-border rounded focus:outline-none focus:border-primary"
+                            autoFocus
+                          />
+                          <button onClick={saveCredit} disabled={savingCredit}
+                            className="p-1 text-green-400 hover:text-green-300 transition-colors">
+                            <Check className="h-4 w-4" />
+                          </button>
+                          <button onClick={() => setEditingCredit(false)}
+                            className="p-1 text-muted-foreground hover:text-foreground transition-colors">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => { setCreditInput(costs.openaiCreditBalance?.toFixed(2) ?? ""); setEditingCredit(true); }}
+                          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded hover:bg-background"
+                          title="Update balance">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+
                     <div>
-                      <div className="text-3xl font-bold font-mono text-foreground">${(costs.openai as any).totalCost.toFixed(4)}</div>
+                      <div className="text-2xl font-bold font-mono text-foreground">${(costs.openai as any).totalCost.toFixed(4)}</div>
                       <p className="text-xs text-muted-foreground mt-0.5">direct API spend this month</p>
                     </div>
 
@@ -300,9 +369,7 @@ export default function Dashboard() {
                       <div className="flex items-start gap-2 rounded-md bg-blue-950/40 border border-blue-800/30 px-3 py-2">
                         <AlertCircle className="h-3.5 w-3.5 text-blue-400 shrink-0 mt-0.5" />
                         <p className="text-[11px] text-blue-300 leading-relaxed">
-                          AI voice calls route through Replit's proxy — those costs appear on your Replit bill, not here.{" "}
-                          <a href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" rel="noopener noreferrer"
-                            className="underline hover:text-blue-200">Check credit balance</a>
+                          AI voice calls route through Replit's proxy — those costs appear on your Replit bill, not here.
                         </p>
                       </div>
                     )}

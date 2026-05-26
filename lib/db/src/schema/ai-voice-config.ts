@@ -12,6 +12,8 @@ export const aiVoiceConfigTable = pgTable("ai_voice_config", {
   speechTimeout: doublePrecision("speech_timeout").notNull().default(1.0),
   maxTokens: integer("max_tokens").notNull().default(100),
   voiceStyle: text("voice_style").notNull().default("Speak naturally and warmly, like a real person — not a recording. Use natural conversational pauses. Vary your pace slightly. Sound professional but approachable."),
+  openaiCreditBalance: doublePrecision("openai_credit_balance"),
+  openaiCreditUpdatedAt: timestamp("openai_credit_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
