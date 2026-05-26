@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { useGetDashboardStats, useGetRecentCalls } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Phone, Users, Clock, PhoneIncoming, PhoneOutgoing, Voicemail, Activity, DollarSign, RefreshCw, AlertCircle, ExternalLink } from "lucide-react";
+import { Phone, Users, Clock, PhoneIncoming, PhoneOutgoing, Voicemail, Activity, DollarSign, RefreshCw, AlertCircle, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,8 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
+  const [expandedLine, setExpandedLine] = useState<string | null>(null);
+  const [openaiExpanded, setOpenaiExpanded] = useState(false);
 
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -206,11 +209,8 @@ export default function Dashboard() {
                     <span className="text-sm font-semibold text-foreground">Twilio</span>
                   </div>
                   {costs?.twilio?.available && (
-                    <a
-                      href="https://console.twilio.com/us1/billing/billing-history"
-                      target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
+                    <a href="https://console.twilio.com/us1/billing/billing-history" target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
                       Console <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
@@ -219,15 +219,13 @@ export default function Dashboard() {
                 {costs?.twilio?.available ? (
                   <>
                     <div>
-                      <div className="text-3xl font-bold font-mono text-foreground">
-                        ${costs.twilio.totalCost.toFixed(4)}
-                      </div>
+                      <div className="text-3xl font-bold font-mono text-foreground">${costs.twilio.totalCost.toFixed(4)}</div>
                       <p className="text-xs text-muted-foreground mt-0.5">{costs.twilio.currency} this month</p>
                     </div>
-                    {/* Per-number breakdown */}
+
                     {costs.twilio.perNumber?.length > 0 && (
-                      <div className="space-y-2 pt-1 border-t border-border/50">
-                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">By Line</p>
+                      <div className="pt-1 border-t border-border/50 space-y-1">
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium pb-1">By Line</p>
                         {costs.twilio.perNumber.map(num => {
                           const fmt = (raw: string | null | undefined) => {
                             if (!raw) return raw ?? "";
@@ -236,43 +234,38 @@ export default function Dashboard() {
                             if (d.length === 10) return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
                             return raw;
                           };
+                          const isOpen = expandedLine === num.phoneNumber;
                           return (
-                            <div key={num.phoneNumber} className="rounded-md bg-background/60 border border-border/40 p-2 space-y-1">
-                              <div className="flex items-center justify-between">
-                                <span className="font-mono text-xs font-medium text-foreground">{fmt(num.phoneNumber)}</span>
-                                <span className="font-mono text-xs font-bold text-foreground">${num.cost.toFixed(4)}</span>
-                              </div>
-                              {num.breakdown.map(r => (
-                                <div key={r.category} className="flex items-center justify-between pl-2 text-[11px]">
-                                  <span className="text-muted-foreground">{r.label}</span>
-                                  <span className="font-mono text-muted-foreground">${r.cost.toFixed(4)}</span>
+                            <div key={num.phoneNumber} className="rounded-md border border-border/40 overflow-hidden">
+                              <button
+                                onClick={() => setExpandedLine(isOpen ? null : num.phoneNumber)}
+                                className="w-full flex items-center justify-between px-3 py-2 bg-background/60 hover:bg-background/90 transition-colors text-left"
+                              >
+                                <div className="flex items-center gap-2">
+                                  {isOpen
+                                    ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+                                    : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />}
+                                  <span className="font-mono text-xs font-medium text-foreground">{fmt(num.phoneNumber)}</span>
+                                  {num.friendlyName && <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">{num.friendlyName}</span>}
                                 </div>
-                              ))}
-                              {num.cost === 0 && (
-                                <p className="text-[11px] text-muted-foreground pl-2">No charges this month</p>
+                                <span className="font-mono text-xs font-bold text-foreground shrink-0">${num.cost.toFixed(4)}</span>
+                              </button>
+                              {isOpen && (
+                                <div className="px-3 py-2 space-y-1 bg-card/20 border-t border-border/30">
+                                  {num.breakdown.length > 0 ? num.breakdown.map(r => (
+                                    <div key={r.category} className="flex items-center justify-between text-[11px]">
+                                      <span className="text-muted-foreground">{r.label}</span>
+                                      <span className="font-mono text-muted-foreground">${r.cost.toFixed(4)}</span>
+                                    </div>
+                                  )) : (
+                                    <p className="text-[11px] text-muted-foreground">No charges this month</p>
+                                  )}
+                                </div>
                               )}
                             </div>
                           );
                         })}
                       </div>
-                    )}
-
-                    {/* Category breakdown */}
-                    {costs.twilio.breakdown.length > 0 ? (
-                      <div className="space-y-1.5 pt-1 border-t border-border/50">
-                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">By Category</p>
-                        {costs.twilio.breakdown.slice(0, 6).map(row => (
-                          <div key={row.category} className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground truncate mr-2">{row.label}</span>
-                            <span className="font-mono text-foreground shrink-0">${row.cost.toFixed(4)}</span>
-                          </div>
-                        ))}
-                        {costs.twilio.breakdown.length > 6 && (
-                          <p className="text-xs text-muted-foreground pt-0.5">+{costs.twilio.breakdown.length - 6} more categories</p>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No charges this month</p>
                     )}
                   </>
                 ) : (
@@ -290,11 +283,8 @@ export default function Dashboard() {
                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
                     <span className="text-sm font-semibold text-foreground">OpenAI</span>
                   </div>
-                  <a
-                    href="https://platform.openai.com/settings/organization/billing/overview"
-                    target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
+                  <a href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
                     Dashboard <ExternalLink className="h-3 w-3" />
                   </a>
                 </div>
@@ -302,19 +292,32 @@ export default function Dashboard() {
                 {costs?.openai?.available ? (
                   <>
                     <div>
-                      <div className="text-3xl font-bold font-mono text-foreground">
-                        ${(costs.openai as any).totalCost.toFixed(6)}
-                      </div>
+                      <div className="text-3xl font-bold font-mono text-foreground">${(costs.openai as any).totalCost.toFixed(6)}</div>
                       <p className="text-xs text-muted-foreground mt-0.5">USD this month</p>
                     </div>
                     {(costs.openai as any).breakdown?.length > 0 && (
-                      <div className="space-y-1.5 pt-1 border-t border-border/50">
-                        {(costs.openai as any).breakdown.slice(0, 6).map((row: any) => (
-                          <div key={row.model} className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground font-mono truncate mr-2">{row.model}</span>
-                            <span className="font-mono text-foreground shrink-0">${row.cost.toFixed(6)}</span>
-                          </div>
-                        ))}
+                      <div className="pt-1 border-t border-border/50 space-y-1">
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium pb-1">By Model</p>
+                        <div className="rounded-md border border-border/40 overflow-hidden">
+                          <button onClick={() => setOpenaiExpanded(v => !v)}
+                            className="w-full flex items-center justify-between px-3 py-2 bg-background/60 hover:bg-background/90 transition-colors text-left">
+                            <div className="flex items-center gap-2">
+                              {openaiExpanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+                              <span className="text-xs text-muted-foreground">{(costs.openai as any).breakdown.length} model{(costs.openai as any).breakdown.length !== 1 ? "s" : ""}</span>
+                            </div>
+                            <span className="font-mono text-xs font-bold text-foreground">${(costs.openai as any).totalCost.toFixed(6)}</span>
+                          </button>
+                          {openaiExpanded && (
+                            <div className="px-3 py-2 space-y-1 bg-card/20 border-t border-border/30">
+                              {(costs.openai as any).breakdown.slice(0, 6).map((row: any) => (
+                                <div key={row.model} className="flex items-center justify-between text-[11px]">
+                                  <span className="text-muted-foreground font-mono truncate mr-2">{row.model}</span>
+                                  <span className="font-mono text-foreground shrink-0">${row.cost.toFixed(6)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </>
