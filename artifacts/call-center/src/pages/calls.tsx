@@ -142,8 +142,10 @@ function AudioPlayer({ src, knownDuration = 0, large = false }: { src: string; k
         />
       </div>
 
-      <span className="text-[11px] font-mono text-muted-foreground tabular-nums shrink-0 w-7 text-right">
-        {playing || currentTime > 0 ? fmtTime(currentTime) : duration ? fmtTime(duration) : ""}
+      <span className="text-[11px] font-mono text-muted-foreground tabular-nums shrink-0 text-right whitespace-nowrap">
+        {playing || currentTime > 0
+          ? <>{fmtTime(currentTime)}<span className="opacity-40"> / {fmtTime(duration)}</span></>
+          : duration ? fmtTime(duration) : ""}
       </span>
 
       <a
