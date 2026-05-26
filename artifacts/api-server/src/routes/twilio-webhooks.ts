@@ -1183,4 +1183,11 @@ function formatE164(raw: string | undefined): string {
   return raw;
 }
 
+// ─── Admin: resend call notification email ───────────────────────────────────
+router.post("/twilio/resend-call-email/:callSid", async (req, res): Promise<void> => {
+  const { callSid } = req.params;
+  await sendCallNotificationIfConfigured(callSid, undefined);
+  res.json({ ok: true, callSid });
+});
+
 export default router;
