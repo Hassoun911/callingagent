@@ -200,7 +200,7 @@ export default function NumberDetail() {
 
                       {/* Destination number */}
                       <div className="space-y-2 pb-6">
-                        <Label>Destination Number</Label>
+                        <Label className="text-green-400">Destination Number</Label>
                         <Input
                           placeholder="+1 (555) 000-0000"
                           value={formData.forwardTo}
@@ -213,7 +213,7 @@ export default function NumberDetail() {
                       {/* When someone calls — caller experience */}
                       <div className="space-y-3 py-6 border-t border-border">
                         <div>
-                          <Label>When Someone Calls</Label>
+                          <Label className="text-green-400">When Someone Calls</Label>
                           <p className="text-xs text-muted-foreground mt-0.5">What does the caller hear while their call is being connected?</p>
                         </div>
                         <div className="space-y-2">
@@ -273,7 +273,7 @@ export default function NumberDetail() {
                       {/* When call routes to you — acceptance mode */}
                       <div className="space-y-3 py-6 border-t border-border">
                         <div>
-                          <Label>When Call Routes to You</Label>
+                          <Label className="text-green-400">When Call Routes to You</Label>
                           <p className="text-xs text-muted-foreground mt-0.5">How should the call be connected to your phone?</p>
                         </div>
                         <div className="space-y-2">
@@ -319,7 +319,7 @@ export default function NumberDetail() {
                       {!formData.callScreen && (
                         <div className="space-y-3 py-6 border-t border-border animate-in fade-in duration-200">
                           <div>
-                            <Label>When No One Answers</Label>
+                            <Label className="text-green-400">When No One Answers</Label>
                             <p className="text-xs text-muted-foreground mt-0.5">What does the caller hear if the call goes unanswered?</p>
                           </div>
                           <div className="space-y-2">
@@ -351,7 +351,7 @@ export default function NumberDetail() {
                       {/* Caller ID shown to you */}
                       <div className="space-y-3 py-6 border-t border-border">
                         <div>
-                          <Label>Caller ID Shown to You</Label>
+                          <Label className="text-green-400">Caller ID Shown to You</Label>
                           <p className="text-xs text-muted-foreground mt-0.5">What number appears on your phone when a call is forwarded?</p>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
@@ -369,7 +369,7 @@ export default function NumberDetail() {
                       {/* Ring count */}
                       <div className="space-y-3 py-6 border-t border-border">
                         <div className="flex items-center justify-between">
-                          <Label>Ring Count</Label>
+                          <Label className="text-green-400">Ring Count</Label>
                           <span className="font-mono text-sm text-muted-foreground">{formData.ringCount} rings</span>
                         </div>
                         <Slider
@@ -389,7 +389,7 @@ export default function NumberDetail() {
                 {formData.answerMode === 'ai_voice' && (
                   <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="space-y-2">
-                      <Label>AI System Prompt (Optional Override)</Label>
+                      <Label className="text-green-400">AI System Prompt (Optional Override)</Label>
                       <Textarea 
                         placeholder="Leave blank to use global AI settings, or provide a specific prompt for this line..." 
                         value={formData.aiSystemPrompt} 
@@ -404,7 +404,7 @@ export default function NumberDetail() {
                 {formData.answerMode === 'voicemail' && (
                   <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="space-y-2">
-                      <Label>Voicemail Greeting Text</Label>
+                      <Label className="text-green-400">Voicemail Greeting Text</Label>
                       <Textarea 
                         placeholder="Please leave a message after the beep." 
                         value={formData.voicemailGreeting} 
@@ -433,7 +433,7 @@ export default function NumberDetail() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Internal Name</Label>
+                <Label className="text-green-400">Internal Name</Label>
                 <Input 
                   value={formData.friendlyName} 
                   onChange={(e) => setFormData({...formData, friendlyName: e.target.value})}
@@ -441,7 +441,7 @@ export default function NumberDetail() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Display Name</Label>
+                <Label className="text-green-400">Display Name</Label>
                 <Input 
                   value={formData.callerIdName} 
                   onChange={(e) => setFormData({...formData, callerIdName: e.target.value})}

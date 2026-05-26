@@ -155,7 +155,7 @@ export default function Settings() {
           {/* Voice + Language row */}
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label>Voice</Label>
+              <Label className="text-green-400">Voice</Label>
               <Select value={formData.voice} onValueChange={(v) => setFormData({...formData, voice: v})}>
                 <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select voice">
@@ -192,7 +192,7 @@ export default function Settings() {
             </div>
 
             <div className="space-y-2">
-              <Label>Language</Label>
+              <Label className="text-green-400">Language</Label>
               <Select value={formData.language} onValueChange={(v) => setFormData({...formData, language: v})}>
                 <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select language">
@@ -227,7 +227,7 @@ export default function Settings() {
           </div>
 
           <div className="space-y-2">
-            <Label>Speaking Style</Label>
+            <Label className="text-green-400">Speaking Style</Label>
             <Textarea
               value={formData.voiceStyle}
               onChange={e => setFormData({...formData, voiceStyle: e.target.value})}
@@ -240,7 +240,7 @@ export default function Settings() {
           </div>
 
           <div className="space-y-2">
-            <Label>Initial Greeting</Label>
+            <Label className="text-green-400">Initial Greeting</Label>
             <Input 
               value={formData.greeting} 
               onChange={e => setFormData({...formData, greeting: e.target.value})}
@@ -252,7 +252,7 @@ export default function Settings() {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>System Prompt (Instructions)</Label>
+              <Label className="text-green-400">System Prompt (Instructions)</Label>
               <button
                 type="button"
                 onClick={() => setShowPreview(p => !p)}
@@ -313,7 +313,7 @@ export default function Settings() {
           </div>
 
           <div className="space-y-2 border-t border-border pt-6">
-            <Label>Max Call Duration (seconds)</Label>
+            <Label className="text-green-400">Max Call Duration (seconds)</Label>
             <Input 
               type="number" 
               value={formData.maxCallDuration} 
@@ -338,7 +338,7 @@ export default function Settings() {
           {/* Reaction Pause */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Reaction Pause</Label>
+              <Label className="text-green-400">Reaction Pause</Label>
               <span className="font-mono text-sm tabular-nums text-foreground">
                 {formData.speechTimeout.toFixed(1)}s
               </span>
@@ -364,7 +364,7 @@ export default function Settings() {
           {/* Response Length */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label>Response Length</Label>
+              <Label className="text-green-400">Response Length</Label>
               <span className="font-mono text-sm tabular-nums text-foreground">
                 {formData.maxTokens <= 60 ? "Brief" : formData.maxTokens <= 120 ? "Balanced" : "Detailed"} ({formData.maxTokens} tokens)
               </span>
