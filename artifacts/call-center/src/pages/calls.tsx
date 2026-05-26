@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PhoneIncoming, PhoneOutgoing, Play, Pause, FileText, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone, Volume2, VolumeX, Loader2 } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Play, Pause, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone, Loader2, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -111,13 +111,22 @@ function AudioPlayer({ src, knownDuration = 0, large = false }: { src: string; k
             <span className="text-xs font-mono text-muted-foreground">{duration ? fmtTime(duration) : ""}</span>
           </div>
         </div>
+        <a
+          href={src}
+          download
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded hover:bg-muted"
+          title="Download recording"
+        >
+          <Download className="h-3.5 w-3.5" />
+        </a>
       </div>
     );
   }
 
-  // Compact table row variant — fixed 160px so table columns stay stable
+  // Compact table row variant — fixed 180px so table columns stay stable
   return (
-    <div className="flex items-center gap-1.5" style={{ width: 160 }}>
+    <div className="flex items-center gap-1.5" style={{ width: 180 }}>
       <button
         onClick={toggle}
         className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-muted hover:bg-muted/60 border border-border/60 transition-colors"
@@ -136,6 +145,16 @@ function AudioPlayer({ src, knownDuration = 0, large = false }: { src: string; k
       <span className="text-[11px] font-mono text-muted-foreground tabular-nums shrink-0 w-7 text-right">
         {playing || currentTime > 0 ? fmtTime(currentTime) : duration ? fmtTime(duration) : ""}
       </span>
+
+      <a
+        href={src}
+        download
+        onClick={(e) => e.stopPropagation()}
+        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+        title="Download recording"
+      >
+        <Download className="h-3 w-3" />
+      </a>
     </div>
   );
 }
