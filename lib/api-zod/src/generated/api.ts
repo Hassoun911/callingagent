@@ -438,7 +438,9 @@ export const GetAiVoiceConfigResponse = zod.object({
   "language": zod.enum(['en-US', 'ar-SA', 'ar-LB']),
   "greeting": zod.string(),
   "systemPrompt": zod.string(),
-  "maxCallDuration": zod.number().optional()
+  "maxCallDuration": zod.number().optional(),
+  "speechTimeout": zod.number().optional().describe('Seconds of silence after caller stops speaking before processing (0.5–3)'),
+  "maxTokens": zod.number().optional().describe('Max tokens per AI response — lower is faster and more concise')
 })
 
 
@@ -447,7 +449,9 @@ export const UpdateAiVoiceConfigBody = zod.object({
   "language": zod.union([zod.literal('en-US'),zod.literal('ar-SA'),zod.literal('ar-LB'),zod.literal(null)]).nullish(),
   "greeting": zod.string().nullish(),
   "systemPrompt": zod.string().nullish(),
-  "maxCallDuration": zod.number().nullish()
+  "maxCallDuration": zod.number().nullish(),
+  "speechTimeout": zod.number().nullish(),
+  "maxTokens": zod.number().nullish()
 })
 
 export const UpdateAiVoiceConfigResponse = zod.object({
@@ -456,7 +460,9 @@ export const UpdateAiVoiceConfigResponse = zod.object({
   "language": zod.enum(['en-US', 'ar-SA', 'ar-LB']),
   "greeting": zod.string(),
   "systemPrompt": zod.string(),
-  "maxCallDuration": zod.number().optional()
+  "maxCallDuration": zod.number().optional(),
+  "speechTimeout": zod.number().optional().describe('Seconds of silence after caller stops speaking before processing (0.5–3)'),
+  "maxTokens": zod.number().optional().describe('Max tokens per AI response — lower is faster and more concise')
 })
 
 

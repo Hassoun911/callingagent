@@ -81,6 +81,8 @@ interface ConversationState {
   voice: string;
   language: string;
   baseUrl: string;
+  speechTimeout: number;
+  maxTokens: number;
 }
 const conversations = new Map<string, ConversationState>();
 
@@ -165,11 +167,11 @@ function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function gatherBlock(audioId: string | null, fallbackText: string, baseUrl: string, language = "en-US"): string {
+function gatherBlock(audioId: string | null, fallbackText: string, baseUrl: string, language = "en-US", speechTimeout = 1): string {
   // Nest the audio INSIDE <Gather> so Twilio only starts speech detection AFTER
   // the prompt finishes playing, preventing echo/sidetone from triggering a false match.
   const audio = playOrSay(audioId, fallbackText, baseUrl);
-  return `<Gather input="speech" timeout="8" speechTimeout="1" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
+  return `<Gather input="speech" timeout="8" speechTimeout="${speechTimeout}" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
   ${audio}
 </Gather>`;
 }
@@ -300,6 +302,8 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     const language = aiConfig?.language ?? "en-US";
     const ttsVoice = aiConfig?.voice ?? "nova";
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
+    const speechTimeout = aiConfig?.speechTimeout ?? 1.0;
+    const maxTokens = aiConfig?.maxTokens ?? 100;
     const greetingText = aiConfig?.greeting?.trim() || "Hello, thank you for calling. How can I help you today?";
 
     // Resolve company name for template substitution
@@ -327,6 +331,8 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       voice: ttsVoice,
       language,
       baseUrl,
+      speechTimeout,
+      maxTokens,
     });
 
     // Generate greeting + retry audio in parallel, and start recording (non-blocking)
@@ -402,7 +408,7 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${gatherBlock(audioId, retryText, baseUrl, language)}
+  ${gatherBlock(audioId, retryText, baseUrl, language, conv.speechTimeout)}
   <Hangup/>
 </Response>`);
     return;
@@ -424,7 +430,7 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
         },
         ...conv.messages,
       ],
-      max_tokens: 100,
+      max_tokens: conv.maxTokens,
       stream: true,
     });
 
@@ -474,7 +480,7 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${gatherBlock(audioId, aiText, baseUrl, language)}
+  ${gatherBlock(audioId, aiText, baseUrl, language, conv.speechTimeout)}
   <Hangup/>
 </Response>`);
   } catch (err: any) {
@@ -583,6 +589,8 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
     const language = aiConfig?.language ?? "en-US";
     const ttsVoice = aiConfig?.voice ?? "nova";
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
+    const speechTimeout = aiConfig?.speechTimeout ?? 1.0;
+    const maxTokens = aiConfig?.maxTokens ?? 100;
     const greetingText = aiConfig?.greeting?.trim() || "Hello, thank you for calling. How can I help you today?";
 
     // Resolve company name for template substitution
@@ -608,6 +616,8 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
       voice: ttsVoice,
       language,
       baseUrl,
+      speechTimeout,
+      maxTokens,
     });
 
     // Generate greeting + retry audio in parallel, and start recording (non-blocking)

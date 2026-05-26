@@ -38,6 +38,8 @@ router.patch("/ai-voice/config", async (req, res): Promise<void> => {
   if (body.greeting != null) updateData.greeting = body.greeting;
   if (body.systemPrompt != null) updateData.systemPrompt = body.systemPrompt;
   if (body.maxCallDuration != null) updateData.maxCallDuration = body.maxCallDuration;
+  if (body.speechTimeout != null) updateData.speechTimeout = body.speechTimeout;
+  if (body.maxTokens != null) updateData.maxTokens = body.maxTokens;
 
   const [updated] = await db.update(aiVoiceConfigTable)
     .set(updateData)

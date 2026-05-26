@@ -15,4 +15,8 @@ export interface AiVoiceConfig {
   greeting: string;
   systemPrompt: string;
   maxCallDuration?: number;
+  /** Seconds of silence after caller stops speaking before processing (0.5–3) */
+  speechTimeout?: number;
+  /** Max tokens per AI response — lower is faster and more concise */
+  maxTokens?: number;
 }

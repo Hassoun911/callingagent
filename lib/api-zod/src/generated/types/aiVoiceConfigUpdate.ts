@@ -19,4 +19,8 @@ export interface AiVoiceConfigUpdate {
   systemPrompt?: string | null;
   /** @nullable */
   maxCallDuration?: number | null;
+  /** @nullable */
+  speechTimeout?: number | null;
+  /** @nullable */
+  maxTokens?: number | null;
 }

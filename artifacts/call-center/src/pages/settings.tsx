@@ -13,9 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Bot, Save, Mic2, Globe, Eye, EyeOff } from "lucide-react";
+import { Bot, Save, Mic2, Globe, Eye, EyeOff, Zap } from "lucide-react";
 
 const VOICES = [
   { id: "coral",   name: "Coral",   gender: "Female", desc: "Natural, warm — best for calls" },
@@ -74,6 +75,8 @@ export default function Settings() {
     greeting: "",
     systemPrompt: "",
     maxCallDuration: 300,
+    speechTimeout: 1.0,
+    maxTokens: 100,
   });
   const initRef = useRef(false);
 
@@ -85,6 +88,8 @@ export default function Settings() {
         greeting: config.greeting,
         systemPrompt: config.systemPrompt,
         maxCallDuration: config.maxCallDuration,
+        speechTimeout: config.speechTimeout ?? 1.0,
+        maxTokens: config.maxTokens ?? 100,
       });
       initRef.current = true;
     }
@@ -302,6 +307,71 @@ export default function Settings() {
             />
             <p className="text-xs text-muted-foreground">Hard cutoff to prevent runaway costs.</p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border">
+        <CardHeader>
+          <div className="flex items-center gap-2 text-primary mb-2">
+            <Zap className="h-5 w-5" />
+            <CardTitle>Response Speed</CardTitle>
+          </div>
+          <CardDescription>Control how quickly the AI reacts and how long its replies are.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-8">
+
+          {/* Reaction Pause */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Reaction Pause</Label>
+              <span className="font-mono text-sm tabular-nums text-foreground">
+                {formData.speechTimeout.toFixed(1)}s
+              </span>
+            </div>
+            <Slider
+              min={0.5}
+              max={3}
+              step={0.5}
+              value={[formData.speechTimeout]}
+              onValueChange={([v]) => setFormData({...formData, speechTimeout: v})}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>0.5s — snappy</span>
+              <span>1.5s — balanced</span>
+              <span>3s — patient</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              How long after you stop talking before the AI begins processing. Lower values feel more responsive but may cut you off mid-sentence.
+            </p>
+          </div>
+
+          {/* Response Length */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Response Length</Label>
+              <span className="font-mono text-sm tabular-nums text-foreground">
+                {formData.maxTokens <= 60 ? "Brief" : formData.maxTokens <= 120 ? "Balanced" : "Detailed"} ({formData.maxTokens} tokens)
+              </span>
+            </div>
+            <Slider
+              min={40}
+              max={200}
+              step={20}
+              value={[formData.maxTokens]}
+              onValueChange={([v]) => setFormData({...formData, maxTokens: v})}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>40 — very brief</span>
+              <span>100 — balanced</span>
+              <span>200 — detailed</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Maximum length of each AI response. Shorter responses generate faster and keep the conversation moving. Longer responses allow more complete answers.
+            </p>
+          </div>
+
         </CardContent>
       </Card>
     </div>

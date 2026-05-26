@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -9,6 +9,8 @@ export const aiVoiceConfigTable = pgTable("ai_voice_config", {
   greeting: text("greeting").notNull().default("Hello, thank you for calling. How can I help you today?"),
   systemPrompt: text("system_prompt").notNull().default("You are a professional phone agent. Speak naturally and conversationally — not like a script. Use contractions. Keep every response to 1-3 sentences. Ask only one question at a time. Sound warm but professional. If someone asks if you are AI, acknowledge you are a virtual assistant and redirect to helping them. Never use bullet points, lists, or markdown — this is a phone call. Your goal is to understand their need and help them or take a detailed message."),
   maxCallDuration: integer("max_call_duration").notNull().default(300),
+  speechTimeout: doublePrecision("speech_timeout").notNull().default(1.0),
+  maxTokens: integer("max_tokens").notNull().default(100),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
