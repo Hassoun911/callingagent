@@ -87,6 +87,10 @@ interface ConversationState {
 }
 const conversations = new Map<string, ConversationState>();
 
+// Tracks calls where the agent actually pressed 1 to accept — used to distinguish
+// "agent answered and talked" from "agent declined and phone reported completed".
+const acceptedScreenCalls = new Set<string>();
+
 // TTS audio cache — buffers keyed by UUID, auto-expire after 10 minutes
 const ttsCache = new Map<string, Buffer>();
 function cacheTts(buffer: Buffer): string {
@@ -664,9 +668,11 @@ router.post("/twilio/screen", async (req, res): Promise<void> => {
 
 // ─── Screen accept — pressed key after whisper ───────────────────────────────
 router.post("/twilio/screen-accept", (req, res): void => {
-  const { Digits } = req.body;
+  const { Digits, CallSid } = req.body;
   res.set("Content-Type", "text/xml");
   if (Digits === "1") {
+    // Mark this call as truly accepted so screen-fallback knows not to start AI/voicemail
+    if (CallSid) acceptedScreenCalls.add(CallSid);
     // Empty response = bridge the two call legs
     res.send(`<?xml version="1.0" encoding="UTF-8"?><Response/>`);
   } else {
@@ -680,9 +686,12 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
   const { phoneNumberId, mode } = req.query as Record<string, string>;
   req.log.info({ CallSid, phoneNumberId, mode, DialCallStatus }, "Call screen fallback");
 
-  // If the agent answered and then hung up, DialCallStatus will be "completed".
-  // Do NOT start AI/voicemail — the call was handled. Just end cleanly.
-  if (DialCallStatus === "completed") {
+  // Only skip the fallback if the agent genuinely accepted (pressed 1) AND talked.
+  // DialCallStatus "completed" alone isn't enough — declining on a mobile phone also
+  // produces "completed" because the device answers briefly to signal the reject.
+  const wasAccepted = acceptedScreenCalls.has(CallSid);
+  acceptedScreenCalls.delete(CallSid); // cleanup regardless
+  if (wasAccepted && DialCallStatus === "completed") {
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
     return;
