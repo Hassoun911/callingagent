@@ -209,11 +209,16 @@ function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function gatherBlock(audioId: string | null, fallbackText: string, baseUrl: string, language = "en-US", speechTimeout = 1): string {
+function gatherBlock(audioId: string | null, fallbackText: string, baseUrl: string, language = "en-US", speechTimeout = 2.5): string {
   // Nest the audio INSIDE <Gather> so Twilio only starts speech detection AFTER
   // the prompt finishes playing, preventing echo/sidetone from triggering a false match.
+  //
+  // speechTimeout="auto" uses Twilio's ML model to detect natural end-of-speech rather
+  // than a fixed timer. This prevents cutting the caller off mid-sentence during pauses.
+  // We use "auto" whenever the configured value is <= 1.5 s (the old default was 1.0).
+  const stValue = speechTimeout <= 1.5 ? "auto" : speechTimeout.toString();
   const audio = playOrSay(audioId, fallbackText, baseUrl);
-  return `<Gather input="speech" timeout="8" speechTimeout="${speechTimeout}" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
+  return `<Gather input="speech" timeout="10" speechTimeout="${stValue}" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
   ${audio}
 </Gather>`;
 }
