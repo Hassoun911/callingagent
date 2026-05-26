@@ -6,9 +6,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 
+type TwilioPerNumber = { phoneNumber: string; friendlyName: string | null; cost: number; breakdown: { category: string; label: string; cost: number; usage: string }[] };
 type CostData = {
   period: string;
-  twilio: { available: true; totalCost: number; currency: string; breakdown: { category: string; label: string; cost: number; usage: string; usageUnit: string }[] } | { available: false; error: string } | null;
+  twilio: { available: true; totalCost: number; currency: string; breakdown: { category: string; label: string; cost: number; usage: string; usageUnit: string }[]; perNumber: TwilioPerNumber[] } | { available: false; error: string } | null;
   openai: { available: true; totalCost: number; currency: string; breakdown: { model: string; cost: number }[] } | { available: false; error: string } | null;
 };
 
@@ -223,8 +224,43 @@ export default function Dashboard() {
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">{costs.twilio.currency} this month</p>
                     </div>
+                    {/* Per-number breakdown */}
+                    {costs.twilio.perNumber?.length > 0 && (
+                      <div className="space-y-2 pt-1 border-t border-border/50">
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">By Line</p>
+                        {costs.twilio.perNumber.map(num => {
+                          const fmt = (raw: string | null | undefined) => {
+                            if (!raw) return raw ?? "";
+                            const d = raw.replace(/\D/g, "");
+                            if (d.length === 11 && d[0] === "1") return `(${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
+                            if (d.length === 10) return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+                            return raw;
+                          };
+                          return (
+                            <div key={num.phoneNumber} className="rounded-md bg-background/60 border border-border/40 p-2 space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-mono text-xs font-medium text-foreground">{fmt(num.phoneNumber)}</span>
+                                <span className="font-mono text-xs font-bold text-foreground">${num.cost.toFixed(4)}</span>
+                              </div>
+                              {num.breakdown.map(r => (
+                                <div key={r.category} className="flex items-center justify-between pl-2 text-[11px]">
+                                  <span className="text-muted-foreground">{r.label}</span>
+                                  <span className="font-mono text-muted-foreground">${r.cost.toFixed(4)}</span>
+                                </div>
+                              ))}
+                              {num.cost === 0 && (
+                                <p className="text-[11px] text-muted-foreground pl-2">No charges this month</p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Category breakdown */}
                     {costs.twilio.breakdown.length > 0 ? (
                       <div className="space-y-1.5 pt-1 border-t border-border/50">
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">By Category</p>
                         {costs.twilio.breakdown.slice(0, 6).map(row => (
                           <div key={row.category} className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground truncate mr-2">{row.label}</span>

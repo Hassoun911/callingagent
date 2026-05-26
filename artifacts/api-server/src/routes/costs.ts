@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { db, phoneNumbersTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -20,6 +21,22 @@ const TWILIO_LABELS: Record<string, { label: string; unit: string }> = {
   "voice-insights":           { label: "Voice Insights",        unit: "calls"   },
 };
 
+async function fetchTwilioUsage(accountSid: string, auth: string, phoneNumber?: string) {
+  const url = new URL(
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Usage/Records/ThisMonth.json`
+  );
+  url.searchParams.set("PageSize", "200");
+  if (phoneNumber) url.searchParams.set("PhoneNumber", phoneNumber);
+
+  const r = await fetch(url.toString(), {
+    headers: { Authorization: `Basic ${auth}` },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!r.ok) return null;
+  const body = await r.json() as any;
+  return (body.usage_records ?? []) as any[];
+}
+
 router.get("/costs", async (req, res): Promise<void> => {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken  = process.env.TWILIO_AUTH_TOKEN;
@@ -27,35 +44,65 @@ router.get("/costs", async (req, res): Promise<void> => {
   const now = new Date();
   const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  // ── Twilio Usage Records (ThisMonth) ──────────────────────────────────────
+  // ── Twilio Usage Records ───────────────────────────────────────────────────
   let twilio: any = null;
   try {
     const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
-    const r = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Usage/Records/ThisMonth.json?PageSize=200`,
-      { headers: { Authorization: `Basic ${auth}` }, signal: AbortSignal.timeout(10_000) }
-    );
-    if (r.ok) {
-      const body = await r.json() as any;
-      const records: any[] = body.usage_records ?? [];
-      const currency = records[0]?.price_unit ?? "USD";
 
-      const breakdown = records
+    // Fetch provisioned numbers from DB in parallel with overall usage
+    const [overallRecords, numbers] = await Promise.all([
+      fetchTwilioUsage(accountSid!, auth),
+      db.select().from(phoneNumbersTable),
+    ]);
+
+    if (overallRecords) {
+      const currency = overallRecords[0]?.price_unit ?? "USD";
+
+      const breakdown = overallRecords
         .filter((rec: any) => parseFloat(rec.price ?? "0") > 0)
         .map((rec: any) => ({
-          category:    rec.category as string,
-          label:       TWILIO_LABELS[rec.category]?.label ?? rec.category,
-          cost:        parseFloat(rec.price ?? "0"),
-          usage:       rec.usage as string,
-          usageUnit:   TWILIO_LABELS[rec.category]?.unit ?? (rec.usage_unit as string ?? ""),
-          count:       rec.count as string,
+          category:  rec.category as string,
+          label:     TWILIO_LABELS[rec.category]?.label ?? rec.category,
+          cost:      parseFloat(rec.price ?? "0"),
+          usage:     rec.usage as string,
+          usageUnit: TWILIO_LABELS[rec.category]?.unit ?? (rec.usage_unit as string ?? ""),
+          count:     rec.count as string,
         }))
         .sort((a: any, b: any) => b.cost - a.cost);
 
       const totalCost = breakdown.reduce((s: number, r: any) => s + r.cost, 0);
-      twilio = { totalCost, currency, period, breakdown, available: true };
+
+      // Per-number breakdown — query each provisioned number in parallel
+      const perNumber = numbers.length > 0
+        ? await Promise.all(
+            numbers.map(async (num) => {
+              const records = await fetchTwilioUsage(accountSid!, auth, num.number);
+              if (!records) return { phoneNumber: num.number, friendlyName: num.friendlyName, cost: 0, breakdown: [] };
+
+              const numBreakdown = records
+                .filter((rec: any) => parseFloat(rec.price ?? "0") > 0)
+                .map((rec: any) => ({
+                  category: rec.category as string,
+                  label:    TWILIO_LABELS[rec.category]?.label ?? rec.category,
+                  cost:     parseFloat(rec.price ?? "0"),
+                  usage:    rec.usage as string,
+                }))
+                .sort((a: any, b: any) => b.cost - a.cost);
+
+              const numTotal = numBreakdown.reduce((s: number, r: any) => s + r.cost, 0);
+              return {
+                phoneNumber:  num.number,
+                friendlyName: num.friendlyName,
+                cost: numTotal,
+                breakdown: numBreakdown,
+              };
+            })
+          )
+        : [];
+
+      twilio = { totalCost, currency, period, breakdown, perNumber, available: true };
     } else {
-      twilio = { available: false, error: `Twilio API ${r.status}` };
+      twilio = { available: false, error: "Twilio API error" };
     }
   } catch (err: any) {
     req.log.warn({ err: err?.message }, "Failed to fetch Twilio costs");
@@ -64,7 +111,6 @@ router.get("/costs", async (req, res): Promise<void> => {
 
   // ── OpenAI Organization Costs API ─────────────────────────────────────────
   let openai: any = null;
-  // Admin key is required for the org costs API. Regular project keys return 403.
   const openaiKey = process.env.OPENAI_ADMIN_API_KEY ?? process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
