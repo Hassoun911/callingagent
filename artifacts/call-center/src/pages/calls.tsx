@@ -288,6 +288,7 @@ export default function Calls() {
   const [status, setStatus] = useState<string>("all");
   const [selectedCall, setSelectedCall] = useState<any>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [clearConfirm, setClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
@@ -320,12 +321,13 @@ export default function Calls() {
   const hasSummaryData = (call: any) =>
     call.callSummary || call.callerName || call.callType || call.transcription;
 
-  const handleDelete = async (e: React.MouseEvent, id: number) => {
-    e.stopPropagation();
-    setDeletingId(id);
+  const handleDelete = async () => {
+    if (confirmDeleteId === null) return;
+    setDeletingId(confirmDeleteId);
+    setConfirmDeleteId(null);
     try {
-      await fetch(`/api/call-logs/${id}`, { method: "DELETE" });
-      if (selectedCall?.id === id) setSelectedCall(null);
+      await fetch(`/api/call-logs/${confirmDeleteId}`, { method: "DELETE" });
+      if (selectedCall?.id === confirmDeleteId) setSelectedCall(null);
       await refetch();
     } finally {
       setDeletingId(null);
@@ -500,7 +502,7 @@ export default function Calls() {
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <button
-                    onClick={(e) => handleDelete(e, call.id)}
+                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(call.id); }}
                     disabled={deletingId === call.id}
                     className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-muted-foreground hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
                     title="Delete log"
@@ -522,6 +524,27 @@ export default function Calls() {
         open={!!selectedCall}
         onClose={() => setSelectedCall(null)}
       />
+
+      <AlertDialog open={confirmDeleteId !== null} onOpenChange={(o) => !o && setConfirmDeleteId(null)}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this call log?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This record will be permanently removed. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={clearConfirm} onOpenChange={setClearConfirm}>
         <AlertDialogContent className="bg-card border-border">
