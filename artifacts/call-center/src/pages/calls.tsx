@@ -36,54 +36,43 @@ function fmtTime(s: number): string {
 // Global tracker so only one player plays at a time
 const activeAudio = { current: null as HTMLAudioElement | null };
 
-function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
+function AudioPlayer({ src, knownDuration = 0, large = false }: { src: string; knownDuration?: number; large?: boolean }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [buffering, setBuffering] = useState(false);
   const [error, setError] = useState(false);
-  const [muted, setMuted] = useState(false);
+
+  // Use the audio-reported duration if available, else fall back to the known call duration
+  const duration = audioDuration || knownDuration;
 
   useEffect(() => {
     const audio = new Audio();
+    audio.preload = "none"; // Load on demand only — preloading 100 rows causes too many requests
     audioRef.current = audio;
-
-    audio.addEventListener("loadedmetadata", () => {
-      setDuration(audio.duration);
-      setLoading(false);
-    });
+    audio.addEventListener("loadedmetadata", () => setAudioDuration(audio.duration));
     audio.addEventListener("timeupdate", () => setCurrentTime(audio.currentTime));
     audio.addEventListener("ended", () => { setPlaying(false); setCurrentTime(0); });
-    audio.addEventListener("error", () => { setError(true); setLoading(false); });
-    audio.addEventListener("waiting", () => setLoading(true));
-    audio.addEventListener("canplay", () => setLoading(false));
-
-    return () => {
-      audio.pause();
-      audio.src = "";
-    };
-  }, [src]);
+    audio.addEventListener("error", () => { setError(true); setBuffering(false); });
+    audio.addEventListener("waiting", () => setBuffering(true));
+    audio.addEventListener("canplay", () => setBuffering(false));
+    return () => { audio.pause(); audio.src = ""; };
+  }, []);
 
   const toggle = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
     if (playing) {
       audio.pause();
       setPlaying(false);
     } else {
-      // Stop whatever is currently playing globally
       if (activeAudio.current && activeAudio.current !== audio) {
         activeAudio.current.pause();
       }
       activeAudio.current = audio;
-
-      if (!audio.src) {
-        audio.src = src;
-        setLoading(true);
-      }
+      if (!audio.src) { audio.src = src; setBuffering(true); }
       audio.play().then(() => setPlaying(true)).catch(() => setError(true));
     }
   }, [playing, src]);
@@ -95,23 +84,13 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
     const rect = track.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     audio.currentTime = ratio * duration;
-    setCurrentTime(audio.currentTime);
   }, [duration]);
-
-  const toggleMute = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.muted = !audio.muted;
-    setMuted(audio.muted);
-  }, []);
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  if (error) {
-    return (
-      <span className="text-xs text-muted-foreground italic">unavailable</span>
-    );
-  }
+  if (error) return <span className="text-xs text-muted-foreground italic">unavailable</span>;
+
+  const Icon = buffering ? Loader2 : playing ? Pause : Play;
 
   if (large) {
     return (
@@ -120,91 +99,50 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
           onClick={toggle}
           className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/20 transition-colors text-primary"
         >
-          {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : playing ? (
-            <Pause className="h-4 w-4" />
-          ) : (
-            <Play className="h-4 w-4 ml-0.5" />
-          )}
+          <Icon className={`h-4 w-4 ${Icon === Play ? "ml-0.5" : ""} ${Icon === Loader2 ? "animate-spin" : ""}`} />
         </button>
-
         <div className="flex-1 space-y-1.5">
-          <div
-            ref={trackRef}
-            onClick={seek}
-            className="relative h-1.5 w-full bg-muted rounded-full cursor-pointer group"
-          >
-            <div
-              className="absolute inset-y-0 left-0 bg-primary rounded-full transition-all"
-              style={{ width: `${progress}%` }}
-            />
-            <div
-              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary border-2 border-background shadow opacity-0 group-hover:opacity-100 transition-opacity -ml-1.5"
-              style={{ left: `${progress}%` }}
-            />
+          <div ref={trackRef} onClick={seek} className="relative h-1.5 w-full bg-muted rounded-full cursor-pointer group">
+            <div className="absolute inset-y-0 left-0 bg-primary rounded-full" style={{ width: `${progress}%` }} />
+            <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary border-2 border-background shadow opacity-0 group-hover:opacity-100 transition-opacity -ml-1.5" style={{ left: `${progress}%` }} />
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs font-mono text-muted-foreground">
-              {fmtTime(currentTime)}
-            </span>
-            <span className="text-xs font-mono text-muted-foreground">
-              {duration ? fmtTime(duration) : "--:--"}
-            </span>
+          <div className="flex justify-between">
+            <span className="text-xs font-mono text-muted-foreground">{fmtTime(currentTime)}</span>
+            <span className="text-xs font-mono text-muted-foreground">{duration ? fmtTime(duration) : ""}</span>
           </div>
         </div>
-
-        <button
-          onClick={toggleMute}
-          className="shrink-0 p-1 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-        </button>
       </div>
     );
   }
 
-  // Compact table row variant
+  // Compact table row variant — fixed 160px so table columns stay stable
   return (
-    <div className="flex items-center gap-1.5 w-[200px]">
+    <div className="flex items-center gap-1.5" style={{ width: 160 }}>
       <button
         onClick={toggle}
-        className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-muted hover:bg-muted/80 border border-border transition-colors text-foreground"
+        className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-muted hover:bg-muted/60 border border-border/60 transition-colors"
       >
-        {loading ? (
-          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-        ) : playing ? (
-          <Pause className="h-3 w-3" />
-        ) : (
-          <Play className="h-3 w-3 ml-0.5" />
-        )}
+        <Icon className={`h-2.5 w-2.5 ${Icon === Play ? "ml-px" : ""} ${Icon === Loader2 ? "animate-spin text-muted-foreground" : ""}`} />
       </button>
 
-      <div
-        ref={trackRef}
-        onClick={seek}
-        className="relative h-1 flex-1 bg-muted rounded-full cursor-pointer group"
-      >
+      <div ref={trackRef} onClick={seek} className="relative h-[3px] flex-1 bg-border rounded-full cursor-pointer group">
+        <div className="absolute inset-y-0 left-0 bg-cyan-500 rounded-full transition-none" style={{ width: `${progress}%` }} />
         <div
-          className="absolute inset-y-0 left-0 bg-blue-400 rounded-full"
-          style={{ width: `${progress}%` }}
-        />
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-blue-400 opacity-0 group-hover:opacity-100 transition-opacity -ml-1"
-          style={{ left: `${progress}%` }}
+          className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cyan-400 border border-background opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ left: `calc(${progress}% - 4px)` }}
         />
       </div>
 
-      <span className="text-xs font-mono text-muted-foreground tabular-nums w-[36px] text-right">
-        {playing || currentTime > 0 ? fmtTime(currentTime) : duration ? fmtTime(duration) : "--:--"}
+      <span className="text-[11px] font-mono text-muted-foreground tabular-nums shrink-0 w-7 text-right">
+        {playing || currentTime > 0 ? fmtTime(currentTime) : duration ? fmtTime(duration) : ""}
       </span>
     </div>
   );
 }
 
-function RecordingPlayer({ callId, hasRecording }: { callId: number; hasRecording: boolean }) {
+function RecordingPlayer({ callId, hasRecording, duration }: { callId: number; hasRecording: boolean; duration?: number }) {
   if (!hasRecording) return <span className="text-muted-foreground text-xs">--</span>;
-  return <AudioPlayer src={`/api/call-logs/${callId}/recording`} />;
+  return <AudioPlayer src={`/api/call-logs/${callId}/recording`} knownDuration={duration} />;
 }
 
 function PriorityBadge({ priority }: { priority: string | null | undefined }) {
@@ -295,7 +233,7 @@ function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose
         {hasRecording && call?.id && (
           <div className="space-y-1.5">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Recording</p>
-            <AudioPlayer src={`/api/call-logs/${call.id}/recording`} large />
+            <AudioPlayer src={`/api/call-logs/${call.id}/recording`} knownDuration={call.duration ?? undefined} large />
           </div>
         )}
 
@@ -503,7 +441,7 @@ export default function Calls() {
                   <PriorityBadge priority={call.priority} />
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  <RecordingPlayer callId={call.id} hasRecording={!!(call.recordingSid || call.recordingUrl)} />
+                  <RecordingPlayer callId={call.id} hasRecording={!!(call.recordingSid || call.recordingUrl)} duration={call.duration ?? undefined} />
                 </TableCell>
                 <TableCell>
                   {hasSummaryData(call) && (
