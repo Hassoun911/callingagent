@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { PhoneNumberInputAnswerMode } from './phoneNumberInputAnswerMode';
+import type { PhoneNumberInputCallerExperience } from './phoneNumberInputCallerExperience';
 import type { PhoneNumberInputCallScreenFallback } from './phoneNumberInputCallScreenFallback';
 import type { PhoneNumberInputForwardCallerId } from './phoneNumberInputForwardCallerId';
 import type { PhoneNumberInputForwardNoAnswerAction } from './phoneNumberInputForwardNoAnswerAction';
@@ -23,6 +24,7 @@ export interface PhoneNumberInput {
   ringCount?: number;
   answerMode: PhoneNumberInputAnswerMode;
   forwardCallerId?: PhoneNumberInputForwardCallerId;
+  callerExperience?: PhoneNumberInputCallerExperience;
   callScreen?: boolean;
   callScreenFallback?: PhoneNumberInputCallScreenFallback;
   forwardNoAnswerAction?: PhoneNumberInputForwardNoAnswerAction;

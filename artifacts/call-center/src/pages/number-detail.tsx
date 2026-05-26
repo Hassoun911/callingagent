@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck, MessageSquare, Keyboard } from "lucide-react";
+import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck, MessageSquare, Keyboard, Mic } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -57,6 +57,14 @@ export default function NumberDetail() {
         ringCount: number.ringCount || 4,
         answerMode: number.answerMode || "forward",
         forwardCallerId: number.forwardCallerId || "caller",
+        callerExperience: (() => {
+          const exp = number.callerExperience;
+          if (exp && exp !== "ringing") return exp;
+          // backward compat: derive from holdMessage if callerExperience is still default
+          if (number.holdMessage === PRESET_HOLD) return "connecting";
+          if (number.holdMessage) return "hold_message";
+          return "ringing";
+        })(),
         callScreen: number.callScreen ?? false,
         callScreenFallback: number.callScreenFallback || "voicemail",
         forwardNoAnswerAction: number.forwardNoAnswerAction || "personal_voicemail",
@@ -173,11 +181,6 @@ export default function NumberDetail() {
 
               <div className="mt-8 space-y-6">
                 {formData.answerMode === 'forward' && (() => {
-                  const callerExp = !formData.holdMessage
-                    ? "ringing"
-                    : formData.holdMessage === PRESET_HOLD
-                      ? "connecting"
-                      : "custom";
                   const radioBase = "flex items-start gap-3 w-full p-3 rounded-md border text-left transition-colors cursor-pointer";
                   const radioOn  = "border-primary bg-primary/10 text-foreground";
                   const radioOff = "border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground";
@@ -186,6 +189,12 @@ export default function NumberDetail() {
                       {on && <span className="h-2 w-2 rounded-full bg-primary" />}
                     </span>
                   );
+                  const callerExp = formData.callerExperience || "ringing";
+                  const setCallerExp = (exp: string, msg?: string) => setFormData({
+                    ...formData,
+                    callerExperience: exp,
+                    holdMessage: msg !== undefined ? msg : (exp === "ringing" ? "" : exp === "connecting" ? PRESET_HOLD : formData.holdMessage),
+                  });
                   return (
                     <div className="space-y-0 animate-in fade-in slide-in-from-top-2 duration-300">
 
@@ -205,40 +214,59 @@ export default function NumberDetail() {
                       <div className="space-y-3 py-6 border-t border-border">
                         <div>
                           <Label>When Someone Calls</Label>
-                          <p className="text-xs text-muted-foreground mt-0.5">What does the caller hear while being connected?</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">What does the caller hear while their call is being connected?</p>
                         </div>
                         <div className="space-y-2">
-                          <button type="button" onClick={() => setFormData({...formData, holdMessage: ""})} className={`${radioBase} ${callerExp === "ringing" ? radioOn : radioOff}`}>
+                          <button type="button" onClick={() => setCallerExp("greeting_name", formData.holdMessage || "")} className={`${radioBase} ${callerExp === "greeting_name" ? radioOn : radioOff}`}>
+                            <Radio on={callerExp === "greeting_name"} />
+                            <div>
+                              <div className="flex items-center gap-2 text-sm font-medium"><Mic className="h-3.5 w-3.5" /> Personal greeting, caller states name, then hold</div>
+                              <div className="text-xs opacity-70 mt-0.5">Plays your greeting, records caller's name — agent hears the name before answering</div>
+                            </div>
+                          </button>
+                          <button type="button" onClick={() => setCallerExp("greeting", formData.holdMessage || "")} className={`${radioBase} ${callerExp === "greeting" ? radioOn : radioOff}`}>
+                            <Radio on={callerExp === "greeting"} />
+                            <div>
+                              <div className="flex items-center gap-2 text-sm font-medium"><MessageSquare className="h-3.5 w-3.5" /> Personal greeting then connecting</div>
+                              <div className="text-xs opacity-70 mt-0.5">Caller hears your custom greeting, then the call connects</div>
+                            </div>
+                          </button>
+                          <button type="button" onClick={() => setCallerExp("hold_message", formData.holdMessage || "")} className={`${radioBase} ${callerExp === "hold_message" ? radioOn : radioOff}`}>
+                            <Radio on={callerExp === "hold_message"} />
+                            <div>
+                              <div className="flex items-center gap-2 text-sm font-medium"><MessageSquare className="h-3.5 w-3.5" /> Hold message only</div>
+                              <div className="text-xs opacity-70 mt-0.5">Caller hears a hold message while connecting — no ringing announcement</div>
+                            </div>
+                          </button>
+                          <button type="button" onClick={() => setCallerExp("connecting", PRESET_HOLD)} className={`${radioBase} ${callerExp === "connecting" ? radioOn : radioOff}`}>
+                            <Radio on={callerExp === "connecting"} />
+                            <div>
+                              <div className="flex items-center gap-2 text-sm font-medium"><PhoneForwarded className="h-3.5 w-3.5" /> "Connecting Call" then ringing</div>
+                              <div className="text-xs opacity-70 mt-0.5">Plays "Connecting your call, please hold." then rings</div>
+                            </div>
+                          </button>
+                          <button type="button" onClick={() => setCallerExp("ringing", "")} className={`${radioBase} ${callerExp === "ringing" ? radioOn : radioOff}`}>
                             <Radio on={callerExp === "ringing"} />
                             <div>
                               <div className="flex items-center gap-2 text-sm font-medium"><PhoneCall className="h-3.5 w-3.5" /> Ringing only</div>
                               <div className="text-xs opacity-70 mt-0.5">Caller hears standard ringing directly</div>
                             </div>
                           </button>
-                          <button type="button" onClick={() => setFormData({...formData, holdMessage: PRESET_HOLD})} className={`${radioBase} ${callerExp === "connecting" ? radioOn : radioOff}`}>
-                            <Radio on={callerExp === "connecting"} />
-                            <div>
-                              <div className="flex items-center gap-2 text-sm font-medium"><PhoneForwarded className="h-3.5 w-3.5" /> Connecting message then ringing</div>
-                              <div className="text-xs opacity-70 mt-0.5">Plays "Connecting your call, please hold." then rings</div>
-                            </div>
-                          </button>
-                          <button type="button" onClick={() => setFormData({...formData, holdMessage: callerExp === "custom" ? formData.holdMessage : ""})} className={`${radioBase} ${callerExp === "custom" ? radioOn : radioOff}`}>
-                            <Radio on={callerExp === "custom"} />
-                            <div>
-                              <div className="flex items-center gap-2 text-sm font-medium"><MessageSquare className="h-3.5 w-3.5" /> Custom message then ringing</div>
-                              <div className="text-xs opacity-70 mt-0.5">Play your own recorded message before ringing starts</div>
-                            </div>
-                          </button>
                         </div>
-                        {callerExp === "custom" && (
-                          <input
-                            type="text"
-                            value={formData.holdMessage}
-                            onChange={e => setFormData({...formData, holdMessage: e.target.value})}
-                            placeholder="Type the message the caller will hear..."
-                            className="w-full h-9 rounded-md border border-border bg-background px-3 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                            autoFocus
-                          />
+                        {(callerExp === "greeting_name" || callerExp === "greeting" || callerExp === "hold_message") && (
+                          <div className="space-y-1.5">
+                            <input
+                              type="text"
+                              value={formData.holdMessage}
+                              onChange={e => setFormData({...formData, holdMessage: e.target.value})}
+                              placeholder={callerExp === "greeting_name" || callerExp === "greeting" ? "Type your personal greeting..." : "Type the hold message the caller will hear..."}
+                              className="w-full h-9 rounded-md border border-border bg-background px-3 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                              autoFocus
+                            />
+                            {callerExp === "greeting_name" && (
+                              <p className="text-xs text-muted-foreground">After the greeting, callers are prompted to say their name. Your phone will play the recording before you answer — works like a built-in call screen.</p>
+                            )}
+                          </div>
                         )}
                       </div>
 

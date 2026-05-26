@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { PhoneNumberUpdateAnswerMode } from './phoneNumberUpdateAnswerMode';
+import type { PhoneNumberUpdateCallerExperience } from './phoneNumberUpdateCallerExperience';
 import type { PhoneNumberUpdateCallScreenFallback } from './phoneNumberUpdateCallScreenFallback';
 import type { PhoneNumberUpdateForwardCallerId } from './phoneNumberUpdateForwardCallerId';
 import type { PhoneNumberUpdateForwardNoAnswerAction } from './phoneNumberUpdateForwardNoAnswerAction';
@@ -25,6 +26,8 @@ export interface PhoneNumberUpdate {
   answerMode?: PhoneNumberUpdateAnswerMode;
   /** @nullable */
   forwardCallerId?: PhoneNumberUpdateForwardCallerId;
+  /** @nullable */
+  callerExperience?: PhoneNumberUpdateCallerExperience;
   /** @nullable */
   callScreen?: boolean | null;
   /** @nullable */

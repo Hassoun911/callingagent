@@ -577,6 +577,9 @@ components:
         forwardCallerId:
           type: string
           enum: [caller, line]
+        callerExperience:
+          type: string
+          enum: [ringing, connecting, hold_message, greeting, greeting_name]
         callScreen:
           type: boolean
         callScreenFallback:
@@ -621,6 +624,9 @@ components:
         forwardCallerId:
           type: string
           enum: [caller, line]
+        callerExperience:
+          type: string
+          enum: [ringing, connecting, hold_message, greeting, greeting_name]
         callScreen:
           type: boolean
         callScreenFallback:
@@ -655,6 +661,9 @@ components:
         forwardCallerId:
           type: ["string", "null"]
           enum: [caller, line, null]
+        callerExperience:
+          type: ["string", "null"]
+          enum: [ringing, connecting, hold_message, greeting, greeting_name, null]
         callScreen:
           type: ["boolean", "null"]
         callScreenFallback:

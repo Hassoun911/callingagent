@@ -13,6 +13,7 @@ export const phoneNumbersTable = pgTable("phone_numbers", {
   ringCount: integer("ring_count").notNull().default(4),
   answerMode: text("answer_mode").notNull().default("forward"),
   forwardCallerId: text("forward_caller_id").notNull().default("caller"),
+  callerExperience: text("caller_experience").notNull().default("ringing"),
   callScreen: boolean("call_screen").notNull().default(false),
   callScreenFallback: text("call_screen_fallback").notNull().default("voicemail"),
   forwardNoAnswerAction: text("forward_no_answer_action").notNull().default("personal_voicemail"),

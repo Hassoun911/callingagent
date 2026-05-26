@@ -27,6 +27,17 @@ export const PhoneNumberForwardCallerId = {
   line: 'line',
 } as const;
 
+export type PhoneNumberCallerExperience = typeof PhoneNumberCallerExperience[keyof typeof PhoneNumberCallerExperience];
+
+
+export const PhoneNumberCallerExperience = {
+  ringing: 'ringing',
+  connecting: 'connecting',
+  hold_message: 'hold_message',
+  greeting: 'greeting',
+  greeting_name: 'greeting_name',
+} as const;
+
 export type PhoneNumberCallScreenFallback = typeof PhoneNumberCallScreenFallback[keyof typeof PhoneNumberCallScreenFallback];
 
 
@@ -58,6 +69,7 @@ export interface PhoneNumber {
   ringCount: number;
   answerMode: PhoneNumberAnswerMode;
   forwardCallerId?: PhoneNumberForwardCallerId;
+  callerExperience?: PhoneNumberCallerExperience;
   callScreen?: boolean;
   callScreenFallback?: PhoneNumberCallScreenFallback;
   forwardNoAnswerAction?: PhoneNumberForwardNoAnswerAction;
@@ -87,6 +99,17 @@ export type PhoneNumberInputForwardCallerId = typeof PhoneNumberInputForwardCall
 export const PhoneNumberInputForwardCallerId = {
   caller: 'caller',
   line: 'line',
+} as const;
+
+export type PhoneNumberInputCallerExperience = typeof PhoneNumberInputCallerExperience[keyof typeof PhoneNumberInputCallerExperience];
+
+
+export const PhoneNumberInputCallerExperience = {
+  ringing: 'ringing',
+  connecting: 'connecting',
+  hold_message: 'hold_message',
+  greeting: 'greeting',
+  greeting_name: 'greeting_name',
 } as const;
 
 export type PhoneNumberInputCallScreenFallback = typeof PhoneNumberInputCallScreenFallback[keyof typeof PhoneNumberInputCallScreenFallback];
@@ -119,6 +142,7 @@ export interface PhoneNumberInput {
   ringCount?: number;
   answerMode: PhoneNumberInputAnswerMode;
   forwardCallerId?: PhoneNumberInputForwardCallerId;
+  callerExperience?: PhoneNumberInputCallerExperience;
   callScreen?: boolean;
   callScreenFallback?: PhoneNumberInputCallScreenFallback;
   forwardNoAnswerAction?: PhoneNumberInputForwardNoAnswerAction;
@@ -152,6 +176,20 @@ export type PhoneNumberUpdateForwardCallerId = typeof PhoneNumberUpdateForwardCa
 export const PhoneNumberUpdateForwardCallerId = {
   caller: 'caller',
   line: 'line',
+} as const;
+
+/**
+ * @nullable
+ */
+export type PhoneNumberUpdateCallerExperience = typeof PhoneNumberUpdateCallerExperience[keyof typeof PhoneNumberUpdateCallerExperience] | null;
+
+
+export const PhoneNumberUpdateCallerExperience = {
+  ringing: 'ringing',
+  connecting: 'connecting',
+  hold_message: 'hold_message',
+  greeting: 'greeting',
+  greeting_name: 'greeting_name',
 } as const;
 
 /**
@@ -192,6 +230,8 @@ export interface PhoneNumberUpdate {
   answerMode?: PhoneNumberUpdateAnswerMode;
   /** @nullable */
   forwardCallerId?: PhoneNumberUpdateForwardCallerId;
+  /** @nullable */
+  callerExperience?: PhoneNumberUpdateCallerExperience;
   /** @nullable */
   callScreen?: boolean | null;
   /** @nullable */

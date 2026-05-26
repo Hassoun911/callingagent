@@ -306,14 +306,28 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
 
     const recordAttr = ` record="record-from-answer-dual-channel" recordingStatusCallback="${baseUrl}/api/twilio/recording" recordingStatusCallbackMethod="POST"`;
 
-    if (callScreen && phoneNumber?.id) {
+    const callerExperience = phoneNumber?.callerExperience ?? "ringing";
+    const holdMsg = phoneNumber?.holdMessage?.trim() || null;
+    const preDialSay = holdMsg ? `<Say voice="${TWILIO_FALLBACK_VOICE}">${escapeXml(holdMsg)}</Say>` : "";
+
+    if (callerExperience === "greeting_name" && phoneNumber?.id) {
+      // Record caller's name, then dial with name whisper to agent
+      const encodedFrom = encodeURIComponent(From ?? "");
+      const encodedFwd = encodeURIComponent(forwardTo);
+      const nameRecordedUrl = `${baseUrl}/api/twilio/name-recorded?phoneNumberId=${phoneNumber.id}&amp;forwardTo=${encodedFwd}&amp;callerFrom=${encodedFrom}&amp;callScreenFallback=${callScreenFallback}`;
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  ${preDialSay}
+  <Say voice="${TWILIO_FALLBACK_VOICE}">Please say your name after the tone, then press pound.</Say>
+  <Record maxLength="8" trim="trim-silence" finishOnKey="#" action="${nameRecordedUrl}" method="POST"/>
+</Response>`;
+    } else if (callScreen && phoneNumber?.id) {
       const encodedFrom = encodeURIComponent(From ?? "");
       const screenUrl = `${baseUrl}/api/twilio/screen?phoneNumberId=${phoneNumber.id}&amp;fallback=${callScreenFallback}&amp;callerFrom=${encodedFrom}`;
       const fallbackUrl = `${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&amp;mode=${callScreenFallback}`;
-      const holdMsg = phoneNumber?.holdMessage?.trim() || null;
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${holdMsg ? `<Say voice="${TWILIO_FALLBACK_VOICE}">${escapeXml(holdMsg)}</Say>` : ""}
+  ${preDialSay}
   <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}">
     <Number url="${screenUrl}">${forwardTo}</Number>
   </Dial>
@@ -324,10 +338,9 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       const noAnswerRedirect = (noAnswerAction === "voicemail" || noAnswerAction === "ai_voice") && phoneNumber?.id
         ? `\n  <Redirect method="POST">${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&amp;mode=${noAnswerAction}</Redirect>`
         : "";
-      const holdMsg = phoneNumber?.holdMessage?.trim() || null;
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${holdMsg ? `<Say voice="${TWILIO_FALLBACK_VOICE}">${escapeXml(holdMsg)}</Say>` : ""}
+  ${preDialSay}
   <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}">
     <Number>${forwardTo}</Number>
   </Dial>${noAnswerRedirect}
@@ -542,6 +555,67 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   <Hangup/>
 </Response>`);
   }
+});
+
+// ─── Name recorded — caller stated their name, now dial agent with whisper ─────
+router.post("/twilio/name-recorded", async (req, res): Promise<void> => {
+  const { RecordingUrl, CallSid } = req.body;
+  const { phoneNumberId, forwardTo, callerFrom, callScreenFallback } = req.query as Record<string, string>;
+  req.log.info({ CallSid, phoneNumberId, hasRecording: !!RecordingUrl }, "Caller name recorded");
+
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : `${req.protocol}://${req.get("host")}`;
+
+  let phoneNumber = null;
+  if (phoneNumberId) {
+    const rows = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, parseInt(phoneNumberId, 10)));
+    phoneNumber = rows[0] ?? null;
+  }
+
+  const forwardCallerId = phoneNumber?.forwardCallerId ?? "caller";
+  const lineNumber = phoneNumber?.number ?? "";
+  const callerIdAttr = forwardCallerId === "line" && lineNumber ? ` callerId="${lineNumber}"` : "";
+  const ringCount = phoneNumber?.ringCount ?? 4;
+  const fbMode = callScreenFallback ?? phoneNumber?.callScreenFallback ?? "voicemail";
+  const recordAttr = ` record="record-from-answer-dual-channel" recordingStatusCallback="${baseUrl}/api/twilio/recording" recordingStatusCallbackMethod="POST"`;
+
+  const recordingMp3 = RecordingUrl ? RecordingUrl + ".mp3" : "";
+  const encodedRecUrl = encodeURIComponent(recordingMp3);
+  const nameScreenUrl = `${baseUrl}/api/twilio/name-screen?recordingUrl=${encodedRecUrl}&amp;phoneNumberId=${phoneNumberId}&amp;fallback=${fbMode}`;
+  const fallbackUrl = `${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumberId}&amp;mode=${fbMode}`;
+  const fwdTo = forwardTo ? decodeURIComponent(forwardTo) : (phoneNumber?.forwardTo ?? "");
+
+  res.set("Content-Type", "text/xml");
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}">
+    <Number url="${nameScreenUrl}">${escapeXml(fwdTo)}</Number>
+  </Dial>
+  <Redirect method="POST">${fallbackUrl}</Redirect>
+</Response>`);
+});
+
+// ─── Name screen whisper — plays caller's name recording to agent before bridge
+router.post("/twilio/name-screen", (req, res): void => {
+  const { recordingUrl, fallback } = req.query as Record<string, string>;
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : `${req.protocol}://${req.get("host")}`;
+
+  const decodedRecUrl = recordingUrl ? decodeURIComponent(recordingUrl) : "";
+  const fallbackLabel = fallback === "ai_voice" ? "AI agent" : "voicemail";
+
+  res.set("Content-Type", "text/xml");
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Gather numDigits="1" action="${baseUrl}/api/twilio/screen-accept" method="POST" timeout="15">
+    <Say voice="${TWILIO_FALLBACK_VOICE}">Incoming call. The caller says their name is</Say>
+    ${decodedRecUrl ? `<Play>${decodedRecUrl}</Play>` : `<Say voice="${TWILIO_FALLBACK_VOICE}">unknown.</Say>`}
+    <Say voice="${TWILIO_FALLBACK_VOICE}">Press 1 to answer, or hang up to send to ${fallbackLabel}.</Say>
+  </Gather>
+  <Hangup/>
+</Response>`);
 });
 
 // ─── Call screen whisper (plays to YOU when you answer a forwarded call) ──────
