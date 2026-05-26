@@ -383,9 +383,13 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       : "";
     const systemPrompt = basePrompt + langDirective;
 
+    // Pre-seed the greeting as the first assistant message so the AI knows it
+    // already introduced itself and won't repeat the greeting on the first reply.
+    const greetingForHistory = aiConfig?.greeting?.trim() || DEFAULT_GREETING;
+
     conversations.set(CallSid, {
       systemPrompt,
-      messages: [],
+      messages: [{ role: "assistant", content: greetingForHistory }],
       maxDuration,
       startedAt: Date.now(),
       voice: ttsVoice,
@@ -691,7 +695,7 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
     const voiceStyle2 = aiConfig?.voiceStyle ?? "";
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
     const speechTimeout = aiConfig?.speechTimeout ?? 1.0;
-    const maxTokens = aiConfig?.maxTokens ?? 100;
+    const maxTokens = aiConfig?.maxTokens ?? 250;
     const greetingText = aiConfig?.greeting?.trim() || "Hello, thank you for calling. How can I help you today?";
 
     // Resolve company name for template substitution
@@ -711,7 +715,7 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
 
     conversations.set(CallSid, {
       systemPrompt: basePrompt + langDirective,
-      messages: [],
+      messages: [{ role: "assistant", content: greetingText }],
       maxDuration,
       startedAt: Date.now(),
       voice: ttsVoice,
