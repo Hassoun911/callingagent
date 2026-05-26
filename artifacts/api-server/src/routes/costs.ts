@@ -144,12 +144,14 @@ router.get("/costs", async (req, res): Promise<void> => {
           .map(([model, cost]) => ({ model, cost }))
           .sort((a, b) => b.cost - a.cost);
 
+        const viaProxy = !!(process.env.AI_INTEGRATIONS_OPENAI_BASE_URL);
         openai = {
           totalCost: Math.round(totalCost * 1_000_000) / 1_000_000,
           currency: "USD",
           period,
           breakdown,
           available: true,
+          viaProxy,
         };
       } else {
         const status = r.status;

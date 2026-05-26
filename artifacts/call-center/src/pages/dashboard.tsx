@@ -11,7 +11,7 @@ type TwilioPerNumber = { phoneNumber: string; friendlyName: string | null; cost:
 type CostData = {
   period: string;
   twilio: { available: true; totalCost: number; currency: string; breakdown: { category: string; label: string; cost: number; usage: string; usageUnit: string }[]; perNumber: TwilioPerNumber[] } | { available: false; error: string } | null;
-  openai: { available: true; totalCost: number; currency: string; breakdown: { model: string; cost: number }[] } | { available: false; error: string } | null;
+  openai: { available: true; totalCost: number; currency: string; breakdown: { model: string; cost: number }[]; viaProxy: boolean } | { available: false; error: string } | null;
 };
 
 export default function Dashboard() {
@@ -292,10 +292,22 @@ export default function Dashboard() {
                 {costs?.openai?.available ? (
                   <>
                     <div>
-                      <div className="text-3xl font-bold font-mono text-foreground">${(costs.openai as any).totalCost.toFixed(6)}</div>
-                      <p className="text-xs text-muted-foreground mt-0.5">USD this month</p>
+                      <div className="text-3xl font-bold font-mono text-foreground">${(costs.openai as any).totalCost.toFixed(4)}</div>
+                      <p className="text-xs text-muted-foreground mt-0.5">direct API spend this month</p>
                     </div>
-                    {(costs.openai as any).breakdown?.length > 0 && (
+
+                    {(costs.openai as any).viaProxy && (
+                      <div className="flex items-start gap-2 rounded-md bg-blue-950/40 border border-blue-800/30 px-3 py-2">
+                        <AlertCircle className="h-3.5 w-3.5 text-blue-400 shrink-0 mt-0.5" />
+                        <p className="text-[11px] text-blue-300 leading-relaxed">
+                          AI voice calls route through Replit's proxy — those costs appear on your Replit bill, not here.{" "}
+                          <a href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" rel="noopener noreferrer"
+                            className="underline hover:text-blue-200">Check credit balance</a>
+                        </p>
+                      </div>
+                    )}
+
+                    {(costs.openai as any).breakdown?.length > 0 ? (
                       <div className="pt-1 border-t border-border/50 space-y-1">
                         <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium pb-1">By Model</p>
                         <div className="rounded-md border border-border/40 overflow-hidden">
@@ -305,20 +317,22 @@ export default function Dashboard() {
                               {openaiExpanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
                               <span className="text-xs text-muted-foreground">{(costs.openai as any).breakdown.length} model{(costs.openai as any).breakdown.length !== 1 ? "s" : ""}</span>
                             </div>
-                            <span className="font-mono text-xs font-bold text-foreground">${(costs.openai as any).totalCost.toFixed(6)}</span>
+                            <span className="font-mono text-xs font-bold text-foreground">${(costs.openai as any).totalCost.toFixed(4)}</span>
                           </button>
                           {openaiExpanded && (
                             <div className="px-3 py-2 space-y-1 bg-card/20 border-t border-border/30">
-                              {(costs.openai as any).breakdown.slice(0, 6).map((row: any) => (
+                              {(costs.openai as any).breakdown.slice(0, 8).map((row: any) => (
                                 <div key={row.model} className="flex items-center justify-between text-[11px]">
                                   <span className="text-muted-foreground font-mono truncate mr-2">{row.model}</span>
-                                  <span className="font-mono text-foreground shrink-0">${row.cost.toFixed(6)}</span>
+                                  <span className="font-mono text-foreground shrink-0">${row.cost.toFixed(4)}</span>
                                 </div>
                               ))}
                             </div>
                           )}
                         </div>
                       </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No direct API charges this month</p>
                     )}
                   </>
                 ) : (
@@ -327,15 +341,37 @@ export default function Dashboard() {
                       <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                       <span>{(costs?.openai as any)?.error ?? "Not available"}</span>
                     </div>
-                    <a
-                      href="https://platform.openai.com/settings/organization/billing/overview"
-                      target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                    >
+                    <a href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
                       View on OpenAI platform <ExternalLink className="h-3 w-3" />
                     </a>
                   </div>
                 )}
+              </div>
+
+              {/* Replit */}
+              <div className="rounded-lg border border-border bg-card/30 p-4 space-y-3 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-orange-400" />
+                    <span className="text-sm font-semibold text-foreground">Replit</span>
+                  </div>
+                  <a href="https://replit.com/account#billing" target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    Billing <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Replit does not expose a billing API — costs cannot be fetched programmatically.</p>
+                    <p className="text-xs text-muted-foreground">AI voice calls (TTS + completions) are routed through Replit's AI proxy and billed to your Replit account. Check your usage breakdown on the Replit billing page.</p>
+                    <a href="https://replit.com/account#billing" target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1">
+                      View Replit billing <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
               </div>
 
             </div>
