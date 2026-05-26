@@ -32,15 +32,18 @@ import type {
   ContactUpdate,
   DashboardStats,
   GetRecentCallsParams,
+  GetSmsUnreadCount200,
   HealthStatus,
   ListCallLogsParams,
   ListContactsParams,
+  ListSmsMessagesParams,
   PhoneNumber,
   PhoneNumberInput,
   PhoneNumberTwilioStatus,
   PhoneNumberUpdate,
   RecordingUrl,
   SearchAvailableNumbersParams,
+  SmsMessage,
   TestCallInput,
   TestCallResult
 } from './api.schemas';
@@ -1926,6 +1929,167 @@ export function useGetRecentCalls<TData = Awaited<ReturnType<typeof getRecentCal
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetRecentCallsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListSmsMessagesUrl = (params?: ListSmsMessagesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/sms?${stringifiedParams}` : `/api/sms`
+}
+
+/**
+ * @summary List SMS messages
+ */
+export const listSmsMessages = async (params?: ListSmsMessagesParams, options?: RequestInit): Promise<SmsMessage[]> => {
+
+  return customFetch<SmsMessage[]>(getListSmsMessagesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSmsMessagesQueryKey = (params?: ListSmsMessagesParams,) => {
+    return [
+    `/api/sms`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSmsMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listSmsMessages>>, TError = ErrorType<unknown>>(params?: ListSmsMessagesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSmsMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSmsMessagesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSmsMessages>>> = ({ signal }) => listSmsMessages(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSmsMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSmsMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listSmsMessages>>>
+export type ListSmsMessagesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List SMS messages
+ */
+
+export function useListSmsMessages<TData = Awaited<ReturnType<typeof listSmsMessages>>, TError = ErrorType<unknown>>(
+ params?: ListSmsMessagesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSmsMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSmsMessagesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSmsUnreadCountUrl = () => {
+
+
+
+
+  return `/api/sms/unread-count`
+}
+
+/**
+ * @summary Get count of unread inbound SMS messages
+ */
+export const getSmsUnreadCount = async ( options?: RequestInit): Promise<GetSmsUnreadCount200> => {
+
+  return customFetch<GetSmsUnreadCount200>(getGetSmsUnreadCountUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSmsUnreadCountQueryKey = () => {
+    return [
+    `/api/sms/unread-count`
+    ] as const;
+    }
+
+
+export const getGetSmsUnreadCountQueryOptions = <TData = Awaited<ReturnType<typeof getSmsUnreadCount>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSmsUnreadCount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSmsUnreadCountQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSmsUnreadCount>>> = ({ signal }) => getSmsUnreadCount({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSmsUnreadCount>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSmsUnreadCountQueryResult = NonNullable<Awaited<ReturnType<typeof getSmsUnreadCount>>>
+export type GetSmsUnreadCountQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get count of unread inbound SMS messages
+ */
+
+export function useGetSmsUnreadCount<TData = Awaited<ReturnType<typeof getSmsUnreadCount>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSmsUnreadCount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSmsUnreadCountQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -140,9 +140,11 @@ router.post("/phone-numbers", async (req, res): Promise<void> => {
       const purchased = await client.incomingPhoneNumbers.create({
         phoneNumber: data.number,
         voiceUrl: `${baseUrl}/api/twilio/voice`,
-        statusCallback: `${baseUrl}/api/twilio/status`,
         voiceMethod: "POST",
+        statusCallback: `${baseUrl}/api/twilio/status`,
         statusCallbackMethod: "POST",
+        smsUrl: `${baseUrl}/api/twilio/sms`,
+        smsMethod: "POST",
         friendlyName: data.callerIdName,
       });
       twilioSid = purchased.sid;

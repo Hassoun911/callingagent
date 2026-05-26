@@ -552,6 +552,36 @@ export interface DashboardStats {
   forwardedCalls: number;
 }
 
+export type SmsMessageDirection = typeof SmsMessageDirection[keyof typeof SmsMessageDirection];
+
+
+export const SmsMessageDirection = {
+  inbound: 'inbound',
+  outbound: 'outbound',
+} as const;
+
+export interface SmsMessage {
+  id: number;
+  /** @nullable */
+  phoneNumberId?: number | null;
+  /** @nullable */
+  twilioSid?: string | null;
+  direction: SmsMessageDirection;
+  from: string;
+  to: string;
+  body: string;
+  /** @nullable */
+  status?: string | null;
+  /** @nullable */
+  numMedia?: number | null;
+  /** @nullable */
+  mediaUrls?: string[] | null;
+  /** @nullable */
+  lineName?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export type SearchAvailableNumbersParams = {
 /**
  * @nullable
@@ -609,5 +639,17 @@ export const ListCallLogsDirection = {
 
 export type GetRecentCallsParams = {
 limit?: number;
+};
+
+export type ListSmsMessagesParams = {
+phoneNumberId?: number;
+direction?: string;
+search?: string;
+limit?: number;
+offset?: number;
+};
+
+export type GetSmsUnreadCount200 = {
+  count: number;
 };
 

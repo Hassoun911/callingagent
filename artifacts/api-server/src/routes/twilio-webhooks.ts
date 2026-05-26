@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable, contactsTable } from "@workspace/db";
+import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable, contactsTable, smsMessagesTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
 import twilio from "twilio";
@@ -1080,5 +1080,103 @@ router.post("/twilio/recording", async (req, res): Promise<void> => {
 
   res.sendStatus(200);
 });
+
+// ─── SMS webhook ─────────────────────────────────────────────────────────────
+
+router.post("/twilio/sms", async (req, res): Promise<void> => {
+  const { MessageSid, From, To, Body, NumMedia, SmsStatus } = req.body;
+  req.log.info({ MessageSid, From, To }, "Inbound SMS received");
+
+  // Resolve the phone number row so we can link and get notification email
+  let phoneNumberId: number | null = null;
+  let notificationEmail: string | null = null;
+  let lineName: string | null = null;
+
+  if (To) {
+    const [pn] = await db
+      .select()
+      .from(phoneNumbersTable)
+      .where(eq(phoneNumbersTable.number, To));
+    if (pn) {
+      phoneNumberId = pn.id;
+      notificationEmail = pn.notificationEmail ?? null;
+      lineName = pn.friendlyName ?? null;
+    }
+  }
+
+  // Collect media URLs if any
+  const mediaUrls: string[] = [];
+  const numMedia = parseInt(NumMedia ?? "0", 10);
+  for (let i = 0; i < numMedia; i++) {
+    const url = req.body[`MediaUrl${i}`];
+    if (url) mediaUrls.push(url);
+  }
+
+  // Store in DB
+  if (MessageSid) {
+    await db.insert(smsMessagesTable).values({
+      twilioSid: MessageSid,
+      phoneNumberId,
+      direction: "inbound",
+      from: From ?? "",
+      to: To ?? "",
+      body: Body ?? "",
+      status: SmsStatus ?? "received",
+      numMedia: numMedia || 0,
+      mediaUrls: mediaUrls.length > 0 ? mediaUrls : null,
+    }).onConflictDoNothing();
+  }
+
+  // Send email notification if configured
+  if (notificationEmail) {
+    const transport = getEmailTransport();
+    if (transport) {
+      const fromDisplay = formatE164(From);
+      const subject = `New SMS — ${fromDisplay}`;
+      const mediaSection = mediaUrls.length > 0
+        ? `<p style="margin:12px 0"><strong>Media (${mediaUrls.length}):</strong> ${mediaUrls.map((u, i) => `<a href="${u}" style="color:#22c55e">Attachment ${i + 1}</a>`).join(" &nbsp;")}</p>`
+        : "";
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333">
+  <h2 style="color:#111;border-bottom:2px solid #22c55e;padding-bottom:8px">New SMS Message${lineName ? ` — ${lineName}` : ""}</h2>
+  <table style="width:100%;border-collapse:collapse;margin:16px 0">
+    <tr><td style="padding:6px 0;color:#666;width:100px">From</td><td style="padding:6px 0;font-weight:500">${fromDisplay}</td></tr>
+    <tr><td style="padding:6px 0;color:#666">To</td><td style="padding:6px 0">${lineName ? `${lineName} (${To ?? ""})` : (To ?? "")}</td></tr>
+    <tr><td style="padding:6px 0;color:#666">Time</td><td style="padding:6px 0">${new Date().toLocaleString()}</td></tr>
+  </table>
+  <div style="background:#f4f4f4;border-left:3px solid #22c55e;padding:12px 16px;border-radius:4px;margin:16px 0">
+    <p style="margin:0;font-size:15px;line-height:1.5">${(Body ?? "").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+  </div>
+  ${mediaSection}
+  <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+  <p style="font-size:11px;color:#999;margin:0">Sent by Vanguard.OPS</p>
+</body></html>`;
+      transport.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER || "",
+        to: notificationEmail,
+        subject,
+        html,
+      }).catch((err: any) => {
+        logger.error({ err: err?.message }, "Failed to send SMS notification email");
+      });
+    }
+  }
+
+  // Respond with empty TwiML so Twilio doesn't auto-reply
+  res.setHeader("Content-Type", "text/xml");
+  res.send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
+});
+
+function formatE164(raw: string | undefined): string {
+  if (!raw) return "Unknown";
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 11 && digits[0] === "1") {
+    const d = digits.slice(1);
+    return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  }
+  if (digits.length === 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return raw;
+}
 
 export default router;

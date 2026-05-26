@@ -544,3 +544,43 @@ export const GetRecentCallsResponseItem = zod.object({
 export const GetRecentCallsResponse = zod.array(GetRecentCallsResponseItem)
 
 
+/**
+ * @summary List SMS messages
+ */
+export const listSmsMessagesQueryLimitDefault = 100;
+export const listSmsMessagesQueryOffsetDefault = 0;
+
+export const ListSmsMessagesQueryParams = zod.object({
+  "phoneNumberId": zod.coerce.number().optional(),
+  "direction": zod.coerce.string().optional(),
+  "search": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().default(listSmsMessagesQueryLimitDefault),
+  "offset": zod.coerce.number().default(listSmsMessagesQueryOffsetDefault)
+})
+
+export const ListSmsMessagesResponseItem = zod.object({
+  "id": zod.number(),
+  "phoneNumberId": zod.number().nullish(),
+  "twilioSid": zod.string().nullish(),
+  "direction": zod.enum(['inbound', 'outbound']),
+  "from": zod.string(),
+  "to": zod.string(),
+  "body": zod.string(),
+  "status": zod.string().nullish(),
+  "numMedia": zod.number().nullish(),
+  "mediaUrls": zod.array(zod.string()).nullish(),
+  "lineName": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+export const ListSmsMessagesResponse = zod.array(ListSmsMessagesResponseItem)
+
+
+/**
+ * @summary Get count of unread inbound SMS messages
+ */
+export const GetSmsUnreadCountResponse = zod.object({
+  "count": zod.number()
+})
+
+

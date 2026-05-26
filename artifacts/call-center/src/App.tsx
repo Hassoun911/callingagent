@@ -13,6 +13,7 @@ import Contacts from "@/pages/contacts";
 import Companies from "@/pages/companies";
 import Settings from "@/pages/settings";
 import Billing from "@/pages/billing";
+import Messages from "@/pages/messages";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -36,6 +37,7 @@ function Router() {
         <Route path="/companies" component={Companies} />
         <Route path="/settings" component={Settings} />
         <Route path="/billing" component={Billing} />
+        <Route path="/messages" component={Messages} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

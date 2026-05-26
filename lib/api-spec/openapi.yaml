@@ -21,6 +21,8 @@ tags:
     description: AI voice configuration
   - name: dashboard
     description: Dashboard stats
+  - name: sms
+    description: SMS messages
 
 paths:
   /healthz:
@@ -511,6 +513,61 @@ paths:
                 items:
                   $ref: "#/components/schemas/CallLog"
 
+  /sms:
+    get:
+      operationId: listSmsMessages
+      tags: [sms]
+      summary: List SMS messages
+      parameters:
+        - name: phoneNumberId
+          in: query
+          schema:
+            type: integer
+        - name: direction
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of SMS messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SmsMessage"
+
+  /sms/unread-count:
+    get:
+      operationId: getSmsUnreadCount
+      tags: [sms]
+      summary: Get count of unread inbound SMS messages
+      responses:
+        "200":
+          description: Unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [count]
+                properties:
+                  count:
+                    type: integer
+
   /twilio/voice:
     post:
       operationId: twilioVoiceWebhook
@@ -999,3 +1056,37 @@ components:
           type: integer
         forwardedCalls:
           type: integer
+
+    SmsMessage:
+      type: object
+      required: [id, direction, from, to, body, createdAt]
+      properties:
+        id:
+          type: integer
+        phoneNumberId:
+          type: ["integer", "null"]
+        twilioSid:
+          type: ["string", "null"]
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        from:
+          type: string
+        to:
+          type: string
+        body:
+          type: string
+        status:
+          type: ["string", "null"]
+        numMedia:
+          type: ["integer", "null"]
+        mediaUrls:
+          type: ["array", "null"]
+          items:
+            type: string
+        lineName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
