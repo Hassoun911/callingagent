@@ -37,6 +37,7 @@ export const ListPhoneNumbersResponseItem = zod.object({
   "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "voicemailGreeting": zod.string().nullish(),
+  "notificationEmail": zod.string().nullish(),
   "isActive": zod.boolean(),
   "createdAt": zod.string()
 })
@@ -64,7 +65,8 @@ export const ProvisionPhoneNumberBody = zod.object({
   "forwardNoAnswerAction": zod.enum(['personal_voicemail', 'voicemail', 'ai_voice']).optional(),
   "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
-  "voicemailGreeting": zod.string().nullish()
+  "voicemailGreeting": zod.string().nullish(),
+  "notificationEmail": zod.string().nullish()
 })
 
 
@@ -136,6 +138,7 @@ export const GetPhoneNumberResponse = zod.object({
   "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "voicemailGreeting": zod.string().nullish(),
+  "notificationEmail": zod.string().nullish(),
   "isActive": zod.boolean(),
   "createdAt": zod.string()
 })
@@ -160,6 +163,7 @@ export const UpdatePhoneNumberBody = zod.object({
   "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "voicemailGreeting": zod.string().nullish(),
+  "notificationEmail": zod.string().nullish(),
   "isActive": zod.boolean().nullish()
 })
 
@@ -181,6 +185,7 @@ export const UpdatePhoneNumberResponse = zod.object({
   "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "voicemailGreeting": zod.string().nullish(),
+  "notificationEmail": zod.string().nullish(),
   "isActive": zod.boolean(),
   "createdAt": zod.string()
 })

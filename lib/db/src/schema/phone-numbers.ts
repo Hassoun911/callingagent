@@ -20,6 +20,7 @@ export const phoneNumbersTable = pgTable("phone_numbers", {
   holdMessage: text("hold_message"),
   aiSystemPrompt: text("ai_system_prompt"),
   voicemailGreeting: text("voicemail_greeting"),
+  notificationEmail: text("notification_email"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),

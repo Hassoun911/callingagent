@@ -594,6 +594,8 @@ components:
           type: ["string", "null"]
         voicemailGreeting:
           type: ["string", "null"]
+        notificationEmail:
+          type: ["string", "null"]
         isActive:
           type: boolean
         createdAt:
@@ -641,6 +643,8 @@ components:
           type: ["string", "null"]
         voicemailGreeting:
           type: ["string", "null"]
+        notificationEmail:
+          type: ["string", "null"]
 
     PhoneNumberUpdate:
       type: object
@@ -677,6 +681,8 @@ components:
         aiSystemPrompt:
           type: ["string", "null"]
         voicemailGreeting:
+          type: ["string", "null"]
+        notificationEmail:
           type: ["string", "null"]
         isActive:
           type: ["boolean", "null"]

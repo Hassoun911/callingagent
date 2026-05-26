@@ -35,6 +35,8 @@ export interface PhoneNumber {
   aiSystemPrompt?: string | null;
   /** @nullable */
   voicemailGreeting?: string | null;
+  /** @nullable */
+  notificationEmail?: string | null;
   isActive: boolean;
   createdAt: string;
 }

@@ -34,4 +34,6 @@ export interface PhoneNumberInput {
   aiSystemPrompt?: string | null;
   /** @nullable */
   voicemailGreeting?: string | null;
+  /** @nullable */
+  notificationEmail?: string | null;
 }

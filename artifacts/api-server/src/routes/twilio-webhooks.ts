@@ -5,6 +5,114 @@ import { logger } from "../lib/logger";
 import OpenAI from "openai";
 import twilio from "twilio";
 import { randomUUID } from "crypto";
+import nodemailer from "nodemailer";
+
+// ─── Email notifications ─────────────────────────────────────────────────────
+
+function getEmailTransport(): nodemailer.Transporter | null {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) return null;
+  return nodemailer.createTransport({
+    host,
+    port: parseInt(process.env.SMTP_PORT ?? "587", 10),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user, pass },
+  });
+}
+
+/** Fetch all data needed for an email notification and send it (if configured). */
+async function sendCallNotificationIfConfigured(callSid: string, overrideRecordingUrl?: string | null): Promise<void> {
+  try {
+    const [log] = await db
+      .select()
+      .from(callLogsTable)
+      .where(eq(callLogsTable.twilioCallSid, callSid));
+    if (!log) return;
+
+    // Find the phone number row by the "to" (Twilio line number)
+    let phoneNumber = null;
+    if (log.to) {
+      const rows = await db
+        .select()
+        .from(phoneNumbersTable)
+        .where(eq(phoneNumbersTable.number, log.to));
+      phoneNumber = rows[0] ?? null;
+    }
+
+    const notificationEmail = phoneNumber?.notificationEmail;
+    if (!notificationEmail) return;
+
+    const transport = getEmailTransport();
+    if (!transport) {
+      logger.warn({ callSid }, "SMTP not configured — skipping call notification email");
+      return;
+    }
+
+    const from = process.env.SMTP_FROM || process.env.SMTP_USER || "";
+    const recordingUrl = overrideRecordingUrl ?? log.recordingUrl ?? null;
+
+    const callerDisplay = log.callerName
+      ? `${log.callerName} (${log.from ?? "Unknown"})`
+      : (log.from ?? "Unknown caller");
+
+    const durationSec = log.duration ?? 0;
+    const durationDisplay = durationSec > 0
+      ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
+      : "N/A";
+
+    const modeLabels: Record<string, string> = {
+      forward: "Forwarded", ai_voice: "AI Agent", voicemail: "Voicemail", reject: "Rejected",
+    };
+    const modeDisplay = modeLabels[log.answerMode ?? ""] ?? (log.answerMode ?? "Unknown");
+
+    const calledAt = log.startedAt ?? log.createdAt ?? new Date();
+    const subject = `Call Summary — ${callerDisplay} — ${calledAt.toLocaleString()}`;
+
+    const recordingSection = recordingUrl
+      ? `<p style="margin:12px 0"><strong>Recording:</strong> <a href="${recordingUrl}" style="color:#22c55e">Listen to recording</a></p>`
+      : "";
+
+    const summarySection = log.callSummary
+      ? `<h3 style="color:#22c55e;margin:20px 0 8px">Call Summary</h3>
+         <p style="margin:0 0 8px">${log.callSummary}</p>
+         ${log.actionRequired ? `<p style="margin:0 0 4px"><strong>Action required:</strong> ${log.actionRequired}</p>` : ""}
+         ${log.priority ? `<p style="margin:0 0 4px"><strong>Priority:</strong> ${log.priority}</p>` : ""}`
+      : "";
+
+    const transcriptSection = log.transcription
+      ? `<h3 style="color:#22c55e;margin:20px 0 8px">Transcript</h3>
+         <pre style="background:#f4f4f4;padding:12px;border-radius:4px;white-space:pre-wrap;font-size:12px;margin:0">${log.transcription}</pre>`
+      : "";
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333">
+  <h2 style="color:#111;border-bottom:2px solid #22c55e;padding-bottom:8px">
+    Incoming Call — ${phoneNumber?.friendlyName ?? log.to ?? "Your Line"}
+  </h2>
+  <table style="width:100%;border-collapse:collapse;margin:16px 0">
+    <tr><td style="padding:6px 0;color:#666;width:130px">Caller</td><td style="padding:6px 0;font-weight:500">${callerDisplay}</td></tr>
+    <tr><td style="padding:6px 0;color:#666">Line</td><td style="padding:6px 0">${phoneNumber?.friendlyName ?? ""} (${log.to ?? ""})</td></tr>
+    <tr><td style="padding:6px 0;color:#666">Mode</td><td style="padding:6px 0">${modeDisplay}</td></tr>
+    <tr><td style="padding:6px 0;color:#666">Duration</td><td style="padding:6px 0">${durationDisplay}</td></tr>
+    <tr><td style="padding:6px 0;color:#666">Time</td><td style="padding:6px 0">${calledAt.toLocaleString()}</td></tr>
+    ${log.callType ? `<tr><td style="padding:6px 0;color:#666">Call type</td><td style="padding:6px 0">${log.callType}</td></tr>` : ""}
+  </table>
+  ${recordingSection}
+  ${summarySection}
+  ${transcriptSection}
+  <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+  <p style="font-size:11px;color:#999;margin:0">Sent by Vanguard.OPS</p>
+</body></html>`;
+
+    await transport.sendMail({ from, to: notificationEmail, subject, html });
+    logger.info({ callSid, to: notificationEmail }, "Call notification email sent");
+  } catch (err: any) {
+    logger.error({ err: err?.message, callSid }, "Failed to send call notification email");
+  }
+}
 
 /** Replace template variables in an AI system prompt.
  *
@@ -891,6 +999,7 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
                   await db.update(callLogsTable)
                     .set({ recordingUrl: url })
                     .where(eq(callLogsTable.twilioCallSid, CallSid));
+                  await sendCallNotificationIfConfigured(CallSid, url);
                   return;
                 }
               } else {
@@ -899,13 +1008,12 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
                 if (recs.length > 0) {
                   // Prefer the longest recording (actual conversation vs short whisper)
                   const rec = recs.sort((a, b) => (Number(b.duration) || 0) - (Number(a.duration) || 0))[0];
+                  const url = `https://api.twilio.com/2010-04-01/Accounts/${rec.accountSid}/Recordings/${rec.sid}.mp3`;
                   logger.info({ CallSid, recordingSid: rec.sid, duration: rec.duration }, "Recording found via polling");
                   await db.update(callLogsTable)
-                    .set({
-                      recordingSid: rec.sid,
-                      recordingUrl: `https://api.twilio.com/2010-04-01/Accounts/${rec.accountSid}/Recordings/${rec.sid}.mp3`,
-                    })
+                    .set({ recordingSid: rec.sid, recordingUrl: url })
                     .where(eq(callLogsTable.twilioCallSid, CallSid));
+                  await sendCallNotificationIfConfigured(CallSid, url);
                   return;
                 }
               }
@@ -914,8 +1022,15 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
             }
           }
           logger.info({ CallSid }, "No recording found after polling (call may not have been recorded)");
+          // Send notification even without a recording so the summary/transcript still arrives
+          await sendCallNotificationIfConfigured(CallSid, null);
         };
         setImmediate(() => { pollForRecording().catch(() => {}); });
+      } else {
+        // RecordingUrl already present in the status callback — send notification after DB update
+        setImmediate(() => {
+          sendCallNotificationIfConfigured(CallSid, `${RecordingUrl}.mp3`).catch(() => {});
+        });
       }
     }
 

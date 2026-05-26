@@ -79,6 +79,8 @@ export interface PhoneNumber {
   aiSystemPrompt?: string | null;
   /** @nullable */
   voicemailGreeting?: string | null;
+  /** @nullable */
+  notificationEmail?: string | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -152,6 +154,8 @@ export interface PhoneNumberInput {
   aiSystemPrompt?: string | null;
   /** @nullable */
   voicemailGreeting?: string | null;
+  /** @nullable */
+  notificationEmail?: string | null;
 }
 
 /**
@@ -244,6 +248,8 @@ export interface PhoneNumberUpdate {
   aiSystemPrompt?: string | null;
   /** @nullable */
   voicemailGreeting?: string | null;
+  /** @nullable */
+  notificationEmail?: string | null;
   /** @nullable */
   isActive?: boolean | null;
 }

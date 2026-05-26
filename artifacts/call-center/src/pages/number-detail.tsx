@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck, MessageSquare, Keyboard, Mic } from "lucide-react";
+import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck, MessageSquare, Keyboard, Mic, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -70,7 +70,8 @@ export default function NumberDetail() {
         forwardNoAnswerAction: number.forwardNoAnswerAction || "personal_voicemail",
         holdMessage: number.holdMessage ?? "",
         aiSystemPrompt: number.aiSystemPrompt || "",
-        voicemailGreeting: number.voicemailGreeting || ""
+        voicemailGreeting: number.voicemailGreeting || "",
+        notificationEmail: number.notificationEmail || ""
       });
       initRef.current = true;
     }
@@ -459,6 +460,26 @@ export default function NumberDetail() {
                   In Twilio console: <strong className="text-foreground/80">Phone Numbers → Manage → select this number → Properties → Caller Name (CNAM)</strong>. Alternatively, enable "Require key press to accept" — the call screen verbally announces the line name before you pick up.
                 </p>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Mail className="h-4 w-4 text-green-400" />Notifications</CardTitle>
+              <CardDescription>Receive call summaries and recordings by email after each call.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Label className="text-green-400">Notification Email</Label>
+              <Input
+                type="email"
+                placeholder="you@example.com"
+                value={formData.notificationEmail}
+                onChange={(e) => setFormData({...formData, notificationEmail: e.target.value})}
+                className="bg-background"
+              />
+              <p className="text-xs text-muted-foreground">
+                After each call ends, a summary with caller info, duration, transcript (if AI), and a recording link will be sent here. Leave blank to disable.
+              </p>
             </CardContent>
           </Card>
 

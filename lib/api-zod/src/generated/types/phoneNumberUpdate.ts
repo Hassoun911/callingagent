@@ -41,5 +41,7 @@ export interface PhoneNumberUpdate {
   /** @nullable */
   voicemailGreeting?: string | null;
   /** @nullable */
+  notificationEmail?: string | null;
+  /** @nullable */
   isActive?: boolean | null;
 }
