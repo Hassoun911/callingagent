@@ -166,7 +166,7 @@ function escapeXml(text: string): string {
 function gatherBlock(audioId: string | null, fallbackText: string, baseUrl: string, language = "en-US"): string {
   const audio = playOrSay(audioId, fallbackText, baseUrl);
   return `${audio}
-  <Gather input="speech" timeout="5" speechTimeout="1" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
+  <Gather input="speech" timeout="8" speechTimeout="1" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
   </Gather>`;
 }
 
@@ -263,7 +263,8 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     const recordAttr = ` record="record-from-answer-dual-channel" recordingStatusCallback="${baseUrl}/api/twilio/recording" recordingStatusCallbackMethod="POST"`;
 
     if (callScreen && phoneNumber?.id) {
-      const screenUrl = `${baseUrl}/api/twilio/screen?phoneNumberId=${phoneNumber.id}&amp;fallback=${callScreenFallback}`;
+      const encodedFrom = encodeURIComponent(From ?? "");
+      const screenUrl = `${baseUrl}/api/twilio/screen?phoneNumberId=${phoneNumber.id}&amp;fallback=${callScreenFallback}&amp;callerFrom=${encodedFrom}`;
       const fallbackUrl = `${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&amp;mode=${callScreenFallback}`;
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -324,14 +325,13 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       baseUrl,
     });
 
-    // Generate greeting audio with OpenAI TTS
-    const greetingAudioId = await generateTts(greetingText, ttsVoice);
-
-    // Start recording the call immediately (non-blocking)
-    startCallRecording(CallSid, `${baseUrl}/api/twilio/recording`);
-
+    // Generate greeting + retry audio in parallel, and start recording (non-blocking)
     const retryFallback = language === "ar-SA" ? "لم أفهم. هل يمكنك الإعادة؟" : "I didn't catch that. Could you please repeat?";
-    const retryAudioId = await generateTts(retryFallback, ttsVoice);
+    startCallRecording(CallSid, `${baseUrl}/api/twilio/recording`);
+    const [greetingAudioId, retryAudioId] = await Promise.all([
+      generateTts(greetingText, ttsVoice),
+      generateTts(retryFallback, ttsVoice),
+    ]);
 
     twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -465,14 +465,16 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
 
 // ─── Call screen whisper (plays to YOU when you answer a forwarded call) ──────
 router.post("/twilio/screen", async (req, res): Promise<void> => {
-  const { phoneNumberId, fallback } = req.query as Record<string, string>;
-  const { From } = req.body;
+  // callerFrom is passed as a query param from the voice webhook (the real inbound caller).
+  // req.body.From here is the Twilio-to-forwardTo outbound leg number, NOT the caller.
+  const { phoneNumberId, fallback, callerFrom } = req.query as Record<string, string>;
+  const From = callerFrom ? decodeURIComponent(callerFrom) : null;
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : `${req.protocol}://${req.get("host")}`;
 
   const fallbackLabel = fallback === "ai_voice" ? "AI agent" : "voicemail";
-  req.log.info({ phoneNumberId, fallback, From }, "Call screen whisper");
+  req.log.info({ phoneNumberId, fallback, callerFrom: From }, "Call screen whisper");
 
   // Look up the line name and caller identity in parallel
   let lineName = "your business";
@@ -581,12 +583,13 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
       baseUrl,
     });
 
-    const greetingAudioId = await generateTts(greetingText, ttsVoice);
+    // Generate greeting + retry audio in parallel, and start recording (non-blocking)
     const retryFallback = language.startsWith("ar-") ? "لم أفهم. هل يمكنك الإعادة؟" : "I didn't catch that. Could you please repeat?";
-    const retryAudioId = await generateTts(retryFallback, ttsVoice);
-
-    // Start recording the call immediately (non-blocking)
     startCallRecording(CallSid, `${baseUrl}/api/twilio/recording`);
+    const [greetingAudioId, retryAudioId] = await Promise.all([
+      generateTts(greetingText, ttsVoice),
+      generateTts(retryFallback, ttsVoice),
+    ]);
 
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
