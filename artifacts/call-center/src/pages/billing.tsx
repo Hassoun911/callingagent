@@ -26,7 +26,31 @@ export default function Billing() {
     refetchOnWindowFocus: false,
   });
 
+  const { data: fxData } = useQuery<{ rate: number; updatedAt: string }>({
+    queryKey: ["fx-usd-cad"],
+    queryFn: async () => {
+      const r = await fetch("https://open.er-api.com/v6/latest/USD");
+      const body = await r.json();
+      return {
+        rate: body.rates?.CAD ?? 1.36,
+        updatedAt: body.time_last_update_utc ?? "",
+      };
+    },
+    staleTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const [currency, setCurrency] = useState<"USD" | "CAD">("USD");
   const [expandedLine, setExpandedLine] = useState<string | null>(null);
+
+  const fxRate = currency === "CAD" ? (fxData?.rate ?? 1.36) : 1;
+
+  const convert = (usd: number) => usd * fxRate;
+
+  const fmtMoney = (usd: number) => {
+    const val = convert(usd);
+    return `${currency === "CAD" ? "CA" : ""}$${val.toFixed(4)}`;
+  };
 
   const fmt = (raw: string | null | undefined) => {
     if (!raw) return raw ?? "";
@@ -45,15 +69,40 @@ export default function Billing() {
             Usage and costs for the current billing period: {costs?.period ?? "loading..."}
           </p>
         </div>
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Currency toggle */}
+          <div className="flex items-center rounded-md border border-border overflow-hidden text-xs font-semibold">
+            <button
+              onClick={() => setCurrency("USD")}
+              className={`px-3 py-1.5 transition-colors ${currency === "USD" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"}`}
+            >
+              USD
+            </button>
+            <button
+              onClick={() => setCurrency("CAD")}
+              className={`px-3 py-1.5 transition-colors ${currency === "CAD" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary/30"}`}
+            >
+              CAD
+            </button>
+          </div>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Exchange rate note */}
+      {currency === "CAD" && fxData && (
+        <p className="text-[11px] text-muted-foreground -mt-3">
+          Rate: 1 USD = {fxData.rate.toFixed(4)} CAD
+          {fxData.updatedAt ? ` · ${new Date(fxData.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
+        </p>
+      )}
 
       {isLoading ? (
         <Skeleton className="h-64" />
@@ -80,9 +129,9 @@ export default function Billing() {
             <>
               <div>
                 <div className="text-3xl font-bold font-mono text-foreground">
-                  ${costs.twilio.totalCost.toFixed(4)}
+                  {fmtMoney(costs.twilio.totalCost)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{costs.twilio.currency} this month</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{currency} this month</p>
               </div>
 
               {costs.twilio.perNumber?.length > 0 && (
@@ -105,7 +154,7 @@ export default function Billing() {
                               <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">{num.friendlyName}</span>
                             )}
                           </div>
-                          <span className="font-mono text-xs font-bold text-foreground shrink-0">${num.cost.toFixed(4)}</span>
+                          <span className="font-mono text-xs font-bold text-foreground shrink-0">{fmtMoney(num.cost)}</span>
                         </button>
                         {isOpen && (
                           <div className="px-3 py-2 space-y-1 bg-card/20 border-t border-border/30">
@@ -118,7 +167,7 @@ export default function Billing() {
                                     : <span className="shrink-0 text-[10px] font-bold text-sky-500/70" title="Per-use charge">+</span>
                                   }
                                 </div>
-                                <span className="font-mono text-muted-foreground shrink-0 ml-2">${r.cost.toFixed(4)}</span>
+                                <span className="font-mono text-muted-foreground shrink-0 ml-2">{fmtMoney(r.cost)}</span>
                               </div>
                             )) : (
                               <p className="text-[11px] text-muted-foreground">No charges this month</p>
