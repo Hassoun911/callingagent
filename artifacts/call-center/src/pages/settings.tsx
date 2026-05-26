@@ -331,9 +331,9 @@ export default function Settings() {
             <Slider
               min={0.5}
               max={3}
-              step={0.5}
+              step={0.1}
               value={[formData.speechTimeout]}
-              onValueChange={([v]) => setFormData({...formData, speechTimeout: v})}
+              onValueChange={([v]) => setFormData({...formData, speechTimeout: parseFloat(v.toFixed(1))})}
               className="w-full"
             />
             <div className="flex justify-between text-xs text-muted-foreground">
@@ -342,7 +342,7 @@ export default function Settings() {
               <span>3s — patient</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              How long after you stop talking before the AI begins processing. Lower values feel more responsive but may cut you off mid-sentence.
+              How long after you stop talking before the AI begins processing. Try <strong className="text-foreground">0.7s–0.9s</strong> for a middle ground — fast without cutting off mid-sentence.
             </p>
           </div>
 
