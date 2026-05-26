@@ -969,17 +969,22 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
           .join("\n\n");
       }
       conversations.delete(CallSid);
+    }
 
-      // If we still don't have a recording URL, poll Twilio to catch recordings
-      // that finish processing after the status callback fires.
+    // Always write DB first so the notification email reads fresh duration/status/transcript.
+    await db.update(callLogsTable)
+      .set(updateData)
+      .where(eq(callLogsTable.twilioCallSid, CallSid));
+
+    if (isTerminal) {
       if (!RecordingUrl) {
+        // No recording in the status callback — poll Twilio until it's ready, then notify.
         const pollForRecording = async () => {
           const delays = [5000, 20000, 60000];
           const client = getTwilioClient();
 
-          // Check if startCallRecording() already stored a preferred SID.
-          // If so, poll that specific recording rather than grabbing whichever
-          // recording Twilio returns first (which might be the short Dial whisper).
+          // Use the preferred recording SID stored by startCallRecording() if available,
+          // so we don't accidentally pick up the short Dial whisper recording.
           const [currentRow] = await db
             .select({ recordingSid: callLogsTable.recordingSid, recordingUrl: callLogsTable.recordingUrl })
             .from(callLogsTable)
@@ -991,7 +996,6 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
             await new Promise(r => setTimeout(r, delay));
             try {
               if (preferredSid) {
-                // Fetch the specific recording we started via API
                 const rec = await client.recordings(preferredSid).fetch();
                 if (rec && rec.status === "completed") {
                   const url = `https://api.twilio.com/2010-04-01/Accounts/${rec.accountSid}/Recordings/${rec.sid}.mp3`;
@@ -1003,10 +1007,8 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
                   return;
                 }
               } else {
-                // No preferred SID — take the longest available recording for this call
                 const recs = await client.recordings.list({ callSid: CallSid, limit: 10 });
                 if (recs.length > 0) {
-                  // Prefer the longest recording (actual conversation vs short whisper)
                   const rec = recs.sort((a, b) => (Number(b.duration) || 0) - (Number(a.duration) || 0))[0];
                   const url = `https://api.twilio.com/2010-04-01/Accounts/${rec.accountSid}/Recordings/${rec.sid}.mp3`;
                   logger.info({ CallSid, recordingSid: rec.sid, duration: rec.duration }, "Recording found via polling");
@@ -1021,22 +1023,20 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
               logger.warn({ CallSid, err: err?.message }, "Recording poll attempt failed");
             }
           }
-          logger.info({ CallSid }, "No recording found after polling (call may not have been recorded)");
-          // Send notification even without a recording so the summary/transcript still arrives
+          // Polling exhausted — send notification without a recording link so the
+          // summary and transcript still reach the user.
+          logger.info({ CallSid }, "No recording found after polling — sending notification without recording");
           await sendCallNotificationIfConfigured(CallSid, null);
         };
         setImmediate(() => { pollForRecording().catch(() => {}); });
       } else {
-        // RecordingUrl already present in the status callback — send notification after DB update
+        // Recording URL already in the status callback — DB is already updated above,
+        // so the notification will read fresh data including duration and transcript.
         setImmediate(() => {
           sendCallNotificationIfConfigured(CallSid, `${RecordingUrl}.mp3`).catch(() => {});
         });
       }
     }
-
-    await db.update(callLogsTable)
-      .set(updateData)
-      .where(eq(callLogsTable.twilioCallSid, CallSid));
   }
 
   res.sendStatus(200);
