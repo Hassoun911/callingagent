@@ -33,16 +33,19 @@ async function sendCallNotificationIfConfigured(callSid: string, overrideRecordi
 
     // Find the phone number row by the "to" (Twilio line number)
     let phoneNumber = null;
-    if (log.to) {
+    if (log.toNumber) {
       const rows = await db
         .select()
         .from(phoneNumbersTable)
-        .where(eq(phoneNumbersTable.number, log.to));
+        .where(eq(phoneNumbersTable.number, log.toNumber));
       phoneNumber = rows[0] ?? null;
     }
 
     const notificationEmail = phoneNumber?.notificationEmail;
-    if (!notificationEmail) return;
+    if (!notificationEmail) {
+      logger.info({ callSid, toNumber: log.toNumber }, "No notification email configured — skipping call email");
+      return;
+    }
 
     const transport = getEmailTransport();
     if (!transport) {
@@ -53,9 +56,10 @@ async function sendCallNotificationIfConfigured(callSid: string, overrideRecordi
     const from = process.env.SMTP_FROM || process.env.SMTP_USER || "";
     const recordingUrl = overrideRecordingUrl ?? log.recordingUrl ?? null;
 
-    const callerDisplay = log.callerName
-      ? `${log.callerName} (${log.from ?? "Unknown"})`
-      : (log.from ?? "Unknown caller");
+    const callerLabel = log.contactName ?? log.callerIdName ?? log.callerName ?? null;
+    const callerDisplay = callerLabel
+      ? `${callerLabel} (${log.fromNumber ?? "Unknown"})`
+      : (log.fromNumber ?? "Unknown caller");
 
     const durationSec = log.duration ?? 0;
     const durationDisplay = durationSec > 0
@@ -67,7 +71,7 @@ async function sendCallNotificationIfConfigured(callSid: string, overrideRecordi
     };
     const modeDisplay = modeLabels[log.answerMode ?? ""] ?? (log.answerMode ?? "Unknown");
 
-    const calledAt = log.startedAt ?? log.createdAt ?? new Date();
+    const calledAt = log.createdAt ?? new Date();
     const subject = `Call Summary — ${callerDisplay} — ${calledAt.toLocaleString()}`;
 
     const recordingSection = recordingUrl
@@ -90,11 +94,11 @@ async function sendCallNotificationIfConfigured(callSid: string, overrideRecordi
 <html><head><meta charset="utf-8"></head>
 <body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333">
   <h2 style="color:#111;border-bottom:2px solid #22c55e;padding-bottom:8px">
-    Incoming Call — ${phoneNumber?.friendlyName ?? log.to ?? "Your Line"}
+    Incoming Call — ${phoneNumber?.friendlyName ?? log.toNumber ?? "Your Line"}
   </h2>
   <table style="width:100%;border-collapse:collapse;margin:16px 0">
     <tr><td style="padding:6px 0;color:#666;width:130px">Caller</td><td style="padding:6px 0;font-weight:500">${callerDisplay}</td></tr>
-    <tr><td style="padding:6px 0;color:#666">Line</td><td style="padding:6px 0">${phoneNumber?.friendlyName ?? ""} (${log.to ?? ""})</td></tr>
+    <tr><td style="padding:6px 0;color:#666">Line</td><td style="padding:6px 0">${phoneNumber?.friendlyName ?? ""} (${log.toNumber ?? ""})</td></tr>
     <tr><td style="padding:6px 0;color:#666">Mode</td><td style="padding:6px 0">${modeDisplay}</td></tr>
     <tr><td style="padding:6px 0;color:#666">Duration</td><td style="padding:6px 0">${durationDisplay}</td></tr>
     <tr><td style="padding:6px 0;color:#666">Time</td><td style="padding:6px 0">${calledAt.toLocaleString()}</td></tr>
