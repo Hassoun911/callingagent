@@ -164,10 +164,12 @@ function escapeXml(text: string): string {
 }
 
 function gatherBlock(audioId: string | null, fallbackText: string, baseUrl: string, language = "en-US"): string {
+  // Nest the audio INSIDE <Gather> so Twilio only starts speech detection AFTER
+  // the prompt finishes playing, preventing echo/sidetone from triggering a false match.
   const audio = playOrSay(audioId, fallbackText, baseUrl);
-  return `${audio}
-  <Gather input="speech" timeout="8" speechTimeout="1" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
-  </Gather>`;
+  return `<Gather input="speech" timeout="8" speechTimeout="1" speechModel="experimental_conversations" language="${language}" action="${baseUrl}/api/twilio/ai-gather" method="POST">
+  ${audio}
+</Gather>`;
 }
 
 // ─── Serve TTS audio ────────────────────────────────────────────────────────
@@ -296,7 +298,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     const language = aiConfig?.language ?? "en-US";
     const ttsVoice = aiConfig?.voice ?? "nova";
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
-    const greetingText = aiConfig?.greeting ?? "Hello, thank you for calling. How can I help you today?";
+    const greetingText = aiConfig?.greeting?.trim() || "Hello, thank you for calling. How can I help you today?";
 
     // Resolve company name for template substitution
     let companyName: string | null = null;
@@ -556,7 +558,7 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
     const language = aiConfig?.language ?? "en-US";
     const ttsVoice = aiConfig?.voice ?? "nova";
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
-    const greetingText = aiConfig?.greeting ?? "Hello, thank you for calling. How can I help you today?";
+    const greetingText = aiConfig?.greeting?.trim() || "Hello, thank you for calling. How can I help you today?";
 
     // Resolve company name for template substitution
     let companyName2: string | null = null;
