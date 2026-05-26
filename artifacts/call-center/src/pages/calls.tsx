@@ -36,30 +36,30 @@ function fmtTime(s: number): string {
 // Global tracker so only one player plays at a time
 const activeAudio = { current: null as HTMLAudioElement | null };
 
-function AudioPlayer({ src, knownDuration = 0, large = false }: { src: string; knownDuration?: number; large?: boolean }) {
+function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [buffering, setBuffering] = useState(false);
   const [error, setError] = useState(false);
 
-  // Use the audio-reported duration if available, else fall back to the known call duration
-  const duration = audioDuration || knownDuration;
-
   useEffect(() => {
     const audio = new Audio();
-    audio.preload = "none"; // Load on demand only — preloading 100 rows causes too many requests
+    // Preload just the metadata so real recording duration shows immediately.
+    // The server supports range requests so only the audio header is fetched.
+    audio.preload = "metadata";
+    audio.src = src;
     audioRef.current = audio;
-    audio.addEventListener("loadedmetadata", () => setAudioDuration(audio.duration));
+    audio.addEventListener("loadedmetadata", () => setDuration(audio.duration));
     audio.addEventListener("timeupdate", () => setCurrentTime(audio.currentTime));
     audio.addEventListener("ended", () => { setPlaying(false); setCurrentTime(0); });
     audio.addEventListener("error", () => { setError(true); setBuffering(false); });
     audio.addEventListener("waiting", () => setBuffering(true));
     audio.addEventListener("canplay", () => setBuffering(false));
     return () => { audio.pause(); audio.src = ""; };
-  }, []);
+  }, [src]);
 
   const toggle = useCallback(() => {
     const audio = audioRef.current;
@@ -72,10 +72,9 @@ function AudioPlayer({ src, knownDuration = 0, large = false }: { src: string; k
         activeAudio.current.pause();
       }
       activeAudio.current = audio;
-      if (!audio.src) { audio.src = src; setBuffering(true); }
       audio.play().then(() => setPlaying(true)).catch(() => setError(true));
     }
-  }, [playing, src]);
+  }, [playing]);
 
   const seek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const audio = audioRef.current;
@@ -161,9 +160,9 @@ function AudioPlayer({ src, knownDuration = 0, large = false }: { src: string; k
   );
 }
 
-function RecordingPlayer({ callId, hasRecording, duration }: { callId: number; hasRecording: boolean; duration?: number }) {
+function RecordingPlayer({ callId, hasRecording }: { callId: number; hasRecording: boolean }) {
   if (!hasRecording) return <span className="text-muted-foreground text-xs">--</span>;
-  return <AudioPlayer src={`/api/call-logs/${callId}/recording`} knownDuration={duration} />;
+  return <AudioPlayer src={`/api/call-logs/${callId}/recording`} />;
 }
 
 function PriorityBadge({ priority }: { priority: string | null | undefined }) {
@@ -254,7 +253,7 @@ function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose
         {hasRecording && call?.id && (
           <div className="space-y-1.5">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">Recording</p>
-            <AudioPlayer src={`/api/call-logs/${call.id}/recording`} knownDuration={call.duration ?? undefined} large />
+            <AudioPlayer src={`/api/call-logs/${call.id}/recording`} large />
           </div>
         )}
 
@@ -462,7 +461,7 @@ export default function Calls() {
                   <PriorityBadge priority={call.priority} />
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  <RecordingPlayer callId={call.id} hasRecording={!!(call.recordingSid || call.recordingUrl)} duration={call.duration ?? undefined} />
+                  <RecordingPlayer callId={call.id} hasRecording={!!(call.recordingSid || call.recordingUrl)} />
                 </TableCell>
                 <TableCell>
                   {hasSummaryData(call) && (
