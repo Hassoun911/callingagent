@@ -8,6 +8,7 @@
 import type { PhoneNumberAnswerMode } from './phoneNumberAnswerMode';
 import type { PhoneNumberCallScreenFallback } from './phoneNumberCallScreenFallback';
 import type { PhoneNumberForwardCallerId } from './phoneNumberForwardCallerId';
+import type { PhoneNumberForwardNoAnswerAction } from './phoneNumberForwardNoAnswerAction';
 
 export interface PhoneNumber {
   id: number;
@@ -25,6 +26,7 @@ export interface PhoneNumber {
   forwardCallerId?: PhoneNumberForwardCallerId;
   callScreen?: boolean;
   callScreenFallback?: PhoneNumberCallScreenFallback;
+  forwardNoAnswerAction?: PhoneNumberForwardNoAnswerAction;
   /** @nullable */
   holdMessage?: string | null;
   /** @nullable */

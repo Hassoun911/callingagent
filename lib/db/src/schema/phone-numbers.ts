@@ -15,6 +15,7 @@ export const phoneNumbersTable = pgTable("phone_numbers", {
   forwardCallerId: text("forward_caller_id").notNull().default("caller"),
   callScreen: boolean("call_screen").notNull().default(false),
   callScreenFallback: text("call_screen_fallback").notNull().default("voicemail"),
+  forwardNoAnswerAction: text("forward_no_answer_action").notNull().default("personal_voicemail"),
   holdMessage: text("hold_message"),
   aiSystemPrompt: text("ai_system_prompt"),
   voicemailGreeting: text("voicemail_greeting"),

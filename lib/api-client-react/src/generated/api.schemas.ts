@@ -35,6 +35,15 @@ export const PhoneNumberCallScreenFallback = {
   voicemail: 'voicemail',
 } as const;
 
+export type PhoneNumberForwardNoAnswerAction = typeof PhoneNumberForwardNoAnswerAction[keyof typeof PhoneNumberForwardNoAnswerAction];
+
+
+export const PhoneNumberForwardNoAnswerAction = {
+  personal_voicemail: 'personal_voicemail',
+  voicemail: 'voicemail',
+  ai_voice: 'ai_voice',
+} as const;
+
 export interface PhoneNumber {
   id: number;
   number: string;
@@ -51,6 +60,7 @@ export interface PhoneNumber {
   forwardCallerId?: PhoneNumberForwardCallerId;
   callScreen?: boolean;
   callScreenFallback?: PhoneNumberCallScreenFallback;
+  forwardNoAnswerAction?: PhoneNumberForwardNoAnswerAction;
   /** @nullable */
   holdMessage?: string | null;
   /** @nullable */
@@ -87,6 +97,15 @@ export const PhoneNumberInputCallScreenFallback = {
   voicemail: 'voicemail',
 } as const;
 
+export type PhoneNumberInputForwardNoAnswerAction = typeof PhoneNumberInputForwardNoAnswerAction[keyof typeof PhoneNumberInputForwardNoAnswerAction];
+
+
+export const PhoneNumberInputForwardNoAnswerAction = {
+  personal_voicemail: 'personal_voicemail',
+  voicemail: 'voicemail',
+  ai_voice: 'ai_voice',
+} as const;
+
 export interface PhoneNumberInput {
   number: string;
   /** @nullable */
@@ -102,6 +121,7 @@ export interface PhoneNumberInput {
   forwardCallerId?: PhoneNumberInputForwardCallerId;
   callScreen?: boolean;
   callScreenFallback?: PhoneNumberInputCallScreenFallback;
+  forwardNoAnswerAction?: PhoneNumberInputForwardNoAnswerAction;
   /** @nullable */
   holdMessage?: string | null;
   /** @nullable */
@@ -145,6 +165,18 @@ export const PhoneNumberUpdateCallScreenFallback = {
   voicemail: 'voicemail',
 } as const;
 
+/**
+ * @nullable
+ */
+export type PhoneNumberUpdateForwardNoAnswerAction = typeof PhoneNumberUpdateForwardNoAnswerAction[keyof typeof PhoneNumberUpdateForwardNoAnswerAction] | null;
+
+
+export const PhoneNumberUpdateForwardNoAnswerAction = {
+  personal_voicemail: 'personal_voicemail',
+  voicemail: 'voicemail',
+  ai_voice: 'ai_voice',
+} as const;
+
 export interface PhoneNumberUpdate {
   /** @nullable */
   friendlyName?: string | null;
@@ -164,6 +196,8 @@ export interface PhoneNumberUpdate {
   callScreen?: boolean | null;
   /** @nullable */
   callScreenFallback?: PhoneNumberUpdateCallScreenFallback;
+  /** @nullable */
+  forwardNoAnswerAction?: PhoneNumberUpdateForwardNoAnswerAction;
   /** @nullable */
   holdMessage?: string | null;
   /** @nullable */

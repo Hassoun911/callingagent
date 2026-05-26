@@ -582,6 +582,9 @@ components:
         callScreenFallback:
           type: string
           enum: [ai_voice, voicemail]
+        forwardNoAnswerAction:
+          type: string
+          enum: [personal_voicemail, voicemail, ai_voice]
         holdMessage:
           type: ["string", "null"]
         aiSystemPrompt:
@@ -623,6 +626,9 @@ components:
         callScreenFallback:
           type: string
           enum: [ai_voice, voicemail]
+        forwardNoAnswerAction:
+          type: string
+          enum: [personal_voicemail, voicemail, ai_voice]
         holdMessage:
           type: ["string", "null"]
         aiSystemPrompt:
@@ -654,6 +660,9 @@ components:
         callScreenFallback:
           type: ["string", "null"]
           enum: [ai_voice, voicemail, null]
+        forwardNoAnswerAction:
+          type: ["string", "null"]
+          enum: [personal_voicemail, voicemail, ai_voice, null]
         holdMessage:
           type: ["string", "null"]
         aiSystemPrompt:

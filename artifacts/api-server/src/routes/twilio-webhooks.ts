@@ -320,11 +320,17 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
   <Redirect method="POST">${fallbackUrl}</Redirect>
 </Response>`;
     } else {
+      const noAnswerAction = phoneNumber?.forwardNoAnswerAction ?? "personal_voicemail";
+      const noAnswerRedirect = (noAnswerAction === "voicemail" || noAnswerAction === "ai_voice") && phoneNumber?.id
+        ? `\n  <Redirect method="POST">${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&amp;mode=${noAnswerAction}</Redirect>`
+        : "";
+      const holdMsg = phoneNumber?.holdMessage?.trim() || null;
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
+  ${holdMsg ? `<Say voice="${TWILIO_FALLBACK_VOICE}">${escapeXml(holdMsg)}</Say>` : ""}
   <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}">
     <Number>${forwardTo}</Number>
-  </Dial>
+  </Dial>${noAnswerRedirect}
 </Response>`;
     }
 

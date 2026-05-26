@@ -8,6 +8,7 @@
 import type { PhoneNumberUpdateAnswerMode } from './phoneNumberUpdateAnswerMode';
 import type { PhoneNumberUpdateCallScreenFallback } from './phoneNumberUpdateCallScreenFallback';
 import type { PhoneNumberUpdateForwardCallerId } from './phoneNumberUpdateForwardCallerId';
+import type { PhoneNumberUpdateForwardNoAnswerAction } from './phoneNumberUpdateForwardNoAnswerAction';
 
 export interface PhoneNumberUpdate {
   /** @nullable */
@@ -28,6 +29,8 @@ export interface PhoneNumberUpdate {
   callScreen?: boolean | null;
   /** @nullable */
   callScreenFallback?: PhoneNumberUpdateCallScreenFallback;
+  /** @nullable */
+  forwardNoAnswerAction?: PhoneNumberUpdateForwardNoAnswerAction;
   /** @nullable */
   holdMessage?: string | null;
   /** @nullable */
