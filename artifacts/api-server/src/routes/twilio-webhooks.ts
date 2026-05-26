@@ -312,6 +312,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       const fallbackUrl = `${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&amp;mode=${callScreenFallback}`;
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
+  <Say voice="${TWILIO_FALLBACK_VOICE}">Please hold while we connect your call.</Say>
   <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}">
     <Number url="${screenUrl}">${forwardTo}</Number>
   </Dial>
@@ -504,7 +505,7 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
     const endPhrases = isArabic
       ? ["مع السلامة", "وداعا", "شكرا لاتصالك", "يوم سعيد"]
       : ["goodbye", "have a great day", "take care", "thank you for calling", "bye", "take care now"];
-    const wantsToEnd = endPhrases.some(p => aiText.toLowerCase().includes(p.toLowerCase())) && conv.messages.length > 4;
+    const wantsToEnd = endPhrases.some(p => aiText.toLowerCase().includes(p.toLowerCase())) && conv.messages.length > 12;
 
     if (wantsToEnd) {
       conversations.delete(CallSid);
@@ -589,7 +590,7 @@ router.post("/twilio/screen", async (req, res): Promise<void> => {
   res.set("Content-Type", "text/xml");
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Gather numDigits="1" action="${baseUrl}/api/twilio/screen-accept" method="POST" timeout="8">
+  <Gather numDigits="1" action="${baseUrl}/api/twilio/screen-accept" method="POST" timeout="3">
     <Say voice="${TWILIO_FALLBACK_VOICE}">Incoming call for ${escapeXml(lineName)} from ${escapeXml(callerLabel)}. Press 1 to answer, or hang up to send to ${fallbackLabel}.</Say>
   </Gather>
   <Hangup/>
