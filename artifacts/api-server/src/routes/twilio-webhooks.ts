@@ -310,9 +310,10 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       const encodedFrom = encodeURIComponent(From ?? "");
       const screenUrl = `${baseUrl}/api/twilio/screen?phoneNumberId=${phoneNumber.id}&amp;fallback=${callScreenFallback}&amp;callerFrom=${encodedFrom}`;
       const fallbackUrl = `${baseUrl}/api/twilio/screen-fallback?phoneNumberId=${phoneNumber.id}&amp;mode=${callScreenFallback}`;
+      const holdMsg = phoneNumber?.holdMessage?.trim() || null;
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="${TWILIO_FALLBACK_VOICE}">Please hold while we connect your call.</Say>
+  ${holdMsg ? `<Say voice="${TWILIO_FALLBACK_VOICE}">${escapeXml(holdMsg)}</Say>` : ""}
   <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}">
     <Number url="${screenUrl}">${forwardTo}</Number>
   </Dial>

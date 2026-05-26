@@ -240,6 +240,7 @@ router.patch("/phone-numbers/:id", async (req, res): Promise<void> => {
   if (body.forwardCallerId != null) updateData.forwardCallerId = body.forwardCallerId;
   if (body.callScreen != null) updateData.callScreen = body.callScreen;
   if (body.callScreenFallback != null) updateData.callScreenFallback = body.callScreenFallback;
+  if ("holdMessage" in body) updateData.holdMessage = body.holdMessage ?? null;
 
   const [updated] = await db.update(phoneNumbersTable)
     .set(updateData)

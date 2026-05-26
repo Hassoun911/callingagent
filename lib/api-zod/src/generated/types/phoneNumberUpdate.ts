@@ -29,6 +29,8 @@ export interface PhoneNumberUpdate {
   /** @nullable */
   callScreenFallback?: PhoneNumberUpdateCallScreenFallback;
   /** @nullable */
+  holdMessage?: string | null;
+  /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */
   voicemailGreeting?: string | null;

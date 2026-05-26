@@ -25,6 +25,8 @@ export interface PhoneNumberInput {
   callScreen?: boolean;
   callScreenFallback?: PhoneNumberInputCallScreenFallback;
   /** @nullable */
+  holdMessage?: string | null;
+  /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */
   voicemailGreeting?: string | null;

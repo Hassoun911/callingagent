@@ -26,6 +26,8 @@ export interface PhoneNumber {
   callScreen?: boolean;
   callScreenFallback?: PhoneNumberCallScreenFallback;
   /** @nullable */
+  holdMessage?: string | null;
+  /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */
   voicemailGreeting?: string | null;

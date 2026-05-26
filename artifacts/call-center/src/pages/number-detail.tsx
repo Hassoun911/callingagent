@@ -53,6 +53,7 @@ export default function NumberDetail() {
         forwardCallerId: number.forwardCallerId || "caller",
         callScreen: number.callScreen ?? false,
         callScreenFallback: number.callScreenFallback || "voicemail",
+        holdMessage: number.holdMessage ?? "",
         aiSystemPrompt: number.aiSystemPrompt || "",
         voicemailGreeting: number.voicemailGreeting || ""
       });
@@ -232,7 +233,33 @@ export default function NumberDetail() {
                       </div>
                       <p className="text-xs text-muted-foreground">When enabled, you hear "Incoming call — press 1 to answer" before connecting. If you don't press 1, the call is redirected.</p>
                       {formData.callScreen && (
-                        <div className="space-y-2 animate-in fade-in duration-200">
+                        <div className="space-y-4 animate-in fade-in duration-200">
+
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Hold Message</Label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={formData.holdMessage}
+                                onChange={e => setFormData({...formData, holdMessage: e.target.value})}
+                                placeholder="Leave blank to play ringing directly"
+                                className="flex-1 h-9 rounded-md border border-border bg-background px-3 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                              />
+                              {formData.holdMessage && (
+                                <button
+                                  type="button"
+                                  onClick={() => setFormData({...formData, holdMessage: ""})}
+                                  className="h-9 px-3 rounded-md border border-border bg-background text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  Clear
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Spoken to the caller before ringing starts. Leave blank for direct ringing (no message).
+                            </p>
+                          </div>
+
                           <Label className="text-xs text-muted-foreground uppercase tracking-wider">If you don't answer, send to</Label>
                           <div className="grid grid-cols-2 gap-2">
                             <button

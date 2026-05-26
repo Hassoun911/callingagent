@@ -52,6 +52,8 @@ export interface PhoneNumber {
   callScreen?: boolean;
   callScreenFallback?: PhoneNumberCallScreenFallback;
   /** @nullable */
+  holdMessage?: string | null;
+  /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */
   voicemailGreeting?: string | null;
@@ -100,6 +102,8 @@ export interface PhoneNumberInput {
   forwardCallerId?: PhoneNumberInputForwardCallerId;
   callScreen?: boolean;
   callScreenFallback?: PhoneNumberInputCallScreenFallback;
+  /** @nullable */
+  holdMessage?: string | null;
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */
@@ -160,6 +164,8 @@ export interface PhoneNumberUpdate {
   callScreen?: boolean | null;
   /** @nullable */
   callScreenFallback?: PhoneNumberUpdateCallScreenFallback;
+  /** @nullable */
+  holdMessage?: string | null;
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */

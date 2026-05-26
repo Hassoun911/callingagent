@@ -32,6 +32,7 @@ export const ListPhoneNumbersResponseItem = zod.object({
   "forwardCallerId": zod.enum(['caller', 'line']).optional(),
   "callScreen": zod.boolean().optional(),
   "callScreenFallback": zod.enum(['ai_voice', 'voicemail']).optional(),
+  "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "voicemailGreeting": zod.string().nullish(),
   "isActive": zod.boolean(),
@@ -57,6 +58,7 @@ export const ProvisionPhoneNumberBody = zod.object({
   "forwardCallerId": zod.enum(['caller', 'line']).optional(),
   "callScreen": zod.boolean().optional(),
   "callScreenFallback": zod.enum(['ai_voice', 'voicemail']).optional(),
+  "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "voicemailGreeting": zod.string().nullish()
 })
@@ -125,6 +127,7 @@ export const GetPhoneNumberResponse = zod.object({
   "forwardCallerId": zod.enum(['caller', 'line']).optional(),
   "callScreen": zod.boolean().optional(),
   "callScreenFallback": zod.enum(['ai_voice', 'voicemail']).optional(),
+  "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "voicemailGreeting": zod.string().nullish(),
   "isActive": zod.boolean(),
@@ -146,6 +149,7 @@ export const UpdatePhoneNumberBody = zod.object({
   "forwardCallerId": zod.union([zod.literal('caller'),zod.literal('line'),zod.literal(null)]).nullish(),
   "callScreen": zod.boolean().nullish(),
   "callScreenFallback": zod.union([zod.literal('ai_voice'),zod.literal('voicemail'),zod.literal(null)]).nullish(),
+  "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "voicemailGreeting": zod.string().nullish(),
   "isActive": zod.boolean().nullish()
@@ -164,6 +168,7 @@ export const UpdatePhoneNumberResponse = zod.object({
   "forwardCallerId": zod.enum(['caller', 'line']).optional(),
   "callScreen": zod.boolean().optional(),
   "callScreenFallback": zod.enum(['ai_voice', 'voicemail']).optional(),
+  "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "voicemailGreeting": zod.string().nullish(),
   "isActive": zod.boolean(),
