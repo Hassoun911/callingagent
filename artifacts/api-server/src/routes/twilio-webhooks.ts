@@ -93,11 +93,19 @@ function cacheTts(buffer: Buffer): string {
   return id;
 }
 
-function getOpenAI() {
+// Chat completions use the Replit AI proxy; TTS uses a direct OpenAI key (OPENAI_API_KEY)
+// because the proxy does not support /audio/speech.
+function getChatOpenAI() {
   return new OpenAI({
     baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
     apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   });
+}
+
+function getTtsOpenAI() {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return null;
+  return new OpenAI({ apiKey: key });
 }
 
 // Map AI Settings voice name to OpenAI TTS voice
@@ -115,9 +123,16 @@ const VOICE_MAP: Record<string, string> = {
   verse: "verse",
 };
 
+// Best available Twilio <Say> voice — used only when no OPENAI_API_KEY is set
+const TWILIO_FALLBACK_VOICE = "Google.en-US-Neural2-F";
+
 async function generateTts(text: string, voice = "nova"): Promise<string | null> {
+  const openai = getTtsOpenAI();
+  if (!openai) {
+    logger.warn("OPENAI_API_KEY not set — TTS will use Twilio neural voice fallback");
+    return null;
+  }
   try {
-    const openai = getOpenAI();
     const ttsVoice = (VOICE_MAP[voice] ?? "nova") as any;
     const response = await openai.audio.speech.create({
       model: "tts-1-hd",
@@ -126,8 +141,8 @@ async function generateTts(text: string, voice = "nova"): Promise<string | null>
     });
     const buffer = Buffer.from(await response.arrayBuffer());
     return cacheTts(buffer);
-  } catch (err) {
-    logger.error({ err }, "OpenAI TTS failed");
+  } catch (err: any) {
+    logger.error({ err: err?.message, code: err?.code }, "OpenAI TTS failed — falling back to Twilio neural voice");
     return null;
   }
 }
@@ -136,7 +151,7 @@ function playOrSay(audioId: string | null, fallbackText: string, baseUrl: string
   if (audioId) {
     return `<Play>${baseUrl}/api/twilio/tts/${audioId}</Play>`;
   }
-  return `<Say voice="Polly.Joanna-Neural">${escapeXml(fallbackText)}</Say>`;
+  return `<Say voice="${TWILIO_FALLBACK_VOICE}">${escapeXml(fallbackText)}</Say>`;
 }
 
 function escapeXml(text: string): string {
@@ -392,7 +407,7 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   conv.messages.push({ role: "user", content: SpeechResult });
 
   try {
-    const openai = getOpenAI();
+    const openai = getChatOpenAI();
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -568,7 +583,7 @@ async function extractCallSummary(conv: ConversationState): Promise<{
     return { callerName: null, callerEmail: null, callType: null, callSummary: null, actionRequired: null, priority: null };
   }
   try {
-    const openai = getOpenAI();
+    const openai = getChatOpenAI();
     const transcript = conv.messages.map(m => `${m.role === "user" ? "Caller" : "AI"}: ${m.content}`).join("\n");
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
