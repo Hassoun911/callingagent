@@ -480,46 +480,24 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   try {
     const openai = getChatOpenAI();
 
-    // Stream the completion so we can fire TTS the moment the first sentence is ready,
-    // overlapping LLM generation time with TTS generation time.
-    const stream = await openai.chat.completions.create({
+    const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
-          content: conv.systemPrompt + "\n\nIMPORTANT: You are on a live phone call. Keep responses concise — 1-2 sentences when possible. Never use markdown, bullet points, or lists — only natural spoken language. NUMBERS AND DATES ARE SACRED: reproduce every number, salary, date, and figure character-for-character exactly as written in your instructions — never round, shorten, approximate, paraphrase, or invent any numeric or date value under any circumstances.",
+          content: conv.systemPrompt + "\n\nIMPORTANT: You are on a live phone call. Keep responses concise — 1-2 sentences when possible. Always finish your sentences completely. Never use markdown, bullet points, or lists — only natural spoken language. NUMBERS AND DATES ARE SACRED: reproduce every number, salary, date, and figure character-for-character exactly as written in your instructions — never round, shorten, approximate, paraphrase, or invent any numeric or date value under any circumstances.",
         },
         ...conv.messages,
       ],
       max_tokens: conv.maxTokens,
-      stream: true,
     });
 
-    let aiText = "";
-    let audioIdPromise: Promise<string | null> | null = null;
-    let ttsTriggeredOn = "";
-
-    for await (const chunk of stream) {
-      aiText += chunk.choices[0]?.delta?.content ?? "";
-
-      // Fire TTS as soon as we have a complete sentence — runs concurrently with remaining tokens
-      if (!audioIdPromise && aiText.length >= 8 && /[.!?]/.test(aiText)) {
-        ttsTriggeredOn = aiText;
-        audioIdPromise = generateTts(aiText, voice, voiceStyle);
-      }
-    }
-
-    // If more text arrived after TTS was triggered (rare with short responses) regenerate
-    if (!audioIdPromise) {
-      audioIdPromise = generateTts(aiText, voice, voiceStyle);
-    } else if (aiText !== ttsTriggeredOn && aiText.length > ttsTriggeredOn.length + 20) {
-      audioIdPromise = generateTts(aiText, voice, voiceStyle);
-    }
+    let aiText = completion.choices[0]?.message?.content ?? "";
 
     if (!aiText) aiText = isArabic ? "عذرًا، لم أتمكن من المعالجة. هل يمكنك المحاولة مرة أخرى؟" : "I'm sorry, I couldn't process that. Can you try again?";
     conv.messages.push({ role: "assistant", content: aiText });
 
-    const audioId = await audioIdPromise;
+    const audioId = await generateTts(aiText, voice, voiceStyle);
 
     // Check if AI naturally wants to end
     const endPhrases = isArabic
