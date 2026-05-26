@@ -64,7 +64,8 @@ router.get("/costs", async (req, res): Promise<void> => {
 
   // ── OpenAI Organization Costs API ─────────────────────────────────────────
   let openai: any = null;
-  const openaiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
+  // Admin key is required for the org costs API. Regular project keys return 403.
+  const openaiKey = process.env.OPENAI_ADMIN_API_KEY ?? process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
       const startTime = Math.floor(new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000);
