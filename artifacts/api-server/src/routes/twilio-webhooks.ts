@@ -54,7 +54,18 @@ async function sendCallNotificationIfConfigured(callSid: string, overrideRecordi
     }
 
     const from = process.env.SMTP_FROM || process.env.SMTP_USER || "";
-    const recordingUrl = overrideRecordingUrl ?? log.recordingUrl ?? null;
+
+    // Build a proxied recording URL through our own endpoint so the email
+    // recipient can click and play instantly — no Twilio credentials required.
+    const publicDomain = process.env.REPLIT_DOMAINS
+      ? `https://${process.env.REPLIT_DOMAINS.split(",")[0].trim()}`
+      : process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : null;
+    const hasRecording = !!(overrideRecordingUrl ?? log.recordingUrl ?? log.recordingSid);
+    const recordingUrl = hasRecording && publicDomain
+      ? `${publicDomain}/api/call-logs/${log.id}/recording`
+      : null;
 
     const callerLabel = log.contactName ?? log.callerIdName ?? log.callerName ?? null;
     const callerDisplay = callerLabel
@@ -74,41 +85,130 @@ async function sendCallNotificationIfConfigured(callSid: string, overrideRecordi
     const calledAt = log.createdAt ?? new Date();
     const subject = `Call Summary — ${callerDisplay} — ${calledAt.toLocaleString()}`;
 
-    const recordingSection = recordingUrl
-      ? `<p style="margin:12px 0"><strong>Recording:</strong> <a href="${recordingUrl}" style="color:#22c55e">Listen to recording</a></p>`
+    const priorityColor: Record<string, string> = {
+      high: "#ef4444", medium: "#f59e0b", low: "#22c55e",
+    };
+    const priorityBadge = log.priority
+      ? `<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;background:${priorityColor[log.priority] ?? "#6b7280"}22;color:${priorityColor[log.priority] ?? "#6b7280"};border:1px solid ${priorityColor[log.priority] ?? "#6b7280"}44">${log.priority}</span>`
       : "";
 
-    const summarySection = log.callSummary
-      ? `<h3 style="color:#22c55e;margin:20px 0 8px">Call Summary</h3>
-         <p style="margin:0 0 8px">${log.callSummary}</p>
-         ${log.actionRequired ? `<p style="margin:0 0 4px"><strong>Action required:</strong> ${log.actionRequired}</p>` : ""}
-         ${log.priority ? `<p style="margin:0 0 4px"><strong>Priority:</strong> ${log.priority}</p>` : ""}`
+    const recordingBtn = recordingUrl
+      ? `<div style="margin:28px 0;text-align:center">
+           <a href="${recordingUrl}" style="display:inline-block;padding:12px 32px;background:#22c55e;color:#fff;font-family:sans-serif;font-size:14px;font-weight:700;text-decoration:none;border-radius:6px;letter-spacing:.3px">
+             &#9654;&nbsp; Listen to Recording
+           </a>
+         </div>`
       : "";
 
-    const transcriptSection = log.transcription
-      ? `<h3 style="color:#22c55e;margin:20px 0 8px">Transcript</h3>
-         <pre style="background:#f4f4f4;padding:12px;border-radius:4px;white-space:pre-wrap;font-size:12px;margin:0">${log.transcription}</pre>`
+    const summaryBlock = log.callSummary
+      ? `<div style="background:#f8f9fa;border-left:3px solid #22c55e;border-radius:0 6px 6px 0;padding:14px 18px;margin:0 0 16px">
+           <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#22c55e">AI Summary</p>
+           <p style="margin:0;font-size:14px;line-height:1.6;color:#1a1a1a">${log.callSummary}</p>
+           ${log.actionRequired ? `<p style="margin:10px 0 0;font-size:13px;color:#374151"><strong style="color:#1a1a1a">Action:</strong> ${log.actionRequired}</p>` : ""}
+         </div>`
+      : "";
+
+    const transcriptBlock = log.transcription
+      ? `<div style="margin-top:16px">
+           <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#6b7280">Transcript</p>
+           <div style="background:#f1f5f9;border-radius:6px;padding:14px 16px;font-size:12px;line-height:1.7;color:#374151;white-space:pre-wrap;font-family:ui-monospace,monospace">${log.transcription}</div>
+         </div>`
       : "";
 
     const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
-<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333">
-  <h2 style="color:#111;border-bottom:2px solid #22c55e;padding-bottom:8px">
-    Incoming Call — ${phoneNumber?.friendlyName ?? log.toNumber ?? "Your Line"}
-  </h2>
-  <table style="width:100%;border-collapse:collapse;margin:16px 0">
-    <tr><td style="padding:6px 0;color:#666;width:130px">Caller</td><td style="padding:6px 0;font-weight:500">${callerDisplay}</td></tr>
-    <tr><td style="padding:6px 0;color:#666">Line</td><td style="padding:6px 0">${phoneNumber?.friendlyName ?? ""} (${log.toNumber ?? ""})</td></tr>
-    <tr><td style="padding:6px 0;color:#666">Mode</td><td style="padding:6px 0">${modeDisplay}</td></tr>
-    <tr><td style="padding:6px 0;color:#666">Duration</td><td style="padding:6px 0">${durationDisplay}</td></tr>
-    <tr><td style="padding:6px 0;color:#666">Time</td><td style="padding:6px 0">${calledAt.toLocaleString()}</td></tr>
-    ${log.callType ? `<tr><td style="padding:6px 0;color:#666">Call type</td><td style="padding:6px 0">${log.callType}</td></tr>` : ""}
-  </table>
-  ${recordingSection}
-  ${summarySection}
-  ${transcriptSection}
-  <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
-  <p style="font-size:11px;color:#999;margin:0">Sent by Vanguard.OPS</p>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
+  <tr><td align="center">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px">
+
+      <!-- Header -->
+      <tr><td style="background:#0f172a;border-radius:10px 10px 0 0;padding:24px 32px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td>
+              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#22c55e">Vanguard.OPS</p>
+              <h1 style="margin:4px 0 0;font-size:20px;font-weight:700;color:#f8fafc;letter-spacing:-.3px">Incoming Call</h1>
+              <p style="margin:4px 0 0;font-size:13px;color:#94a3b8">${phoneNumber?.friendlyName ?? log.toNumber ?? "Your Line"}</p>
+            </td>
+            <td align="right" valign="top">
+              <span style="display:inline-block;padding:4px 12px;background:#22c55e22;border:1px solid #22c55e55;border-radius:20px;font-size:11px;font-weight:700;color:#22c55e;letter-spacing:.5px;text-transform:uppercase">Completed</span>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+
+      <!-- Stats bar -->
+      <tr><td style="background:#1e293b;padding:0 32px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:16px 0;border-right:1px solid #334155;text-align:center;width:33%">
+              <p style="margin:0;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#64748b">Duration</p>
+              <p style="margin:4px 0 0;font-size:20px;font-weight:700;color:#f1f5f9;letter-spacing:-.5px">${durationDisplay}</p>
+            </td>
+            <td style="padding:16px 0;border-right:1px solid #334155;text-align:center;width:33%">
+              <p style="margin:0;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#64748b">Mode</p>
+              <p style="margin:4px 0 0;font-size:14px;font-weight:700;color:#f1f5f9">${modeDisplay}</p>
+            </td>
+            <td style="padding:16px 0;text-align:center;width:33%">
+              <p style="margin:0;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#64748b">Time</p>
+              <p style="margin:4px 0 0;font-size:13px;font-weight:600;color:#f1f5f9">${calledAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</p>
+              <p style="margin:2px 0 0;font-size:11px;color:#64748b">${calledAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+
+      <!-- Body -->
+      <tr><td style="background:#ffffff;padding:28px 32px;border-radius:0 0 10px 10px">
+
+        <!-- Caller info -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px">
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid #f1f5f9;width:120px">
+              <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8">Caller</p>
+            </td>
+            <td style="padding:10px 0;border-bottom:1px solid #f1f5f9">
+              <p style="margin:0;font-size:14px;font-weight:600;color:#0f172a">${callerDisplay}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid #f1f5f9">
+              <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8">Line</p>
+            </td>
+            <td style="padding:10px 0;border-bottom:1px solid #f1f5f9">
+              <p style="margin:0;font-size:14px;color:#374151">${phoneNumber?.friendlyName ? `${phoneNumber.friendlyName} &nbsp;<span style="color:#94a3b8;font-size:12px">${log.toNumber ?? ""}</span>` : (log.toNumber ?? "")}</p>
+            </td>
+          </tr>
+          ${log.callType ? `<tr>
+            <td style="padding:10px 0;border-bottom:1px solid #f1f5f9">
+              <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8">Type</p>
+            </td>
+            <td style="padding:10px 0;border-bottom:1px solid #f1f5f9">
+              <p style="margin:0;font-size:14px;color:#374151">${log.callType}</p>
+            </td>
+          </tr>` : ""}
+          ${log.priority ? `<tr>
+            <td style="padding:10px 0">
+              <p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8">Priority</p>
+            </td>
+            <td style="padding:10px 0">${priorityBadge}</td>
+          </tr>` : ""}
+        </table>
+
+        ${recordingBtn}
+        ${summaryBlock}
+        ${transcriptBlock}
+
+        <!-- Footer -->
+        <div style="margin-top:28px;padding-top:20px;border-top:1px solid #f1f5f9;display:flex;align-items:center">
+          <p style="margin:0;font-size:11px;color:#94a3b8">Sent by <strong style="color:#64748b">Vanguard.OPS</strong></p>
+        </div>
+
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
 </body></html>`;
 
     await transport.sendMail({ from, to: notificationEmail, subject, html });
@@ -1137,24 +1237,72 @@ router.post("/twilio/sms", async (req, res): Promise<void> => {
     if (transport) {
       const fromDisplay = formatE164(From);
       const subject = `New SMS — ${fromDisplay}`;
-      const mediaSection = mediaUrls.length > 0
-        ? `<p style="margin:12px 0"><strong>Media (${mediaUrls.length}):</strong> ${mediaUrls.map((u, i) => `<a href="${u}" style="color:#22c55e">Attachment ${i + 1}</a>`).join(" &nbsp;")}</p>`
+      const now = new Date();
+      const mediaAttachments = mediaUrls.length > 0
+        ? `<div style="margin-top:16px">
+             <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#94a3b8">Media (${mediaUrls.length})</p>
+             <div style="display:flex;gap:8px;flex-wrap:wrap">
+               ${mediaUrls.map((u, i) => `<a href="${u}" style="display:inline-block;padding:8px 16px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-weight:600;color:#0f172a;text-decoration:none">Attachment ${i + 1}</a>`).join("")}
+             </div>
+           </div>`
         : "";
       const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
-<body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333">
-  <h2 style="color:#111;border-bottom:2px solid #22c55e;padding-bottom:8px">New SMS Message${lineName ? ` — ${lineName}` : ""}</h2>
-  <table style="width:100%;border-collapse:collapse;margin:16px 0">
-    <tr><td style="padding:6px 0;color:#666;width:100px">From</td><td style="padding:6px 0;font-weight:500">${fromDisplay}</td></tr>
-    <tr><td style="padding:6px 0;color:#666">To</td><td style="padding:6px 0">${lineName ? `${lineName} (${To ?? ""})` : (To ?? "")}</td></tr>
-    <tr><td style="padding:6px 0;color:#666">Time</td><td style="padding:6px 0">${new Date().toLocaleString()}</td></tr>
-  </table>
-  <div style="background:#f4f4f4;border-left:3px solid #22c55e;padding:12px 16px;border-radius:4px;margin:16px 0">
-    <p style="margin:0;font-size:15px;line-height:1.5">${(Body ?? "").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
-  </div>
-  ${mediaSection}
-  <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
-  <p style="font-size:11px;color:#999;margin:0">Sent by Vanguard.OPS</p>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
+  <tr><td align="center">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px">
+
+      <!-- Header -->
+      <tr><td style="background:#0f172a;border-radius:10px 10px 0 0;padding:24px 32px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td>
+              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#22c55e">Vanguard.OPS</p>
+              <h1 style="margin:4px 0 0;font-size:20px;font-weight:700;color:#f8fafc;letter-spacing:-.3px">New SMS Message</h1>
+              ${lineName ? `<p style="margin:4px 0 0;font-size:13px;color:#94a3b8">${lineName}</p>` : ""}
+            </td>
+            <td align="right" valign="top">
+              <span style="display:inline-block;padding:4px 12px;background:#3b82f622;border:1px solid #3b82f655;border-radius:20px;font-size:11px;font-weight:700;color:#60a5fa;letter-spacing:.5px;text-transform:uppercase">SMS</span>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+
+      <!-- Meta bar -->
+      <tr><td style="background:#1e293b;padding:0 32px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:16px 0;border-right:1px solid #334155;width:50%">
+              <p style="margin:0;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#64748b">From</p>
+              <p style="margin:4px 0 0;font-size:15px;font-weight:700;color:#f1f5f9">${fromDisplay}</p>
+            </td>
+            <td style="padding:16px 0;padding-left:24px;width:50%">
+              <p style="margin:0;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#64748b">Received</p>
+              <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:#f1f5f9">${now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}</p>
+              <p style="margin:2px 0 0;font-size:11px;color:#64748b">${now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+
+      <!-- Message body -->
+      <tr><td style="background:#ffffff;padding:28px 32px;border-radius:0 0 10px 10px">
+        <p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#94a3b8">Message</p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:18px 20px">
+          <p style="margin:0;font-size:15px;line-height:1.7;color:#0f172a">${(Body ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+        </div>
+
+        ${mediaAttachments}
+
+        <div style="margin-top:28px;padding-top:20px;border-top:1px solid #f1f5f9">
+          <p style="margin:0;font-size:11px;color:#94a3b8">Sent by <strong style="color:#64748b">Vanguard.OPS</strong>${lineName ? ` &nbsp;&middot;&nbsp; ${lineName} (${To ?? ""})` : ""}</p>
+        </div>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
 </body></html>`;
       transport.sendMail({
         from: process.env.SMTP_FROM || process.env.SMTP_USER || "",
