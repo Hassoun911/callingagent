@@ -143,7 +143,7 @@ export default function NumberDetail() {
         <div className="md:col-span-2 space-y-6">
           <Card className="border-border">
             <CardHeader>
-              <CardTitle>Routing Mode</CardTitle>
+              <CardTitle className="text-green-400">Routing Mode</CardTitle>
               <CardDescription>Determine how incoming calls are handled.</CardDescription>
             </CardHeader>
             <CardContent>
