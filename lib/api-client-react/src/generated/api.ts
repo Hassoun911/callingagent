@@ -43,6 +43,7 @@ import type {
   PhoneNumberUpdate,
   RecordingUrl,
   SearchAvailableNumbersParams,
+  SendSmsBody,
   SmsMessage,
   TestCallInput,
   TestCallResult
@@ -2024,6 +2025,77 @@ export function useListSmsMessages<TData = Awaited<ReturnType<typeof listSmsMess
 
 
 
+
+export const getSendSmsUrl = () => {
+
+
+
+
+  return `/api/sms/send`
+}
+
+/**
+ * @summary Send an outbound SMS
+ */
+export const sendSms = async (sendSmsBody: SendSmsBody, options?: RequestInit): Promise<SmsMessage> => {
+
+  return customFetch<SmsMessage>(getSendSmsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      sendSmsBody,)
+  }
+);}
+
+
+
+
+export const getSendSmsMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendSms>>, TError,{data: BodyType<SendSmsBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendSms>>, TError,{data: BodyType<SendSmsBody>}, TContext> => {
+
+const mutationKey = ['sendSms'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendSms>>, {data: BodyType<SendSmsBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  sendSms(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendSmsMutationResult = NonNullable<Awaited<ReturnType<typeof sendSms>>>
+    export type SendSmsMutationBody = BodyType<SendSmsBody>
+    export type SendSmsMutationError = ErrorType<void>
+
+    /**
+ * @summary Send an outbound SMS
+ */
+export const useSendSms = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendSms>>, TError,{data: BodyType<SendSmsBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendSms>>,
+        TError,
+        {data: BodyType<SendSmsBody>},
+        TContext
+      > => {
+      return useMutation(getSendSmsMutationOptions(options));
+    }
 
 export const getGetSmsUnreadCountUrl = () => {
 

@@ -551,6 +551,29 @@ paths:
                 items:
                   $ref: "#/components/schemas/SmsMessage"
 
+  /sms/send:
+    post:
+      operationId: sendSms
+      tags: [sms]
+      summary: Send an outbound SMS
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendSmsBody"
+      responses:
+        "200":
+          description: Sent message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmsMessage"
+        "400":
+          description: Validation error
+        "500":
+          description: Send failed
+
   /sms/unread-count:
     get:
       operationId: getSmsUnreadCount
@@ -1056,6 +1079,19 @@ components:
           type: integer
         forwardedCalls:
           type: integer
+
+    SendSmsBody:
+      type: object
+      required: [from, to, body]
+      properties:
+        from:
+          type: string
+          description: Your Twilio number (E.164)
+        to:
+          type: string
+          description: Destination number (E.164)
+        body:
+          type: string
 
     SmsMessage:
       type: object

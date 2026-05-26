@@ -51,6 +51,7 @@ export * from './phoneNumberUpdateForwardCallerId';
 export * from './phoneNumberUpdateForwardNoAnswerAction';
 export * from './recordingUrl';
 export * from './searchAvailableNumbersParams';
+export * from './sendSmsBody';
 export * from './smsMessage';
 export * from './smsMessageDirection';
 export * from './testCallInput';

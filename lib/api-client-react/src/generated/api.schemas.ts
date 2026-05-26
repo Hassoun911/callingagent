@@ -552,6 +552,14 @@ export interface DashboardStats {
   forwardedCalls: number;
 }
 
+export interface SendSmsBody {
+  /** Your Twilio number (E.164) */
+  from: string;
+  /** Destination number (E.164) */
+  to: string;
+  body: string;
+}
+
 export type SmsMessageDirection = typeof SmsMessageDirection[keyof typeof SmsMessageDirection];
 
 

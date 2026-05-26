@@ -577,6 +577,32 @@ export const ListSmsMessagesResponse = zod.array(ListSmsMessagesResponseItem)
 
 
 /**
+ * @summary Send an outbound SMS
+ */
+export const SendSmsBody = zod.object({
+  "from": zod.string().describe('Your Twilio number (E.164)'),
+  "to": zod.string().describe('Destination number (E.164)'),
+  "body": zod.string()
+})
+
+export const SendSmsResponse = zod.object({
+  "id": zod.number(),
+  "phoneNumberId": zod.number().nullish(),
+  "twilioSid": zod.string().nullish(),
+  "direction": zod.enum(['inbound', 'outbound']),
+  "from": zod.string(),
+  "to": zod.string(),
+  "body": zod.string(),
+  "status": zod.string().nullish(),
+  "numMedia": zod.number().nullish(),
+  "mediaUrls": zod.array(zod.string()).nullish(),
+  "lineName": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
  * @summary Get count of unread inbound SMS messages
  */
 export const GetSmsUnreadCountResponse = zod.object({
