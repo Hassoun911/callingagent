@@ -448,6 +448,7 @@ router.get("/twilio/tts/:id", (req, res): void => {
 router.post("/twilio/voice", async (req, res): Promise<void> => {
   const { To, From, CallSid, Direction, CallerName } = req.body;
   req.log.info({ To, From, CallSid }, "Incoming Twilio voice webhook");
+  try {
 
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
@@ -653,12 +654,24 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
 
   res.set("Content-Type", "text/xml");
   res.send(twiml);
+
+  } catch (err: any) {
+    req.log.error({ err: err?.message, stack: err?.stack }, "Unhandled error in /twilio/voice — returning safe TwiML");
+    if (!res.headersSent) {
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="${TWILIO_FALLBACK_VOICE}">Thank you for calling. We are unable to take your call right now. Please try again later.</Say>
+</Response>`);
+    }
+  }
 });
 
 // ─── AI speech gather callback ───────────────────────────────────────────────
 router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   const { CallSid, SpeechResult } = req.body;
   req.log.info({ CallSid, SpeechResult }, "AI gather callback");
+  try {
 
   const conv = conversations.get(CallSid);
 
@@ -749,16 +762,31 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   ${gatherBlock(audioId, aiText, baseUrl, language, conv.speechTimeout)}
   <Hangup/>
 </Response>`);
-  } catch (err: any) {
-    req.log.error({ err }, "OpenAI call failed in ai-gather");
-    const errText = isArabic ? "أواجه مشكلة تقنية. يرجى المحاولة مرة أخرى لاحقًا." : "I'm having a technical issue right now. Please try calling again later.";
-    const audioId = await generateTts(errText, voice, voiceStyle);
-    res.set("Content-Type", "text/xml");
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+  } catch (innerErr: any) {
+    req.log.error({ err: innerErr }, "OpenAI call failed in ai-gather");
+    const isArabicFallback = conv?.language?.startsWith("ar-") ?? false;
+    const errText = isArabicFallback ? "أواجه مشكلة تقنية. يرجى المحاولة مرة أخرى لاحقًا." : "I'm having a technical issue right now. Please try calling again later.";
+    const audioId = await generateTts(errText, conv?.voice ?? "nova", conv?.voiceStyle ?? "");
+    if (!res.headersSent) {
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${playOrSay(audioId, errText, baseUrl)}
+  ${playOrSay(audioId, errText, conv?.baseUrl ?? "")}
   <Hangup/>
 </Response>`);
+    }
+  }
+
+  } catch (err: any) {
+    req.log.error({ err: err?.message, stack: err?.stack }, "Unhandled error in /twilio/ai-gather — returning safe TwiML");
+    if (!res.headersSent) {
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="${TWILIO_FALLBACK_VOICE}">I'm having a technical issue. Please try calling again later.</Say>
+  <Hangup/>
+</Response>`);
+    }
   }
 });
 
@@ -767,6 +795,7 @@ router.post("/twilio/name-recorded", async (req, res): Promise<void> => {
   const { RecordingUrl, CallSid } = req.body;
   const { phoneNumberId, forwardTo, callerFrom, callScreenFallback } = req.query as Record<string, string>;
   req.log.info({ CallSid, phoneNumberId, hasRecording: !!RecordingUrl }, "Caller name recorded");
+  try {
 
   const baseUrl = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
@@ -799,6 +828,17 @@ router.post("/twilio/name-recorded", async (req, res): Promise<void> => {
   </Dial>
   <Redirect method="POST">${fallbackUrl}</Redirect>
 </Response>`);
+
+  } catch (err: any) {
+    req.log.error({ err: err?.message, stack: err?.stack }, "Unhandled error in /twilio/name-recorded — returning safe TwiML");
+    if (!res.headersSent) {
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="${TWILIO_FALLBACK_VOICE}">Thank you for calling. We are unable to take your call right now. Please try again later.</Say>
+</Response>`);
+    }
+  }
 });
 
 // ─── Name screen whisper — plays caller's name recording to agent before bridge
@@ -916,6 +956,7 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
   const { CallSid, To, From, DialCallStatus } = req.body;
   const { phoneNumberId, mode } = req.query as Record<string, string>;
   req.log.info({ CallSid, phoneNumberId, mode, DialCallStatus }, "Call screen fallback");
+  try {
 
   // Only skip the fallback if the agent genuinely accepted (pressed 1) AND talked.
   // DialCallStatus "completed" alone isn't enough — declining on a mobile phone also
@@ -1001,6 +1042,17 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
   ${playOrSay(audioId, greeting, baseUrl)}
   <Record maxLength="120" action="${baseUrl}/api/twilio/recording" transcribe="true" transcribeCallback="${baseUrl}/api/twilio/transcription" />
 </Response>`);
+  }
+
+  } catch (err: any) {
+    req.log.error({ err: err?.message, stack: err?.stack }, "Unhandled error in /twilio/screen-fallback — returning safe TwiML");
+    if (!res.headersSent) {
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="${TWILIO_FALLBACK_VOICE}">Thank you for calling. We are unable to take your call right now. Please try again later.</Say>
+</Response>`);
+    }
   }
 });
 
