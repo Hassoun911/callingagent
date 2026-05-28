@@ -1102,6 +1102,7 @@ Return exactly: {"callerName": "...", "callerEmail": "...", "callType": "General
 router.post("/twilio/status", async (req, res): Promise<void> => {
   const { CallSid, CallStatus, CallDuration, RecordingUrl, RecordingSid } = req.body;
   req.log.info({ CallSid, CallStatus, CallDuration }, "Twilio status callback");
+  try {
 
   const isTerminal = ["completed", "failed", "busy", "no-answer", "canceled"].includes(CallStatus);
 
@@ -1196,12 +1197,18 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
   }
 
   res.sendStatus(200);
+
+  } catch (err: any) {
+    req.log.error({ err: err?.message, stack: err?.stack, CallSid, CallStatus }, "Unhandled error in /twilio/status");
+    if (!res.headersSent) res.sendStatus(200); // always 200 to Twilio to prevent retries on a broken payload
+  }
 });
 
 // ─── Recording callback ──────────────────────────────────────────────────────
 router.post("/twilio/recording", async (req, res): Promise<void> => {
   const { CallSid, RecordingUrl, RecordingSid, RecordingDuration, TranscriptionText } = req.body;
   req.log.info({ CallSid, RecordingSid, RecordingDuration }, "Twilio recording callback");
+  try {
 
   if (CallSid && (RecordingUrl || RecordingSid || TranscriptionText)) {
     // If we already have a preferred recording SID (set by startCallRecording()),
@@ -1235,11 +1242,18 @@ router.post("/twilio/recording", async (req, res): Promise<void> => {
   }
 
   res.sendStatus(200);
+
+  } catch (err: any) {
+    req.log.error({ err: err?.message, stack: err?.stack, CallSid }, "Unhandled error in /twilio/recording");
+    if (!res.headersSent) res.sendStatus(200);
+  }
 });
 
 // ─── SMS webhook ─────────────────────────────────────────────────────────────
 
 router.post("/twilio/sms", async (req, res): Promise<void> => {
+  const _smsSid = req.body?.MessageSid;
+  try {
   const { MessageSid, From, To, Body, NumMedia, SmsStatus } = req.body;
   req.log.info({ MessageSid, From, To }, "Inbound SMS received");
 
@@ -1370,6 +1384,14 @@ router.post("/twilio/sms", async (req, res): Promise<void> => {
   // Respond with empty TwiML so Twilio doesn't auto-reply
   res.setHeader("Content-Type", "text/xml");
   res.send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
+
+  } catch (err: any) {
+    req.log.error({ err: err?.message, stack: err?.stack, sid: _smsSid }, "Unhandled error in /twilio/sms");
+    if (!res.headersSent) {
+      res.setHeader("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
+    }
+  }
 });
 
 function formatE164(raw: string | undefined): string {
