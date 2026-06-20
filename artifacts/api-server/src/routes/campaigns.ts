@@ -657,6 +657,7 @@ router.get("/campaigns/:id/call-logs/:logId/recording", async (req, res): Promis
     if (!audioResponse.ok) { res.status(audioResponse.status).send("Recording not available"); return; }
     res.set("Content-Type", audioResponse.headers.get("Content-Type") || "audio/mpeg");
     res.set("Cache-Control", "no-store");
+    if (req.query.download) res.set("Content-Disposition", `attachment; filename="call-${logId}.mp3"`);
     res.send(Buffer.from(await audioResponse.arrayBuffer()));
   } catch (err: any) {
     logger.error({ err: err?.message }, "Failed to fetch call log recording");

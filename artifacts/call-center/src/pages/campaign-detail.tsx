@@ -16,7 +16,7 @@ import {
   ArrowLeft, Play, Pause, Phone, Trash2, Plus, Upload,
   ChevronDown, ChevronRight, CheckCircle2, XCircle, Clock,
   PhoneOff, AlertCircle, Volume2, RefreshCw, Settings2, FileText,
-  Calendar, Mic, Maximize2, Copy, Check,
+  Calendar, Mic, Maximize2, Copy, Check, Download,
 } from "lucide-react";
 
 interface Campaign {
@@ -269,9 +269,20 @@ function CallLogEntry({ log, campaignId, onDeleted }: { log: CampaignCallLog; ca
         {/* Duration */}
         <span className="text-xs text-muted-foreground w-16 shrink-0 tabular-nums">{formatDuration(log.callDuration)}</span>
 
-        {/* Recording player */}
-        <span className="flex-1 min-w-0">
+        {/* Recording player + download */}
+        <span className="flex-1 min-w-0 flex items-center gap-2">
           {recordingUrl && <RecordingPlayer src={recordingUrl} />}
+          {recordingUrl && (
+            <a
+              href={`${recordingUrl}?download=1`}
+              download={`call-${log.id}.mp3`}
+              onClick={e => e.stopPropagation()}
+              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+              title="Download recording"
+            >
+              <Download className="h-3.5 w-3.5" />
+            </a>
+          )}
         </span>
 
         {/* Date/time + delete */}
