@@ -614,7 +614,7 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
       res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(aiGreeting)}</Say>
-  <Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
+  <Gather input="speech" timeout="10" speechTimeout="auto" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
   </Gather>
   <Say voice="${FALLBACK_VOICE}" language="ar-SA">لم أسمعك. شكراً لك وإلى اللقاء.</Say>
   <Hangup/>
@@ -638,7 +638,7 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
       res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(greeting)}</Say>
-  <Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
+  <Gather input="speech" timeout="10" speechTimeout="auto" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
   </Gather>
   <Say voice="${FALLBACK_VOICE}" language="ar-SA">لم أسمعك. شكراً لك وإلى اللقاء.</Say>
   <Hangup/>
@@ -690,7 +690,7 @@ router.post("/twilio/campaign-gather", async (req, res): Promise<void> => {
       res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="${FALLBACK_VOICE}" language="ar-SA">عذراً، لم أسمعك. هل يمكنك الإعادة؟</Say>
-  <Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
+  <Gather input="speech" timeout="10" speechTimeout="auto" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
   </Gather>
   <Hangup/>
 </Response>`);
@@ -730,7 +730,7 @@ router.post("/twilio/campaign-gather", async (req, res): Promise<void> => {
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(aiText)}</Say>
-  <Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
+  <Gather input="speech" timeout="10" speechTimeout="auto" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
   </Gather>
   <Say voice="${FALLBACK_VOICE}" language="ar-SA">شكراً لك. إلى اللقاء.</Say>
   <Hangup/>
