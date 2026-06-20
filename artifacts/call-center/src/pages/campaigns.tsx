@@ -278,7 +278,7 @@ export default function Campaigns() {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
-              <Label>Campaign Name</Label>
+              <Label className="text-green-400">Campaign Name</Label>
               <Input className="mt-1.5" placeholder="e.g. Q1 Real Estate Outreach" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </div>
 
@@ -302,13 +302,13 @@ export default function Campaigns() {
 
             {!form.systemPrompt ? (
               <div>
-                <Label>Opening Script (Arabic)</Label>
+                <Label className="text-green-400">Opening Script (Arabic)</Label>
                 <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">The AI reads this verbatim when the contact answers, then qualifies using the default prompt.</p>
                 <Textarea className="mt-1.5 min-h-[100px] text-right" dir="rtl" placeholder="مرحبا، أنا سارة..." value={form.script} onChange={e => setForm(f => ({ ...f, script: e.target.value }))} />
               </div>
             ) : (
               <div>
-                <Label>AI System Prompt</Label>
+                <Label className="text-green-400">AI System Prompt</Label>
                 <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">The AI generates its own opening and drives the entire conversation. The opening script is not used.</p>
                 <Textarea
                   className="mt-1.5 min-h-[120px]"
@@ -324,7 +324,7 @@ export default function Campaigns() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>From Phone Number</Label>
+                <Label className="text-green-400">From Phone Number</Label>
                 <select
                   className="mt-1.5 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   value={form.fromPhoneNumberId}
@@ -337,13 +337,13 @@ export default function Campaigns() {
                 </select>
               </div>
               <div>
-                <Label>Max Call Duration (seconds)</Label>
+                <Label className="text-green-400">Max Call Duration (seconds)</Label>
                 <Input className="mt-1.5" type="number" min="60" max="600" value={form.maxCallDuration} onChange={e => setForm(f => ({ ...f, maxCallDuration: e.target.value }))} />
               </div>
             </div>
 
             <div>
-              <Label>Hot Lead Notification Email</Label>
+              <Label className="text-green-400">Hot Lead Notification Email</Label>
               <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">Receive an email when a contact says they're interested in selling.</p>
               <Input className="mt-1.5" type="email" placeholder="agent@example.com" value={form.notificationEmail} onChange={e => setForm(f => ({ ...f, notificationEmail: e.target.value }))} />
             </div>

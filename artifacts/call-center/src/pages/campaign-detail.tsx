@@ -495,9 +495,9 @@ export default function CampaignDetail() {
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Add Contact</DialogTitle></DialogHeader>
           <div className="space-y-3 pt-2">
-            <div><Label>Name</Label><Input className="mt-1" value={newContact.name} onChange={e => setNewContact(f => ({ ...f, name: e.target.value }))} placeholder="Ahmed Al-Sayed" /></div>
-            <div><Label>Phone</Label><Input className="mt-1" value={newContact.phone} onChange={e => setNewContact(f => ({ ...f, phone: e.target.value }))} placeholder="+1-555-000-0000" /></div>
-            <div><Label>Address <span className="text-muted-foreground font-normal">(optional)</span></Label><Input className="mt-1" value={newContact.address} onChange={e => setNewContact(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Toronto ON" /></div>
+            <div><Label className="text-green-400">Name</Label><Input className="mt-1" value={newContact.name} onChange={e => setNewContact(f => ({ ...f, name: e.target.value }))} placeholder="Ahmed Al-Sayed" /></div>
+            <div><Label className="text-green-400">Phone</Label><Input className="mt-1" value={newContact.phone} onChange={e => setNewContact(f => ({ ...f, phone: e.target.value }))} placeholder="+1-555-000-0000" /></div>
+            <div><Label className="text-green-400">Address <span className="text-muted-foreground font-normal">(optional)</span></Label><Input className="mt-1" value={newContact.address} onChange={e => setNewContact(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Toronto ON" /></div>
             <div className="flex justify-end gap-2 pt-1 border-t border-border">
               <Button variant="outline" onClick={() => setShowAddContact(false)}>Cancel</Button>
               <Button onClick={() => addContactMutation.mutate()} disabled={!newContact.name || !newContact.phone || addContactMutation.isPending}>
@@ -540,7 +540,7 @@ export default function CampaignDetail() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Campaign Settings</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
-            <div><Label>Campaign Name</Label><Input className="mt-1" value={settingsForm.name ?? ""} onChange={e => setSettingsForm(f => ({ ...f, name: e.target.value }))} /></div>
+            <div><Label className="text-green-400">Campaign Name</Label><Input className="mt-1" value={settingsForm.name ?? ""} onChange={e => setSettingsForm(f => ({ ...f, name: e.target.value }))} /></div>
 
             {/* Mode toggle */}
             <div className="flex items-center gap-1 p-1 bg-secondary/40 rounded-lg w-fit">
@@ -562,13 +562,13 @@ export default function CampaignDetail() {
 
             {!settingsForm.systemPrompt ? (
               <div>
-                <Label>Opening Script (Arabic)</Label>
+                <Label className="text-green-400">Opening Script (Arabic)</Label>
                 <p className="text-xs text-muted-foreground mt-0.5 mb-1">The AI reads this verbatim when the contact answers, then qualifies using the default prompt.</p>
                 <Textarea className="mt-1 min-h-[100px] text-right" dir="rtl" value={settingsForm.script ?? ""} onChange={e => setSettingsForm(f => ({ ...f, script: e.target.value }))} />
               </div>
             ) : (
               <div>
-                <Label>AI System Prompt</Label>
+                <Label className="text-green-400">AI System Prompt</Label>
                 <p className="text-xs text-muted-foreground mt-0.5 mb-1">The AI generates its own opening and drives the entire conversation. The opening script is not used.</p>
                 <Textarea className="mt-1 min-h-[120px]" value={settingsForm.systemPrompt ?? ""} onChange={e => setSettingsForm(f => ({ ...f, systemPrompt: e.target.value || "" }))} />
                 <button type="button" className="mt-1 text-xs text-muted-foreground hover:text-foreground underline" onClick={() => setSettingsForm(f => ({ ...f, systemPrompt: null }))}>
@@ -578,7 +578,7 @@ export default function CampaignDetail() {
             )}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>From Phone Number</Label>
+                <Label className="text-green-400">From Phone Number</Label>
                 <select
                   className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   value={settingsForm.fromPhoneNumberId ?? ""}
@@ -591,12 +591,12 @@ export default function CampaignDetail() {
                 </select>
               </div>
               <div>
-                <Label>Max Call Duration (sec)</Label>
+                <Label className="text-green-400">Max Call Duration (sec)</Label>
                 <Input className="mt-1" type="number" min="60" max="600" value={settingsForm.maxCallDuration ?? 300} onChange={e => setSettingsForm(f => ({ ...f, maxCallDuration: parseInt(e.target.value, 10) }))} />
               </div>
             </div>
             <div>
-              <Label>Hot Lead Notification Email</Label>
+              <Label className="text-green-400">Hot Lead Notification Email</Label>
               <Input className="mt-1" type="email" value={settingsForm.notificationEmail ?? ""} onChange={e => setSettingsForm(f => ({ ...f, notificationEmail: e.target.value || null }))} />
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-border">
