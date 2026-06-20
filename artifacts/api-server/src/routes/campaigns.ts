@@ -4,6 +4,7 @@ import {
   db,
   campaignsTable,
   campaignContactsTable,
+  campaignCallLogsTable,
   phoneNumbersTable,
   aiVoiceConfigTable,
 } from "@workspace/db";
@@ -17,6 +18,9 @@ const router: IRouter = Router();
 
 // In-memory map: twilioCallSid → campaignContactId (for routing status callbacks)
 export const outboundCampaignCalls = new Map<string, number>();
+
+// In-memory map: twilioCallSid → campaignCallLogId (for updating the correct log entry)
+export const outboundCallLogMap = new Map<string, number>();
 
 // In-memory conversation store for outbound campaign calls
 interface OutboundConv {
@@ -189,7 +193,12 @@ Return JSON only. No explanation.`,
 async function sendHotLeadEmail(contact: any, campaign: any, summary: any, recordingUrl: string | null) {
   try {
     const transport = getEmailTransport();
-    if (!transport || !campaign.notificationEmail) return;
+    if (!transport || !campaign.notificationEmail) {
+      logger.warn({ hasTransport: !!transport, notificationEmail: campaign.notificationEmail }, "Hot lead email skipped — no transport or no recipient");
+      return;
+    }
+    // Verify SMTP connection before sending
+    await transport.verify();
     const from = process.env.SMTP_FROM || process.env.SMTP_USER || "";
     const publicDomain = getPublicDomain();
     const recordingLink = recordingUrl && publicDomain
@@ -268,7 +277,16 @@ async function initiateOutboundCall(contact: any, campaign: any, fromNumber: str
     asyncAmdStatusCallbackMethod: "POST",
   });
 
+  // Create a call log entry for this attempt
+  const [callLog] = await db.insert(campaignCallLogsTable).values({
+    contactId: contact.id,
+    campaignId: campaign.id,
+    twilioCallSid: call.sid,
+    callStatus: "calling",
+  }).returning();
+
   outboundCampaignCalls.set(call.sid, contact.id);
+  outboundCallLogMap.set(call.sid, callLog.id);
 
   await db.update(campaignContactsTable).set({
     callStatus: "calling",
@@ -277,7 +295,7 @@ async function initiateOutboundCall(contact: any, campaign: any, fromNumber: str
     attemptCount: (contact.attemptCount ?? 0) + 1,
   }).where(eq(campaignContactsTable.id, contact.id));
 
-  logger.info({ callSid: call.sid, contactId: contact.id, to: contact.phone }, "Outbound campaign call initiated");
+  logger.info({ callSid: call.sid, contactId: contact.id, callLogId: callLog.id, to: contact.phone }, "Outbound campaign call initiated");
   return call.sid;
 }
 
@@ -552,7 +570,53 @@ router.post("/campaigns/:id/contacts/:contactId/call", async (req, res): Promise
   }
 });
 
-// ─── Recording proxy for campaign contacts ────────────────────────────────────
+// ─── Call logs for a contact ─────────────────────────────────────────────────
+router.get("/campaigns/:id/contacts/:contactId/call-logs", async (req, res): Promise<void> => {
+  try {
+    const contactId = parseInt(req.params.contactId, 10);
+    const logs = await db.select().from(campaignCallLogsTable)
+      .where(eq(campaignCallLogsTable.contactId, contactId))
+      .orderBy(desc(campaignCallLogsTable.calledAt));
+    res.json(logs.map(l => ({ ...l, calledAt: l.calledAt.toISOString() })));
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch call logs" });
+  }
+});
+
+// ─── Recording proxy for a specific call log ─────────────────────────────────
+router.get("/campaigns/:id/call-logs/:logId/recording", async (req, res): Promise<void> => {
+  try {
+    const logId = parseInt(req.params.logId, 10);
+    const [log] = await db.select().from(campaignCallLogsTable).where(eq(campaignCallLogsTable.id, logId));
+    if (!log?.recordingUrl && !log?.recordingSid) { res.status(404).send("No recording available"); return; }
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!accountSid || !authToken) { res.status(500).send("Twilio not configured"); return; }
+
+    const url = log.recordingUrl ?? `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${log.recordingSid}.mp3`;
+    const credentials = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+    const response = await fetch(url, { headers: { Authorization: `Basic ${credentials}` }, redirect: "manual" });
+
+    let audioResponse: Response;
+    if (response.status === 301 || response.status === 302 || response.status === 307 || response.status === 308) {
+      const location = response.headers.get("Location");
+      if (!location) { res.status(502).send("Invalid redirect from Twilio"); return; }
+      audioResponse = await fetch(location);
+    } else {
+      audioResponse = response;
+    }
+    if (!audioResponse.ok) { res.status(audioResponse.status).send("Recording not available"); return; }
+    res.set("Content-Type", audioResponse.headers.get("Content-Type") || "audio/mpeg");
+    res.set("Cache-Control", "no-store");
+    res.send(Buffer.from(await audioResponse.arrayBuffer()));
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "Failed to fetch call log recording");
+    res.status(500).send("Failed to fetch recording");
+  }
+});
+
+// ─── Recording proxy for campaign contacts (latest recording) ─────────────────
 router.get("/campaigns/:id/contacts/:contactId/recording", async (req, res): Promise<void> => {
   try {
     const contactId = parseInt(req.params.contactId, 10);
@@ -848,18 +912,28 @@ router.post("/twilio/campaign-status", async (req, res): Promise<void> => {
 
     const isTerminal = ["completed", "failed", "busy", "no-answer", "canceled"].includes(CallStatus);
 
+    const callLogId = outboundCallLogMap.get(CallSid);
+
     if (CallStatus === "no-answer" || CallStatus === "busy") {
       await db.update(campaignContactsTable).set({ callStatus: "no_answer", callDuration: 0 }).where(eq(campaignContactsTable.id, contactId));
+      if (callLogId) {
+        await db.update(campaignCallLogsTable).set({ callStatus: "no_answer", callOutcome: "no_answer", callDuration: 0 }).where(eq(campaignCallLogsTable.id, callLogId));
+      }
       outboundCampaignCalls.delete(CallSid);
       outboundConversations.delete(CallSid);
+      outboundCallLogMap.delete(CallSid);
       res.sendStatus(200);
       return;
     }
 
     if (CallStatus === "failed" || CallStatus === "canceled") {
       await db.update(campaignContactsTable).set({ callStatus: "failed" }).where(eq(campaignContactsTable.id, contactId));
+      if (callLogId) {
+        await db.update(campaignCallLogsTable).set({ callStatus: "failed", callOutcome: "failed" }).where(eq(campaignCallLogsTable.id, callLogId));
+      }
       outboundCampaignCalls.delete(CallSid);
       outboundConversations.delete(CallSid);
+      outboundCallLogMap.delete(CallSid);
       res.sendStatus(200);
       return;
     }
@@ -872,28 +946,38 @@ router.post("/twilio/campaign-status", async (req, res): Promise<void> => {
       const [campaign] = contact ? await db.select().from(campaignsTable).where(eq(campaignsTable.id, contact.campaignId)) : [];
 
       const summary = conv ? await extractOutboundSummary(conv.messages) : null;
+      const transcription = conv ? conv.messages.map(m => `${m.role === "user" ? "Owner" : "AI"}: ${m.content}`).join("\n\n") : null;
 
-      await db.update(campaignContactsTable).set({
+      const callData = {
         callStatus: "completed",
         callDuration: duration,
         callSummary: summary?.callSummary ?? null,
-        transcription: conv ? conv.messages.map(m => `${m.role === "user" ? "Owner" : "AI"}: ${m.content}`).join("\n\n") : null,
+        transcription,
         interestedInSelling: summary?.interestedInSelling ?? null,
         timeline: summary?.timeline ?? null,
         askingPrice: summary?.askingPrice ?? null,
         propertyType: summary?.propertyType ?? null,
         additionalNotes: summary?.additionalNotes ?? null,
         callOutcome: summary?.callOutcome ?? "completed",
-      }).where(eq(campaignContactsTable.id, contactId));
+      };
+
+      // Update contact record (always reflects latest call)
+      await db.update(campaignContactsTable).set(callData).where(eq(campaignContactsTable.id, contactId));
+
+      // Update the call log entry for this specific attempt
+      if (callLogId) {
+        await db.update(campaignCallLogsTable).set(callData).where(eq(campaignCallLogsTable.id, callLogId));
+      }
 
       outboundCampaignCalls.delete(CallSid);
       outboundConversations.delete(CallSid);
+      outboundCallLogMap.delete(CallSid);
 
       // Send hot lead email if interested
       if (summary?.interestedInSelling && contact && campaign) {
         logger.info({ contactId: contact.id, campaignId: campaign.id, notificationEmail: campaign.notificationEmail }, "Hot lead detected — sending email");
         setImmediate(() => {
-          sendHotLeadEmail(contact, campaign, summary, contact.recordingUrl).catch((err: any) => {
+          sendHotLeadEmail(contact, campaign, summary, null).catch((err: any) => {
             logger.error({ err: err?.message, contactId: contact.id }, "Hot lead email failed");
           });
         });
@@ -911,17 +995,28 @@ router.post("/twilio/campaign-status", async (req, res): Promise<void> => {
 router.post("/twilio/campaign-recording", async (req, res): Promise<void> => {
   const { CallSid, RecordingUrl, RecordingSid } = req.body;
   try {
-    // Look up contact by twilioCallSid from DB — the in-memory map may already be cleared
+    const recordingData = {
+      recordingUrl: RecordingUrl ? `${RecordingUrl}.mp3` : undefined,
+      recordingSid: RecordingSid ?? undefined,
+    };
+
+    // Update call log by twilioCallSid (primary path)
+    const [callLog] = await db.select().from(campaignCallLogsTable)
+      .where(eq(campaignCallLogsTable.twilioCallSid, CallSid));
+    if (callLog) {
+      await db.update(campaignCallLogsTable).set(recordingData).where(eq(campaignCallLogsTable.id, callLog.id));
+      logger.info({ callLogId: callLog.id, RecordingSid }, "Campaign recording saved to call log");
+    }
+
+    // Also update contact record for backward compat
     const [contact] = await db.select().from(campaignContactsTable)
       .where(eq(campaignContactsTable.twilioCallSid, CallSid));
-    if (contact && (RecordingUrl || RecordingSid)) {
-      await db.update(campaignContactsTable).set({
-        recordingUrl: RecordingUrl ? `${RecordingUrl}.mp3` : undefined,
-        recordingSid: RecordingSid ?? undefined,
-      }).where(eq(campaignContactsTable.id, contact.id));
-      logger.info({ contactId: contact.id, RecordingSid }, "Campaign recording URL saved");
-    } else {
-      logger.warn({ CallSid, RecordingUrl, RecordingSid }, "Campaign recording callback: contact not found by CallSid");
+    if (contact) {
+      await db.update(campaignContactsTable).set(recordingData).where(eq(campaignContactsTable.id, contact.id));
+    }
+
+    if (!callLog && !contact) {
+      logger.warn({ CallSid, RecordingUrl, RecordingSid }, "Campaign recording callback: no call log or contact found");
     }
     res.sendStatus(200);
   } catch (err: any) {

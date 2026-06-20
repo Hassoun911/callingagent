@@ -16,6 +16,7 @@ import {
   ArrowLeft, Play, Pause, Phone, Trash2, Plus, Upload,
   ChevronDown, ChevronRight, CheckCircle2, XCircle, Clock,
   PhoneOff, AlertCircle, Volume2, RefreshCw, Settings2, FileText,
+  Calendar, Mic,
 } from "lucide-react";
 
 interface Campaign {
@@ -59,6 +60,26 @@ interface CampaignContact {
   createdAt: string;
 }
 
+interface CampaignCallLog {
+  id: number;
+  contactId: number;
+  campaignId: number;
+  twilioCallSid: string | null;
+  callStatus: string;
+  callOutcome: string | null;
+  callDuration: number | null;
+  callSummary: string | null;
+  transcription: string | null;
+  recordingUrl: string | null;
+  recordingSid: string | null;
+  interestedInSelling: boolean | null;
+  timeline: string | null;
+  askingPrice: string | null;
+  propertyType: string | null;
+  additionalNotes: string | null;
+  calledAt: string;
+}
+
 interface PhoneNumber {
   id: number;
   number: string;
@@ -67,25 +88,29 @@ interface PhoneNumber {
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-function statusIcon(status: CampaignContact["callStatus"]) {
+function statusIcon(status: string, size = "h-3.5 w-3.5") {
   const map: Record<string, JSX.Element> = {
-    pending: <Clock className="h-3.5 w-3.5 text-muted-foreground" />,
-    calling: <Phone className="h-3.5 w-3.5 text-yellow-400 animate-pulse" />,
-    completed: <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />,
-    no_answer: <PhoneOff className="h-3.5 w-3.5 text-muted-foreground" />,
-    failed: <AlertCircle className="h-3.5 w-3.5 text-destructive" />,
+    pending: <Clock className={`${size} text-muted-foreground`} />,
+    calling: <Phone className={`${size} text-yellow-400 animate-pulse`} />,
+    completed: <CheckCircle2 className={`${size} text-green-400`} />,
+    no_answer: <PhoneOff className={`${size} text-muted-foreground`} />,
+    failed: <AlertCircle className={`${size} text-destructive`} />,
   };
-  return map[status] ?? <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
+  return map[status] ?? <Clock className={`${size} text-muted-foreground`} />;
 }
 
-function outcomeBadge(contact: CampaignContact) {
-  if (contact.callStatus === "pending") return <span className="text-xs text-muted-foreground">Pending</span>;
-  if (contact.callStatus === "calling") return <span className="text-xs text-yellow-400 font-medium">Calling...</span>;
-  if (contact.callStatus === "no_answer") return <span className="text-xs text-muted-foreground">No answer</span>;
-  if (contact.callStatus === "failed") return <span className="text-xs text-destructive">Failed</span>;
-  if (contact.interestedInSelling === true) return <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-400 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">Hot Lead</span>;
-  if (contact.interestedInSelling === false) return <span className="text-xs text-muted-foreground">Not interested</span>;
-  if (contact.callOutcome) return <span className="text-xs text-muted-foreground capitalize">{contact.callOutcome.replace(/_/g, " ")}</span>;
+function outcomeBadge(interestedInSelling: boolean | null, callStatus: string, callOutcome: string | null) {
+  if (callStatus === "pending") return <span className="text-xs text-muted-foreground">Pending</span>;
+  if (callStatus === "calling") return <span className="text-xs text-yellow-400 font-semibold">Calling...</span>;
+  if (callStatus === "no_answer") return <span className="text-xs text-muted-foreground">No answer</span>;
+  if (callStatus === "failed") return <span className="text-xs text-destructive">Failed</span>;
+  if (interestedInSelling === true) return (
+    <span className="inline-flex items-center gap-1 text-xs font-bold text-green-400 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/25">
+      Hot Lead
+    </span>
+  );
+  if (interestedInSelling === false) return <span className="text-xs text-muted-foreground">Not interested</span>;
+  if (callOutcome) return <span className="text-xs text-muted-foreground capitalize">{callOutcome.replace(/_/g, " ")}</span>;
   return <span className="text-xs text-muted-foreground">Completed</span>;
 }
 
@@ -103,21 +128,209 @@ function formatTime(secs: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignContact; campaignId: number; onRefresh: () => void }) {
-  const [expanded, setExpanded] = useState(false);
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatDateTime(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleString("en-CA", {
+    month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  });
+}
+
+function RecordingPlayer({ src }: { src: string }) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [errored, setErrored] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  if (errored) return (
+    <span className="text-xs text-destructive/70 italic">Recording unavailable</span>
+  );
+
+  return (
+    <div className="flex items-center gap-1.5 bg-black/20 border border-border/40 rounded px-2 py-1">
+      <button
+        className="text-muted-foreground hover:text-green-400 transition-colors"
+        onClick={() => {
+          if (!audioRef.current) return;
+          if (playing) { audioRef.current.pause(); setPlaying(false); }
+          else { audioRef.current.play().catch(() => setErrored(true)); setPlaying(true); }
+        }}
+      >
+        {playing ? <Pause className="h-3 w-3 text-green-400" /> : <Play className="h-3 w-3" />}
+      </button>
+      <button
+        className="text-muted-foreground hover:text-foreground transition-colors"
+        onClick={() => {
+          if (!audioRef.current) return;
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          setPlaying(false);
+          setCurrentTime(0);
+        }}
+      >
+        <span className="inline-block h-2 w-2 bg-current rounded-sm" />
+      </button>
+      <input
+        type="range"
+        min={0}
+        max={duration || 0}
+        step={0.1}
+        value={currentTime}
+        className="w-16 h-1 accent-green-500 cursor-pointer"
+        onChange={e => {
+          const t = parseFloat(e.target.value);
+          setCurrentTime(t);
+          if (audioRef.current) audioRef.current.currentTime = t;
+        }}
+      />
+      <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap tabular-nums">
+        {formatTime(currentTime)} / {formatTime(duration)}
+      </span>
+      <audio
+        ref={audioRef}
+        src={src}
+        onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
+        onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
+        onEnded={() => { setPlaying(false); setCurrentTime(0); }}
+        onError={() => setErrored(true)}
+      />
+    </div>
+  );
+}
+
+function CallLogEntry({ log, campaignId }: { log: CampaignCallLog; campaignId: number }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasRecording = !!(log.recordingSid || log.recordingUrl);
+  const hasDetail = !!(log.callSummary || log.transcription || log.timeline || log.askingPrice || log.propertyType);
+  const recordingUrl = hasRecording
+    ? `${BASE}/api/campaigns/${campaignId}/call-logs/${log.id}/recording`
+    : null;
+
+  const isHot = log.interestedInSelling === true;
+
+  return (
+    <div className={`rounded border ${isHot ? "border-green-500/30 bg-green-500/5" : "border-border/40 bg-black/10"} overflow-hidden`}>
+      {/* Log header row */}
+      <div
+        className={`flex items-center gap-3 px-3 py-2 ${hasDetail ? "cursor-pointer hover:bg-white/5" : ""} transition-colors`}
+        onClick={() => hasDetail && setExpanded(e => !e)}
+      >
+        {/* Expand toggle */}
+        <span className="flex-shrink-0 w-4">
+          {hasDetail ? (
+            expanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />
+          ) : null}
+        </span>
+
+        {/* Status icon + outcome */}
+        <span className="flex items-center gap-1.5 min-w-[100px]">
+          {statusIcon(log.callStatus)}
+          {outcomeBadge(log.interestedInSelling, log.callStatus, log.callOutcome)}
+        </span>
+
+        {/* Duration */}
+        <span className="text-xs text-muted-foreground w-16 shrink-0 tabular-nums">{formatDuration(log.callDuration)}</span>
+
+        {/* Recording player */}
+        <span className="flex-1 min-w-0">
+          {recordingUrl && <RecordingPlayer src={recordingUrl} />}
+        </span>
+
+        {/* Date/time */}
+        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0 flex items-center gap-1 ml-auto">
+          <Calendar className="h-3 w-3" />
+          {formatDateTime(log.calledAt)}
+        </span>
+      </div>
+
+      {/* Expanded detail */}
+      {expanded && hasDetail && (
+        <div className="border-t border-border/30 px-4 py-3">
+          <div className="grid grid-cols-2 gap-5">
+            {/* Left: summary + fields */}
+            <div className="space-y-3">
+              {log.callSummary && (
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-green-400 mb-1">AI Summary</div>
+                  <div className="text-sm text-foreground leading-relaxed">{log.callSummary}</div>
+                </div>
+              )}
+              {(log.propertyType || log.askingPrice || log.timeline) && (
+                <div className="grid grid-cols-3 gap-3">
+                  {log.propertyType && (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Property</div>
+                      <div className="text-sm font-medium capitalize">{log.propertyType}</div>
+                    </div>
+                  )}
+                  {log.askingPrice && (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Price</div>
+                      <div className="text-sm font-semibold text-green-400">{log.askingPrice}</div>
+                    </div>
+                  )}
+                  {log.timeline && (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Timeline</div>
+                      <div className="text-sm font-medium">{log.timeline}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {log.additionalNotes && (
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Notes</div>
+                  <div className="text-xs text-muted-foreground">{log.additionalNotes}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Right: transcript */}
+            {log.transcription && (
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Transcript</div>
+                <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed max-h-52 overflow-y-auto scrollbar-thin">{log.transcription}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignContact; campaignId: number; onRefresh: () => void }) {
+  const [expanded, setExpanded] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
+
+  const { data: callLogs = [], isLoading: logsLoading } = useQuery<CampaignCallLog[]>({
+    queryKey: ["call-logs", contact.id],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}/contacts/${contact.id}/call-logs`);
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    enabled: expanded,
+    staleTime: 10_000,
+  });
 
   const callMutation = useMutation({
     mutationFn: async () => {
       const r = await fetch(`${BASE}/api/campaigns/${campaignId}/contacts/${contact.id}/call`, { method: "POST" });
       if (!r.ok) throw new Error("Failed to call");
     },
-    onSuccess: () => { onRefresh(); toast({ title: `Calling ${contact.name}...` }); },
+    onSuccess: () => {
+      onRefresh();
+      qc.invalidateQueries({ queryKey: ["call-logs", contact.id] });
+      toast({ title: `Calling ${contact.name}...` });
+    },
     onError: () => toast({ title: "Failed to initiate call", variant: "destructive" }),
   });
 
@@ -126,142 +339,118 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
       const r = await fetch(`${BASE}/api/campaigns/${campaignId}/contacts/${contact.id}`, { method: "DELETE" });
       if (!r.ok) throw new Error("Failed to delete");
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["campaign-contacts", campaignId] }); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["campaign-contacts", campaignId] });
+      qc.invalidateQueries({ queryKey: ["call-logs", contact.id] });
+    },
     onError: () => toast({ title: "Failed to delete contact", variant: "destructive" }),
   });
 
-  const recordingUrl = (contact.recordingSid || contact.recordingUrl)
-    ? `${BASE}/api/campaigns/${campaignId}/contacts/${contact.id}/recording`
-    : null;
-
-  const hasDetails = contact.callSummary || contact.transcription || contact.timeline || contact.askingPrice || contact.propertyType;
+  const attemptCount = contact.attemptCount ?? 0;
+  const isHot = contact.interestedInSelling === true;
+  const lastAttempt = contact.lastAttemptAt ? formatDateTime(contact.lastAttemptAt) : null;
 
   return (
     <>
+      {/* Contact row */}
       <tr
-        className={`border-b border-border/50 hover:bg-secondary/20 transition-colors cursor-pointer ${hasDetails ? "" : ""}`}
-        onClick={() => hasDetails && setExpanded(e => !e)}
+        className={`border-b border-border/40 transition-colors cursor-pointer ${
+          isHot ? "bg-green-500/5 hover:bg-green-500/10" : "hover:bg-secondary/20"
+        }`}
+        onClick={() => setExpanded(e => !e)}
       >
-        <td className="px-4 py-2.5 w-8">
-          {hasDetails
-            ? expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-            : null}
+        {/* Expand chevron */}
+        <td className="px-3 py-3 w-7 text-center">
+          {expanded
+            ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
         </td>
-        <td className="px-4 py-2.5">
-          <div className="font-medium text-sm text-foreground">{contact.name}</div>
-          {contact.address && <div className="text-[11px] text-muted-foreground">{contact.address}</div>}
+
+        {/* Name + address */}
+        <td className="px-3 py-3">
+          <div className={`font-semibold text-sm ${isHot ? "text-green-400" : "text-foreground"}`}>{contact.name}</div>
+          {contact.address && <div className="text-[11px] text-muted-foreground mt-0.5">{contact.address}</div>}
         </td>
-        <td className="px-4 py-2.5 font-mono text-sm text-muted-foreground">{contact.phone}</td>
-        <td className="px-4 py-2.5">
+
+        {/* Phone */}
+        <td className="px-3 py-3 font-mono text-sm text-muted-foreground whitespace-nowrap">{contact.phone}</td>
+
+        {/* Outcome */}
+        <td className="px-3 py-3">
           <div className="flex items-center gap-1.5">
             {statusIcon(contact.callStatus)}
-            {outcomeBadge(contact)}
+            {outcomeBadge(contact.interestedInSelling, contact.callStatus, contact.callOutcome)}
           </div>
         </td>
-        <td className="px-4 py-2.5 text-xs text-muted-foreground">{formatDuration(contact.callDuration)}</td>
-        <td className="px-4 py-2.5 text-xs text-muted-foreground">{contact.attemptCount ?? 0}x</td>
-        <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center gap-2 justify-end">
-            {recordingUrl && (
-              <div className="flex items-center gap-1.5 bg-secondary/50 border border-border/60 rounded px-2 py-1">
-                {/* Play / Pause */}
-                <button
-                  className="text-muted-foreground hover:text-green-400 transition-colors"
-                  onClick={() => {
-                    if (!audioRef.current) return;
-                    if (playing) { audioRef.current.pause(); setPlaying(false); }
-                    else { audioRef.current.play(); setPlaying(true); }
-                  }}
-                >
-                  {playing
-                    ? <Pause className="h-3.5 w-3.5 text-green-400" />
-                    : <Play className="h-3.5 w-3.5" />}
-                </button>
-                {/* Stop */}
-                <button
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => {
-                    if (!audioRef.current) return;
-                    audioRef.current.pause();
-                    audioRef.current.currentTime = 0;
-                    setPlaying(false);
-                    setCurrentTime(0);
-                  }}
-                >
-                  <span className="inline-block h-2.5 w-2.5 bg-current rounded-sm" />
-                </button>
-                {/* Scrub bar */}
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 0}
-                  step={0.1}
-                  value={currentTime}
-                  className="w-20 h-1 accent-green-500 cursor-pointer"
-                  onChange={e => {
-                    const t = parseFloat(e.target.value);
-                    setCurrentTime(t);
-                    if (audioRef.current) audioRef.current.currentTime = t;
-                  }}
-                />
-                {/* Time */}
-                <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap tabular-nums">
-                  {formatTime(currentTime)} / {formatTime(duration)}
-                </span>
-              </div>
-            )}
+
+        {/* Duration of last call */}
+        <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">
+          {formatDuration(contact.callDuration)}
+        </td>
+
+        {/* Last called */}
+        <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">
+          {lastAttempt ?? <span className="text-muted-foreground/50">Never</span>}
+        </td>
+
+        {/* Attempts */}
+        <td className="px-3 py-3 text-center">
+          {attemptCount > 0 ? (
+            <span className="inline-flex items-center justify-center text-xs font-semibold bg-secondary/60 border border-border/50 rounded-full px-2 py-0.5 min-w-[28px]">
+              {attemptCount}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground/40">—</span>
+          )}
+        </td>
+
+        {/* Actions */}
+        <td className="px-3 py-3 text-right" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-1 justify-end">
             {contact.callStatus !== "calling" && (
-              <Button size="sm" variant="ghost" className="h-7 w-7 px-0" title="Retry call" onClick={() => callMutation.mutate()} disabled={callMutation.isPending}>
-                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+              <Button
+                size="sm" variant="ghost"
+                className="h-7 w-7 px-0 text-muted-foreground hover:text-foreground"
+                title="Call now"
+                onClick={() => callMutation.mutate()}
+                disabled={callMutation.isPending}
+              >
+                <Phone className="h-3.5 w-3.5" />
               </Button>
             )}
-            <Button size="sm" variant="ghost" className="h-7 w-7 px-0 text-muted-foreground hover:text-destructive" onClick={() => deleteMutation.mutate()}>
+            <Button
+              size="sm" variant="ghost"
+              className="h-7 w-7 px-0 text-muted-foreground hover:text-destructive"
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
+            >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
-          {recordingUrl && (
-            <audio
-              ref={audioRef}
-              src={recordingUrl}
-              onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
-              onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
-              onEnded={() => { setPlaying(false); setCurrentTime(0); }}
-            />
-          )}
         </td>
       </tr>
-      {expanded && hasDetails && (
-        <tr className="border-b border-border/50 bg-secondary/10">
-          <td colSpan={7} className="px-8 py-4">
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-3">
-                {contact.callSummary && (
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">AI Summary</div>
-                    <div className="text-sm text-foreground leading-relaxed">{contact.callSummary}</div>
-                  </div>
-                )}
-                {(contact.propertyType || contact.askingPrice || contact.timeline) && (
-                  <div className="grid grid-cols-3 gap-3">
-                    {contact.propertyType && <div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Property</div><div className="text-sm font-medium capitalize">{contact.propertyType}</div></div>}
-                    {contact.askingPrice && <div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Price</div><div className="text-sm font-medium text-green-400">{contact.askingPrice}</div></div>}
-                    {contact.timeline && <div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Timeline</div><div className="text-sm font-medium">{contact.timeline}</div></div>}
-                  </div>
-                )}
-                {contact.additionalNotes && (
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Notes</div>
-                    <div className="text-sm text-muted-foreground">{contact.additionalNotes}</div>
-                  </div>
-                )}
-              </div>
-              {contact.transcription && (
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Transcript</div>
-                  <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto scrollbar-thin">{contact.transcription}</div>
+
+      {/* Expanded: call history */}
+      {expanded && (
+        <tr className="border-b border-border/40">
+          <td colSpan={8} className="px-6 py-3 bg-secondary/10">
+            {logsLoading ? (
+              <div className="text-xs text-muted-foreground py-2">Loading call history...</div>
+            ) : callLogs.length === 0 ? (
+              <div className="text-xs text-muted-foreground py-2 italic">No calls made yet for this contact.</div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Mic className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Call History — {callLogs.length} {callLogs.length === 1 ? "attempt" : "attempts"}
+                  </span>
                 </div>
-              )}
-            </div>
+                {callLogs.map(log => (
+                  <CallLogEntry key={log.id} log={log} campaignId={campaignId} />
+                ))}
+              </div>
+            )}
           </td>
         </tr>
       )}
@@ -465,27 +654,26 @@ export default function CampaignDetail() {
           { label: "Hot Leads", value: campaign.interestedContacts ?? 0, color: "text-green-400" },
           { label: "No Answer", value: contacts.filter(c => c.callStatus === "no_answer").length, color: "" },
         ].map(({ label, value, color }) => (
-          <div key={label} className="bg-card border border-border rounded-lg px-3 py-2 text-center">
-            <div className="text-xs text-muted-foreground">{label}</div>
-            <div className={`text-xl font-bold ${color || "text-foreground"}`}>{value}</div>
+          <div key={label} className="bg-card border border-border rounded-lg px-3 py-2.5 text-center">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">{label}</div>
+            <div className={`text-2xl font-bold tabular-nums ${color || "text-foreground"}`}>{value}</div>
           </div>
         ))}
       </div>
 
       {/* Script preview */}
       <div className="bg-card border border-border rounded-lg p-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            <FileText className="h-3.5 w-3.5" />
-            Opening Script
-          </div>
+        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
+          <FileText className="h-3.5 w-3.5" />
+          Opening Script
         </div>
-        <div className="text-sm text-foreground leading-relaxed dir-rtl text-right" dir="rtl">{campaign.script}</div>
+        <div className="text-sm text-foreground leading-relaxed" dir="rtl">{campaign.script}</div>
       </div>
 
       {/* Contacts table */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        {/* Table toolbar */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/10">
           <div className="flex items-center gap-3">
             <Input
               placeholder="Search contacts..."
@@ -498,7 +686,12 @@ export default function CampaignDetail() {
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${filter === f ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"}`}
+                  className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
+                    filter === f
+                      ? f === "interested" ? "bg-green-500/15 text-green-400 border border-green-500/20"
+                      : "bg-primary/15 text-primary border border-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  }`}
                 >
                   {f === "all" ? "All" : f === "no_answer" ? "No Answer" : f === "interested" ? "Hot Leads" : f.charAt(0).toUpperCase() + f.slice(1)}
                 </button>
@@ -516,6 +709,7 @@ export default function CampaignDetail() {
             </Button>
           </div>
         </div>
+
         {contactsLoading ? (
           <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">Loading contacts...</div>
         ) : filteredContacts.length === 0 ? (
@@ -525,22 +719,30 @@ export default function CampaignDetail() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-secondary/30">
-                <th className="w-8 px-4" />
-                <th className="text-left px-4 py-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">Name</th>
-                <th className="text-left px-4 py-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">Phone</th>
-                <th className="text-left px-4 py-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">Outcome</th>
-                <th className="text-left px-4 py-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">Duration</th>
-                <th className="text-left px-4 py-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">Attempts</th>
-                <th className="text-right px-4 py-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
+              <tr className="border-b border-border bg-secondary/20">
+                <th className="w-7 px-3" />
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Name</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Phone</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Outcome</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Duration</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Last Called</th>
+                <th className="text-center px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Calls</th>
+                <th className="text-right px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredContacts.map((c, i) => (
+              {filteredContacts.map((c) => (
                 <ContactRow key={c.id} contact={c} campaignId={campaignId} onRefresh={refreshContacts} />
               ))}
             </tbody>
           </table>
+        )}
+
+        {filteredContacts.length > 0 && (
+          <div className="px-4 py-2 border-t border-border/50 text-xs text-muted-foreground bg-secondary/5">
+            {filteredContacts.length} contact{filteredContacts.length !== 1 ? "s" : ""} shown
+            {searchTerm || filter !== "all" ? ` (filtered from ${contacts.length} total)` : ""}
+          </div>
         )}
       </div>
 

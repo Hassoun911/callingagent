@@ -40,10 +40,31 @@ export const campaignContactsTable = pgTable("campaign_contacts", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
 
+export const campaignCallLogsTable = pgTable("campaign_call_logs", {
+  id: serial("id").primaryKey(),
+  contactId: integer("contact_id").notNull(),
+  campaignId: integer("campaign_id").notNull(),
+  twilioCallSid: text("twilio_call_sid"),
+  callStatus: text("call_status").notNull().default("calling"),
+  callOutcome: text("call_outcome"),
+  callDuration: integer("call_duration"),
+  callSummary: text("call_summary"),
+  transcription: text("transcription"),
+  recordingUrl: text("recording_url"),
+  recordingSid: text("recording_sid"),
+  interestedInSelling: boolean("interested_in_selling"),
+  timeline: text("timeline"),
+  askingPrice: text("asking_price"),
+  propertyType: text("property_type"),
+  additionalNotes: text("additional_notes"),
+  calledAt: timestamp("called_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const insertCampaignSchema = createInsertSchema(campaignsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCampaignContactSchema = createInsertSchema(campaignContactsTable).omit({ id: true, createdAt: true, updatedAt: true });
 
 export type Campaign = typeof campaignsTable.$inferSelect;
 export type CampaignContact = typeof campaignContactsTable.$inferSelect;
+export type CampaignCallLog = typeof campaignCallLogsTable.$inferSelect;
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
 export type InsertCampaignContact = z.infer<typeof insertCampaignContactSchema>;
