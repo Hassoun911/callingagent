@@ -970,6 +970,15 @@ router.post("/twilio/campaign-status", async (req, res): Promise<void> => {
       return;
     }
 
+    if (CallStatus === "in-progress") {
+      await db.update(campaignContactsTable).set({ callStatus: "in_progress" }).where(eq(campaignContactsTable.id, contactId));
+      if (callLogId) {
+        await db.update(campaignCallLogsTable).set({ callStatus: "in_progress" }).where(eq(campaignCallLogsTable.id, callLogId));
+      }
+      res.sendStatus(200);
+      return;
+    }
+
     if (CallStatus === "failed" || CallStatus === "canceled") {
       await db.update(campaignContactsTable).set({ callStatus: "failed" }).where(eq(campaignContactsTable.id, contactId));
       if (callLogId) {

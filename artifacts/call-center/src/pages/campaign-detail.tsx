@@ -101,7 +101,13 @@ function statusIcon(status: string, size = "h-3.5 w-3.5") {
 
 function outcomeBadge(interestedInSelling: boolean | null, callStatus: string, callOutcome: string | null) {
   if (callStatus === "pending") return <span className="text-xs text-muted-foreground">Pending</span>;
-  if (callStatus === "calling") return <span className="text-xs text-yellow-400 font-semibold">Calling...</span>;
+  if (callStatus === "calling") return <span className="text-xs text-yellow-400 font-semibold animate-pulse">Ringing...</span>;
+  if (callStatus === "in_progress") return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+      Live
+    </span>
+  );
   if (callStatus === "no_answer") return <span className="text-xs text-muted-foreground">No answer</span>;
   if (callStatus === "failed") return <span className="text-xs text-destructive">Failed</span>;
   const isHot = interestedInSelling === true || callOutcome === "hot_lead" || callOutcome === "callback_requested";
