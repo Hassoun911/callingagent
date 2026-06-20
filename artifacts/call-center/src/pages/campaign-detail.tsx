@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Play, Pause, Phone, Trash2, Plus, Upload,
   ChevronDown, ChevronRight, CheckCircle2, XCircle, Clock,
-  PhoneOff, AlertCircle, Mic, RefreshCw, Settings2, FileText,
+  PhoneOff, AlertCircle, Volume2, RefreshCw, Settings2, FileText,
 } from "lucide-react";
 
 interface Campaign {
@@ -159,7 +159,7 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
                 if (playing) { audioRef.current.pause(); setPlaying(false); }
                 else { audioRef.current.play(); setPlaying(true); }
               }}>
-                <Mic className={`h-3.5 w-3.5 ${playing ? "text-green-400" : "text-muted-foreground"}`} />
+                <Volume2 className={`h-3.5 w-3.5 ${playing ? "text-green-400" : "text-muted-foreground"}`} />
               </Button>
             )}
             {contact.callStatus !== "calling" && (
