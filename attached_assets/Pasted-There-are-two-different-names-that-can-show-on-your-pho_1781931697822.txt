@@ -1,0 +1,89 @@
+There are two different “names” that can show on your phone:
+
+1. Real carrier CNAM name
+
+This is the official caller ID name stored with phone carriers/databases.
+
+Example:
+
+Phone number: 519-xxx-xxxx
+Carrier CNAM: PROPERTY COUSINS
+
+This is the one Twilio is talking about. It needs registration/approval and can take 48–72 hours to propagate to carriers after approval. Twilio says CNAM display names may take 48–72 hours to propagate, and CNAM is supported mainly for US numbers, with only some Canadian carrier support.
+
+2. Internal forwarding display name
+
+This is what I think eVoice is doing.
+
+When you change the “First Name” and “Last Name” inside eVoice, that may be an internal label/profile name that eVoice attaches when forwarding the call to you.
+
+So your phone may show:
+
+plains
++1 eVoice number
+
+because eVoice is sending the forwarded call from its own system with that user/profile label.
+
+That is different from updating the public carrier CNAM database every time.
+
+Why eVoice can update fast
+
+Because eVoice controls its own forwarding system. When you change the user name, eVoice can immediately use that name inside its call-forwarding flow.
+
+It is more like:
+
+eVoice account user name: plains
+Forwarded call display: plains + eVoice number
+
+Not necessarily:
+
+Carrier CNAM database changed worldwide to plains
+Why Twilio takes longer
+
+Twilio gives you lower-level phone tools. When you want the real carrier caller ID name changed, Twilio has to push that CNAM/brand info through carrier systems. That is why it is not instant. Twilio’s CNAM docs say the name may take 48–72 hours to propagate after approval.
+
+Can Twilio copy what eVoice does?
+
+Partly, yes.
+
+Twilio can instantly change the caller ID number used when forwarding:
+
+<Response>
+  <Dial callerId="+1YOUR_TWILIO_NUMBER">
+    +1YOUR_CELL
+  </Dial>
+</Response>
+
+Twilio’s <Dial> is used to connect calls to another party, and caller ID behavior can be controlled in forwarding setups.
+
+But Twilio cannot reliably force your iPhone/Android carrier screen to show a different custom name instantly per call the same way eVoice seems to, unless you use a workaround.
+
+Best workaround
+
+Use different Twilio numbers for different labels, then save them in your phone contacts.
+
+Example:
+
++1 519-xxx-1001 = Property Cousins Main
++1 519-xxx-1002 = Payroll Line
++1 519-xxx-1003 = Sales Line
++1 519-xxx-1004 = Rental Inquiry
+
+Then when a call forwards, your Replit system chooses the correct callerId number. Your phone instantly shows the saved contact name.
+
+That gives you the same feeling as eVoice, without waiting 3 days every time.
+
+The clean explanation
+
+eVoice is likely updating an internal user/profile forwarding name, not changing the official carrier CNAM every time.
+
+Twilio’s 3-day delay is for real CNAM/carrier caller ID name registration.
+
+For your Replit system, the best practical setup is:
+
+Use Twilio number as callerId
+Save that number in your phone contacts
+Use whisper message to tell you which line/extension
+Or use separate Twilio numbers for each department
+
+So yes, you are right that eVoice updates instantly — but it is probably doing it inside its own call-forwarding platform, not through the normal public CNAM process.
