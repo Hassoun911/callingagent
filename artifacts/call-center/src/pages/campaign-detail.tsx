@@ -204,8 +204,10 @@ function RecordingPlayer({ src }: { src: string }) {
   );
 }
 
-function CallLogEntry({ log, campaignId }: { log: CampaignCallLog; campaignId: number }) {
+function CallLogEntry({ log, campaignId, onDeleted }: { log: CampaignCallLog; campaignId: number; onDeleted: () => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { toast } = useToast();
   const hasRecording = !!(log.recordingSid || log.recordingUrl);
   const hasDetail = !!(log.callSummary || log.transcription || log.timeline || log.askingPrice || log.propertyType);
   const recordingUrl = hasRecording
@@ -213,6 +215,20 @@ function CallLogEntry({ log, campaignId }: { log: CampaignCallLog; campaignId: n
     : null;
 
   const isHot = log.interestedInSelling === true;
+
+  async function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm("Delete this call record?")) return;
+    setDeleting(true);
+    try {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}/call-logs/${log.id}`, { method: "DELETE" });
+      if (!r.ok) throw new Error("Failed");
+      onDeleted();
+    } catch {
+      toast({ title: "Failed to delete call record", variant: "destructive" });
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className={`rounded border ${isHot ? "border-green-500/30 bg-green-500/5" : "border-border/40 bg-black/10"} overflow-hidden`}>
@@ -242,10 +258,20 @@ function CallLogEntry({ log, campaignId }: { log: CampaignCallLog; campaignId: n
           {recordingUrl && <RecordingPlayer src={recordingUrl} />}
         </span>
 
-        {/* Date/time */}
-        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0 flex items-center gap-1 ml-auto">
-          <Calendar className="h-3 w-3" />
-          {formatDateTime(log.calledAt)}
+        {/* Date/time + delete */}
+        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0 flex items-center gap-2 ml-auto">
+          <span className="flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            {formatDateTime(log.calledAt)}
+          </span>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40"
+            title="Delete this call record"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </span>
       </div>
 
@@ -447,7 +473,7 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
                   </span>
                 </div>
                 {callLogs.map(log => (
-                  <CallLogEntry key={log.id} log={log} campaignId={campaignId} />
+                  <CallLogEntry key={log.id} log={log} campaignId={campaignId} onDeleted={() => qc.invalidateQueries({ queryKey: ["call-logs", contact.id] })} />
                 ))}
               </div>
             )}

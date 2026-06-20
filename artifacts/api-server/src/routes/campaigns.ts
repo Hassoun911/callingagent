@@ -610,6 +610,23 @@ router.get("/campaigns/:id/contacts/:contactId/call-logs", async (req, res): Pro
   }
 });
 
+// ─── Delete a specific call log entry ────────────────────────────────────────
+router.delete("/campaigns/:id/call-logs/:logId", async (req, res): Promise<void> => {
+  try {
+    const logId = parseInt(req.params.logId, 10);
+    const [log] = await db.select().from(campaignCallLogsTable).where(eq(campaignCallLogsTable.id, logId));
+    if (!log) { res.status(404).json({ error: "Call log not found" }); return; }
+    await db.delete(campaignCallLogsTable).where(eq(campaignCallLogsTable.id, logId));
+    // Decrement attempt_count on the contact
+    await db.update(campaignContactsTable)
+      .set({ attemptCount: sql`GREATEST(COALESCE(attempt_count, 1) - 1, 0)` })
+      .where(eq(campaignContactsTable.id, log.contactId));
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to delete call log" });
+  }
+});
+
 // ─── Recording proxy for a specific call log ─────────────────────────────────
 router.get("/campaigns/:id/call-logs/:logId/recording", async (req, res): Promise<void> => {
   try {
