@@ -299,6 +299,33 @@ async function initiateOutboundCall(contact: any, campaign: any, fromNumber: str
   return call.sid;
 }
 
+// ─── Test email ──────────────────────────────────────────────────────────────
+router.post("/campaigns/test-email", async (req, res): Promise<void> => {
+  try {
+    const transport = getEmailTransport();
+    if (!transport) {
+      res.status(500).json({ error: "Email not configured — SMTP_HOST, SMTP_USER, SMTP_PASS must be set" });
+      return;
+    }
+    const to = req.body?.to || process.env.SMTP_FROM || process.env.SMTP_USER;
+    if (!to) { res.status(400).json({ error: "No recipient — pass { to: 'email@example.com' } or set SMTP_FROM" }); return; }
+
+    // Verify SMTP connection
+    await transport.verify();
+    await transport.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER || "",
+      to,
+      subject: "Vanguard.OPS — Email Test",
+      html: `<p style="font-family:sans-serif">This is a test email from <strong>Vanguard.OPS</strong>. If you received this, hot lead notifications are working correctly.</p>`,
+    });
+    logger.info({ to }, "Test email sent");
+    res.json({ ok: true, sentTo: to });
+  } catch (err: any) {
+    logger.error({ err: err?.message, stack: err?.stack }, "Test email failed");
+    res.status(500).json({ error: err?.message ?? "Unknown error" });
+  }
+});
+
 // ─── List campaigns ──────────────────────────────────────────────────────────
 router.get("/campaigns", async (req, res): Promise<void> => {
   try {
