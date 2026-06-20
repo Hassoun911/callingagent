@@ -79,7 +79,7 @@ function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
-const FALLBACK_VOICE = "Google.en-US-Neural2-F";
+const FALLBACK_VOICE = "Google.ar-XA-Neural2-C";
 
 async function extractOutboundSummary(messages: Array<{ role: string; content: string }>): Promise<{
   callSummary: string | null;
