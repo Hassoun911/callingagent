@@ -951,12 +951,19 @@ router.post("/twilio/campaign-gather", async (req, res): Promise<void> => {
 router.post("/twilio/campaign-status", async (req, res): Promise<void> => {
   const { CallSid, CallStatus, CallDuration } = req.body;
   try {
-    const contactId = outboundCampaignCalls.get(CallSid);
-    if (!contactId) { res.sendStatus(200); return; }
+    let contactId = outboundCampaignCalls.get(CallSid);
+    let callLogId = outboundCallLogMap.get(CallSid);
+
+    // If in-memory maps were wiped (server restart mid-call), fall back to DB lookup
+    if (!contactId) {
+      const [dbLog] = await db.select().from(campaignCallLogsTable).where(eq(campaignCallLogsTable.twilioCallSid, CallSid));
+      if (!dbLog) { res.sendStatus(200); return; }
+      contactId = dbLog.contactId;
+      callLogId = dbLog.id;
+      logger.info({ CallSid, CallStatus, contactId, callLogId }, "campaign-status: recovered from DB after restart");
+    }
 
     const isTerminal = ["completed", "failed", "busy", "no-answer", "canceled"].includes(CallStatus);
-
-    const callLogId = outboundCallLogMap.get(CallSid);
 
     if (CallStatus === "no-answer" || CallStatus === "busy") {
       await db.update(campaignContactsTable).set({ callStatus: "no_answer", callDuration: 0 }).where(eq(campaignContactsTable.id, contactId));
