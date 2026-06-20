@@ -190,7 +190,7 @@ Return JSON only. No explanation.`,
   }
 }
 
-async function sendHotLeadEmail(contact: any, campaign: any, summary: any, recordingUrl: string | null) {
+async function sendHotLeadEmail(contact: any, campaign: any, summary: any, recordingUrl: string | null, audioBuffer?: Buffer | null) {
   try {
     const transport = getEmailTransport();
     if (!transport || !campaign.notificationEmail) {
@@ -246,13 +246,17 @@ async function sendHotLeadEmail(contact: any, campaign: any, summary: any, recor
 </table>
 </body></html>`;
 
+    const safeName = (contact.name ?? "contact").replace(/[^a-z0-9_-]/gi, "_");
     await transport.sendMail({
       from,
       to: campaign.notificationEmail,
       subject: `Hot Lead — ${contact.name} (${contact.phone}) — Ready to Sell`,
       html,
+      attachments: audioBuffer
+        ? [{ filename: `call-${safeName}.mp3`, content: audioBuffer, contentType: "audio/mpeg" }]
+        : [],
     });
-    logger.info({ contactId: contact.id, campaignId: campaign.id }, "Hot lead email sent");
+    logger.info({ contactId: contact.id, campaignId: campaign.id, hasAudio: !!audioBuffer }, "Hot lead email sent");
   } catch (err: any) {
     logger.error({ err: err?.message }, "Failed to send hot lead email");
   }
@@ -1033,16 +1037,7 @@ router.post("/twilio/campaign-status", async (req, res): Promise<void> => {
       outboundConversations.delete(CallSid);
       outboundCallLogMap.delete(CallSid);
 
-      // Send hot lead email if interested OR callback requested
-      const isHotOrCallback = summary?.interestedInSelling || summary?.callOutcome === "callback_requested";
-      if (isHotOrCallback && contact && campaign) {
-        logger.info({ contactId: contact.id, campaignId: campaign.id, notificationEmail: campaign.notificationEmail, outcome: summary?.callOutcome }, "Hot lead / callback detected — sending email");
-        setImmediate(() => {
-          sendHotLeadEmail(contact, campaign, summary, null).catch((err: any) => {
-            logger.error({ err: err?.message, contactId: contact.id }, "Hot lead email failed");
-          });
-        });
-      }
+      // Hot lead email is sent from the recording callback (once audio is ready)
     }
 
     res.sendStatus(200);
@@ -1079,6 +1074,47 @@ router.post("/twilio/campaign-recording", async (req, res): Promise<void> => {
     if (!callLog && !contact) {
       logger.warn({ CallSid, RecordingUrl, RecordingSid }, "Campaign recording callback: no call log or contact found");
     }
+
+    // Send hot lead email now that we have the recording — download MP3 and attach it
+    const isHotOrCallback = callLog?.callOutcome === "hot_lead" || callLog?.callOutcome === "callback_requested";
+    if (isHotOrCallback && contact && RecordingUrl) {
+      setImmediate(async () => {
+        try {
+          const [campaign] = await db.select().from(campaignsTable).where(eq(campaignsTable.id, contact.campaignId));
+          if (!campaign) return;
+
+          // Download the recording from Twilio (requires auth)
+          const accountSid = process.env.TWILIO_ACCOUNT_SID!;
+          const authToken = process.env.TWILIO_AUTH_TOKEN!;
+          const mp3Url = `${RecordingUrl}.mp3`;
+          let audioBuffer: Buffer | null = null;
+          try {
+            const authHeader = "Basic " + Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+            const audioRes = await fetch(mp3Url, { headers: { Authorization: authHeader } });
+            // Twilio redirects to a CDN — follow the redirect without auth
+            const finalUrl = audioRes.redirected ? audioRes.url : mp3Url;
+            const finalRes = audioRes.redirected ? await fetch(finalUrl) : audioRes;
+            if (finalRes.ok) audioBuffer = Buffer.from(await finalRes.arrayBuffer());
+          } catch (dlErr: any) {
+            logger.warn({ dlErr: dlErr?.message }, "Could not download recording for email attachment — sending without audio");
+          }
+
+          const summary = {
+            callSummary: callLog.callSummary,
+            callOutcome: callLog.callOutcome,
+            interestedInSelling: callLog.interestedInSelling,
+            timeline: callLog.timeline,
+            askingPrice: callLog.askingPrice,
+            propertyType: callLog.propertyType,
+            additionalNotes: callLog.additionalNotes,
+          };
+          await sendHotLeadEmail(contact, campaign, summary, mp3Url, audioBuffer);
+        } catch (err: any) {
+          logger.error({ err: err?.message, CallSid }, "Hot lead email (from recording callback) failed");
+        }
+      });
+    }
+
     res.sendStatus(200);
   } catch (err: any) {
     logger.error({ err: err?.message }, "Error in campaign recording callback");
