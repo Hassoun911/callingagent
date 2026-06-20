@@ -550,8 +550,10 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
 
     outboundCampaignCalls.set(CallSid, contact.id);
 
-    const systemPrompt = campaign.systemPrompt ||
-      `أنت سارة، وكيلة عقارية محترفة من مجموعة The Property Cousins. مهمتك الاتصال بأصحاب المنازل وتحديد ما إذا كانوا مهتمين ببيع عقاراتهم.
+    // Determine mode: AI Prompt mode (custom systemPrompt set) vs Script mode (read script verbatim)
+    const isAiPromptMode = !!(campaign.systemPrompt && campaign.systemPrompt.trim().length > 0);
+
+    const DEFAULT_SYSTEM_PROMPT = `أنت سارة، وكيلة عقارية محترفة من مجموعة The Property Cousins. مهمتك الاتصال بأصحاب المنازل وتحديد ما إذا كانوا مهتمين ببيع عقاراتهم.
 
 اتبع هذه الخطوات:
 1. ابدأ بتقديم نفسك وسبب اتصالك
@@ -562,20 +564,9 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
 
 تحدث بالعربية دائماً. كن مهذباً ومحترماً. أجب بجملة أو جملتين فقط في كل مرة.`;
 
-    const greeting = campaign.script;
+    const systemPrompt = campaign.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
 
-    outboundConversations.set(CallSid, {
-      contactId: contact.id,
-      campaignId: campaign.id,
-      messages: [{ role: "assistant", content: greeting }],
-      systemPrompt,
-      startedAt: Date.now(),
-      maxDuration: campaign.maxCallDuration ?? 300,
-      baseUrl,
-      voice: "Google.ar-XA-Neural2-C",
-    });
-
-    // Start recording
+    // Start recording in background
     setImmediate(async () => {
       try {
         const client = getTwilioClient();
@@ -589,8 +580,61 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
       }
     });
 
-    res.set("Content-Type", "text/xml");
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+    if (isAiPromptMode) {
+      // AI Prompt mode: AI generates the opening line — script is NOT used
+      let aiGreeting = "مرحبا، كيف حالك؟";
+      try {
+        const openai = getChatOpenAI();
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: systemPrompt + "\n\nأنت على مكالمة هاتفية. ابدأ المحادثة بجملة افتتاحية واحدة فقط. تحدث بالعربية فقط." },
+            { role: "user", content: "[بدأت المكالمة الهاتفية، قل جملة الافتتاح]" },
+          ],
+          max_tokens: 80,
+        });
+        aiGreeting = completion.choices[0]?.message?.content ?? aiGreeting;
+      } catch (err: any) {
+        logger.warn({ err: err?.message }, "Failed to generate AI opening, using fallback");
+      }
+
+      outboundConversations.set(CallSid, {
+        contactId: contact.id,
+        campaignId: campaign.id,
+        messages: [{ role: "assistant", content: aiGreeting }],
+        systemPrompt,
+        startedAt: Date.now(),
+        maxDuration: campaign.maxCallDuration ?? 300,
+        baseUrl,
+        voice: "Google.ar-XA-Neural2-C",
+      });
+
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(aiGreeting)}</Say>
+  <Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
+  </Gather>
+  <Say voice="${FALLBACK_VOICE}" language="ar-SA">لم أسمعك. شكراً لك وإلى اللقاء.</Say>
+  <Hangup/>
+</Response>`);
+    } else {
+      // Script mode: read the script verbatim as opening, then qualify with default AI prompt
+      const greeting = campaign.script;
+
+      outboundConversations.set(CallSid, {
+        contactId: contact.id,
+        campaignId: campaign.id,
+        messages: [{ role: "assistant", content: greeting }],
+        systemPrompt: DEFAULT_SYSTEM_PROMPT,
+        startedAt: Date.now(),
+        maxDuration: campaign.maxCallDuration ?? 300,
+        baseUrl,
+        voice: "Google.ar-XA-Neural2-C",
+      });
+
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(greeting)}</Say>
   <Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
@@ -598,6 +642,7 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
   <Say voice="${FALLBACK_VOICE}" language="ar-SA">لم أسمعك. شكراً لك وإلى اللقاء.</Say>
   <Hangup/>
 </Response>`);
+    }
   } catch (err: any) {
     logger.error({ err: err?.message, CallSid }, "Error in campaign voice webhook");
     res.set("Content-Type", "text/xml");

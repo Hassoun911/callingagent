@@ -159,7 +159,7 @@ export default function Campaigns() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Campaigns</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-green-400">Campaigns</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Outbound cold calling — AI-powered seller qualification</p>
         </div>
         <Button onClick={() => setShowCreate(true)} size="sm" className="gap-1.5">
@@ -282,16 +282,45 @@ export default function Campaigns() {
               <Input className="mt-1.5" placeholder="e.g. Q1 Real Estate Outreach" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
             </div>
 
-            <div>
-              <Label>Opening Script (Arabic)</Label>
-              <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">The AI will read this script when the contact answers. Write in Arabic.</p>
-              <Textarea className="mt-1.5 min-h-[100px] text-right" dir="rtl" placeholder="مرحبا، أنا سارة..." value={form.script} onChange={e => setForm(f => ({ ...f, script: e.target.value }))} />
+            {/* Mode toggle */}
+            <div className="flex items-center gap-1 p-1 bg-secondary/40 rounded-lg w-fit">
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, systemPrompt: "" }))}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${!form.systemPrompt ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Script Mode
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, systemPrompt: f.systemPrompt || " " }))}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${form.systemPrompt ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                AI Prompt Mode
+              </button>
             </div>
 
-            <div>
-              <Label>AI System Prompt <span className="text-muted-foreground font-normal">(optional — leave blank for default)</span></Label>
-              <Textarea className="mt-1.5 min-h-[80px]" placeholder="Leave blank to use the default seller qualification prompt..." value={form.systemPrompt} onChange={e => setForm(f => ({ ...f, systemPrompt: e.target.value }))} />
-            </div>
+            {!form.systemPrompt ? (
+              <div>
+                <Label>Opening Script (Arabic)</Label>
+                <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">The AI reads this verbatim when the contact answers, then qualifies using the default prompt.</p>
+                <Textarea className="mt-1.5 min-h-[100px] text-right" dir="rtl" placeholder="مرحبا، أنا سارة..." value={form.script} onChange={e => setForm(f => ({ ...f, script: e.target.value }))} />
+              </div>
+            ) : (
+              <div>
+                <Label>AI System Prompt</Label>
+                <p className="text-xs text-muted-foreground mt-0.5 mb-1.5">The AI generates its own opening and drives the entire conversation. The opening script is not used.</p>
+                <Textarea
+                  className="mt-1.5 min-h-[120px]"
+                  placeholder="e.g. You are Sarah, a real estate agent from The Property Cousins Group. Call homeowners and determine if they are interested in selling..."
+                  value={form.systemPrompt.trimStart()}
+                  onChange={e => setForm(f => ({ ...f, systemPrompt: e.target.value }))}
+                />
+                <button type="button" className="mt-1.5 text-xs text-muted-foreground hover:text-foreground underline" onClick={() => setForm(f => ({ ...f, systemPrompt: "" }))}>
+                  Switch back to Script Mode
+                </button>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

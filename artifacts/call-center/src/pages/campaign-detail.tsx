@@ -365,7 +365,7 @@ export default function CampaignDetail() {
           </Button>
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-bold tracking-tight text-foreground">{campaign.name}</h1>
+              <h1 className="text-xl font-bold tracking-tight text-green-400">{campaign.name}</h1>
               <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                 campaign.status === "active" ? "bg-green-500/15 text-green-400 border border-green-500/20" :
                 campaign.status === "paused" ? "bg-yellow-500/15 text-yellow-400 border border-yellow-500/20" :
@@ -541,14 +541,41 @@ export default function CampaignDetail() {
           <DialogHeader><DialogTitle>Campaign Settings</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             <div><Label>Campaign Name</Label><Input className="mt-1" value={settingsForm.name ?? ""} onChange={e => setSettingsForm(f => ({ ...f, name: e.target.value }))} /></div>
-            <div>
-              <Label>Opening Script (Arabic)</Label>
-              <Textarea className="mt-1 min-h-[100px] text-right" dir="rtl" value={settingsForm.script ?? ""} onChange={e => setSettingsForm(f => ({ ...f, script: e.target.value }))} />
+
+            {/* Mode toggle */}
+            <div className="flex items-center gap-1 p-1 bg-secondary/40 rounded-lg w-fit">
+              <button
+                type="button"
+                onClick={() => setSettingsForm(f => ({ ...f, systemPrompt: null }))}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${!settingsForm.systemPrompt ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Script Mode
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettingsForm(f => ({ ...f, systemPrompt: f.systemPrompt || "" }))}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${settingsForm.systemPrompt !== null && settingsForm.systemPrompt !== undefined ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                AI Prompt Mode
+              </button>
             </div>
-            <div>
-              <Label>AI System Prompt <span className="text-muted-foreground font-normal">(leave blank for default)</span></Label>
-              <Textarea className="mt-1 min-h-[80px]" value={settingsForm.systemPrompt ?? ""} onChange={e => setSettingsForm(f => ({ ...f, systemPrompt: e.target.value || null }))} />
-            </div>
+
+            {!settingsForm.systemPrompt ? (
+              <div>
+                <Label>Opening Script (Arabic)</Label>
+                <p className="text-xs text-muted-foreground mt-0.5 mb-1">The AI reads this verbatim when the contact answers, then qualifies using the default prompt.</p>
+                <Textarea className="mt-1 min-h-[100px] text-right" dir="rtl" value={settingsForm.script ?? ""} onChange={e => setSettingsForm(f => ({ ...f, script: e.target.value }))} />
+              </div>
+            ) : (
+              <div>
+                <Label>AI System Prompt</Label>
+                <p className="text-xs text-muted-foreground mt-0.5 mb-1">The AI generates its own opening and drives the entire conversation. The opening script is not used.</p>
+                <Textarea className="mt-1 min-h-[120px]" value={settingsForm.systemPrompt ?? ""} onChange={e => setSettingsForm(f => ({ ...f, systemPrompt: e.target.value || "" }))} />
+                <button type="button" className="mt-1 text-xs text-muted-foreground hover:text-foreground underline" onClick={() => setSettingsForm(f => ({ ...f, systemPrompt: null }))}>
+                  Switch back to Script Mode
+                </button>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>From Phone Number</Label>
