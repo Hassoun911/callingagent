@@ -1,0 +1,586 @@
+import { useState, useRef } from "react";
+import { useParams, useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import {
+  ArrowLeft, Play, Pause, Phone, Trash2, Plus, Upload,
+  ChevronDown, ChevronRight, CheckCircle2, XCircle, Clock,
+  PhoneOff, AlertCircle, Mic, RefreshCw, Settings2, FileText,
+} from "lucide-react";
+
+interface Campaign {
+  id: number;
+  name: string;
+  script: string;
+  systemPrompt: string | null;
+  fromPhoneNumberId: number | null;
+  notificationEmail: string | null;
+  status: "draft" | "active" | "paused" | "completed";
+  maxCallDuration: number | null;
+  createdAt: string;
+  updatedAt: string;
+  totalContacts: number | null;
+  pendingContacts: number | null;
+  completedContacts: number | null;
+  interestedContacts: number | null;
+}
+
+interface CampaignContact {
+  id: number;
+  campaignId: number;
+  name: string;
+  phone: string;
+  address: string | null;
+  callStatus: "pending" | "calling" | "completed" | "no_answer" | "failed";
+  callOutcome: string | null;
+  twilioCallSid: string | null;
+  callSummary: string | null;
+  transcription: string | null;
+  recordingUrl: string | null;
+  recordingSid: string | null;
+  callDuration: number | null;
+  interestedInSelling: boolean | null;
+  timeline: string | null;
+  askingPrice: string | null;
+  propertyType: string | null;
+  additionalNotes: string | null;
+  attemptCount: number | null;
+  lastAttemptAt: string | null;
+  createdAt: string;
+}
+
+interface PhoneNumber {
+  id: number;
+  number: string;
+  friendlyName: string | null;
+}
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function statusIcon(status: CampaignContact["callStatus"]) {
+  const map: Record<string, JSX.Element> = {
+    pending: <Clock className="h-3.5 w-3.5 text-muted-foreground" />,
+    calling: <Phone className="h-3.5 w-3.5 text-yellow-400 animate-pulse" />,
+    completed: <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />,
+    no_answer: <PhoneOff className="h-3.5 w-3.5 text-muted-foreground" />,
+    failed: <AlertCircle className="h-3.5 w-3.5 text-destructive" />,
+  };
+  return map[status] ?? <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
+}
+
+function outcomeBadge(contact: CampaignContact) {
+  if (contact.callStatus === "pending") return <span className="text-xs text-muted-foreground">Pending</span>;
+  if (contact.callStatus === "calling") return <span className="text-xs text-yellow-400 font-medium">Calling...</span>;
+  if (contact.callStatus === "no_answer") return <span className="text-xs text-muted-foreground">No answer</span>;
+  if (contact.callStatus === "failed") return <span className="text-xs text-destructive">Failed</span>;
+  if (contact.interestedInSelling === true) return <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-400 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20">Hot Lead</span>;
+  if (contact.interestedInSelling === false) return <span className="text-xs text-muted-foreground">Not interested</span>;
+  if (contact.callOutcome) return <span className="text-xs text-muted-foreground capitalize">{contact.callOutcome.replace(/_/g, " ")}</span>;
+  return <span className="text-xs text-muted-foreground">Completed</span>;
+}
+
+function formatDuration(secs: number | null) {
+  if (!secs) return "—";
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignContact; campaignId: number; onRefresh: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const callMutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}/contacts/${contact.id}/call`, { method: "POST" });
+      if (!r.ok) throw new Error("Failed to call");
+    },
+    onSuccess: () => { onRefresh(); toast({ title: `Calling ${contact.name}...` }); },
+    onError: () => toast({ title: "Failed to initiate call", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}/contacts/${contact.id}`, { method: "DELETE" });
+      if (!r.ok) throw new Error("Failed to delete");
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["campaign-contacts", campaignId] }); },
+    onError: () => toast({ title: "Failed to delete contact", variant: "destructive" }),
+  });
+
+  const recordingUrl = (contact.recordingSid || contact.recordingUrl)
+    ? `${BASE}/api/campaigns/${campaignId}/contacts/${contact.id}/recording`
+    : null;
+
+  const hasDetails = contact.callSummary || contact.transcription || contact.timeline || contact.askingPrice || contact.propertyType;
+
+  return (
+    <>
+      <tr
+        className={`border-b border-border/50 hover:bg-secondary/20 transition-colors cursor-pointer ${hasDetails ? "" : ""}`}
+        onClick={() => hasDetails && setExpanded(e => !e)}
+      >
+        <td className="px-4 py-2.5 w-8">
+          {hasDetails
+            ? expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            : null}
+        </td>
+        <td className="px-4 py-2.5">
+          <div className="font-medium text-sm text-foreground">{contact.name}</div>
+          {contact.address && <div className="text-[11px] text-muted-foreground">{contact.address}</div>}
+        </td>
+        <td className="px-4 py-2.5 font-mono text-sm text-muted-foreground">{contact.phone}</td>
+        <td className="px-4 py-2.5">
+          <div className="flex items-center gap-1.5">
+            {statusIcon(contact.callStatus)}
+            {outcomeBadge(contact)}
+          </div>
+        </td>
+        <td className="px-4 py-2.5 text-xs text-muted-foreground">{formatDuration(contact.callDuration)}</td>
+        <td className="px-4 py-2.5 text-xs text-muted-foreground">{contact.attemptCount ?? 0}x</td>
+        <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5 justify-end">
+            {recordingUrl && (
+              <Button size="sm" variant="ghost" className="h-7 w-7 px-0" onClick={() => {
+                if (!audioRef.current) return;
+                if (playing) { audioRef.current.pause(); setPlaying(false); }
+                else { audioRef.current.play(); setPlaying(true); }
+              }}>
+                <Mic className={`h-3.5 w-3.5 ${playing ? "text-green-400" : "text-muted-foreground"}`} />
+              </Button>
+            )}
+            {contact.callStatus !== "calling" && (
+              <Button size="sm" variant="ghost" className="h-7 w-7 px-0" title="Retry call" onClick={() => callMutation.mutate()} disabled={callMutation.isPending}>
+                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" className="h-7 w-7 px-0 text-muted-foreground hover:text-destructive" onClick={() => deleteMutation.mutate()}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          {recordingUrl && (
+            <audio ref={audioRef} src={recordingUrl} onEnded={() => setPlaying(false)} className="hidden" />
+          )}
+        </td>
+      </tr>
+      {expanded && hasDetails && (
+        <tr className="border-b border-border/50 bg-secondary/10">
+          <td colSpan={7} className="px-8 py-4">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                {contact.callSummary && (
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">AI Summary</div>
+                    <div className="text-sm text-foreground leading-relaxed">{contact.callSummary}</div>
+                  </div>
+                )}
+                {(contact.propertyType || contact.askingPrice || contact.timeline) && (
+                  <div className="grid grid-cols-3 gap-3">
+                    {contact.propertyType && <div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Property</div><div className="text-sm font-medium capitalize">{contact.propertyType}</div></div>}
+                    {contact.askingPrice && <div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Price</div><div className="text-sm font-medium text-green-400">{contact.askingPrice}</div></div>}
+                    {contact.timeline && <div><div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Timeline</div><div className="text-sm font-medium">{contact.timeline}</div></div>}
+                  </div>
+                )}
+                {contact.additionalNotes && (
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Notes</div>
+                    <div className="text-sm text-muted-foreground">{contact.additionalNotes}</div>
+                  </div>
+                )}
+              </div>
+              {contact.transcription && (
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Transcript</div>
+                  <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto scrollbar-thin">{contact.transcription}</div>
+                </div>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+export default function CampaignDetail() {
+  const { id } = useParams<{ id: string }>();
+  const campaignId = parseInt(id, 10);
+  const [, navigate] = useLocation();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [newContact, setNewContact] = useState({ name: "", phone: "", address: "" });
+  const [importText, setImportText] = useState("");
+  const [filter, setFilter] = useState<"all" | "pending" | "completed" | "interested" | "no_answer">("all");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: campaign, isLoading: campLoading } = useQuery<Campaign>({
+    queryKey: ["campaign", campaignId],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}`);
+      if (!r.ok) throw new Error("Not found");
+      return r.json();
+    },
+    refetchInterval: 5000,
+  });
+
+  const { data: contacts = [], isLoading: contactsLoading } = useQuery<CampaignContact[]>({
+    queryKey: ["campaign-contacts", campaignId],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}/contacts`);
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    refetchInterval: 5000,
+  });
+
+  const { data: phoneNumbers = [] } = useQuery<PhoneNumber[]>({
+    queryKey: ["phone-numbers"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/phone-numbers`);
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+  });
+
+  const [settingsForm, setSettingsForm] = useState<Partial<Campaign>>({});
+
+  const statusMutation = useMutation({
+    mutationFn: async (action: "start" | "pause") => {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}/${action}`, { method: "POST" });
+      if (!r.ok) throw new Error(`Failed to ${action}`);
+      return r.json();
+    },
+    onSuccess: (data, action) => {
+      qc.invalidateQueries({ queryKey: ["campaign", campaignId] });
+      qc.invalidateQueries({ queryKey: ["campaign-contacts", campaignId] });
+      qc.invalidateQueries({ queryKey: ["campaigns"] });
+      if (action === "start") toast({ title: `Campaign started — ${data.queued} contacts queued for calling` });
+      else toast({ title: "Campaign paused" });
+    },
+    onError: (_, action) => toast({ title: `Failed to ${action} campaign`, variant: "destructive" }),
+  });
+
+  const addContactMutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newContact.name, phone: newContact.phone, address: newContact.address || null }),
+      });
+      if (!r.ok) throw new Error("Failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["campaign-contacts", campaignId] });
+      qc.invalidateQueries({ queryKey: ["campaign", campaignId] });
+      setShowAddContact(false);
+      setNewContact({ name: "", phone: "", address: "" });
+      toast({ title: "Contact added" });
+    },
+    onError: () => toast({ title: "Failed to add contact", variant: "destructive" }),
+  });
+
+  const importMutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}/contacts/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: importText }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      return r.json() as Promise<{ imported: number; skipped: number }>;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["campaign-contacts", campaignId] });
+      qc.invalidateQueries({ queryKey: ["campaign", campaignId] });
+      setShowImport(false);
+      setImportText("");
+      toast({ title: `Imported ${data.imported} contacts${data.skipped > 0 ? ` (${data.skipped} skipped)` : ""}` });
+    },
+    onError: () => toast({ title: "Import failed", variant: "destructive" }),
+  });
+
+  const updateCampaignMutation = useMutation({
+    mutationFn: async (data: Partial<Campaign>) => {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["campaign", campaignId] });
+      qc.invalidateQueries({ queryKey: ["campaigns"] });
+      setShowSettings(false);
+      toast({ title: "Campaign updated" });
+    },
+    onError: () => toast({ title: "Failed to update campaign", variant: "destructive" }),
+  });
+
+  const refreshContacts = () => {
+    qc.invalidateQueries({ queryKey: ["campaign-contacts", campaignId] });
+    qc.invalidateQueries({ queryKey: ["campaign", campaignId] });
+  };
+
+  const filteredContacts = contacts.filter(c => {
+    const matchSearch = !searchTerm || c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.phone.includes(searchTerm) || (c.address ?? "").toLowerCase().includes(searchTerm.toLowerCase());
+    const matchFilter =
+      filter === "all" ? true :
+      filter === "pending" ? c.callStatus === "pending" :
+      filter === "completed" ? c.callStatus === "completed" :
+      filter === "interested" ? c.interestedInSelling === true :
+      filter === "no_answer" ? c.callStatus === "no_answer" : true;
+    return matchSearch && matchFilter;
+  });
+
+  if (campLoading) return <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">Loading...</div>;
+  if (!campaign) return <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">Campaign not found.</div>;
+
+  const canStart = campaign.status !== "active" && campaign.status !== "completed" && (campaign.totalContacts ?? 0) > 0 && !!campaign.fromPhoneNumberId;
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3">
+          <Button variant="ghost" size="sm" className="h-8 w-8 px-0 mt-0.5" onClick={() => navigate("/campaigns")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-bold tracking-tight text-foreground">{campaign.name}</h1>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                campaign.status === "active" ? "bg-green-500/15 text-green-400 border border-green-500/20" :
+                campaign.status === "paused" ? "bg-yellow-500/15 text-yellow-400 border border-yellow-500/20" :
+                campaign.status === "completed" ? "bg-blue-500/15 text-blue-400 border border-blue-500/20" :
+                "bg-muted text-muted-foreground"
+              }`}>{campaign.status}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {campaign.fromPhoneNumberId
+                ? `Calling from ${phoneNumbers.find(p => p.id === campaign.fromPhoneNumberId)?.number ?? "—"}`
+                : "No phone number configured"}
+              {campaign.notificationEmail && <span> · Alerts to {campaign.notificationEmail}</span>}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-8 w-8 px-0" onClick={() => { setSettingsForm({ name: campaign.name, script: campaign.script, systemPrompt: campaign.systemPrompt, fromPhoneNumberId: campaign.fromPhoneNumberId, notificationEmail: campaign.notificationEmail, maxCallDuration: campaign.maxCallDuration }); setShowSettings(true); }}>
+            <Settings2 className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 px-3" onClick={refreshContacts}>
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+          {campaign.status === "active" ? (
+            <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => statusMutation.mutate("pause")} disabled={statusMutation.isPending}>
+              <Pause className="h-3.5 w-3.5" />
+              Pause Campaign
+            </Button>
+          ) : (
+            <Button size="sm" className="h-8 gap-1.5" onClick={() => statusMutation.mutate("start")} disabled={!canStart || statusMutation.isPending} title={!campaign.fromPhoneNumberId ? "Configure a phone number first" : !campaign.totalContacts ? "Add contacts first" : ""}>
+              <Play className="h-3.5 w-3.5" />
+              {campaign.status === "paused" ? "Resume" : "Start Dialing"}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-5 gap-2">
+        {[
+          { label: "Total", value: campaign.totalContacts ?? 0, color: "" },
+          { label: "Pending", value: campaign.pendingContacts ?? 0, color: "" },
+          { label: "Completed", value: campaign.completedContacts ?? 0, color: "" },
+          { label: "Hot Leads", value: campaign.interestedContacts ?? 0, color: "text-green-400" },
+          { label: "No Answer", value: contacts.filter(c => c.callStatus === "no_answer").length, color: "" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="bg-card border border-border rounded-lg px-3 py-2 text-center">
+            <div className="text-xs text-muted-foreground">{label}</div>
+            <div className={`text-xl font-bold ${color || "text-foreground"}`}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Script preview */}
+      <div className="bg-card border border-border rounded-lg p-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <FileText className="h-3.5 w-3.5" />
+            Opening Script
+          </div>
+        </div>
+        <div className="text-sm text-foreground leading-relaxed dir-rtl text-right" dir="rtl">{campaign.script}</div>
+      </div>
+
+      {/* Contacts table */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-3">
+            <Input
+              placeholder="Search contacts..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="h-7 w-48 text-xs"
+            />
+            <div className="flex gap-1">
+              {(["all", "pending", "interested", "completed", "no_answer"] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${filter === f ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"}`}
+                >
+                  {f === "all" ? "All" : f === "no_answer" ? "No Answer" : f === "interested" ? "Hot Leads" : f.charAt(0).toUpperCase() + f.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1" onClick={() => setShowImport(true)}>
+              <Upload className="h-3 w-3" />
+              Bulk Import
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1" onClick={() => setShowAddContact(true)}>
+              <Plus className="h-3 w-3" />
+              Add Contact
+            </Button>
+          </div>
+        </div>
+        {contactsLoading ? (
+          <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">Loading contacts...</div>
+        ) : filteredContacts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-32 text-muted-foreground gap-2">
+            <div className="text-sm">{contacts.length === 0 ? "No contacts yet. Add contacts or bulk import to start." : "No contacts match the current filter."}</div>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-secondary/30">
+                <th className="w-8 px-4" />
+                <th className="text-left px-4 py-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">Name</th>
+                <th className="text-left px-4 py-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">Phone</th>
+                <th className="text-left px-4 py-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">Outcome</th>
+                <th className="text-left px-4 py-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">Duration</th>
+                <th className="text-left px-4 py-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">Attempts</th>
+                <th className="text-right px-4 py-2 font-medium text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredContacts.map((c, i) => (
+                <ContactRow key={c.id} contact={c} campaignId={campaignId} onRefresh={refreshContacts} />
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Add Contact Dialog */}
+      <Dialog open={showAddContact} onOpenChange={setShowAddContact}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Add Contact</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div><Label>Name</Label><Input className="mt-1" value={newContact.name} onChange={e => setNewContact(f => ({ ...f, name: e.target.value }))} placeholder="Ahmed Al-Sayed" /></div>
+            <div><Label>Phone</Label><Input className="mt-1" value={newContact.phone} onChange={e => setNewContact(f => ({ ...f, phone: e.target.value }))} placeholder="+1-555-000-0000" /></div>
+            <div><Label>Address <span className="text-muted-foreground font-normal">(optional)</span></Label><Input className="mt-1" value={newContact.address} onChange={e => setNewContact(f => ({ ...f, address: e.target.value }))} placeholder="123 Main St, Toronto ON" /></div>
+            <div className="flex justify-end gap-2 pt-1 border-t border-border">
+              <Button variant="outline" onClick={() => setShowAddContact(false)}>Cancel</Button>
+              <Button onClick={() => addContactMutation.mutate()} disabled={!newContact.name || !newContact.phone || addContactMutation.isPending}>
+                {addContactMutation.isPending ? "Adding..." : "Add Contact"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Import Dialog */}
+      <Dialog open={showImport} onOpenChange={setShowImport}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Bulk Import Contacts</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <p className="text-sm text-muted-foreground">Paste one contact per line. Format: <code className="text-xs bg-secondary px-1 py-0.5 rounded">Name, Phone, Address</code> or separated by <code className="text-xs bg-secondary px-1 py-0.5 rounded">|</code></p>
+            <div className="bg-secondary/30 rounded p-2 text-xs text-muted-foreground font-mono">
+              Ahmed Al-Sayed, +15550001111, 123 King St Toronto<br />
+              Sara Mohammed, +15550002222, 456 Queen Ave<br />
+              Omar Hassan | +15550003333 | 789 Bloor St
+            </div>
+            <Textarea
+              className="min-h-[200px] font-mono text-xs"
+              placeholder="Ahmed Al-Sayed, +15550001111, 123 King St&#10;Sara Mohammed, +15550002222&#10;..."
+              value={importText}
+              onChange={e => setImportText(e.target.value)}
+            />
+            <div className="flex justify-end gap-2 pt-1 border-t border-border">
+              <Button variant="outline" onClick={() => setShowImport(false)}>Cancel</Button>
+              <Button onClick={() => importMutation.mutate()} disabled={!importText.trim() || importMutation.isPending}>
+                {importMutation.isPending ? "Importing..." : "Import"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Settings Dialog */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Campaign Settings</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div><Label>Campaign Name</Label><Input className="mt-1" value={settingsForm.name ?? ""} onChange={e => setSettingsForm(f => ({ ...f, name: e.target.value }))} /></div>
+            <div>
+              <Label>Opening Script (Arabic)</Label>
+              <Textarea className="mt-1 min-h-[100px] text-right" dir="rtl" value={settingsForm.script ?? ""} onChange={e => setSettingsForm(f => ({ ...f, script: e.target.value }))} />
+            </div>
+            <div>
+              <Label>AI System Prompt <span className="text-muted-foreground font-normal">(leave blank for default)</span></Label>
+              <Textarea className="mt-1 min-h-[80px]" value={settingsForm.systemPrompt ?? ""} onChange={e => setSettingsForm(f => ({ ...f, systemPrompt: e.target.value || null }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>From Phone Number</Label>
+                <select
+                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  value={settingsForm.fromPhoneNumberId ?? ""}
+                  onChange={e => setSettingsForm(f => ({ ...f, fromPhoneNumberId: e.target.value ? parseInt(e.target.value, 10) : null }))}
+                >
+                  <option value="">Select a number...</option>
+                  {phoneNumbers.map((p: PhoneNumber) => (
+                    <option key={p.id} value={p.id}>{p.friendlyName ?? p.number} — {p.number}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Max Call Duration (sec)</Label>
+                <Input className="mt-1" type="number" min="60" max="600" value={settingsForm.maxCallDuration ?? 300} onChange={e => setSettingsForm(f => ({ ...f, maxCallDuration: parseInt(e.target.value, 10) }))} />
+              </div>
+            </div>
+            <div>
+              <Label>Hot Lead Notification Email</Label>
+              <Input className="mt-1" type="email" value={settingsForm.notificationEmail ?? ""} onChange={e => setSettingsForm(f => ({ ...f, notificationEmail: e.target.value || null }))} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <Button variant="outline" onClick={() => setShowSettings(false)}>Cancel</Button>
+              <Button onClick={() => updateCampaignMutation.mutate(settingsForm)} disabled={updateCampaignMutation.isPending}>
+                {updateCampaignMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

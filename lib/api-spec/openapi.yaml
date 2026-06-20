@@ -23,6 +23,8 @@ tags:
     description: Dashboard stats
   - name: sms
     description: SMS messages
+  - name: campaigns
+    description: Outbound cold calling campaigns
 
 paths:
   /healthz:
@@ -591,6 +593,274 @@ paths:
                   count:
                     type: integer
 
+  /campaigns:
+    get:
+      operationId: listCampaigns
+      tags: [campaigns]
+      summary: List all campaigns
+      responses:
+        "200":
+          description: List of campaigns
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Campaign"
+    post:
+      operationId: createCampaign
+      tags: [campaigns]
+      summary: Create a new campaign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+
+  /campaigns/{id}:
+    get:
+      operationId: getCampaign
+      tags: [campaigns]
+      summary: Get a campaign by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Campaign
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+    patch:
+      operationId: updateCampaign
+      tags: [campaigns]
+      summary: Update a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+    delete:
+      operationId: deleteCampaign
+      tags: [campaigns]
+      summary: Delete a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /campaigns/{id}/contacts:
+    get:
+      operationId: listCampaignContacts
+      tags: [campaigns]
+      summary: List contacts for a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of contacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignContact"
+    post:
+      operationId: addCampaignContact
+      tags: [campaigns]
+      summary: Add a single contact to a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignContactInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignContact"
+
+  /campaigns/{id}/contacts/import:
+    post:
+      operationId: importCampaignContacts
+      tags: [campaigns]
+      summary: Bulk import contacts from pasted text
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignContactBulkImport"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [imported, skipped]
+                properties:
+                  imported:
+                    type: integer
+                  skipped:
+                    type: integer
+
+  /campaigns/{id}/contacts/{contactId}:
+    patch:
+      operationId: updateCampaignContact
+      tags: [campaigns]
+      summary: Update a campaign contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignContactInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignContact"
+    delete:
+      operationId: deleteCampaignContact
+      tags: [campaigns]
+      summary: Delete a campaign contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /campaigns/{id}/start:
+    post:
+      operationId: startCampaign
+      tags: [campaigns]
+      summary: Start or resume dialing a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [queued]
+                properties:
+                  queued:
+                    type: integer
+
+  /campaigns/{id}/pause:
+    post:
+      operationId: pauseCampaign
+      tags: [campaigns]
+      summary: Pause a running campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+
+  /campaigns/{id}/contacts/{contactId}/call:
+    post:
+      operationId: callCampaignContact
+      tags: [campaigns]
+      summary: Manually call a single campaign contact
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+
   /twilio/voice:
     post:
       operationId: twilioVoiceWebhook
@@ -1079,6 +1349,142 @@ components:
           type: integer
         forwardedCalls:
           type: integer
+
+    Campaign:
+      type: object
+      required: [id, name, script, status, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        script:
+          type: string
+        systemPrompt:
+          type: ["string", "null"]
+        fromPhoneNumberId:
+          type: ["integer", "null"]
+        notificationEmail:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [draft, active, paused, completed]
+        maxCallDuration:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        totalContacts:
+          type: ["integer", "null"]
+        pendingContacts:
+          type: ["integer", "null"]
+        completedContacts:
+          type: ["integer", "null"]
+        interestedContacts:
+          type: ["integer", "null"]
+
+    CampaignInput:
+      type: object
+      required: [name, script]
+      properties:
+        name:
+          type: string
+        script:
+          type: string
+        systemPrompt:
+          type: ["string", "null"]
+        fromPhoneNumberId:
+          type: ["integer", "null"]
+        notificationEmail:
+          type: ["string", "null"]
+        maxCallDuration:
+          type: ["integer", "null"]
+
+    CampaignUpdate:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        script:
+          type: ["string", "null"]
+        systemPrompt:
+          type: ["string", "null"]
+        fromPhoneNumberId:
+          type: ["integer", "null"]
+        notificationEmail:
+          type: ["string", "null"]
+        status:
+          type: ["string", "null"]
+        maxCallDuration:
+          type: ["integer", "null"]
+
+    CampaignContact:
+      type: object
+      required: [id, campaignId, name, phone, callStatus, createdAt]
+      properties:
+        id:
+          type: integer
+        campaignId:
+          type: integer
+        name:
+          type: string
+        phone:
+          type: string
+        address:
+          type: ["string", "null"]
+        callStatus:
+          type: string
+          enum: [pending, calling, completed, no_answer, failed]
+        callOutcome:
+          type: ["string", "null"]
+        twilioCallSid:
+          type: ["string", "null"]
+        callSummary:
+          type: ["string", "null"]
+        transcription:
+          type: ["string", "null"]
+        recordingUrl:
+          type: ["string", "null"]
+        recordingSid:
+          type: ["string", "null"]
+        callDuration:
+          type: ["integer", "null"]
+        interestedInSelling:
+          type: ["boolean", "null"]
+        timeline:
+          type: ["string", "null"]
+        askingPrice:
+          type: ["string", "null"]
+        propertyType:
+          type: ["string", "null"]
+        additionalNotes:
+          type: ["string", "null"]
+        attemptCount:
+          type: ["integer", "null"]
+        lastAttemptAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    CampaignContactInput:
+      type: object
+      required: [name, phone]
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        address:
+          type: ["string", "null"]
+
+    CampaignContactBulkImport:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          description: "Raw text: each line is name,phone,address or name|phone|address"
 
     SendSmsBody:
       type: object

@@ -1,0 +1,780 @@
+import { Router, type IRouter } from "express";
+import { eq, and, desc, sql } from "drizzle-orm";
+import {
+  db,
+  campaignsTable,
+  campaignContactsTable,
+  phoneNumbersTable,
+} from "@workspace/db";
+import { logger } from "../lib/logger";
+import twilio from "twilio";
+import OpenAI from "openai";
+import nodemailer from "nodemailer";
+
+const router: IRouter = Router();
+
+// In-memory map: twilioCallSid → campaignContactId (for routing status callbacks)
+export const outboundCampaignCalls = new Map<string, number>();
+
+// In-memory conversation store for outbound campaign calls
+interface OutboundConv {
+  contactId: number;
+  campaignId: number;
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  systemPrompt: string;
+  startedAt: number;
+  maxDuration: number;
+  baseUrl: string;
+  voice: string;
+}
+export const outboundConversations = new Map<string, OutboundConv>();
+
+function getTwilioClient() {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!accountSid || !authToken) throw new Error("Twilio credentials not configured");
+  return twilio(accountSid, authToken);
+}
+
+function getChatOpenAI() {
+  const directKey = process.env.OPENAI_API_KEY;
+  if (directKey) return new OpenAI({ apiKey: directKey });
+  return new OpenAI({
+    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  });
+}
+
+function getEmailTransport(): nodemailer.Transporter | null {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) return null;
+  return nodemailer.createTransport({
+    host,
+    port: parseInt(process.env.SMTP_PORT ?? "587", 10),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user, pass },
+  });
+}
+
+function getBaseUrl(req: any): string {
+  return process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : `${req.protocol}://${req.get("host")}`;
+}
+
+function getPublicDomain(): string | null {
+  if (process.env.REPLIT_DOMAINS) return `https://${process.env.REPLIT_DOMAINS.split(",")[0].trim()}`;
+  if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  return null;
+}
+
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+const FALLBACK_VOICE = "Google.en-US-Neural2-F";
+
+async function extractOutboundSummary(messages: Array<{ role: string; content: string }>): Promise<{
+  callSummary: string | null;
+  interestedInSelling: boolean | null;
+  timeline: string | null;
+  askingPrice: string | null;
+  propertyType: string | null;
+  additionalNotes: string | null;
+  callOutcome: string;
+}> {
+  if (messages.length <= 1) {
+    return { callSummary: null, interestedInSelling: null, timeline: null, askingPrice: null, propertyType: null, additionalNotes: null, callOutcome: "no_answer" };
+  }
+  try {
+    const openai = getChatOpenAI();
+    const transcript = messages.map(m => `${m.role === "user" ? "Owner" : "Agent"}: ${m.content}`).join("\n");
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are analyzing a real estate cold call transcript. Extract the following as JSON only:
+{
+  "callSummary": "2-3 sentence summary of the conversation",
+  "interestedInSelling": true/false/null (null if unknown),
+  "timeline": "when they want to sell (e.g. immediately, 3 months, 1 year) or null",
+  "askingPrice": "what they expect to sell for or null",
+  "propertyType": "house/condo/land/commercial/etc or null",
+  "additionalNotes": "any other useful info or null",
+  "callOutcome": "interested/not_interested/callback_requested/no_answer/hung_up"
+}
+Return JSON only. No explanation.`,
+        },
+        { role: "user", content: `Transcript:\n\n${transcript}` },
+      ],
+      max_tokens: 400,
+      response_format: { type: "json_object" },
+    });
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
+    return {
+      callSummary: parsed.callSummary ?? null,
+      interestedInSelling: parsed.interestedInSelling ?? null,
+      timeline: parsed.timeline ?? null,
+      askingPrice: parsed.askingPrice ?? null,
+      propertyType: parsed.propertyType ?? null,
+      additionalNotes: parsed.additionalNotes ?? null,
+      callOutcome: parsed.callOutcome ?? "completed",
+    };
+  } catch (err: any) {
+    logger.warn({ err: err?.message }, "Failed to extract outbound call summary");
+    return { callSummary: null, interestedInSelling: null, timeline: null, askingPrice: null, propertyType: null, additionalNotes: null, callOutcome: "completed" };
+  }
+}
+
+async function sendHotLeadEmail(contact: any, campaign: any, summary: any, recordingUrl: string | null) {
+  try {
+    const transport = getEmailTransport();
+    if (!transport || !campaign.notificationEmail) return;
+    const from = process.env.SMTP_FROM || process.env.SMTP_USER || "";
+    const publicDomain = getPublicDomain();
+    const recordingLink = recordingUrl && publicDomain
+      ? `${publicDomain}/api/campaigns/${campaign.id}/contacts/${contact.id}/recording`
+      : recordingUrl;
+
+    const html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px">
+  <tr><td align="center">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px">
+      <tr><td style="background:#0f172a;border-radius:10px 10px 0 0;padding:24px 32px">
+        <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#22c55e">Vanguard.OPS — Hot Lead</p>
+        <h1 style="margin:4px 0 0;font-size:22px;font-weight:700;color:#f8fafc">Seller Interested in Listing</h1>
+        <p style="margin:4px 0 0;font-size:13px;color:#94a3b8">Campaign: ${escapeXml(campaign.name)}</p>
+      </td></tr>
+      <tr><td style="background:#1e293b;padding:0 32px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:16px 0;border-right:1px solid #334155;text-align:center;width:50%">
+              <p style="margin:0;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#64748b">Contact</p>
+              <p style="margin:4px 0 0;font-size:16px;font-weight:700;color:#f1f5f9">${escapeXml(contact.name)}</p>
+            </td>
+            <td style="padding:16px 0;text-align:center;width:50%">
+              <p style="margin:0;font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#64748b">Phone</p>
+              <p style="margin:4px 0 0;font-size:16px;font-weight:700;color:#22c55e">${escapeXml(contact.phone)}</p>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+      <tr><td style="background:#ffffff;padding:28px 32px;border-radius:0 0 10px 10px">
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px">
+          ${contact.address ? `<tr><td style="padding:8px 0;border-bottom:1px solid #f1f5f9;width:140px"><p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8">Address</p></td><td style="padding:8px 0;border-bottom:1px solid #f1f5f9"><p style="margin:0;font-size:14px;color:#0f172a">${escapeXml(contact.address)}</p></td></tr>` : ""}
+          ${summary.propertyType ? `<tr><td style="padding:8px 0;border-bottom:1px solid #f1f5f9"><p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8">Property Type</p></td><td style="padding:8px 0;border-bottom:1px solid #f1f5f9"><p style="margin:0;font-size:14px;color:#0f172a">${escapeXml(summary.propertyType)}</p></td></tr>` : ""}
+          ${summary.askingPrice ? `<tr><td style="padding:8px 0;border-bottom:1px solid #f1f5f9"><p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8">Asking Price</p></td><td style="padding:8px 0;border-bottom:1px solid #f1f5f9"><p style="margin:0;font-size:14px;font-weight:700;color:#22c55e">${escapeXml(summary.askingPrice)}</p></td></tr>` : ""}
+          ${summary.timeline ? `<tr><td style="padding:8px 0"><p style="margin:0;font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#94a3b8">Timeline</p></td><td style="padding:8px 0"><p style="margin:0;font-size:14px;color:#0f172a">${escapeXml(summary.timeline)}</p></td></tr>` : ""}
+        </table>
+        ${summary.callSummary ? `<div style="background:#f8f9fa;border-left:3px solid #22c55e;border-radius:0 6px 6px 0;padding:14px 18px;margin:0 0 20px"><p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#22c55e">AI Call Summary</p><p style="margin:0;font-size:14px;line-height:1.6;color:#1a1a1a">${escapeXml(summary.callSummary)}</p>${summary.additionalNotes ? `<p style="margin:10px 0 0;font-size:13px;color:#374151"><strong>Notes:</strong> ${escapeXml(summary.additionalNotes)}</p>` : ""}</div>` : ""}
+        ${recordingLink ? `<div style="margin:0 0 20px;text-align:center"><a href="${recordingLink}" style="display:inline-block;padding:12px 32px;background:#22c55e;color:#fff;font-family:sans-serif;font-size:14px;font-weight:700;text-decoration:none;border-radius:6px">&#9654;&nbsp; Listen to Recording</a></div>` : ""}
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9"><p style="margin:0;font-size:11px;color:#94a3b8">Sent by <strong style="color:#64748b">Vanguard.OPS</strong> — Outbound Campaign</p></div>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
+
+    await transport.sendMail({
+      from,
+      to: campaign.notificationEmail,
+      subject: `Hot Lead — ${contact.name} (${contact.phone}) — Ready to Sell`,
+      html,
+    });
+    logger.info({ contactId: contact.id, campaignId: campaign.id }, "Hot lead email sent");
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "Failed to send hot lead email");
+  }
+}
+
+async function initiateOutboundCall(contact: any, campaign: any, fromNumber: string, baseUrl: string) {
+  const client = getTwilioClient();
+  const callbackUrl = `${baseUrl}/api/twilio/campaign-status`;
+  const voiceUrl = `${baseUrl}/api/twilio/campaign-voice?contactId=${contact.id}&campaignId=${campaign.id}`;
+
+  const call = await client.calls.create({
+    to: contact.phone,
+    from: fromNumber,
+    url: voiceUrl,
+    statusCallback: callbackUrl,
+    statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
+    statusCallbackMethod: "POST",
+    method: "POST",
+    machineDetection: "DetectMessageEnd",
+    asyncAmd: "true",
+    asyncAmdStatusCallback: `${baseUrl}/api/twilio/campaign-amd?contactId=${contact.id}&campaignId=${campaign.id}`,
+    asyncAmdStatusCallbackMethod: "POST",
+  });
+
+  outboundCampaignCalls.set(call.sid, contact.id);
+
+  await db.update(campaignContactsTable).set({
+    callStatus: "calling",
+    twilioCallSid: call.sid,
+    lastAttemptAt: new Date(),
+    attemptCount: (contact.attemptCount ?? 0) + 1,
+  }).where(eq(campaignContactsTable.id, contact.id));
+
+  logger.info({ callSid: call.sid, contactId: contact.id, to: contact.phone }, "Outbound campaign call initiated");
+  return call.sid;
+}
+
+// ─── List campaigns ──────────────────────────────────────────────────────────
+router.get("/campaigns", async (req, res): Promise<void> => {
+  try {
+    const campaigns = await db.select().from(campaignsTable).orderBy(desc(campaignsTable.createdAt));
+    const counts = await db
+      .select({
+        campaignId: campaignContactsTable.campaignId,
+        total: sql<number>`count(*)::int`,
+        pending: sql<number>`count(*) filter (where ${campaignContactsTable.callStatus} = 'pending')::int`,
+        completed: sql<number>`count(*) filter (where ${campaignContactsTable.callStatus} = 'completed')::int`,
+        interested: sql<number>`count(*) filter (where ${campaignContactsTable.interestedInSelling} = true)::int`,
+      })
+      .from(campaignContactsTable)
+      .groupBy(campaignContactsTable.campaignId);
+
+    const countMap = new Map(counts.map(c => [c.campaignId, c]));
+    const result = campaigns.map(c => ({
+      ...c,
+      createdAt: c.createdAt.toISOString(),
+      updatedAt: c.updatedAt.toISOString(),
+      totalContacts: countMap.get(c.id)?.total ?? 0,
+      pendingContacts: countMap.get(c.id)?.pending ?? 0,
+      completedContacts: countMap.get(c.id)?.completed ?? 0,
+      interestedContacts: countMap.get(c.id)?.interested ?? 0,
+    }));
+    res.json(result);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "Failed to list campaigns");
+    res.status(500).json({ error: "Failed to list campaigns" });
+  }
+});
+
+// ─── Create campaign ─────────────────────────────────────────────────────────
+router.post("/campaigns", async (req, res): Promise<void> => {
+  try {
+    const { name, script, systemPrompt, fromPhoneNumberId, notificationEmail, maxCallDuration } = req.body;
+    if (!name || !script) { res.status(400).json({ error: "name and script are required" }); return; }
+    const [campaign] = await db.insert(campaignsTable).values({
+      name, script, systemPrompt: systemPrompt ?? null,
+      fromPhoneNumberId: fromPhoneNumberId ?? null,
+      notificationEmail: notificationEmail ?? null,
+      maxCallDuration: maxCallDuration ?? 300,
+      status: "draft",
+    }).returning();
+    res.status(201).json({ ...campaign, createdAt: campaign.createdAt.toISOString(), updatedAt: campaign.updatedAt.toISOString(), totalContacts: 0, pendingContacts: 0, completedContacts: 0, interestedContacts: 0 });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "Failed to create campaign");
+    res.status(500).json({ error: "Failed to create campaign" });
+  }
+});
+
+// ─── Get campaign ────────────────────────────────────────────────────────────
+router.get("/campaigns/:id", async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const [campaign] = await db.select().from(campaignsTable).where(eq(campaignsTable.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+    const [counts] = await db
+      .select({
+        total: sql<number>`count(*)::int`,
+        pending: sql<number>`count(*) filter (where ${campaignContactsTable.callStatus} = 'pending')::int`,
+        completed: sql<number>`count(*) filter (where ${campaignContactsTable.callStatus} = 'completed')::int`,
+        interested: sql<number>`count(*) filter (where ${campaignContactsTable.interestedInSelling} = true)::int`,
+      })
+      .from(campaignContactsTable)
+      .where(eq(campaignContactsTable.campaignId, id));
+    res.json({ ...campaign, createdAt: campaign.createdAt.toISOString(), updatedAt: campaign.updatedAt.toISOString(), totalContacts: counts?.total ?? 0, pendingContacts: counts?.pending ?? 0, completedContacts: counts?.completed ?? 0, interestedContacts: counts?.interested ?? 0 });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to get campaign" });
+  }
+});
+
+// ─── Update campaign ─────────────────────────────────────────────────────────
+router.patch("/campaigns/:id", async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { name, script, systemPrompt, fromPhoneNumberId, notificationEmail, status, maxCallDuration } = req.body;
+    const updateData: any = {};
+    if (name != null) updateData.name = name;
+    if (script != null) updateData.script = script;
+    if (systemPrompt !== undefined) updateData.systemPrompt = systemPrompt;
+    if (fromPhoneNumberId !== undefined) updateData.fromPhoneNumberId = fromPhoneNumberId;
+    if (notificationEmail !== undefined) updateData.notificationEmail = notificationEmail;
+    if (status != null) updateData.status = status;
+    if (maxCallDuration != null) updateData.maxCallDuration = maxCallDuration;
+    const [campaign] = await db.update(campaignsTable).set(updateData).where(eq(campaignsTable.id, id)).returning();
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+    res.json({ ...campaign, createdAt: campaign.createdAt.toISOString(), updatedAt: campaign.updatedAt.toISOString() });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update campaign" });
+  }
+});
+
+// ─── Delete campaign ─────────────────────────────────────────────────────────
+router.delete("/campaigns/:id", async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    await db.delete(campaignContactsTable).where(eq(campaignContactsTable.campaignId, id));
+    await db.delete(campaignsTable).where(eq(campaignsTable.id, id));
+    res.sendStatus(204);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to delete campaign" });
+  }
+});
+
+// ─── List contacts ───────────────────────────────────────────────────────────
+router.get("/campaigns/:id/contacts", async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const contacts = await db.select().from(campaignContactsTable)
+      .where(eq(campaignContactsTable.campaignId, id))
+      .orderBy(campaignContactsTable.createdAt);
+    res.json(contacts.map(c => ({ ...c, createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString(), lastAttemptAt: c.lastAttemptAt?.toISOString() ?? null })));
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to list contacts" });
+  }
+});
+
+// ─── Add single contact ───────────────────────────────────────────────────────
+router.post("/campaigns/:id/contacts", async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { name, phone, address } = req.body;
+    if (!name || !phone) { res.status(400).json({ error: "name and phone are required" }); return; }
+    const [contact] = await db.insert(campaignContactsTable).values({ campaignId: id, name, phone, address: address ?? null }).returning();
+    res.status(201).json({ ...contact, createdAt: contact.createdAt.toISOString(), updatedAt: contact.updatedAt.toISOString(), lastAttemptAt: null });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to add contact" });
+  }
+});
+
+// ─── Bulk import contacts ─────────────────────────────────────────────────────
+router.post("/campaigns/:id/contacts/import", async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { text } = req.body;
+    if (!text) { res.status(400).json({ error: "text is required" }); return; }
+
+    const lines = text.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+    let imported = 0;
+    let skipped = 0;
+
+    for (const line of lines) {
+      const parts = line.split(/[,|\t]/).map((p: string) => p.trim());
+      const name = parts[0];
+      const phone = parts[1];
+      const address = parts[2] ?? null;
+      if (!name || !phone) { skipped++; continue; }
+      try {
+        await db.insert(campaignContactsTable).values({ campaignId: id, name, phone, address }).onConflictDoNothing();
+        imported++;
+      } catch {
+        skipped++;
+      }
+    }
+    res.json({ imported, skipped });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to import contacts" });
+  }
+});
+
+// ─── Update contact ───────────────────────────────────────────────────────────
+router.patch("/campaigns/:id/contacts/:contactId", async (req, res): Promise<void> => {
+  try {
+    const contactId = parseInt(req.params.contactId, 10);
+    const { name, phone, address } = req.body;
+    const updateData: any = {};
+    if (name != null) updateData.name = name;
+    if (phone != null) updateData.phone = phone;
+    if (address !== undefined) updateData.address = address;
+    const [contact] = await db.update(campaignContactsTable).set(updateData).where(eq(campaignContactsTable.id, contactId)).returning();
+    if (!contact) { res.status(404).json({ error: "Contact not found" }); return; }
+    res.json({ ...contact, createdAt: contact.createdAt.toISOString(), updatedAt: contact.updatedAt.toISOString(), lastAttemptAt: contact.lastAttemptAt?.toISOString() ?? null });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update contact" });
+  }
+});
+
+// ─── Delete contact ───────────────────────────────────────────────────────────
+router.delete("/campaigns/:id/contacts/:contactId", async (req, res): Promise<void> => {
+  try {
+    const contactId = parseInt(req.params.contactId, 10);
+    await db.delete(campaignContactsTable).where(eq(campaignContactsTable.id, contactId));
+    res.sendStatus(204);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to delete contact" });
+  }
+});
+
+// ─── Start campaign ───────────────────────────────────────────────────────────
+router.post("/campaigns/:id/start", async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const [campaign] = await db.select().from(campaignsTable).where(eq(campaignsTable.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+    let fromNumber = "";
+    if (campaign.fromPhoneNumberId) {
+      const [pn] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, campaign.fromPhoneNumberId));
+      fromNumber = pn?.number ?? "";
+    }
+    if (!fromNumber) { res.status(400).json({ error: "No phone number configured for this campaign" }); return; }
+
+    await db.update(campaignsTable).set({ status: "active" }).where(eq(campaignsTable.id, id));
+
+    const pendingContacts = await db.select().from(campaignContactsTable)
+      .where(and(eq(campaignContactsTable.campaignId, id), eq(campaignContactsTable.callStatus, "pending")));
+
+    const baseUrl = getBaseUrl(req);
+    let queued = 0;
+    for (const contact of pendingContacts) {
+      try {
+        await initiateOutboundCall(contact, campaign, fromNumber, baseUrl);
+        queued++;
+        await new Promise(r => setTimeout(r, 1000));
+        const [updated] = await db.select({ status: campaignsTable.status }).from(campaignsTable).where(eq(campaignsTable.id, id));
+        if (updated?.status !== "active") break;
+      } catch (err: any) {
+        logger.error({ err: err?.message, contactId: contact.id }, "Failed to initiate call for contact");
+        await db.update(campaignContactsTable).set({ callStatus: "failed" }).where(eq(campaignContactsTable.id, contact.id));
+      }
+    }
+
+    if (pendingContacts.length === 0 || queued === pendingContacts.length) {
+      await db.update(campaignsTable).set({ status: "completed" }).where(eq(campaignsTable.id, id));
+    }
+
+    res.json({ queued });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "Failed to start campaign");
+    res.status(500).json({ error: "Failed to start campaign" });
+  }
+});
+
+// ─── Pause campaign ───────────────────────────────────────────────────────────
+router.post("/campaigns/:id/pause", async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    await db.update(campaignsTable).set({ status: "paused" }).where(eq(campaignsTable.id, id));
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to pause campaign" });
+  }
+});
+
+// ─── Call single contact manually ────────────────────────────────────────────
+router.post("/campaigns/:id/contacts/:contactId/call", async (req, res): Promise<void> => {
+  try {
+    const campaignId = parseInt(req.params.id, 10);
+    const contactId = parseInt(req.params.contactId, 10);
+    const [campaign] = await db.select().from(campaignsTable).where(eq(campaignsTable.id, campaignId));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+    const [contact] = await db.select().from(campaignContactsTable).where(eq(campaignContactsTable.id, contactId));
+    if (!contact) { res.status(404).json({ error: "Contact not found" }); return; }
+
+    let fromNumber = "";
+    if (campaign.fromPhoneNumberId) {
+      const [pn] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, campaign.fromPhoneNumberId));
+      fromNumber = pn?.number ?? "";
+    }
+    if (!fromNumber) { res.status(400).json({ error: "No phone number configured for this campaign" }); return; }
+
+    const baseUrl = getBaseUrl(req);
+    await initiateOutboundCall(contact, campaign, fromNumber, baseUrl);
+    res.json({ ok: true });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "Failed to manually call contact");
+    res.status(500).json({ error: "Failed to call contact" });
+  }
+});
+
+// ─── Recording proxy for campaign contacts ────────────────────────────────────
+router.get("/campaigns/:id/contacts/:contactId/recording", async (req, res): Promise<void> => {
+  try {
+    const contactId = parseInt(req.params.contactId, 10);
+    const [contact] = await db.select().from(campaignContactsTable).where(eq(campaignContactsTable.id, contactId));
+    if (!contact?.recordingUrl && !contact?.recordingSid) { res.status(404).send("No recording available"); return; }
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    if (!accountSid || !authToken) { res.status(500).send("Twilio not configured"); return; }
+
+    const url = contact.recordingUrl ?? `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${contact.recordingSid}.mp3`;
+    const credentials = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+    const response = await fetch(url, { headers: { Authorization: `Basic ${credentials}` } });
+    if (!response.ok) { res.status(response.status).send("Recording not available"); return; }
+
+    res.set("Content-Type", response.headers.get("Content-Type") || "audio/mpeg");
+    res.set("Cache-Control", "no-store");
+    const buffer = Buffer.from(await response.arrayBuffer());
+    res.send(buffer);
+  } catch (err: any) {
+    res.status(500).send("Failed to fetch recording");
+  }
+});
+
+// ─── Twilio: outbound campaign voice webhook ──────────────────────────────────
+router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
+  const { CallSid, AnsweredBy } = req.body;
+  const { contactId, campaignId } = req.query as Record<string, string>;
+  const baseUrl = getBaseUrl(req);
+  try {
+    const [contact] = await db.select().from(campaignContactsTable).where(eq(campaignContactsTable.id, parseInt(contactId, 10)));
+    const [campaign] = await db.select().from(campaignsTable).where(eq(campaignsTable.id, parseInt(campaignId, 10)));
+
+    if (!contact || !campaign) {
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
+      return;
+    }
+
+    // If AMD detected a machine, leave a message or hang up
+    if (AnsweredBy === "machine_start" || AnsweredBy === "fax") {
+      await db.update(campaignContactsTable).set({ callStatus: "completed", callOutcome: "voicemail" }).where(eq(campaignContactsTable.id, contact.id));
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(campaign.script)}</Say><Hangup/></Response>`);
+      return;
+    }
+
+    outboundCampaignCalls.set(CallSid, contact.id);
+
+    const systemPrompt = campaign.systemPrompt ||
+      `أنت سارة، وكيلة عقارية محترفة من مجموعة The Property Cousins. مهمتك الاتصال بأصحاب المنازل وتحديد ما إذا كانوا مهتمين ببيع عقاراتهم.
+
+اتبع هذه الخطوات:
+1. ابدأ بتقديم نفسك وسبب اتصالك
+2. اسأل عن مدى اهتمامهم ببيع العقار
+3. إذا أبدوا اهتماماً: اسأل عن نوع العقار، السعر المتوقع، والجدول الزمني
+4. اجمع المعلومات بشكل طبيعي ومحادثي
+5. اشكرهم على وقتهم في النهاية
+
+تحدث بالعربية دائماً. كن مهذباً ومحترماً. أجب بجملة أو جملتين فقط في كل مرة.`;
+
+    const greeting = campaign.script;
+
+    outboundConversations.set(CallSid, {
+      contactId: contact.id,
+      campaignId: campaign.id,
+      messages: [{ role: "assistant", content: greeting }],
+      systemPrompt,
+      startedAt: Date.now(),
+      maxDuration: campaign.maxCallDuration ?? 300,
+      baseUrl,
+      voice: "Google.ar-XA-Neural2-C",
+    });
+
+    // Start recording
+    setImmediate(async () => {
+      try {
+        const client = getTwilioClient();
+        const rec = await client.calls(CallSid).recordings.create({
+          recordingStatusCallback: `${baseUrl}/api/twilio/campaign-recording`,
+          recordingStatusCallbackMethod: "POST",
+        });
+        await db.update(campaignContactsTable).set({ recordingSid: rec.sid }).where(eq(campaignContactsTable.id, contact.id));
+      } catch (err: any) {
+        logger.warn({ err: err?.message, CallSid }, "Failed to start campaign call recording");
+      }
+    });
+
+    res.set("Content-Type", "text/xml");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(greeting)}</Say>
+  <Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
+  </Gather>
+  <Say voice="${FALLBACK_VOICE}" language="ar-SA">لم أسمعك. شكراً لك وإلى اللقاء.</Say>
+  <Hangup/>
+</Response>`);
+  } catch (err: any) {
+    logger.error({ err: err?.message, CallSid }, "Error in campaign voice webhook");
+    res.set("Content-Type", "text/xml");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
+  }
+});
+
+// ─── AMD callback ─────────────────────────────────────────────────────────────
+router.post("/twilio/campaign-amd", async (req, res): Promise<void> => {
+  const { CallSid, AnsweredBy } = req.body;
+  const { contactId } = req.query as Record<string, string>;
+  logger.info({ CallSid, AnsweredBy, contactId }, "Campaign AMD callback");
+  if (AnsweredBy === "machine_end_beep" || AnsweredBy === "machine_end_silence") {
+    try {
+      const client = getTwilioClient();
+      await client.calls(CallSid).update({ twiml: `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>` });
+    } catch {}
+  }
+  res.sendStatus(200);
+});
+
+// ─── Twilio: outbound campaign gather (AI response) ───────────────────────────
+router.post("/twilio/campaign-gather", async (req, res): Promise<void> => {
+  const { CallSid, SpeechResult } = req.body;
+  const baseUrl = getBaseUrl(req);
+  try {
+    const conv = outboundConversations.get(CallSid);
+    if (!conv) {
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${FALLBACK_VOICE}" language="ar-SA">شكراً لك. إلى اللقاء.</Say><Hangup/></Response>`);
+      return;
+    }
+
+    const elapsed = (Date.now() - conv.startedAt) / 1000;
+    if (elapsed > conv.maxDuration) {
+      outboundConversations.delete(CallSid);
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${FALLBACK_VOICE}" language="ar-SA">شكراً لوقتك. إلى اللقاء.</Say><Hangup/></Response>`);
+      return;
+    }
+
+    if (!SpeechResult) {
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="${FALLBACK_VOICE}" language="ar-SA">عذراً، لم أسمعك. هل يمكنك الإعادة؟</Say>
+  <Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
+  </Gather>
+  <Hangup/>
+</Response>`);
+      return;
+    }
+
+    conv.messages.push({ role: "user", content: SpeechResult });
+
+    const openai = getChatOpenAI();
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: conv.systemPrompt + "\n\nأنت على مكالمة هاتفية مباشرة. أجب بجملة أو جملتين كحد أقصى. تحدث بالعربية فقط. لا تستخدم علامات الترقيم المعقدة. إذا أبدى صاحب العقار اهتماماً بالبيع، اجمع المعلومات التالية: نوع العقار، السعر المتوقع، والجدول الزمني." },
+        ...conv.messages,
+      ],
+      max_tokens: 120,
+    });
+
+    const aiText = completion.choices[0]?.message?.content ?? "شكراً لك.";
+    conv.messages.push({ role: "assistant", content: aiText });
+
+    const endPhrases = ["إلى اللقاء", "وداعاً", "مع السلامة", "شكراً لك", "شكراً جزيلاً"];
+    const wantsToEnd = endPhrases.some(p => aiText.includes(p)) && conv.messages.length > 6;
+
+    if (wantsToEnd) {
+      outboundConversations.delete(CallSid);
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(aiText)}</Say>
+  <Hangup/>
+</Response>`);
+      return;
+    }
+
+    res.set("Content-Type", "text/xml");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(aiText)}</Say>
+  <Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
+  </Gather>
+  <Say voice="${FALLBACK_VOICE}" language="ar-SA">شكراً لك. إلى اللقاء.</Say>
+  <Hangup/>
+</Response>`);
+  } catch (err: any) {
+    logger.error({ err: err?.message, CallSid }, "Error in campaign gather");
+    res.set("Content-Type", "text/xml");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${FALLBACK_VOICE}" language="ar-SA">عذراً، حدث خطأ تقني. شكراً لك.</Say><Hangup/></Response>`);
+  }
+});
+
+// ─── Twilio: campaign call status callback ────────────────────────────────────
+router.post("/twilio/campaign-status", async (req, res): Promise<void> => {
+  const { CallSid, CallStatus, CallDuration } = req.body;
+  try {
+    const contactId = outboundCampaignCalls.get(CallSid);
+    if (!contactId) { res.sendStatus(200); return; }
+
+    const isTerminal = ["completed", "failed", "busy", "no-answer", "canceled"].includes(CallStatus);
+
+    if (CallStatus === "no-answer" || CallStatus === "busy") {
+      await db.update(campaignContactsTable).set({ callStatus: "no_answer", callDuration: 0 }).where(eq(campaignContactsTable.id, contactId));
+      outboundCampaignCalls.delete(CallSid);
+      outboundConversations.delete(CallSid);
+      res.sendStatus(200);
+      return;
+    }
+
+    if (CallStatus === "failed" || CallStatus === "canceled") {
+      await db.update(campaignContactsTable).set({ callStatus: "failed" }).where(eq(campaignContactsTable.id, contactId));
+      outboundCampaignCalls.delete(CallSid);
+      outboundConversations.delete(CallSid);
+      res.sendStatus(200);
+      return;
+    }
+
+    if (isTerminal) {
+      const conv = outboundConversations.get(CallSid);
+      const duration = CallDuration ? parseInt(CallDuration, 10) : 0;
+
+      const [contact] = await db.select().from(campaignContactsTable).where(eq(campaignContactsTable.id, contactId));
+      const [campaign] = contact ? await db.select().from(campaignsTable).where(eq(campaignsTable.id, contact.campaignId)) : [];
+
+      const summary = conv ? await extractOutboundSummary(conv.messages) : null;
+
+      await db.update(campaignContactsTable).set({
+        callStatus: "completed",
+        callDuration: duration,
+        callSummary: summary?.callSummary ?? null,
+        transcription: conv ? conv.messages.map(m => `${m.role === "user" ? "Owner" : "AI"}: ${m.content}`).join("\n\n") : null,
+        interestedInSelling: summary?.interestedInSelling ?? null,
+        timeline: summary?.timeline ?? null,
+        askingPrice: summary?.askingPrice ?? null,
+        propertyType: summary?.propertyType ?? null,
+        additionalNotes: summary?.additionalNotes ?? null,
+        callOutcome: summary?.callOutcome ?? "completed",
+      }).where(eq(campaignContactsTable.id, contactId));
+
+      outboundCampaignCalls.delete(CallSid);
+      outboundConversations.delete(CallSid);
+
+      // Send hot lead email if interested
+      if (summary?.interestedInSelling && contact && campaign) {
+        setImmediate(() => { sendHotLeadEmail(contact, campaign, summary, contact.recordingUrl).catch(() => {}); });
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (err: any) {
+    logger.error({ err: err?.message, CallSid }, "Error in campaign status callback");
+    if (!res.headersSent) res.sendStatus(200);
+  }
+});
+
+// ─── Twilio: campaign recording callback ─────────────────────────────────────
+router.post("/twilio/campaign-recording", async (req, res): Promise<void> => {
+  const { CallSid, RecordingUrl, RecordingSid } = req.body;
+  try {
+    const contactId = outboundCampaignCalls.get(CallSid);
+    if (contactId && (RecordingUrl || RecordingSid)) {
+      await db.update(campaignContactsTable).set({
+        recordingUrl: RecordingUrl ? `${RecordingUrl}.mp3` : undefined,
+        recordingSid: RecordingSid ?? undefined,
+      }).where(eq(campaignContactsTable.id, contactId));
+    }
+    res.sendStatus(200);
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "Error in campaign recording callback");
+    if (!res.headersSent) res.sendStatus(200);
+  }
+});
+
+export default router;

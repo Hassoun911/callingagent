@@ -610,3 +610,247 @@ export const GetSmsUnreadCountResponse = zod.object({
 })
 
 
+/**
+ * @summary List all campaigns
+ */
+export const ListCampaignsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "script": zod.string(),
+  "systemPrompt": zod.string().nullish(),
+  "fromPhoneNumberId": zod.number().nullish(),
+  "notificationEmail": zod.string().nullish(),
+  "status": zod.enum(['draft', 'active', 'paused', 'completed']),
+  "maxCallDuration": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional(),
+  "totalContacts": zod.number().nullish(),
+  "pendingContacts": zod.number().nullish(),
+  "completedContacts": zod.number().nullish(),
+  "interestedContacts": zod.number().nullish()
+})
+export const ListCampaignsResponse = zod.array(ListCampaignsResponseItem)
+
+
+/**
+ * @summary Create a new campaign
+ */
+export const CreateCampaignBody = zod.object({
+  "name": zod.string(),
+  "script": zod.string(),
+  "systemPrompt": zod.string().nullish(),
+  "fromPhoneNumberId": zod.number().nullish(),
+  "notificationEmail": zod.string().nullish(),
+  "maxCallDuration": zod.number().nullish()
+})
+
+
+/**
+ * @summary Get a campaign by ID
+ */
+export const GetCampaignParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetCampaignResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "script": zod.string(),
+  "systemPrompt": zod.string().nullish(),
+  "fromPhoneNumberId": zod.number().nullish(),
+  "notificationEmail": zod.string().nullish(),
+  "status": zod.enum(['draft', 'active', 'paused', 'completed']),
+  "maxCallDuration": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional(),
+  "totalContacts": zod.number().nullish(),
+  "pendingContacts": zod.number().nullish(),
+  "completedContacts": zod.number().nullish(),
+  "interestedContacts": zod.number().nullish()
+})
+
+
+/**
+ * @summary Update a campaign
+ */
+export const UpdateCampaignParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateCampaignBody = zod.object({
+  "name": zod.string().nullish(),
+  "script": zod.string().nullish(),
+  "systemPrompt": zod.string().nullish(),
+  "fromPhoneNumberId": zod.number().nullish(),
+  "notificationEmail": zod.string().nullish(),
+  "status": zod.string().nullish(),
+  "maxCallDuration": zod.number().nullish()
+})
+
+export const UpdateCampaignResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "script": zod.string(),
+  "systemPrompt": zod.string().nullish(),
+  "fromPhoneNumberId": zod.number().nullish(),
+  "notificationEmail": zod.string().nullish(),
+  "status": zod.enum(['draft', 'active', 'paused', 'completed']),
+  "maxCallDuration": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional(),
+  "totalContacts": zod.number().nullish(),
+  "pendingContacts": zod.number().nullish(),
+  "completedContacts": zod.number().nullish(),
+  "interestedContacts": zod.number().nullish()
+})
+
+
+/**
+ * @summary Delete a campaign
+ */
+export const DeleteCampaignParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary List contacts for a campaign
+ */
+export const ListCampaignContactsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListCampaignContactsResponseItem = zod.object({
+  "id": zod.number(),
+  "campaignId": zod.number(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string().nullish(),
+  "callStatus": zod.enum(['pending', 'calling', 'completed', 'no_answer', 'failed']),
+  "callOutcome": zod.string().nullish(),
+  "twilioCallSid": zod.string().nullish(),
+  "callSummary": zod.string().nullish(),
+  "transcription": zod.string().nullish(),
+  "recordingUrl": zod.string().nullish(),
+  "recordingSid": zod.string().nullish(),
+  "callDuration": zod.number().nullish(),
+  "interestedInSelling": zod.boolean().nullish(),
+  "timeline": zod.string().nullish(),
+  "askingPrice": zod.string().nullish(),
+  "propertyType": zod.string().nullish(),
+  "additionalNotes": zod.string().nullish(),
+  "attemptCount": zod.number().nullish(),
+  "lastAttemptAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListCampaignContactsResponse = zod.array(ListCampaignContactsResponseItem)
+
+
+/**
+ * @summary Add a single contact to a campaign
+ */
+export const AddCampaignContactParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AddCampaignContactBody = zod.object({
+  "name": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string().nullish()
+})
+
+
+/**
+ * @summary Bulk import contacts from pasted text
+ */
+export const ImportCampaignContactsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ImportCampaignContactsBody = zod.object({
+  "text": zod.string().describe('Raw text: each line is name,phone,address or name|phone|address')
+})
+
+export const ImportCampaignContactsResponse = zod.object({
+  "imported": zod.number(),
+  "skipped": zod.number()
+})
+
+
+/**
+ * @summary Update a campaign contact
+ */
+export const UpdateCampaignContactParams = zod.object({
+  "id": zod.coerce.number(),
+  "contactId": zod.coerce.number()
+})
+
+export const UpdateCampaignContactBody = zod.object({
+  "name": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string().nullish()
+})
+
+export const UpdateCampaignContactResponse = zod.object({
+  "id": zod.number(),
+  "campaignId": zod.number(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "address": zod.string().nullish(),
+  "callStatus": zod.enum(['pending', 'calling', 'completed', 'no_answer', 'failed']),
+  "callOutcome": zod.string().nullish(),
+  "twilioCallSid": zod.string().nullish(),
+  "callSummary": zod.string().nullish(),
+  "transcription": zod.string().nullish(),
+  "recordingUrl": zod.string().nullish(),
+  "recordingSid": zod.string().nullish(),
+  "callDuration": zod.number().nullish(),
+  "interestedInSelling": zod.boolean().nullish(),
+  "timeline": zod.string().nullish(),
+  "askingPrice": zod.string().nullish(),
+  "propertyType": zod.string().nullish(),
+  "additionalNotes": zod.string().nullish(),
+  "attemptCount": zod.number().nullish(),
+  "lastAttemptAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a campaign contact
+ */
+export const DeleteCampaignContactParams = zod.object({
+  "id": zod.coerce.number(),
+  "contactId": zod.coerce.number()
+})
+
+
+/**
+ * @summary Start or resume dialing a campaign
+ */
+export const StartCampaignParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const StartCampaignResponse = zod.object({
+  "queued": zod.number()
+})
+
+
+/**
+ * @summary Pause a running campaign
+ */
+export const PauseCampaignParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Manually call a single campaign contact
+ */
+export const CallCampaignContactParams = zod.object({
+  "id": zod.coerce.number(),
+  "contactId": zod.coerce.number()
+})
+
+

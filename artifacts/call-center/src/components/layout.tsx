@@ -10,6 +10,7 @@ import {
   Bell,
   CreditCard,
   MessageSquare,
+  Target,
 } from "lucide-react";
 import { useWatches } from "@/hooks/use-watches";
 
@@ -39,6 +40,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/contacts", label: "Contacts", icon: Users },
     { href: "/companies", label: "Companies", icon: Building2 },
     { href: "/settings", label: "AI Settings", icon: Settings },
+    { href: "/campaigns", label: "Campaigns", icon: Target },
     { href: "/billing", label: "Billing", icon: CreditCard },
   ];
 

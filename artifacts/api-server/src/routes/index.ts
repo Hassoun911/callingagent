@@ -10,6 +10,7 @@ import costsRouter from "./costs";
 import twilioWebhooksRouter from "./twilio-webhooks";
 import watchesRouter from "./watches";
 import smsRouter from "./sms";
+import campaignsRouter from "./campaigns";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(costsRouter);
 router.use(twilioWebhooksRouter);
 router.use(watchesRouter);
 router.use(smsRouter);
+router.use(campaignsRouter);
 
 export default router;

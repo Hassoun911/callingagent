@@ -552,6 +552,133 @@ export interface DashboardStats {
   forwardedCalls: number;
 }
 
+export type CampaignStatus = typeof CampaignStatus[keyof typeof CampaignStatus];
+
+
+export const CampaignStatus = {
+  draft: 'draft',
+  active: 'active',
+  paused: 'paused',
+  completed: 'completed',
+} as const;
+
+export interface Campaign {
+  id: number;
+  name: string;
+  script: string;
+  /** @nullable */
+  systemPrompt?: string | null;
+  /** @nullable */
+  fromPhoneNumberId?: number | null;
+  /** @nullable */
+  notificationEmail?: string | null;
+  status: CampaignStatus;
+  /** @nullable */
+  maxCallDuration?: number | null;
+  createdAt: string;
+  updatedAt?: string;
+  /** @nullable */
+  totalContacts?: number | null;
+  /** @nullable */
+  pendingContacts?: number | null;
+  /** @nullable */
+  completedContacts?: number | null;
+  /** @nullable */
+  interestedContacts?: number | null;
+}
+
+export interface CampaignInput {
+  name: string;
+  script: string;
+  /** @nullable */
+  systemPrompt?: string | null;
+  /** @nullable */
+  fromPhoneNumberId?: number | null;
+  /** @nullable */
+  notificationEmail?: string | null;
+  /** @nullable */
+  maxCallDuration?: number | null;
+}
+
+export interface CampaignUpdate {
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  script?: string | null;
+  /** @nullable */
+  systemPrompt?: string | null;
+  /** @nullable */
+  fromPhoneNumberId?: number | null;
+  /** @nullable */
+  notificationEmail?: string | null;
+  /** @nullable */
+  status?: string | null;
+  /** @nullable */
+  maxCallDuration?: number | null;
+}
+
+export type CampaignContactCallStatus = typeof CampaignContactCallStatus[keyof typeof CampaignContactCallStatus];
+
+
+export const CampaignContactCallStatus = {
+  pending: 'pending',
+  calling: 'calling',
+  completed: 'completed',
+  no_answer: 'no_answer',
+  failed: 'failed',
+} as const;
+
+export interface CampaignContact {
+  id: number;
+  campaignId: number;
+  name: string;
+  phone: string;
+  /** @nullable */
+  address?: string | null;
+  callStatus: CampaignContactCallStatus;
+  /** @nullable */
+  callOutcome?: string | null;
+  /** @nullable */
+  twilioCallSid?: string | null;
+  /** @nullable */
+  callSummary?: string | null;
+  /** @nullable */
+  transcription?: string | null;
+  /** @nullable */
+  recordingUrl?: string | null;
+  /** @nullable */
+  recordingSid?: string | null;
+  /** @nullable */
+  callDuration?: number | null;
+  /** @nullable */
+  interestedInSelling?: boolean | null;
+  /** @nullable */
+  timeline?: string | null;
+  /** @nullable */
+  askingPrice?: string | null;
+  /** @nullable */
+  propertyType?: string | null;
+  /** @nullable */
+  additionalNotes?: string | null;
+  /** @nullable */
+  attemptCount?: number | null;
+  /** @nullable */
+  lastAttemptAt?: string | null;
+  createdAt: string;
+}
+
+export interface CampaignContactInput {
+  name: string;
+  phone: string;
+  /** @nullable */
+  address?: string | null;
+}
+
+export interface CampaignContactBulkImport {
+  /** Raw text: each line is name,phone,address or name|phone|address */
+  text: string;
+}
+
 export interface SendSmsBody {
   /** Your Twilio number (E.164) */
   from: string;
@@ -659,5 +786,14 @@ offset?: number;
 
 export type GetSmsUnreadCount200 = {
   count: number;
+};
+
+export type ImportCampaignContacts200 = {
+  imported: number;
+  skipped: number;
+};
+
+export type StartCampaign200 = {
+  queued: number;
 };
 
