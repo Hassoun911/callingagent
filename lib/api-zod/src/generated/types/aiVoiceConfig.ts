@@ -5,6 +5,7 @@
  * Call Center API
  * OpenAPI spec version: 0.1.0
  */
+import type { AiVoiceConfigCampaignVoiceEngine } from './aiVoiceConfigCampaignVoiceEngine';
 import type { AiVoiceConfigLanguage } from './aiVoiceConfigLanguage';
 import type { AiVoiceConfigVoice } from './aiVoiceConfigVoice';
 
@@ -21,4 +22,8 @@ export interface AiVoiceConfig {
   maxTokens?: number;
   /** Speaking style instructions passed to the TTS model for a more human sound */
   voiceStyle?: string;
+  /** TTS engine used for outbound campaign calls */
+  campaignVoiceEngine?: AiVoiceConfigCampaignVoiceEngine;
+  /** ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs */
+  elevenLabsVoiceId?: string | null;
 }

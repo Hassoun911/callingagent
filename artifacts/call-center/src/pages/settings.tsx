@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Bot, Save, Mic2, Globe, Eye, EyeOff, Zap } from "lucide-react";
+import { Bot, Save, Mic2, Globe, Eye, EyeOff, Zap, Waves } from "lucide-react";
 
 const VOICES = [
   { id: "coral",   name: "Coral",   gender: "Female", desc: "Natural, warm — best for calls" },
@@ -78,6 +78,8 @@ export default function Settings() {
     maxCallDuration: 300,
     speechTimeout: 1.0,
     maxTokens: 100,
+    campaignVoiceEngine: "google",
+    elevenLabsVoiceId: "",
   });
   const initRef = useRef(false);
 
@@ -92,6 +94,8 @@ export default function Settings() {
         maxCallDuration: config.maxCallDuration,
         speechTimeout: config.speechTimeout ?? 1.0,
         maxTokens: config.maxTokens ?? 100,
+        campaignVoiceEngine: (config as any).campaignVoiceEngine ?? "google",
+        elevenLabsVoiceId: (config as any).elevenLabsVoiceId ?? "",
       });
       initRef.current = true;
     }
@@ -386,6 +390,71 @@ export default function Settings() {
               Maximum length of each AI response. Shorter responses generate faster and keep the conversation moving. Longer responses allow more complete answers.
             </p>
           </div>
+
+        </CardContent>
+      </Card>
+
+      <Card className="border-border">
+        <CardHeader>
+          <div className="flex items-center gap-2 text-primary mb-2">
+            <Waves className="h-5 w-5" />
+            <CardTitle>Campaign Voice Engine</CardTitle>
+          </div>
+          <CardDescription>Choose the TTS engine used for outbound campaign calls. ElevenLabs produces more natural, human-sounding Arabic speech.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, campaignVoiceEngine: "google" })}
+              className={`relative flex flex-col gap-1 rounded-lg border p-4 text-left transition-colors ${
+                formData.campaignVoiceEngine === "google"
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-border/80 hover:bg-muted/30"
+              }`}
+            >
+              {formData.campaignVoiceEngine === "google" && (
+                <span className="absolute top-3 right-3 h-2 w-2 rounded-full bg-primary" />
+              )}
+              <span className="font-semibold text-sm text-foreground">Google Neural2</span>
+              <span className="text-xs text-muted-foreground">Arabic Neural2-C — current engine, no extra API key required.</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, campaignVoiceEngine: "elevenlabs" })}
+              className={`relative flex flex-col gap-1 rounded-lg border p-4 text-left transition-colors ${
+                formData.campaignVoiceEngine === "elevenlabs"
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-border/80 hover:bg-muted/30"
+              }`}
+            >
+              {formData.campaignVoiceEngine === "elevenlabs" && (
+                <span className="absolute top-3 right-3 h-2 w-2 rounded-full bg-primary" />
+              )}
+              <span className="font-semibold text-sm text-foreground">ElevenLabs</span>
+              <span className="text-xs text-muted-foreground">Multilingual v2 — more natural Arabic voice. Requires API key + Voice ID.</span>
+            </button>
+          </div>
+
+          {formData.campaignVoiceEngine === "elevenlabs" && (
+            <div className="space-y-4 pt-2 border-t border-border">
+              <div className="space-y-2">
+                <Label className="text-green-400">ElevenLabs Voice ID</Label>
+                <Input
+                  value={formData.elevenLabsVoiceId ?? ""}
+                  onChange={e => setFormData({ ...formData, elevenLabsVoiceId: e.target.value })}
+                  className="bg-background font-mono text-sm"
+                  placeholder="e.g. EXAVITQu4vr4xnSDxMaL"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Find your Voice ID in the ElevenLabs dashboard under Voices. Use a multilingual v2-compatible voice for best Arabic quality.
+                  The <span className="font-mono text-foreground">ELEVENLABS_API_KEY</span> secret must also be set in your environment.
+                </p>
+              </div>
+            </div>
+          )}
 
         </CardContent>
       </Card>

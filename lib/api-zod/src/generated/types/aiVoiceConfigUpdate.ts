@@ -5,6 +5,7 @@
  * Call Center API
  * OpenAPI spec version: 0.1.0
  */
+import type { AiVoiceConfigUpdateCampaignVoiceEngine } from './aiVoiceConfigUpdateCampaignVoiceEngine';
 import type { AiVoiceConfigUpdateLanguage } from './aiVoiceConfigUpdateLanguage';
 import type { AiVoiceConfigUpdateVoice } from './aiVoiceConfigUpdateVoice';
 
@@ -25,4 +26,8 @@ export interface AiVoiceConfigUpdate {
   maxTokens?: number | null;
   /** @nullable */
   voiceStyle?: string | null;
+  /** @nullable */
+  campaignVoiceEngine?: AiVoiceConfigUpdateCampaignVoiceEngine;
+  /** @nullable */
+  elevenLabsVoiceId?: string | null;
 }

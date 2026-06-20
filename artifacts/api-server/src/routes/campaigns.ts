@@ -5,11 +5,13 @@ import {
   campaignsTable,
   campaignContactsTable,
   phoneNumbersTable,
+  aiVoiceConfigTable,
 } from "@workspace/db";
 import { logger } from "../lib/logger";
 import twilio from "twilio";
 import OpenAI from "openai";
 import nodemailer from "nodemailer";
+import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
 
@@ -26,6 +28,8 @@ interface OutboundConv {
   maxDuration: number;
   baseUrl: string;
   voice: string;
+  voiceEngine: "google" | "elevenlabs";
+  elevenLabsVoiceId: string | null;
 }
 export const outboundConversations = new Map<string, OutboundConv>();
 
@@ -80,6 +84,53 @@ function escapeXml(text: string): string {
 }
 
 const FALLBACK_VOICE = "Google.ar-XA-Neural2-C";
+
+// ─── ElevenLabs TTS cache ─────────────────────────────────────────────────────
+const elevenLabsTtsCache = new Map<string, { buffer: Buffer; expiresAt: number }>();
+
+// Prune expired entries on a 5-minute interval
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of elevenLabsTtsCache) {
+    if (v.expiresAt < now) elevenLabsTtsCache.delete(k);
+  }
+}, 5 * 60 * 1000);
+
+async function synthesizeElevenLabs(text: string, voiceId: string): Promise<Buffer> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error("ELEVENLABS_API_KEY not configured");
+  const resp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      model_id: "eleven_multilingual_v2",
+      voice_settings: { stability: 0.5, similarity_boost: 0.8 },
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text();
+    throw new Error(`ElevenLabs TTS error ${resp.status}: ${errText}`);
+  }
+  return Buffer.from(await resp.arrayBuffer());
+}
+
+async function renderSpeech(
+  text: string,
+  opts: { voiceEngine: string; elevenLabsVoiceId: string | null; baseUrl: string }
+): Promise<string> {
+  if (opts.voiceEngine === "elevenlabs" && opts.elevenLabsVoiceId) {
+    try {
+      const key = randomUUID();
+      const buf = await synthesizeElevenLabs(text, opts.elevenLabsVoiceId);
+      elevenLabsTtsCache.set(key, { buffer: buf, expiresAt: Date.now() + 120_000 });
+      return `<Play>${opts.baseUrl}/api/twilio/campaign-tts/${key}</Play>`;
+    } catch (err: any) {
+      logger.warn({ err: err?.message }, "ElevenLabs TTS failed, falling back to Google Neural2");
+    }
+  }
+  return `<Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(text)}</Say>`;
+}
 
 async function extractOutboundSummary(messages: Array<{ role: string; content: string }>): Promise<{
   callSummary: string | null;
@@ -541,6 +592,11 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
       return;
     }
 
+    // Fetch voice engine config (non-fatal if missing)
+    const [voiceConfig] = await db.select().from(aiVoiceConfigTable);
+    const voiceEngine = (voiceConfig?.campaignVoiceEngine ?? "google") as "google" | "elevenlabs";
+    const elevenLabsVoiceId = voiceConfig?.elevenLabsVoiceId ?? null;
+
     // If AMD detected a machine, leave a message or hang up
     if (AnsweredBy === "machine_start" || AnsweredBy === "fax") {
       await db.update(campaignContactsTable).set({ callStatus: "completed", callOutcome: "voicemail" }).where(eq(campaignContactsTable.id, contact.id));
@@ -599,6 +655,7 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
         logger.warn({ err: err?.message }, "Failed to generate AI opening, using fallback");
       }
 
+      const engineOpts = { voiceEngine, elevenLabsVoiceId, baseUrl };
       outboundConversations.set(CallSid, {
         contactId: contact.id,
         campaignId: campaign.id,
@@ -608,12 +665,15 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
         maxDuration: campaign.maxCallDuration ?? 300,
         baseUrl,
         voice: "Google.ar-XA-Neural2-C",
+        voiceEngine,
+        elevenLabsVoiceId,
       });
 
+      const greetingBlock = await renderSpeech(aiGreeting, engineOpts);
       res.set("Content-Type", "text/xml");
       res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(aiGreeting)}</Say>
+  ${greetingBlock}
   <Gather input="speech" timeout="10" speechTimeout="auto" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
   </Gather>
   <Say voice="${FALLBACK_VOICE}" language="ar-SA">لم أسمعك. شكراً لك وإلى اللقاء.</Say>
@@ -622,6 +682,7 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
     } else {
       // Script mode: read the script verbatim as opening, then qualify with default AI prompt
       const greeting = campaign.script;
+      const engineOpts = { voiceEngine, elevenLabsVoiceId, baseUrl };
 
       outboundConversations.set(CallSid, {
         contactId: contact.id,
@@ -632,12 +693,15 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
         maxDuration: campaign.maxCallDuration ?? 300,
         baseUrl,
         voice: "Google.ar-XA-Neural2-C",
+        voiceEngine,
+        elevenLabsVoiceId,
       });
 
+      const greetingBlock = await renderSpeech(greeting, engineOpts);
       res.set("Content-Type", "text/xml");
       res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(greeting)}</Say>
+  ${greetingBlock}
   <Gather input="speech" timeout="10" speechTimeout="auto" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
   </Gather>
   <Say voice="${FALLBACK_VOICE}" language="ar-SA">لم أسمعك. شكراً لك وإلى اللقاء.</Say>
@@ -649,6 +713,19 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
   }
+});
+
+// ─── ElevenLabs TTS audio serve endpoint ─────────────────────────────────────
+router.get("/twilio/campaign-tts/:key", (req, res): void => {
+  const entry = elevenLabsTtsCache.get(req.params.key);
+  if (!entry || entry.expiresAt < Date.now()) {
+    res.status(404).send("Not found or expired");
+    return;
+  }
+  res.set("Content-Type", "audio/mpeg");
+  res.set("Content-Length", String(entry.buffer.length));
+  res.set("Cache-Control", "no-store");
+  res.send(entry.buffer);
 });
 
 // ─── AMD callback ─────────────────────────────────────────────────────────────
@@ -712,24 +789,27 @@ router.post("/twilio/campaign-gather", async (req, res): Promise<void> => {
     const aiText = completion.choices[0]?.message?.content ?? "شكراً لك.";
     conv.messages.push({ role: "assistant", content: aiText });
 
+    const engineOpts = { voiceEngine: conv.voiceEngine, elevenLabsVoiceId: conv.elevenLabsVoiceId, baseUrl };
     const endPhrases = ["إلى اللقاء", "وداعاً", "مع السلامة", "شكراً لك", "شكراً جزيلاً"];
     const wantsToEnd = endPhrases.some(p => aiText.includes(p)) && conv.messages.length > 6;
 
     if (wantsToEnd) {
       outboundConversations.delete(CallSid);
+      const speechBlock = await renderSpeech(aiText, engineOpts);
       res.set("Content-Type", "text/xml");
       res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(aiText)}</Say>
+  ${speechBlock}
   <Hangup/>
 </Response>`);
       return;
     }
 
+    const speechBlock = await renderSpeech(aiText, engineOpts);
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(aiText)}</Say>
+  ${speechBlock}
   <Gather input="speech" timeout="10" speechTimeout="auto" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
   </Gather>
   <Say voice="${FALLBACK_VOICE}" language="ar-SA">شكراً لك. إلى اللقاء.</Say>

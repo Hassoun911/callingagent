@@ -461,7 +461,9 @@ export const GetAiVoiceConfigResponse = zod.object({
   "maxCallDuration": zod.number().optional(),
   "speechTimeout": zod.number().optional().describe('Seconds of silence after caller stops speaking before processing (0.5–3)'),
   "maxTokens": zod.number().optional().describe('Max tokens per AI response — lower is faster and more concise'),
-  "voiceStyle": zod.string().optional().describe('Speaking style instructions passed to the TTS model for a more human sound')
+  "voiceStyle": zod.string().optional().describe('Speaking style instructions passed to the TTS model for a more human sound'),
+  "campaignVoiceEngine": zod.enum(['google', 'elevenlabs']).optional().describe('TTS engine used for outbound campaign calls'),
+  "elevenLabsVoiceId": zod.string().nullish().describe('ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs')
 })
 
 
@@ -473,7 +475,9 @@ export const UpdateAiVoiceConfigBody = zod.object({
   "maxCallDuration": zod.number().nullish(),
   "speechTimeout": zod.number().nullish(),
   "maxTokens": zod.number().nullish(),
-  "voiceStyle": zod.string().nullish()
+  "voiceStyle": zod.string().nullish(),
+  "campaignVoiceEngine": zod.union([zod.literal('google'),zod.literal('elevenlabs'),zod.literal(null)]).nullish(),
+  "elevenLabsVoiceId": zod.string().nullish()
 })
 
 export const UpdateAiVoiceConfigResponse = zod.object({
@@ -485,7 +489,9 @@ export const UpdateAiVoiceConfigResponse = zod.object({
   "maxCallDuration": zod.number().optional(),
   "speechTimeout": zod.number().optional().describe('Seconds of silence after caller stops speaking before processing (0.5–3)'),
   "maxTokens": zod.number().optional().describe('Max tokens per AI response — lower is faster and more concise'),
-  "voiceStyle": zod.string().optional().describe('Speaking style instructions passed to the TTS model for a more human sound')
+  "voiceStyle": zod.string().optional().describe('Speaking style instructions passed to the TTS model for a more human sound'),
+  "campaignVoiceEngine": zod.enum(['google', 'elevenlabs']).optional().describe('TTS engine used for outbound campaign calls'),
+  "elevenLabsVoiceId": zod.string().nullish().describe('ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs')
 })
 
 

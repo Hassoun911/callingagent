@@ -7,8 +7,10 @@
  */
 
 export * from './aiVoiceConfig';
+export * from './aiVoiceConfigCampaignVoiceEngine';
 export * from './aiVoiceConfigLanguage';
 export * from './aiVoiceConfigUpdate';
+export * from './aiVoiceConfigUpdateCampaignVoiceEngine';
 export * from './aiVoiceConfigUpdateLanguage';
 export * from './aiVoiceConfigUpdateVoice';
 export * from './aiVoiceConfigVoice';

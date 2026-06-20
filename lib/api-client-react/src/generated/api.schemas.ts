@@ -471,6 +471,17 @@ export const AiVoiceConfigLanguage = {
   'ar-LB': 'ar-LB',
 } as const;
 
+/**
+ * TTS engine used for outbound campaign calls
+ */
+export type AiVoiceConfigCampaignVoiceEngine = typeof AiVoiceConfigCampaignVoiceEngine[keyof typeof AiVoiceConfigCampaignVoiceEngine];
+
+
+export const AiVoiceConfigCampaignVoiceEngine = {
+  google: 'google',
+  elevenlabs: 'elevenlabs',
+} as const;
+
 export interface AiVoiceConfig {
   id: number;
   voice: AiVoiceConfigVoice;
@@ -484,6 +495,10 @@ export interface AiVoiceConfig {
   maxTokens?: number;
   /** Speaking style instructions passed to the TTS model for a more human sound */
   voiceStyle?: string;
+  /** TTS engine used for outbound campaign calls */
+  campaignVoiceEngine?: AiVoiceConfigCampaignVoiceEngine;
+  /** ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs */
+  elevenLabsVoiceId?: string | null;
 }
 
 /**
@@ -518,6 +533,17 @@ export const AiVoiceConfigUpdateLanguage = {
   'ar-LB': 'ar-LB',
 } as const;
 
+/**
+ * @nullable
+ */
+export type AiVoiceConfigUpdateCampaignVoiceEngine = typeof AiVoiceConfigUpdateCampaignVoiceEngine[keyof typeof AiVoiceConfigUpdateCampaignVoiceEngine] | null;
+
+
+export const AiVoiceConfigUpdateCampaignVoiceEngine = {
+  google: 'google',
+  elevenlabs: 'elevenlabs',
+} as const;
+
 export interface AiVoiceConfigUpdate {
   /** @nullable */
   voice?: AiVoiceConfigUpdateVoice;
@@ -535,6 +561,10 @@ export interface AiVoiceConfigUpdate {
   maxTokens?: number | null;
   /** @nullable */
   voiceStyle?: string | null;
+  /** @nullable */
+  campaignVoiceEngine?: AiVoiceConfigUpdateCampaignVoiceEngine;
+  /** @nullable */
+  elevenLabsVoiceId?: string | null;
 }
 
 export interface DashboardStats {

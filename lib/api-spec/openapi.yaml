@@ -1298,6 +1298,14 @@ components:
         voiceStyle:
           type: string
           description: Speaking style instructions passed to the TTS model for a more human sound
+        campaignVoiceEngine:
+          type: string
+          enum: [google, elevenlabs]
+          description: TTS engine used for outbound campaign calls
+        elevenLabsVoiceId:
+          type: string
+          nullable: true
+          description: ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs
 
     AiVoiceConfigUpdate:
       type: object
@@ -1319,6 +1327,11 @@ components:
         maxTokens:
           type: ["integer", "null"]
         voiceStyle:
+          type: ["string", "null"]
+        campaignVoiceEngine:
+          type: ["string", "null"]
+          enum: [google, elevenlabs, null]
+        elevenLabsVoiceId:
           type: ["string", "null"]
 
     DashboardStats:

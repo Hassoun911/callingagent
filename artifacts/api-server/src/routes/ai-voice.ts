@@ -42,6 +42,8 @@ router.patch("/ai-voice/config", async (req, res): Promise<void> => {
   if (body.speechTimeout != null) updateData.speechTimeout = body.speechTimeout;
   if (body.maxTokens != null) updateData.maxTokens = body.maxTokens;
   if (body.voiceStyle != null) updateData.voiceStyle = body.voiceStyle;
+  if (body.campaignVoiceEngine != null) updateData.campaignVoiceEngine = body.campaignVoiceEngine;
+  if (body.elevenLabsVoiceId != null) updateData.elevenLabsVoiceId = body.elevenLabsVoiceId;
 
   const [updated] = await db.update(aiVoiceConfigTable)
     .set(updateData)
