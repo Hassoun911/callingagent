@@ -109,8 +109,9 @@ async function extractOutboundSummary(messages: Array<{ role: string; content: s
   "askingPrice": "what they expect to sell for or null",
   "propertyType": "house/condo/land/commercial/etc or null",
   "additionalNotes": "any other useful info or null",
-  "callOutcome": "interested/not_interested/callback_requested/no_answer/hung_up"
+  "callOutcome": "interested/not_interested/callback_requested/hung_up/no_answer"
 }
+IMPORTANT: Use "no_answer" ONLY when the human side produced zero speech (truly unanswered). If the person said anything at all (even just hello), use "hung_up" or "not_interested" as appropriate.
 Return JSON only. No explanation.`,
         },
         { role: "user", content: `Transcript:\n\n${transcript}` },
@@ -702,7 +703,7 @@ router.post("/twilio/campaign-gather", async (req, res): Promise<void> => {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: conv.systemPrompt + "\n\nأنت على مكالمة هاتفية مباشرة. أجب بجملة أو جملتين كحد أقصى. تحدث بالعربية فقط. لا تستخدم علامات الترقيم المعقدة. إذا أبدى صاحب العقار اهتماماً بالبيع، اجمع المعلومات التالية: نوع العقار، السعر المتوقع، والجدول الزمني." },
+        { role: "system", content: conv.systemPrompt + "\n\nأنت على مكالمة هاتفية مباشرة. المحادثة جارية بالفعل — لا تعيد تقديم نفسك أبداً ولا تعيد قراءة الرسالة الافتتاحية. استمر في المحادثة من حيث توقفت. أجب بجملة أو جملتين كحد أقصى. تحدث بالعربية فقط. لا تستخدم علامات الترقيم المعقدة. إذا أبدى صاحب العقار اهتماماً بالبيع، اجمع المعلومات التالية: نوع العقار، السعر المتوقع، والجدول الزمني." },
         ...conv.messages,
       ],
       max_tokens: 120,
