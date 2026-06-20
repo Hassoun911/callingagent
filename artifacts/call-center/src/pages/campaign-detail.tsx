@@ -344,7 +344,7 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
       return r.json();
     },
     enabled: expanded,
-    staleTime: 10_000,
+    staleTime: 0,
   });
 
   const callMutation = useMutation({
