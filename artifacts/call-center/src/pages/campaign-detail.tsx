@@ -16,7 +16,7 @@ import {
   ArrowLeft, Play, Pause, Phone, Trash2, Plus, Upload,
   ChevronDown, ChevronRight, CheckCircle2, XCircle, Clock,
   PhoneOff, AlertCircle, Volume2, RefreshCw, Settings2, FileText,
-  Calendar, Mic,
+  Calendar, Mic, Maximize2, Copy, Check,
 } from "lucide-react";
 
 interface Campaign {
@@ -208,7 +208,16 @@ function RecordingPlayer({ src }: { src: string }) {
 function CallLogEntry({ log, campaignId, onDeleted }: { log: CampaignCallLog; campaignId: number; onDeleted: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [copied, setCopied] = useState<"summary" | "transcript" | null>(null);
   const { toast } = useToast();
+
+  function copyText(text: string, field: "summary" | "transcript") {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(field);
+      setTimeout(() => setCopied(null), 2000);
+    });
+  }
   const hasRecording = !!(log.recordingSid || log.recordingUrl);
   const hasDetail = !!(log.callSummary || log.transcription || log.timeline || log.askingPrice || log.propertyType);
   const recordingUrl = hasRecording
@@ -279,6 +288,16 @@ function CallLogEntry({ log, campaignId, onDeleted }: { log: CampaignCallLog; ca
       {/* Expanded detail */}
       {expanded && hasDetail && (
         <div className="border-t border-border/30 px-4 py-3">
+          <div className="flex justify-end mb-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); setDetailOpen(true); }}
+              className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground hover:text-foreground border border-border/40 hover:border-border px-2 py-1 rounded transition-colors"
+              title="Open full view"
+            >
+              <Maximize2 className="h-3 w-3" />
+              Full view
+            </button>
+          </div>
           <div className="grid grid-cols-2 gap-5">
             {/* Left: summary + fields */}
             <div className="space-y-3">
@@ -328,6 +347,90 @@ function CallLogEntry({ log, campaignId, onDeleted }: { log: CampaignCallLog; ca
           </div>
         </div>
       )}
+
+      {/* Full-view modal */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="max-w-4xl w-full max-h-[85vh] overflow-hidden flex flex-col gap-0 p-0">
+          <DialogHeader className="px-6 pt-5 pb-4 border-b border-border/40 flex-shrink-0">
+            <DialogTitle className="flex items-center gap-3 text-base">
+              {outcomeBadge(log.interestedInSelling, log.callStatus, log.callOutcome)}
+              <span className="text-muted-foreground font-normal text-sm">{formatDuration(log.callDuration)}</span>
+              <span className="text-muted-foreground font-normal text-sm ml-auto">{formatDateTime(log.calledAt)}</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+            {/* Summary */}
+            {log.callSummary && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-bold uppercase tracking-wider text-green-400">AI Summary</div>
+                  <button
+                    onClick={() => copyText(log.callSummary!, "summary")}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {copied === "summary" ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copied === "summary" ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                <div className="text-base text-foreground leading-relaxed">{log.callSummary}</div>
+              </div>
+            )}
+
+            {/* Fields row */}
+            {(log.propertyType || log.askingPrice || log.timeline || log.additionalNotes) && (
+              <div className="grid grid-cols-4 gap-4 p-4 rounded-lg bg-white/5 border border-border/30">
+                {log.propertyType && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Property</div>
+                    <div className="text-sm font-medium capitalize">{log.propertyType}</div>
+                  </div>
+                )}
+                {log.askingPrice && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Price</div>
+                    <div className="text-sm font-semibold text-green-400">{log.askingPrice}</div>
+                  </div>
+                )}
+                {log.timeline && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Timeline</div>
+                    <div className="text-sm font-medium">{log.timeline}</div>
+                  </div>
+                )}
+                {log.additionalNotes && (
+                  <div className="col-span-2">
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Notes</div>
+                    <div className="text-sm text-muted-foreground">{log.additionalNotes}</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Transcript */}
+            {log.transcription && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Transcript</div>
+                  <button
+                    onClick={() => copyText(log.transcription!, "transcript")}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {copied === "transcript" ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copied === "transcript" ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                <div
+                  className="text-sm text-muted-foreground whitespace-pre-wrap leading-7 p-4 rounded-lg bg-black/20 border border-border/20"
+                  dir="auto"
+                >
+                  {log.transcription}
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
