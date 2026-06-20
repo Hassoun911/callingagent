@@ -557,7 +557,7 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
             <Button
               size="sm" variant="ghost"
               className="h-7 w-7 px-0 text-muted-foreground hover:text-destructive"
-              onClick={() => deleteMutation.mutate()}
+              onClick={() => { if (confirm(`Delete ${contact.name}? This will remove the contact and all call history.`)) deleteMutation.mutate(); }}
               disabled={deleteMutation.isPending}
             >
               <Trash2 className="h-3.5 w-3.5" />
