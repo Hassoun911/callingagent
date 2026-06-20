@@ -5,6 +5,42 @@
  * Call Center API
  * OpenAPI spec version: 0.1.0
  */
+export interface AuthUser {
+  id: string;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  firstName: string | null;
+  /** @nullable */
+  lastName: string | null;
+  /** @nullable */
+  profileImageUrl: string | null;
+}
+
+export interface AuthUserEnvelope {
+  user: AuthUser | null;
+}
+
+export interface MobileTokenExchangeRequest {
+  code: string;
+  code_verifier: string;
+  redirect_uri: string;
+  state: string;
+  nonce?: string;
+}
+
+export interface MobileTokenExchangeSuccess {
+  token: string;
+}
+
+export interface LogoutSuccess {
+  success: boolean;
+}
+
+export interface ErrorEnvelope {
+  error: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -747,6 +783,11 @@ export interface SmsMessage {
   updatedAt?: string;
 }
 
+/**
+ * Opaque session token — `Bearer <sid>`.
+ */
+export type AuthorizationSessionHeaderParameter = string;
+
 export type SearchAvailableNumbersParams = {
 /**
  * @nullable
@@ -825,5 +866,9 @@ export type ImportCampaignContacts200 = {
 
 export type StartCampaign200 = {
   queued: number;
+};
+
+export type BeginBrowserLoginParams = {
+returnTo?: string;
 };
 
