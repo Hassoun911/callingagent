@@ -104,7 +104,7 @@ async function synthesizeElevenLabs(text: string, voiceId: string): Promise<Buff
     headers: { "xi-api-key": apiKey, "Content-Type": "application/json" },
     body: JSON.stringify({
       text,
-      model_id: "eleven_multilingual_v2",
+      model_id: "eleven_turbo_v2_5",
       voice_settings: { stability: 0.5, similarity_boost: 0.8 },
     }),
   });
@@ -565,14 +565,31 @@ router.get("/campaigns/:id/contacts/:contactId/recording", async (req, res): Pro
 
     const url = contact.recordingUrl ?? `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${contact.recordingSid}.mp3`;
     const credentials = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
-    const response = await fetch(url, { headers: { Authorization: `Basic ${credentials}` } });
-    if (!response.ok) { res.status(response.status).send("Recording not available"); return; }
 
-    res.set("Content-Type", response.headers.get("Content-Type") || "audio/mpeg");
+    // Fetch with manual redirect handling — Twilio redirects to CDN and the auth
+    // header must NOT be forwarded to the CDN or it returns 400.
+    const response = await fetch(url, {
+      headers: { Authorization: `Basic ${credentials}` },
+      redirect: "manual",
+    });
+
+    let audioResponse: Response;
+    if (response.status === 301 || response.status === 302 || response.status === 307 || response.status === 308) {
+      const location = response.headers.get("Location");
+      if (!location) { res.status(502).send("Invalid redirect from Twilio"); return; }
+      audioResponse = await fetch(location); // no auth header for CDN
+    } else {
+      audioResponse = response;
+    }
+
+    if (!audioResponse.ok) { res.status(audioResponse.status).send("Recording not available"); return; }
+
+    res.set("Content-Type", audioResponse.headers.get("Content-Type") || "audio/mpeg");
     res.set("Cache-Control", "no-store");
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const buffer = Buffer.from(await audioResponse.arrayBuffer());
     res.send(buffer);
   } catch (err: any) {
+    logger.error({ err: err?.message }, "Failed to fetch campaign recording");
     res.status(500).send("Failed to fetch recording");
   }
 });
@@ -874,7 +891,12 @@ router.post("/twilio/campaign-status", async (req, res): Promise<void> => {
 
       // Send hot lead email if interested
       if (summary?.interestedInSelling && contact && campaign) {
-        setImmediate(() => { sendHotLeadEmail(contact, campaign, summary, contact.recordingUrl).catch(() => {}); });
+        logger.info({ contactId: contact.id, campaignId: campaign.id, notificationEmail: campaign.notificationEmail }, "Hot lead detected — sending email");
+        setImmediate(() => {
+          sendHotLeadEmail(contact, campaign, summary, contact.recordingUrl).catch((err: any) => {
+            logger.error({ err: err?.message, contactId: contact.id }, "Hot lead email failed");
+          });
+        });
       }
     }
 
@@ -889,12 +911,17 @@ router.post("/twilio/campaign-status", async (req, res): Promise<void> => {
 router.post("/twilio/campaign-recording", async (req, res): Promise<void> => {
   const { CallSid, RecordingUrl, RecordingSid } = req.body;
   try {
-    const contactId = outboundCampaignCalls.get(CallSid);
-    if (contactId && (RecordingUrl || RecordingSid)) {
+    // Look up contact by twilioCallSid from DB — the in-memory map may already be cleared
+    const [contact] = await db.select().from(campaignContactsTable)
+      .where(eq(campaignContactsTable.twilioCallSid, CallSid));
+    if (contact && (RecordingUrl || RecordingSid)) {
       await db.update(campaignContactsTable).set({
         recordingUrl: RecordingUrl ? `${RecordingUrl}.mp3` : undefined,
         recordingSid: RecordingSid ?? undefined,
-      }).where(eq(campaignContactsTable.id, contactId));
+      }).where(eq(campaignContactsTable.id, contact.id));
+      logger.info({ contactId: contact.id, RecordingSid }, "Campaign recording URL saved");
+    } else {
+      logger.warn({ CallSid, RecordingUrl, RecordingSid }, "Campaign recording callback: contact not found by CallSid");
     }
     res.sendStatus(200);
   } catch (err: any) {
