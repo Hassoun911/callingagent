@@ -1,9 +1,9 @@
+import { useState, useEffect, useCallback } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
-import { useAuth } from "@workspace/replit-auth-web";
 
 // Pages
 import Dashboard from "@/pages/dashboard";
@@ -28,6 +28,117 @@ const queryClient = new QueryClient({
   },
 });
 
+interface AuthUser {
+  id: string;
+  firstName: string | null;
+}
+
+function useAuth() {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const checkAuth = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/user", { credentials: "include" });
+      const data = await res.json();
+      setUser(data.user ?? null);
+    } catch {
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { checkAuth(); }, [checkAuth]);
+
+  const logout = useCallback(async () => {
+    await fetch("/api/logout", { method: "POST", credentials: "include" });
+    setUser(null);
+  }, []);
+
+  return { user, isLoading, isAuthenticated: !!user, logout, refetch: checkAuth };
+}
+
+function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Login failed.");
+      } else {
+        onSuccess();
+      }
+    } catch {
+      setError("Connection error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
+      <div className="w-full max-w-sm px-8">
+        <div className="mb-10 text-center">
+          <p className="text-xs font-bold tracking-[3px] uppercase text-emerald-500 mb-2">Operations Platform</p>
+          <h1 className="text-3xl font-bold text-slate-50 tracking-tight">Vanguard.OPS</h1>
+          <p className="mt-2 text-sm text-slate-500">Call Center Management</p>
+        </div>
+        <form onSubmit={handleSubmit} className="border border-slate-800 rounded-lg bg-slate-900/60 p-8 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Username</label>
+            <input
+              type="text"
+              autoComplete="username"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-600 transition-colors"
+              placeholder="Enter username"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Password</label>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-600 transition-colors"
+              placeholder="Enter password"
+              required
+            />
+          </div>
+          {error && (
+            <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{error}</p>
+          )}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold py-2.5 rounded-md transition-colors text-sm mt-2"
+          >
+            {loading ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
+        <p className="mt-6 text-center text-xs text-slate-600">Vanguard.OPS &copy; {new Date().getFullYear()}</p>
+      </div>
+    </div>
+  );
+}
+
 function Router() {
   return (
     <Layout>
@@ -49,35 +160,8 @@ function Router() {
   );
 }
 
-function LoginScreen() {
-  const { login } = useAuth();
-  return (
-    <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
-      <div className="w-full max-w-sm px-8">
-        <div className="mb-10 text-center">
-          <p className="text-xs font-bold tracking-[3px] uppercase text-emerald-500 mb-2">Operations Platform</p>
-          <h1 className="text-3xl font-bold text-slate-50 tracking-tight">Vanguard.OPS</h1>
-          <p className="mt-2 text-sm text-slate-500">Call Center Management</p>
-        </div>
-        <div className="border border-slate-800 rounded-lg bg-slate-900/60 p-8">
-          <p className="text-sm text-slate-400 mb-6 text-center leading-relaxed">
-            Secure access to your call center dashboard, campaigns, and CRM.
-          </p>
-          <button
-            onClick={login}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-md transition-colors text-sm"
-          >
-            Log in
-          </button>
-        </div>
-        <p className="mt-6 text-center text-xs text-slate-600">Vanguard.OPS &copy; {new Date().getFullYear()}</p>
-      </div>
-    </div>
-  );
-}
-
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated, refetch } = useAuth();
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
@@ -85,7 +169,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!isAuthenticated) return <LoginScreen />;
+  if (!isAuthenticated) return <LoginScreen onSuccess={refetch} />;
   return <>{children}</>;
 }
 
