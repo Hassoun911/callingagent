@@ -96,9 +96,18 @@ function formatDuration(secs: number | null) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
+function formatTime(secs: number): string {
+  if (!isFinite(secs) || isNaN(secs)) return "0:00";
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignContact; campaignId: number; onRefresh: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -151,16 +160,55 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
         </td>
         <td className="px-4 py-2.5 text-xs text-muted-foreground">{formatDuration(contact.callDuration)}</td>
         <td className="px-4 py-2.5 text-xs text-muted-foreground">{contact.attemptCount ?? 0}x</td>
-        <td className="px-4 py-2.5 text-right" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center gap-1.5 justify-end">
+        <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-2 justify-end">
             {recordingUrl && (
-              <Button size="sm" variant="ghost" className="h-7 w-7 px-0" onClick={() => {
-                if (!audioRef.current) return;
-                if (playing) { audioRef.current.pause(); setPlaying(false); }
-                else { audioRef.current.play(); setPlaying(true); }
-              }}>
-                <Volume2 className={`h-3.5 w-3.5 ${playing ? "text-green-400" : "text-muted-foreground"}`} />
-              </Button>
+              <div className="flex items-center gap-1.5 bg-secondary/50 border border-border/60 rounded px-2 py-1">
+                {/* Play / Pause */}
+                <button
+                  className="text-muted-foreground hover:text-green-400 transition-colors"
+                  onClick={() => {
+                    if (!audioRef.current) return;
+                    if (playing) { audioRef.current.pause(); setPlaying(false); }
+                    else { audioRef.current.play(); setPlaying(true); }
+                  }}
+                >
+                  {playing
+                    ? <Pause className="h-3.5 w-3.5 text-green-400" />
+                    : <Play className="h-3.5 w-3.5" />}
+                </button>
+                {/* Stop */}
+                <button
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => {
+                    if (!audioRef.current) return;
+                    audioRef.current.pause();
+                    audioRef.current.currentTime = 0;
+                    setPlaying(false);
+                    setCurrentTime(0);
+                  }}
+                >
+                  <span className="inline-block h-2.5 w-2.5 bg-current rounded-sm" />
+                </button>
+                {/* Scrub bar */}
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 0}
+                  step={0.1}
+                  value={currentTime}
+                  className="w-20 h-1 accent-green-500 cursor-pointer"
+                  onChange={e => {
+                    const t = parseFloat(e.target.value);
+                    setCurrentTime(t);
+                    if (audioRef.current) audioRef.current.currentTime = t;
+                  }}
+                />
+                {/* Time */}
+                <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap tabular-nums">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+              </div>
             )}
             {contact.callStatus !== "calling" && (
               <Button size="sm" variant="ghost" className="h-7 w-7 px-0" title="Retry call" onClick={() => callMutation.mutate()} disabled={callMutation.isPending}>
@@ -172,7 +220,13 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
             </Button>
           </div>
           {recordingUrl && (
-            <audio ref={audioRef} src={recordingUrl} onEnded={() => setPlaying(false)} className="hidden" />
+            <audio
+              ref={audioRef}
+              src={recordingUrl}
+              onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
+              onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
+              onEnded={() => { setPlaying(false); setCurrentTime(0); }}
+            />
           )}
         </td>
       </tr>
