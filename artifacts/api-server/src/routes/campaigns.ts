@@ -1017,9 +1017,10 @@ router.post("/twilio/campaign-status", async (req, res): Promise<void> => {
       outboundConversations.delete(CallSid);
       outboundCallLogMap.delete(CallSid);
 
-      // Send hot lead email if interested
-      if (summary?.interestedInSelling && contact && campaign) {
-        logger.info({ contactId: contact.id, campaignId: campaign.id, notificationEmail: campaign.notificationEmail }, "Hot lead detected — sending email");
+      // Send hot lead email if interested OR callback requested
+      const isHotOrCallback = summary?.interestedInSelling || summary?.callOutcome === "callback_requested";
+      if (isHotOrCallback && contact && campaign) {
+        logger.info({ contactId: contact.id, campaignId: campaign.id, notificationEmail: campaign.notificationEmail, outcome: summary?.callOutcome }, "Hot lead / callback detected — sending email");
         setImmediate(() => {
           sendHotLeadEmail(contact, campaign, summary, null).catch((err: any) => {
             logger.error({ err: err?.message, contactId: contact.id }, "Hot lead email failed");

@@ -104,9 +104,10 @@ function outcomeBadge(interestedInSelling: boolean | null, callStatus: string, c
   if (callStatus === "calling") return <span className="text-xs text-yellow-400 font-semibold">Calling...</span>;
   if (callStatus === "no_answer") return <span className="text-xs text-muted-foreground">No answer</span>;
   if (callStatus === "failed") return <span className="text-xs text-destructive">Failed</span>;
-  if (interestedInSelling === true) return (
+  const isHot = interestedInSelling === true || callOutcome === "hot_lead" || callOutcome === "callback_requested";
+  if (isHot) return (
     <span className="inline-flex items-center gap-1 text-xs font-bold text-green-400 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/25">
-      Hot Lead
+      {callOutcome === "callback_requested" ? "Callback" : "Hot Lead"}
     </span>
   );
   if (interestedInSelling === false) return <span className="text-xs text-muted-foreground">Not interested</span>;
