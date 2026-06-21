@@ -121,28 +121,18 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
     );
   }
 
+  // Compact table row: play button + time only, no scrubber
   return (
-    <div className="flex items-center gap-1.5" style={{ width: 140 }}>
+    <div className="flex items-center gap-1.5 shrink-0">
       <button
         onClick={toggle}
         className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-muted hover:bg-muted/60 border border-border/60 transition-colors"
       >
         <Icon className={`h-2.5 w-2.5 ${Icon === Play ? "ml-px" : ""} ${Icon === Loader2 ? "animate-spin text-muted-foreground" : ""}`} />
       </button>
-
-      <div ref={trackRef} onClick={seek} className="relative h-[3px] w-20 shrink-0 bg-border rounded-full cursor-pointer group">
-        <div className="absolute inset-y-0 left-0 bg-cyan-500 rounded-full transition-none" style={{ width: `${progress}%` }} />
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cyan-400 border border-background opacity-0 group-hover:opacity-100 transition-opacity"
-          style={{ left: `calc(${progress}% - 4px)` }}
-        />
-      </div>
-
-      {(playing || currentTime > 0) && (
-        <span className="text-[10px] font-mono text-muted-foreground tabular-nums shrink-0 whitespace-nowrap">
-          {fmtTime(currentTime)}
-        </span>
-      )}
+      <span className="text-[10px] font-mono text-muted-foreground tabular-nums whitespace-nowrap">
+        {playing || currentTime > 0 ? fmtTime(currentTime) : (duration ? fmtTime(duration) : "")}
+      </span>
     </div>
   );
 }
@@ -561,7 +551,7 @@ export default function Calls() {
               <TableHead className="w-[70px]">Duration</TableHead>
               <TableHead className="w-[100px]">Status</TableHead>
               <TableHead className="w-[85px]">Priority</TableHead>
-              <TableHead className="w-[155px]">Recording</TableHead>
+              <TableHead className="w-[100px]">Recording</TableHead>
               <TableHead className="w-[90px]"></TableHead>
             </TableRow>
           </TableHeader>
