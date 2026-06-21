@@ -138,17 +138,17 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
         />
       </div>
 
-      <span className="text-[11px] font-mono text-muted-foreground tabular-nums shrink-0 text-right whitespace-nowrap">
-        {playing || currentTime > 0
-          ? <>{fmtTime(currentTime)}<span className="opacity-40"> / {fmtTime(duration)}</span></>
-          : duration ? fmtTime(duration) : ""}
-      </span>
+      {playing || currentTime > 0 ? (
+        <span className="text-[10px] font-mono text-muted-foreground tabular-nums shrink-0 whitespace-nowrap">
+          {fmtTime(currentTime)}
+        </span>
+      ) : null}
 
       <a
         href={src}
         download
         onClick={(e) => e.stopPropagation()}
-        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors ml-1"
         title="Download recording"
       >
         <Download className="h-3 w-3" />
