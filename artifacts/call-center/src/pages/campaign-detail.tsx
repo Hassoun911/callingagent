@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import {
   ArrowLeft, Play, Pause, Phone, Trash2, Plus, Upload,
   ChevronDown, ChevronRight, ChevronLeft, CheckCircle2, XCircle, Clock,
   PhoneOff, AlertCircle, Volume2, RefreshCw, Settings2, FileText,
-  Calendar, Mic, Maximize2, Copy, Check, Download, CalendarClock,
+  Calendar, Mic, Maximize2, Copy, Check, Download, CalendarClock, Pencil, X, Bot,
 } from "lucide-react";
 
 interface Campaign {
@@ -98,7 +98,7 @@ interface PhoneNumber {
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function statusIcon(status: string, size = "h-3.5 w-3.5") {
-  const map: Record<string, JSX.Element> = {
+  const map: Record<string, React.ReactElement> = {
     pending: <Clock className={`${size} text-muted-foreground`} />,
     calling: <Phone className={`${size} text-yellow-400 animate-pulse`} />,
     in_progress: <Phone className={`${size} text-emerald-400 animate-pulse`} />,
@@ -1095,6 +1095,8 @@ export default function CampaignDetail() {
   });
 
   const [settingsForm, setSettingsForm] = useState<Partial<Campaign>>({});
+  const [editingScript, setEditingScript] = useState(false);
+  const [scriptDraft, setScriptDraft] = useState("");
 
   const statusMutation = useMutation({
     mutationFn: async (action: "start" | "pause") => {
@@ -1284,13 +1286,64 @@ export default function CampaignDetail() {
         ))}
       </div>
 
-      {/* Script preview */}
+      {/* AI Script & Instructions — inline editable */}
       <div className="bg-card border border-border rounded-lg p-4">
-        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">
-          <FileText className="h-3.5 w-3.5" />
-          Opening Script
+        <div className="flex items-center gap-2 mb-2">
+          <Bot className="h-3.5 w-3.5 text-primary" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">AI Script &amp; Instructions</span>
+          <span className="ml-auto flex items-center gap-1">
+            {editingScript ? (
+              <>
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-muted-foreground" onClick={() => setEditingScript(false)}>
+                  <X className="h-3 w-3 mr-1" />Cancel
+                </Button>
+                <Button size="sm" className="h-6 px-2 text-xs" onClick={async () => {
+                  await fetch(`${BASE}/api/campaigns/${campaignId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ script: scriptDraft, systemPrompt: null }),
+                  });
+                  qc.invalidateQueries({ queryKey: ["campaign", campaignId] });
+                  setEditingScript(false);
+                  toast({ title: "Script saved" });
+                }}>
+                  <Check className="h-3 w-3 mr-1" />Save
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={() => {
+                setScriptDraft(campaign.systemPrompt?.trim() || campaign.script || "");
+                setEditingScript(true);
+              }}>
+                <Pencil className="h-3 w-3 mr-1" />Edit
+              </Button>
+            )}
+          </span>
         </div>
-        <div className="text-sm text-foreground leading-relaxed" dir="rtl">{campaign.script}</div>
+        {editingScript ? (
+          <Textarea
+            autoFocus
+            className="min-h-[140px] bg-background font-mono text-sm"
+            placeholder="Describe how the AI should behave on this call — who it is, what to say, the goal, the tone, the language. The AI will read these as instructions, not as a script to recite."
+            value={scriptDraft}
+            onChange={e => setScriptDraft(e.target.value)}
+          />
+        ) : (
+          <div
+            className="text-sm text-foreground leading-relaxed whitespace-pre-wrap cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => {
+              setScriptDraft(campaign.systemPrompt?.trim() || campaign.script || "");
+              setEditingScript(true);
+            }}
+          >
+            {campaign.systemPrompt?.trim() || campaign.script || (
+              <span className="text-muted-foreground italic">No AI script configured. Click Edit to add instructions for the AI agent on this campaign.</span>
+            )}
+          </div>
+        )}
+        {!editingScript && (
+          <p className="text-[10px] text-muted-foreground mt-2">The AI uses these as behavioral instructions — it will never read them word-for-word.</p>
+        )}
       </div>
 
       {/* Contacts table */}
@@ -1457,40 +1510,16 @@ export default function CampaignDetail() {
           <div className="space-y-4 pt-2">
             <div><Label className="text-green-400">Campaign Name</Label><Input className="mt-1" value={settingsForm.name ?? ""} onChange={e => setSettingsForm(f => ({ ...f, name: e.target.value }))} /></div>
 
-            {/* Mode toggle */}
-            <div className="flex items-center gap-1 p-1 bg-secondary/40 rounded-lg w-fit">
-              <button
-                type="button"
-                onClick={() => setSettingsForm(f => ({ ...f, systemPrompt: null }))}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${!settingsForm.systemPrompt ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                Script Mode
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettingsForm(f => ({ ...f, systemPrompt: f.systemPrompt || "" }))}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${settingsForm.systemPrompt !== null && settingsForm.systemPrompt !== undefined ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                AI Prompt Mode
-              </button>
+            <div>
+              <Label className="text-green-400">AI Script &amp; Instructions</Label>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-1">Tell the AI who it is, what to say, the goal, tone, and language. These are instructions — the AI will never read them word-for-word.</p>
+              <Textarea
+                className="mt-1 min-h-[140px] font-mono text-sm"
+                placeholder="e.g. You are Sarah from Acme Corp. Call clients in Arabic and wish them a happy Father's Day in a warm, natural way. Keep responses to 1-2 sentences. Do not sound scripted."
+                value={settingsForm.script ?? settingsForm.systemPrompt ?? ""}
+                onChange={e => setSettingsForm(f => ({ ...f, script: e.target.value, systemPrompt: null }))}
+              />
             </div>
-
-            {!settingsForm.systemPrompt ? (
-              <div>
-                <Label className="text-green-400">Opening Script (Arabic)</Label>
-                <p className="text-xs text-muted-foreground mt-0.5 mb-1">The AI reads this verbatim when the contact answers, then qualifies using the default prompt.</p>
-                <Textarea className="mt-1 min-h-[100px] text-right" dir="rtl" value={settingsForm.script ?? ""} onChange={e => setSettingsForm(f => ({ ...f, script: e.target.value }))} />
-              </div>
-            ) : (
-              <div>
-                <Label className="text-green-400">AI System Prompt</Label>
-                <p className="text-xs text-muted-foreground mt-0.5 mb-1">The AI generates its own opening and drives the entire conversation. The opening script is not used.</p>
-                <Textarea className="mt-1 min-h-[120px]" value={settingsForm.systemPrompt ?? ""} onChange={e => setSettingsForm(f => ({ ...f, systemPrompt: e.target.value || "" }))} />
-                <button type="button" className="mt-1 text-xs text-muted-foreground hover:text-foreground underline" onClick={() => setSettingsForm(f => ({ ...f, systemPrompt: null }))}>
-                  Switch back to Script Mode
-                </button>
-              </div>
-            )}
             <div>
               <Label className="text-green-400">From Phone Number</Label>
               <select
