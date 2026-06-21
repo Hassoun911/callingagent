@@ -13,6 +13,7 @@ export const campaignsTable = pgTable("campaigns", {
   maxCallDuration: integer("max_call_duration").default(300),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+  scheduleConfig: text("schedule_config"),
 });
 
 export const campaignContactsTable = pgTable("campaign_contacts", {

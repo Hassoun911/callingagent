@@ -495,7 +495,7 @@ router.get("/campaigns/:id", async (req, res): Promise<void> => {
 router.patch("/campaigns/:id", async (req, res): Promise<void> => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { name, script, systemPrompt, fromPhoneNumberId, notificationEmail, status, maxCallDuration } = req.body;
+    const { name, script, systemPrompt, fromPhoneNumberId, notificationEmail, status, maxCallDuration, scheduleConfig } = req.body;
     const updateData: any = {};
     if (name != null) updateData.name = name;
     if (script != null) updateData.script = script;
@@ -504,6 +504,7 @@ router.patch("/campaigns/:id", async (req, res): Promise<void> => {
     if (notificationEmail !== undefined) updateData.notificationEmail = notificationEmail;
     if (status != null) updateData.status = status;
     if (maxCallDuration != null) updateData.maxCallDuration = maxCallDuration;
+    if (scheduleConfig !== undefined) updateData.scheduleConfig = scheduleConfig;
     const [campaign] = await db.update(campaignsTable).set(updateData).where(eq(campaignsTable.id, id)).returning();
     if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
     res.json({ ...campaign, createdAt: campaign.createdAt.toISOString(), updatedAt: campaign.updatedAt.toISOString() });
@@ -1220,5 +1221,111 @@ router.post("/twilio/campaign-recording", async (req, res): Promise<void> => {
     if (!res.headersSent) res.sendStatus(200);
   }
 });
+
+// ─── Campaign Scheduler ───────────────────────────────────────────────────────
+interface ScheduleSlot { days: number[]; startTime: string; endTime: string; }
+interface CampaignScheduleConfig { enabled: boolean; timezone: string; slots: ScheduleSlot[]; }
+
+function isWithinScheduleWindow(config: CampaignScheduleConfig): boolean {
+  const tz = config.timezone || "UTC";
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const weekday = parts.find(p => p.type === "weekday")?.value ?? "";
+  const dayOfWeek = dayMap[weekday] ?? -1;
+  let hour = parseInt(parts.find(p => p.type === "hour")?.value ?? "0", 10);
+  if (hour === 24) hour = 0;
+  const minute = parseInt(parts.find(p => p.type === "minute")?.value ?? "0", 10);
+  const currentMinutes = hour * 60 + minute;
+  for (const slot of (config.slots ?? [])) {
+    if (!slot.days.includes(dayOfWeek)) continue;
+    const [sh, sm] = slot.startTime.split(":").map(Number);
+    const [eh, em] = slot.endTime.split(":").map(Number);
+    if (currentMinutes >= sh * 60 + sm && currentMinutes < eh * 60 + em) return true;
+  }
+  return false;
+}
+
+async function autoStartCampaignScheduled(campaign: any): Promise<void> {
+  const baseUrl = getPublicDomain();
+  if (!baseUrl) {
+    logger.warn({ campaignId: campaign.id }, "Scheduler: no public domain, cannot auto-start");
+    return;
+  }
+  let fromNumber = "";
+  if (campaign.fromPhoneNumberId) {
+    const [pn] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, campaign.fromPhoneNumberId));
+    fromNumber = pn?.number ?? "";
+  }
+  if (!fromNumber) {
+    logger.warn({ campaignId: campaign.id }, "Scheduler: no phone number configured");
+    return;
+  }
+  await db.update(campaignsTable).set({ status: "active" }).where(eq(campaignsTable.id, campaign.id));
+  const pendingContacts = await db.select().from(campaignContactsTable)
+    .where(and(eq(campaignContactsTable.campaignId, campaign.id), eq(campaignContactsTable.callStatus, "pending")));
+  if (pendingContacts.length === 0) {
+    await db.update(campaignsTable).set({ status: "completed" }).where(eq(campaignsTable.id, campaign.id));
+    return;
+  }
+  logger.info({ campaignId: campaign.id, pending: pendingContacts.length }, "Scheduler auto-starting campaign");
+  (async () => {
+    for (const contact of pendingContacts) {
+      try {
+        const [current] = await db.select({ status: campaignsTable.status, scheduleConfig: campaignsTable.scheduleConfig })
+          .from(campaignsTable).where(eq(campaignsTable.id, campaign.id));
+        if (current?.status !== "active") break;
+        if (current.scheduleConfig) {
+          try {
+            const cfg: CampaignScheduleConfig = JSON.parse(current.scheduleConfig);
+            if (cfg.enabled && !isWithinScheduleWindow(cfg)) {
+              await db.update(campaignsTable).set({ status: "paused" }).where(eq(campaignsTable.id, campaign.id));
+              logger.info({ campaignId: campaign.id }, "Scheduler auto-paused mid-run (left window)");
+              break;
+            }
+          } catch { /* ignore parse errors */ }
+        }
+        await initiateOutboundCall(contact, campaign, fromNumber, baseUrl);
+        await new Promise(r => setTimeout(r, 1000));
+      } catch (err: any) {
+        logger.error({ err: err?.message, contactId: contact.id }, "Scheduler: call failed");
+        await db.update(campaignContactsTable).set({ callStatus: "failed" }).where(eq(campaignContactsTable.id, contact.id));
+      }
+    }
+    const remaining = await db.select().from(campaignContactsTable)
+      .where(and(eq(campaignContactsTable.campaignId, campaign.id), eq(campaignContactsTable.callStatus, "pending")));
+    if (remaining.length === 0) {
+      await db.update(campaignsTable).set({ status: "completed" }).where(eq(campaignsTable.id, campaign.id));
+    }
+  })().catch(err => logger.error({ err: err?.message, campaignId: campaign.id }, "Scheduler auto-start failed"));
+}
+
+setInterval(async () => {
+  try {
+    const allCampaigns = await db.select().from(campaignsTable)
+      .where(sql`schedule_config IS NOT NULL`);
+    for (const campaign of allCampaigns) {
+      if (!campaign.scheduleConfig) continue;
+      let config: CampaignScheduleConfig;
+      try { config = JSON.parse(campaign.scheduleConfig); } catch { continue; }
+      if (!config.enabled || !config.slots?.length) continue;
+      const inWindow = isWithinScheduleWindow(config);
+      if (inWindow && (campaign.status === "draft" || campaign.status === "paused")) {
+        await autoStartCampaignScheduled(campaign);
+      } else if (!inWindow && campaign.status === "active") {
+        await db.update(campaignsTable).set({ status: "paused" }).where(eq(campaignsTable.id, campaign.id));
+        logger.info({ campaignId: campaign.id }, "Campaign auto-paused (outside schedule window)");
+      }
+    }
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "Campaign scheduler tick error");
+  }
+}, 60_000);
 
 export default router;
