@@ -210,9 +210,11 @@ function AuthGate({ children }: { children?: React.ReactNode }) {
     return <LoginScreen onSuccess={refetch} />;
   }
 
+  const isSuperAdmin = !user.role || user.role === "super_admin";
+
   return (
     <AuthContext.Provider value={{ user, logout, refetch }}>
-      {user.role === "super_admin"
+      {isSuperAdmin
         ? children
         : <PortalRedirect user={user} />
       }
