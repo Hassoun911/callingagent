@@ -836,6 +836,7 @@ export default function CampaignDetail() {
   const [showAddContact, setShowAddContact] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", phone: "", address: "" });
   const [importText, setImportText] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "completed" | "interested" | "no_answer">("all");
@@ -996,6 +997,15 @@ export default function CampaignDetail() {
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" className="h-8 w-8 px-0" onClick={() => { setSettingsForm({ name: campaign.name, script: campaign.script, systemPrompt: campaign.systemPrompt, fromPhoneNumberId: campaign.fromPhoneNumberId, notificationEmail: campaign.notificationEmail, maxCallDuration: campaign.maxCallDuration, scheduleConfig: campaign.scheduleConfig }); setShowSettings(true); }}>
             <Settings2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-8 w-8 px-0 ${parseSchedule(campaign.scheduleConfig).enabled ? "text-blue-400" : ""}`}
+            title="Schedule"
+            onClick={() => setShowSchedule(true)}
+          >
+            <CalendarClock className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" className="h-8 px-3" onClick={refreshContacts}>
             <RefreshCw className="h-3.5 w-3.5" />
@@ -1237,6 +1247,41 @@ export default function CampaignDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Standalone Schedule Dialog */}
+      {campaign && (
+        <Dialog open={showSchedule} onOpenChange={setShowSchedule}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-blue-400" />
+                Campaign Schedule
+              </DialogTitle>
+            </DialogHeader>
+            <div className="pt-1 space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Configure when this campaign dials automatically. The server checks every minute and starts or pauses based on the schedule.
+              </p>
+              <ScheduleEditor
+                value={campaign.scheduleConfig}
+                onChange={v => {
+                  updateCampaignMutation.mutate({ scheduleConfig: v }, {
+                    onSuccess: () => qc.invalidateQueries({ queryKey: ["campaign", campaignId] }),
+                  });
+                }}
+              />
+              {parseSchedule(campaign.scheduleConfig).enabled && parseSchedule(campaign.scheduleConfig).slots.length > 0 && (
+                <div className="text-xs text-blue-400/80 bg-blue-500/5 border border-blue-500/15 rounded px-3 py-2">
+                  Schedule active — campaign will auto-start at the configured times and pause when outside them.
+                </div>
+              )}
+              <div className="flex justify-end pt-1">
+                <Button variant="outline" size="sm" onClick={() => setShowSchedule(false)}>Done</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
