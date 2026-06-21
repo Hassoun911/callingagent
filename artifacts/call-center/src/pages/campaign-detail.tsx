@@ -11,10 +11,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Play, Pause, Phone, Trash2, Plus, Upload,
-  ChevronDown, ChevronRight, CheckCircle2, XCircle, Clock,
+  ChevronDown, ChevronRight, ChevronLeft, CheckCircle2, XCircle, Clock,
   PhoneOff, AlertCircle, Volume2, RefreshCw, Settings2, FileText,
   Calendar, Mic, Maximize2, Copy, Check, Download, CalendarClock,
 } from "lucide-react";
@@ -459,12 +464,34 @@ function CallLogEntry({ log, campaignId, onDeleted }: { log: CampaignCallLog; ca
   );
 }
 
+function getMonthDays(year: number, month: number): (Date | null)[] {
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
+  const days: (Date | null)[] = [];
+  for (let i = 0; i < first.getDay(); i++) days.push(null);
+  for (let d = 1; d <= last.getDate(); d++) days.push(new Date(year, month, d));
+  return days;
+}
+const TIME_SLOTS = [7,8,9,10,11,12,13,14,15,16,17,18,19,20,21];
+function fmtHour(h: number) { return h === 12 ? "12 PM" : h > 12 ? `${h-12} PM` : `${h} AM`; }
+
 function ContactRow({ contact, campaignId, campaignHasSchedule, onRefresh }: { contact: CampaignContact; campaignId: number; campaignHasSchedule: boolean; onRefresh: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [notesDraft, setNotesDraft] = useState(contact.userNotes ?? "");
   const [notesSaved, setNotesSaved] = useState(false);
   const [notesEditing, setNotesEditing] = useState(false);
   const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Schedule picker state
+  const [showSchedPicker, setShowSchedPicker] = useState(false);
+  const initSched = contact.scheduledCallAt ? new Date(contact.scheduledCallAt) : null;
+  const [calMonth, setCalMonth] = useState<Date>(() => {
+    const d = initSched ?? new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [pickedDay, setPickedDay] = useState<Date | null>(
+    initSched ? new Date(initSched.getFullYear(), initSched.getMonth(), initSched.getDate()) : null
+  );
+  const [pickedHour, setPickedHour] = useState<number | null>(initSched ? initSched.getHours() : null);
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -605,22 +632,149 @@ function ContactRow({ contact, campaignId, campaignHasSchedule, onRefresh }: { c
         {/* Actions */}
         <td className="px-3 py-3 text-right" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-1 justify-end">
-            {/* Include / exclude toggle — green = included in campaign run, muted = skipped */}
-            <Button
-              size="sm" variant="ghost"
-              className={`h-7 w-7 px-0 transition-colors ${
-                isSkipped
-                  ? "text-muted-foreground/40 hover:text-muted-foreground"
-                  : campaignHasSchedule
-                    ? "text-green-400 hover:text-muted-foreground"
-                    : "text-muted-foreground hover:text-green-400"
-              }`}
-              title={isSkipped ? "Click to include in campaign run" : "Click to exclude from campaign run"}
-              onClick={() => patchContactMutation.mutate({ callStatus: isSkipped ? "pending" : "skipped" })}
-              disabled={patchContactMutation.isPending || contact.callStatus === "calling" || contact.callStatus === "in_progress"}
-            >
-              <CalendarClock className="h-3.5 w-3.5" />
-            </Button>
+            {/* Schedule picker — opens calendar + time slot popover */}
+            <Popover open={showSchedPicker} onOpenChange={setShowSchedPicker}>
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm" variant="ghost"
+                  className={`h-7 w-7 px-0 transition-colors ${
+                    isSkipped
+                      ? "text-muted-foreground/40 hover:text-muted-foreground"
+                      : contact.scheduledCallAt
+                        ? "text-blue-400 hover:text-blue-300"
+                        : campaignHasSchedule
+                          ? "text-green-400 hover:text-green-300"
+                          : "text-muted-foreground hover:text-green-400"
+                  }`}
+                  title={
+                    isSkipped ? "Excluded from campaign — click to schedule"
+                    : contact.scheduledCallAt ? `Scheduled: ${formatDateTime(contact.scheduledCallAt)}`
+                    : "Schedule specific call time"
+                  }
+                >
+                  <CalendarClock className="h-3.5 w-3.5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-3 space-y-2" align="end" onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Schedule call for</div>
+
+                {/* Selected preview */}
+                {pickedDay && pickedHour !== null ? (
+                  <div className="text-xs text-green-400 font-semibold bg-green-500/10 rounded px-2 py-1">
+                    {pickedDay.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                    {" · "}
+                    {fmtHour(pickedHour)}
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground/60 italic">Pick a date and time below</div>
+                )}
+
+                {/* Month navigation */}
+                <div className="flex items-center justify-between">
+                  <button
+                    className="h-6 w-6 flex items-center justify-center rounded hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setCalMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="text-xs font-semibold">
+                    {calMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  </span>
+                  <button
+                    className="h-6 w-6 flex items-center justify-center rounded hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setCalMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* Day grid */}
+                <div className="grid grid-cols-7 gap-0.5">
+                  {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d => (
+                    <div key={d} className="text-[9px] text-center text-muted-foreground font-semibold py-0.5">{d}</div>
+                  ))}
+                  {getMonthDays(calMonth.getFullYear(), calMonth.getMonth()).map((day, i) => {
+                    if (!day) return <div key={i} />;
+                    const isToday = day.toDateString() === new Date().toDateString();
+                    const isPicked = pickedDay?.toDateString() === day.toDateString();
+                    const isPast = day < new Date(new Date().setHours(0,0,0,0));
+                    return (
+                      <button
+                        key={i}
+                        disabled={isPast}
+                        onClick={() => setPickedDay(day)}
+                        className={`text-[11px] rounded py-0.5 text-center transition-colors font-medium ${
+                          isPicked
+                            ? "bg-green-500 text-white"
+                            : isToday
+                              ? "border border-green-500/50 text-green-400"
+                              : isPast
+                                ? "text-muted-foreground/30 cursor-not-allowed"
+                                : "text-foreground hover:bg-secondary/70"
+                        }`}
+                      >
+                        {day.getDate()}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Time slots */}
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground pt-1">Time</div>
+                <div className="grid grid-cols-3 gap-1">
+                  {TIME_SLOTS.map(h => (
+                    <button
+                      key={h}
+                      onClick={() => setPickedHour(h)}
+                      className={`text-[11px] px-1.5 py-1 rounded text-center transition-colors font-medium ${
+                        pickedHour === h
+                          ? "bg-green-500 text-white"
+                          : "text-foreground hover:bg-secondary/70 border border-border/50"
+                      }`}
+                    >
+                      {fmtHour(h)}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Footer buttons */}
+                <div className="flex gap-1.5 pt-2 border-t border-border">
+                  <Button
+                    size="sm" className="h-7 flex-1 text-xs"
+                    disabled={!pickedDay || pickedHour === null || patchContactMutation.isPending}
+                    onClick={() => {
+                      if (!pickedDay || pickedHour === null) return;
+                      const dt = new Date(pickedDay);
+                      dt.setHours(pickedHour, 0, 0, 0);
+                      patchContactMutation.mutate({ scheduledCallAt: dt.toISOString(), callStatus: "pending" });
+                      setShowSchedPicker(false);
+                    }}
+                  >Set</Button>
+                  {contact.scheduledCallAt && (
+                    <Button
+                      size="sm" variant="outline" className="h-7 text-xs"
+                      onClick={() => {
+                        setPickedDay(null); setPickedHour(null);
+                        patchContactMutation.mutate({ scheduledCallAt: null });
+                        setShowSchedPicker(false);
+                      }}
+                    >Clear</Button>
+                  )}
+                  <Button
+                    size="sm" variant="ghost"
+                    className={`h-7 text-xs px-2 ${isSkipped ? "text-green-400 hover:text-green-300" : "text-muted-foreground hover:text-yellow-400"}`}
+                    disabled={contact.callStatus === "calling" || contact.callStatus === "in_progress"}
+                    onClick={() => {
+                      patchContactMutation.mutate({ callStatus: isSkipped ? "pending" : "skipped" });
+                      setShowSchedPicker(false);
+                    }}
+                  >
+                    {isSkipped ? "Include" : "Exclude"}
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
             {!isSkipped && contact.callStatus !== "calling" && contact.callStatus !== "in_progress" && (
               <Button
                 size="sm" variant="ghost"
