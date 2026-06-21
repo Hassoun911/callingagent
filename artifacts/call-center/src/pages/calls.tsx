@@ -122,7 +122,7 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
   }
 
   return (
-    <div className="flex items-center gap-1.5" style={{ minWidth: 210 }}>
+    <div className="flex items-center gap-1.5" style={{ width: 200 }}>
       <button
         onClick={toggle}
         className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-muted hover:bg-muted/60 border border-border/60 transition-colors"
@@ -559,7 +559,7 @@ export default function Calls() {
 
       <Card className="border-border">
         <div className="overflow-x-auto">
-        <Table className="min-w-[800px]">
+        <Table className="min-w-[1000px]">
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead className="w-[150px]">Date / Time</TableHead>
@@ -570,7 +570,7 @@ export default function Calls() {
               <TableHead>Duration</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Priority</TableHead>
-              <TableHead>Recording</TableHead>
+              <TableHead className="w-[220px]">Recording</TableHead>
               <TableHead className="w-8"></TableHead>
               <TableHead className="w-8"></TableHead>
               <TableHead className="w-8"></TableHead>
