@@ -11,6 +11,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Play, Pause, Phone, Trash2, Plus, Upload,
@@ -612,14 +617,39 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
         <td className="px-3 py-3 text-right" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-1 justify-end">
             {/* Schedule call time */}
-            <Button
-              size="sm" variant="ghost"
-              className={`h-7 w-7 px-0 ${contact.scheduledCallAt ? "text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
-              title={contact.scheduledCallAt ? `Scheduled: ${formatDateTime(contact.scheduledCallAt)}` : "Schedule call time"}
-              onClick={() => setShowSchedulePicker(p => !p)}
-            >
-              <CalendarClock className="h-3.5 w-3.5" />
-            </Button>
+            <Popover open={showSchedulePicker} onOpenChange={setShowSchedulePicker}>
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm" variant="ghost"
+                  className={`h-7 w-7 px-0 ${contact.scheduledCallAt ? "text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
+                  title={contact.scheduledCallAt ? `Scheduled: ${formatDateTime(contact.scheduledCallAt)}` : "Schedule call time"}
+                >
+                  <CalendarClock className="h-3.5 w-3.5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-3 space-y-3" align="end" onClick={e => e.stopPropagation()}>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Schedule call for</div>
+                <input
+                  type="datetime-local"
+                  value={schedDraft}
+                  onChange={e => setSchedDraft(e.target.value)}
+                  className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <div className="flex gap-2 pt-1">
+                  <Button size="sm" className="h-7 flex-1 text-xs" onClick={() => {
+                    patchContactMutation.mutate({ scheduledCallAt: schedDraft ? new Date(schedDraft).toISOString() : null });
+                    setShowSchedulePicker(false);
+                  }}>Set</Button>
+                  {contact.scheduledCallAt && (
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
+                      setSchedDraft("");
+                      patchContactMutation.mutate({ scheduledCallAt: null });
+                      setShowSchedulePicker(false);
+                    }}>Clear</Button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
             {/* Skip / Unskip */}
             <Button
               size="sm" variant="ghost"
@@ -650,28 +680,6 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
-          {/* Schedule picker (inline dropdown) */}
-          {showSchedulePicker && (
-            <div className="mt-1.5 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-              <input
-                type="datetime-local"
-                value={schedDraft}
-                onChange={e => setSchedDraft(e.target.value)}
-                className="h-7 rounded border border-input bg-background px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-              <Button size="sm" className="h-7 px-2 text-xs" onClick={() => {
-                patchContactMutation.mutate({ scheduledCallAt: schedDraft ? new Date(schedDraft).toISOString() : null });
-                setShowSchedulePicker(false);
-              }}>Set</Button>
-              {contact.scheduledCallAt && (
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground" onClick={() => {
-                  setSchedDraft("");
-                  patchContactMutation.mutate({ scheduledCallAt: null });
-                  setShowSchedulePicker(false);
-                }}>Clear</Button>
-              )}
-            </div>
-          )}
         </td>
       </tr>
 
