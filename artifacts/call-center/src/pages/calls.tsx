@@ -157,7 +157,7 @@ function RecordingPlayer({ callId, hasRecording }: { callId: number; hasRecordin
         href={src}
         download
         onClick={(e) => e.stopPropagation()}
-        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+        className="shrink-0 text-cyan-500 hover:text-cyan-300 transition-colors"
         title="Download recording"
       >
         <Download className="h-3.5 w-3.5" />
@@ -675,7 +675,7 @@ export default function Calls() {
                   <button
                     onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(call.id); }}
                     disabled={deletingId === call.id}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded text-muted-foreground hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                    className="p-1 rounded text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30"
                     title="Delete log"
                   >
                     {deletingId === call.id
