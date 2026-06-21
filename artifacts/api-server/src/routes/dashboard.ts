@@ -1,6 +1,15 @@
 import { Router, type IRouter } from "express";
 import { desc, eq, gte, sql } from "drizzle-orm";
-import { db, phoneNumbersTable, callLogsTable, contactsTable, companiesTable } from "@workspace/db";
+import {
+  db,
+  phoneNumbersTable,
+  callLogsTable,
+  contactsTable,
+  companiesTable,
+  campaignsTable,
+  campaignCallLogsTable,
+  campaignContactsTable,
+} from "@workspace/db";
 import {
   GetDashboardStatsResponse,
   GetRecentCallsResponse,
@@ -61,7 +70,9 @@ router.get("/dashboard/recent-calls", async (req, res): Promise<void> => {
   }
 
   const limit = query.data.limit ?? 10;
-  const logs = await db
+
+  // Regular inbound/outbound call logs (joined with phone number + company)
+  const regularLogs = await db
     .select({
       id: callLogsTable.id,
       phoneNumberId: callLogsTable.phoneNumberId,
@@ -89,6 +100,9 @@ router.get("/dashboard/recent-calls", async (req, res): Promise<void> => {
       companyName: companiesTable.name,
       phoneNumber: phoneNumbersTable.number,
       phoneFriendlyName: phoneNumbersTable.friendlyName,
+      campaignId: sql<null>`null`,
+      campaignName: sql<null>`null`,
+      campaignContactName: sql<null>`null`,
     })
     .from(callLogsTable)
     .leftJoin(phoneNumbersTable, eq(callLogsTable.phoneNumberId, phoneNumbersTable.id))
@@ -96,9 +110,54 @@ router.get("/dashboard/recent-calls", async (req, res): Promise<void> => {
     .orderBy(desc(callLogsTable.createdAt))
     .limit(limit);
 
-  res.json(GetRecentCallsResponse.parse(logs.map(l => ({
+  // Campaign outbound call logs (joined with campaign + contact + from phone number)
+  const campaignLogs = await db
+    .select({
+      id: campaignCallLogsTable.id,
+      phoneNumberId: sql<null>`null`,
+      twilioCallSid: campaignCallLogsTable.twilioCallSid,
+      direction: sql<string>`'outbound'`,
+      status: campaignCallLogsTable.callStatus,
+      fromNumber: phoneNumbersTable.number,
+      toNumber: campaignContactsTable.phone,
+      duration: campaignCallLogsTable.callDuration,
+      recordingUrl: campaignCallLogsTable.recordingUrl,
+      recordingSid: campaignCallLogsTable.recordingSid,
+      transcription: campaignCallLogsTable.transcription,
+      contactId: campaignCallLogsTable.contactId,
+      contactName: campaignContactsTable.name,
+      callerIdName: sql<null>`null`,
+      answerMode: sql<null>`null`,
+      callerName: campaignContactsTable.name,
+      callerEmail: sql<null>`null`,
+      callType: sql<string>`'Campaign Call'`,
+      callSummary: campaignCallLogsTable.callSummary,
+      actionRequired: sql<null>`null`,
+      priority: sql<null>`null`,
+      createdAt: campaignCallLogsTable.calledAt,
+      companyId: sql<null>`null`,
+      companyName: sql<null>`null`,
+      phoneNumber: phoneNumbersTable.number,
+      phoneFriendlyName: phoneNumbersTable.friendlyName,
+      campaignId: campaignsTable.id,
+      campaignName: campaignsTable.name,
+      campaignContactName: campaignContactsTable.name,
+    })
+    .from(campaignCallLogsTable)
+    .innerJoin(campaignContactsTable, eq(campaignCallLogsTable.contactId, campaignContactsTable.id))
+    .innerJoin(campaignsTable, eq(campaignCallLogsTable.campaignId, campaignsTable.id))
+    .leftJoin(phoneNumbersTable, eq(campaignsTable.fromPhoneNumberId, phoneNumbersTable.id))
+    .orderBy(desc(campaignCallLogsTable.calledAt))
+    .limit(limit);
+
+  // Merge, sort by date, take top N
+  const merged = [...regularLogs, ...campaignLogs]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit);
+
+  res.json(GetRecentCallsResponse.parse(merged.map(l => ({
     ...l,
-    createdAt: l.createdAt.toISOString(),
+    createdAt: l.createdAt instanceof Date ? l.createdAt.toISOString() : l.createdAt,
   }))));
 });
 

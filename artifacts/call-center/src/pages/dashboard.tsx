@@ -108,7 +108,7 @@ function MiniCard({
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const [activityOpen, setActivityOpen] = useState(true);
+  const [activityOpen, setActivityOpen] = useState(false);
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: recentCalls, isLoading: callsLoading } = useGetRecentCalls({ limit: 6 });
 
@@ -433,11 +433,13 @@ export default function Dashboard() {
                 {recentCalls.map(call => {
                   const isInbound = call.direction === "inbound";
                   const externalNumber = isInbound ? call.fromNumber : call.toNumber;
-                  const callerLabel = call.callerName || call.contactName || call.callerIdName || null;
+                  const callerLabel = call.campaignContactName || call.callerName || call.contactName || call.callerIdName || null;
                   const lineName = call.phoneFriendlyName || call.phoneNumber || null;
-                  const lineLabel = call.companyName
-                    ? `${call.companyName}${lineName ? ` · ${lineName}` : ""}`
-                    : lineName;
+                  const lineLabel = call.campaignName
+                    ? `${call.campaignName}${lineName ? ` · ${lineName}` : ""}`
+                    : call.companyName
+                      ? `${call.companyName}${lineName ? ` · ${lineName}` : ""}`
+                      : lineName;
                   return (
                     <Link key={call.id} href="/calls">
                       <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/20 transition-colors cursor-pointer">

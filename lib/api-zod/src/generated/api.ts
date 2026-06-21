@@ -549,7 +549,10 @@ export const GetRecentCallsResponseItem = zod.object({
   "companyId": zod.number().nullish(),
   "companyName": zod.string().nullish(),
   "phoneNumber": zod.string().nullish(),
-  "phoneFriendlyName": zod.string().nullish()
+  "phoneFriendlyName": zod.string().nullish(),
+  "campaignId": zod.number().nullish(),
+  "campaignName": zod.string().nullish(),
+  "campaignContactName": zod.string().nullish()
 })
 export const GetRecentCallsResponse = zod.array(GetRecentCallsResponseItem)
 

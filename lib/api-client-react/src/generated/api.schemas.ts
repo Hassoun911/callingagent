@@ -481,6 +481,12 @@ export interface RecentCallItem {
   phoneNumber?: string | null;
   /** @nullable */
   phoneFriendlyName?: string | null;
+  /** @nullable */
+  campaignId?: number | null;
+  /** @nullable */
+  campaignName?: string | null;
+  /** @nullable */
+  campaignContactName?: string | null;
 }
 
 export type CallLogDirection = typeof CallLogDirection[keyof typeof CallLogDirection];

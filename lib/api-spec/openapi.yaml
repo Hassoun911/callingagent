@@ -1436,6 +1436,12 @@ components:
           type: ["string", "null"]
         phoneFriendlyName:
           type: ["string", "null"]
+        campaignId:
+          type: ["integer", "null"]
+        campaignName:
+          type: ["string", "null"]
+        campaignContactName:
+          type: ["string", "null"]
 
     CallLog:
       type: object
