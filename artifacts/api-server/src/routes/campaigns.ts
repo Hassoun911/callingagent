@@ -383,6 +383,46 @@ router.post("/campaigns", async (req, res): Promise<void> => {
 
 // ─── Get campaign ────────────────────────────────────────────────────────────
 // ─── Calendar events (callbacks + hot leads) ──────────────────────────────────
+router.get("/campaigns/stats", async (req, res): Promise<void> => {
+  try {
+    const [totalRows, notInterestedRows] = await Promise.all([
+      db
+        .select({
+          id: campaignContactsTable.id,
+          name: campaignContactsTable.name,
+          phone: campaignContactsTable.phone,
+          callOutcome: campaignContactsTable.callOutcome,
+          lastAttemptAt: campaignContactsTable.lastAttemptAt,
+          campaignName: campaignsTable.name,
+        })
+        .from(campaignContactsTable)
+        .innerJoin(campaignsTable, eq(campaignContactsTable.campaignId, campaignsTable.id))
+        .where(eq(campaignContactsTable.callStatus, "completed"))
+        .orderBy(desc(campaignContactsTable.lastAttemptAt)),
+      db
+        .select({
+          id: campaignContactsTable.id,
+          name: campaignContactsTable.name,
+          phone: campaignContactsTable.phone,
+          callOutcome: campaignContactsTable.callOutcome,
+          lastAttemptAt: campaignContactsTable.lastAttemptAt,
+          campaignName: campaignsTable.name,
+        })
+        .from(campaignContactsTable)
+        .innerJoin(campaignsTable, eq(campaignContactsTable.campaignId, campaignsTable.id))
+        .where(eq(campaignContactsTable.callOutcome, "not_interested"))
+        .orderBy(desc(campaignContactsTable.lastAttemptAt)),
+    ]);
+    res.json({
+      totalCalls: totalRows.map(r => ({ ...r, lastAttemptAt: r.lastAttemptAt?.toISOString() ?? null })),
+      notInterested: notInterestedRows.map(r => ({ ...r, lastAttemptAt: r.lastAttemptAt?.toISOString() ?? null })),
+    });
+  } catch (err: any) {
+    req.log.error({ err: err?.message }, "Failed to get campaign stats");
+    res.status(500).json({ error: "Failed to get campaign stats" });
+  }
+});
+
 router.get("/campaigns/calendar", async (req, res): Promise<void> => {
   try {
     const rows = await db

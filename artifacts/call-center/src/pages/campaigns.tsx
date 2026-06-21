@@ -40,6 +40,15 @@ interface PhoneNumber {
   friendlyName: string | null;
 }
 
+interface StatContact {
+  id: number;
+  name: string;
+  phone: string;
+  callOutcome: string | null;
+  lastAttemptAt: string | null;
+  campaignName: string;
+}
+
 interface CalendarEvent {
   id: number;
   campaignId: number;
@@ -98,6 +107,82 @@ function ProgressBar({ value, max }: { value: number; max: number }) {
       </div>
       <span className="text-[11px] font-mono text-muted-foreground w-8 text-right">{pct}%</span>
     </div>
+  );
+}
+
+// ─── Stats Popup ──────────────────────────────────────────────────────────────
+type StatsPopupType = "hotLeads" | "callbacks" | "totalCalls" | "notInterested" | null;
+
+function StatsPopup({
+  type,
+  hotLeadContacts,
+  callbackContacts,
+  totalCallContacts,
+  notInterestedContacts,
+  onClose,
+}: {
+  type: StatsPopupType;
+  hotLeadContacts: CalendarEvent[];
+  callbackContacts: CalendarEvent[];
+  totalCallContacts: StatContact[];
+  notInterestedContacts: StatContact[];
+  onClose: () => void;
+}) {
+  if (!type) return null;
+
+  const titles: Record<string, string> = {
+    hotLeads: "Hot Leads",
+    callbacks: "Callbacks Scheduled",
+    totalCalls: "Total Calls",
+    notInterested: "Not Interested",
+  };
+
+  const isCalendarType = type === "hotLeads" || type === "callbacks";
+  const calContacts = type === "hotLeads" ? hotLeadContacts : callbackContacts;
+  const statContacts = type === "totalCalls" ? totalCallContacts : notInterestedContacts;
+  const contacts = isCalendarType ? calContacts : statContacts;
+  const count = contacts.length;
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-lg bg-card border-border max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{titles[type]} — {count}</DialogTitle>
+        </DialogHeader>
+        <div className="overflow-y-auto flex-1 -mx-6 px-6">
+          {count === 0 && (
+            <div className="text-sm text-muted-foreground py-6 text-center">No contacts yet.</div>
+          )}
+          <div className="divide-y divide-border">
+            {isCalendarType
+              ? calContacts.map(c => (
+                <div key={c.id} className="flex items-center gap-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{c.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">{c.campaignName}</div>
+                  </div>
+                  <div className="font-mono text-sm text-muted-foreground shrink-0">{c.phone}</div>
+                </div>
+              ))
+              : statContacts.map(c => (
+                <div key={c.id} className="flex items-center gap-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{c.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">{c.campaignName}</div>
+                  </div>
+                  <div className="font-mono text-sm text-muted-foreground shrink-0">{c.phone}</div>
+                  {c.callOutcome && (
+                    <div className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-secondary text-muted-foreground shrink-0">
+                      {c.callOutcome.replace(/_/g, " ")}
+                    </div>
+                  )}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -199,19 +284,65 @@ function CalendarTab() {
   const hotLeadCount = events.filter(e => e.eventType === "hot_lead").length;
   const callbackCount = events.filter(e => e.eventType === "callback").length;
 
+  const [statsPopup, setStatsPopup] = useState<"totalCalls" | "notInterested" | "hotLeads" | "callbacks" | null>(null);
+
+  const { data: campaignStats } = useQuery({
+    queryKey: ["campaigns-stats"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/campaigns/stats`);
+      if (!r.ok) throw new Error("Failed");
+      return r.json() as Promise<{ totalCalls: StatContact[]; notInterested: StatContact[] }>;
+    },
+    refetchInterval: 30000,
+  });
+
+  const hotLeadContacts = events.filter(e => e.eventType === "hot_lead");
+  const callbackContacts = events.filter(e => e.eventType === "callback");
+
   return (
     <div className="space-y-5">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-card border border-border rounded-lg px-4 py-3">
+        <button
+          onClick={() => setStatsPopup("hotLeads")}
+          className="bg-card border border-border rounded-lg px-4 py-3 text-left hover:border-green-500/30 transition-colors"
+        >
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Hot Leads</div>
           <div className="text-2xl font-bold mt-1 text-green-400">{hotLeadCount}</div>
-        </div>
-        <div className="bg-card border border-border rounded-lg px-4 py-3">
+        </button>
+        <button
+          onClick={() => setStatsPopup("callbacks")}
+          className="bg-card border border-border rounded-lg px-4 py-3 text-left hover:border-orange-500/30 transition-colors"
+        >
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Callbacks Scheduled</div>
           <div className="text-2xl font-bold mt-1 text-orange-400">{callbackCount}</div>
-        </div>
+        </button>
+        <button
+          onClick={() => setStatsPopup("totalCalls")}
+          className="bg-card border border-border rounded-lg px-4 py-3 text-left hover:border-blue-500/30 transition-colors"
+        >
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Calls</div>
+          <div className="text-2xl font-bold mt-1 text-blue-400">{campaignStats?.totalCalls.length ?? 0}</div>
+        </button>
+        <button
+          onClick={() => setStatsPopup("notInterested")}
+          className="bg-card border border-border rounded-lg px-4 py-3 text-left hover:border-red-500/30 transition-colors"
+        >
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Not Interested</div>
+          <div className="text-2xl font-bold mt-1 text-red-400">{campaignStats?.notInterested.length ?? 0}</div>
+        </button>
       </div>
+
+      {/* Stats contact list popup */}
+      <StatsPopup
+        type={statsPopup}
+        hotLeadContacts={hotLeadContacts}
+        callbackContacts={callbackContacts}
+        totalCallContacts={campaignStats?.totalCalls ?? []}
+        notInterestedContacts={campaignStats?.notInterested ?? []}
+        onClose={() => setStatsPopup(null)}
+      />
+
 
       {/* Calendar */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
