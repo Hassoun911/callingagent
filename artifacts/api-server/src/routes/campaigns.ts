@@ -643,9 +643,23 @@ router.delete("/campaigns/:id/contacts/:contactId", async (req, res): Promise<vo
 
 // ─── Fire due contacts up to concurrent limit ─────────────────────────────────
 // Picks pending contacts whose scheduledCallAt is null or in the past, respects maxConcurrentCalls.
+// If campaign has a schedule window, contacts with no specific scheduledCallAt only fire inside that window.
 async function fireDueContacts(campaign: any, fromNumber: string, baseUrl: string): Promise<number> {
   const maxConcurrent = campaign.maxConcurrentCalls ?? 1;
   const now = new Date();
+
+  // Determine if this campaign is restricted to a schedule window
+  let scheduleRestricted = false;
+  let withinWindow = false;
+  if (campaign.scheduleConfig) {
+    try {
+      const cfg: CampaignScheduleConfig = JSON.parse(campaign.scheduleConfig);
+      if (cfg.enabled && cfg.slots?.length) {
+        scheduleRestricted = true;
+        withinWindow = isWithinScheduleWindow(cfg);
+      }
+    } catch { /* ignore */ }
+  }
 
   // Count currently in-flight calls
   const [countRow] = await db
@@ -659,12 +673,18 @@ async function fireDueContacts(campaign: any, fromNumber: string, baseUrl: strin
   const slots = maxConcurrent - calling;
   if (slots <= 0) return 0;
 
-  // Find due pending contacts (not skipped, scheduledCallAt null or past)
+  // Find due pending contacts:
+  // - Contacts with a specific scheduledCallAt in the past always fire (explicit override)
+  // - Contacts with no scheduledCallAt only fire if there's no schedule restriction OR we're inside the window
+  const noSchedCondition = scheduleRestricted
+    ? (withinWindow ? sql`${campaignContactsTable.scheduledCallAt} IS NULL` : sql`false`)
+    : sql`${campaignContactsTable.scheduledCallAt} IS NULL`;
+
   const due = await db.select().from(campaignContactsTable)
     .where(and(
       eq(campaignContactsTable.campaignId, campaign.id),
       eq(campaignContactsTable.callStatus, "pending"),
-      sql`(${campaignContactsTable.scheduledCallAt} IS NULL OR ${campaignContactsTable.scheduledCallAt} <= ${now})`,
+      sql`(${noSchedCondition} OR ${campaignContactsTable.scheduledCallAt} <= ${now})`,
     ))
     .limit(slots);
 
