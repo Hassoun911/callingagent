@@ -551,22 +551,21 @@ export default function Calls() {
               <TableHead className="w-[70px]">Duration</TableHead>
               <TableHead className="w-[100px]">Status</TableHead>
               <TableHead className="w-[85px]">Priority</TableHead>
-              <TableHead className="w-[100px]">Recording</TableHead>
-              <TableHead className="w-[90px]"></TableHead>
+              <TableHead className="w-[180px]">Recording</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               [...Array(5)].map((_, i) => (
                 <TableRow key={i} className="border-border">
-                  {[...Array(10)].map((_, j) => (
+                  {[...Array(9)].map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : filtered?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                   No call logs found.
                 </TableCell>
               </TableRow>
@@ -632,10 +631,8 @@ export default function Calls() {
                   <PriorityBadge priority={call.priority} />
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  <RecordingPlayer callId={call.id} hasRecording={!!(call.recordingSid || call.recordingUrl)} />
-                </TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1">
+                    <RecordingPlayer callId={call.id} hasRecording={!!(call.recordingSid || call.recordingUrl)} />
                     {!!(call.recordingSid || call.recordingUrl) && (
                       <a
                         href={`/api/call-logs/${call.id}/recording`}
