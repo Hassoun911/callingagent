@@ -457,6 +457,7 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
   const [expanded, setExpanded] = useState(false);
   const [notesDraft, setNotesDraft] = useState(contact.userNotes ?? "");
   const [notesSaved, setNotesSaved] = useState(false);
+  const [notesEditing, setNotesEditing] = useState(false);
   const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -609,21 +610,47 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
           <td colSpan={8} className="px-6 py-4 bg-secondary/10">
             <div className="space-y-4">
               {/* Notes section */}
-              <div>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <FileText className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Notes</span>
-                  {notesSaved && <span className="text-[10px] text-green-400 tracking-wider">Saved</span>}
-                </div>
-                <Textarea
-                  value={notesDraft}
-                  onChange={e => handleNotesChange(e.target.value)}
-                  onBlur={() => { if (notesTimerRef.current) { clearTimeout(notesTimerRef.current); notesTimerRef.current = null; } saveNotes(notesDraft); }}
-                  placeholder="Add notes about this contact..."
-                  rows={3}
-                  className="text-sm bg-background/60 border-border/50 resize-none w-full"
-                  onClick={e => e.stopPropagation()}
-                />
+              <div onClick={e => e.stopPropagation()}>
+                {notesEditing ? (
+                  <div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <FileText className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Notes</span>
+                      {notesSaved && <span className="text-[10px] text-green-400 tracking-wider">Saved</span>}
+                    </div>
+                    <Textarea
+                      value={notesDraft}
+                      onChange={e => handleNotesChange(e.target.value)}
+                      onBlur={() => {
+                        if (notesTimerRef.current) { clearTimeout(notesTimerRef.current); notesTimerRef.current = null; }
+                        saveNotes(notesDraft);
+                        setNotesEditing(false);
+                      }}
+                      placeholder="Add notes about this contact..."
+                      rows={3}
+                      autoFocus
+                      className="text-sm bg-background/60 border-border/50 resize-none w-full"
+                    />
+                  </div>
+                ) : notesDraft ? (
+                  <div
+                    className="flex items-start gap-2 cursor-pointer group/note"
+                    onClick={() => setNotesEditing(true)}
+                    title="Click to edit note"
+                  >
+                    <FileText className="h-3 w-3 text-amber-400 mt-0.5 shrink-0" />
+                    <span className="text-xs text-muted-foreground leading-relaxed group-hover/note:text-foreground transition-colors">{notesDraft}</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setNotesEditing(true)}
+                    className="flex items-center gap-1.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                    title="Add note"
+                  >
+                    <FileText className="h-3 w-3" />
+                    <span className="text-[10px] uppercase tracking-wider">Add note</span>
+                  </button>
+                )}
               </div>
 
               {/* Call history */}
