@@ -617,9 +617,18 @@ function ContactRow({ contact, campaignId, campaignHasSchedule, onRefresh }: { c
           {formatDuration(contact.callDuration)}
         </td>
 
-        {/* Last called */}
+        {/* Last called + scheduled */}
         <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">
-          {lastAttempt ?? <span className="text-muted-foreground/50">Never</span>}
+          <div className="flex flex-col gap-0.5">
+            {lastAttempt
+              ? <span>{lastAttempt}</span>
+              : <span className="text-muted-foreground/50">Never</span>}
+            {contact.scheduledCallAt && (
+              <span className="text-blue-400 font-medium">
+                {formatDateTime(contact.scheduledCallAt)}
+              </span>
+            )}
+          </div>
         </td>
 
         {/* Attempts */}
@@ -1302,7 +1311,7 @@ export default function CampaignDetail() {
                 <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Phone</th>
                 <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Outcome</th>
                 <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Duration</th>
-                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Last Called</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Last Called / Scheduled</th>
                 <th className="text-center px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Calls</th>
                 <th className="text-right px-3 py-2.5 font-semibold text-muted-foreground text-[11px] uppercase tracking-wider">Actions</th>
               </tr>
