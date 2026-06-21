@@ -150,20 +150,7 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
 function RecordingPlayer({ callId, hasRecording }: { callId: number; hasRecording: boolean }) {
   if (!hasRecording) return <span className="text-muted-foreground text-xs">--</span>;
   const src = `/api/call-logs/${callId}/recording`;
-  return (
-    <div className="flex items-center gap-2">
-      <AudioPlayer src={src} />
-      <a
-        href={src}
-        download
-        onClick={(e) => e.stopPropagation()}
-        className="shrink-0 text-cyan-500 hover:text-cyan-300 transition-colors"
-        title="Download recording"
-      >
-        <Download className="h-3.5 w-3.5" />
-      </a>
-    </div>
-  );
+  return <AudioPlayer src={src} />;
 }
 
 function PriorityBadge({ priority }: { priority: string | null | undefined }) {
@@ -574,10 +561,8 @@ export default function Calls() {
               <TableHead>Duration</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Priority</TableHead>
-              <TableHead className="w-[220px]">Recording</TableHead>
-              <TableHead className="w-8"></TableHead>
-              <TableHead className="w-8"></TableHead>
-              <TableHead className="w-8"></TableHead>
+              <TableHead className="w-[160px]">Recording</TableHead>
+              <TableHead className="w-[90px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -659,30 +644,36 @@ export default function Calls() {
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <RecordingPlayer callId={call.id} hasRecording={!!(call.recordingSid || call.recordingUrl)} />
                 </TableCell>
-                <TableCell>
-                  {hasSummaryData(call) && (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  <NoteIconButton
-                    callId={call.id}
-                    note={call.id in localNotes ? localNotes[call.id] : ((call as any).notes ?? null)}
-                    onOpen={setNoteTarget}
-                  />
-                </TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(call.id); }}
-                    disabled={deletingId === call.id}
-                    className="p-1 rounded text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30"
-                    title="Delete log"
-                  >
-                    {deletingId === call.id
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <Trash2 className="h-3.5 w-3.5" />
-                    }
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {!!(call.recordingSid || call.recordingUrl) && (
+                      <a
+                        href={`/api/call-logs/${call.id}/recording`}
+                        download
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1 rounded text-cyan-500 hover:text-cyan-300 transition-colors"
+                        title="Download recording"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                      </a>
+                    )}
+                    <NoteIconButton
+                      callId={call.id}
+                      note={call.id in localNotes ? localNotes[call.id] : ((call as any).notes ?? null)}
+                      onOpen={setNoteTarget}
+                    />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(call.id); }}
+                      disabled={deletingId === call.id}
+                      className="p-1 rounded text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30"
+                      title="Delete log"
+                    >
+                      {deletingId === call.id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : <Trash2 className="h-3.5 w-3.5" />
+                      }
+                    </button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
