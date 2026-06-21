@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -11,6 +11,8 @@ import {
   CreditCard,
   MessageSquare,
   Target,
+  Menu,
+  X,
 } from "lucide-react";
 import { useWatches } from "@/hooks/use-watches";
 
@@ -31,6 +33,7 @@ function NotificationBell() {
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -44,14 +47,15 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/billing", label: "Billing", icon: CreditCard },
   ];
 
-  return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 border-r border-border bg-card flex flex-col">
-        <div className="h-16 flex items-center px-6 border-b border-border">
+  function NavContent({ onNav }: { onNav?: () => void }) {
+    return (
+      <>
+        <div className="h-16 flex items-center px-6 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-2 text-primary">
             <PhoneCall className="h-6 w-6" />
-            <span className="font-bold text-lg text-foreground tracking-tight">VANGUARD<span className="text-primary">.OPS</span></span>
+            <span className="font-bold text-lg text-foreground tracking-tight">
+              VANGUARD<span className="text-primary">.OPS</span>
+            </span>
           </div>
         </div>
         <div className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
@@ -59,56 +63,104 @@ export function Layout({ children }: { children: ReactNode }) {
             Systems
           </div>
           {navItems.map((item) => {
-            const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+            const isActive =
+              location === item.href ||
+              (item.href !== "/" && location.startsWith(item.href));
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onNav}
                 className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                   isActive
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                 }`}
               >
-                <item.icon className="h-4 w-4" />
+                <item.icon className="h-4 w-4 flex-shrink-0" />
                 {item.label}
               </Link>
             );
           })}
         </div>
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
+            <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0">
               A
             </div>
-            <div className="text-xs">
+            <div className="text-xs min-w-0">
               <div className="font-medium text-foreground">Admin User</div>
               <div className="text-muted-foreground">System Operator</div>
             </div>
           </div>
         </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="flex h-screen w-full bg-background overflow-hidden">
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex w-64 flex-shrink-0 border-r border-border bg-card flex-col">
+        <NavContent />
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <div className="h-16 flex-shrink-0 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center px-6 justify-between z-10">
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]"></div>
-              <span>Systems Online</span>
+      {/* Mobile sidebar overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+          <aside className="absolute left-0 top-0 h-full w-64 bg-card border-r border-border flex flex-col shadow-2xl">
+            <div className="absolute top-3 right-3">
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <span className="text-border">|</span>
-            <span className="font-mono text-xs">US-EAST-1</span>
+            <NavContent onNav={() => setMobileOpen(false)} />
+          </aside>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative min-w-0">
+        <div className="h-16 flex-shrink-0 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center px-4 md:px-6 justify-between z-10">
+          <div className="flex items-center gap-3">
+            {/* Hamburger — mobile only */}
+            <button
+              className="md:hidden flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open navigation"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
+              <span className="hidden sm:inline">Systems Online</span>
+              <span className="hidden sm:inline text-border">|</span>
+              <span className="hidden sm:inline font-mono text-xs">US-EAST-1</span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <NotificationBell />
-            <div className="font-mono text-xs text-muted-foreground">
-              {new Date().toLocaleTimeString("en-US", { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })} ET
+            <div className="hidden sm:block font-mono text-xs text-muted-foreground">
+              {new Date().toLocaleTimeString("en-US", {
+                timeZone: "America/Toronto",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: true,
+              })}{" "}
+              ET
             </div>
           </div>
         </div>
-        <div className="flex-1 overflow-auto bg-background p-6">
-          <div className="max-w-6xl mx-auto h-full">
+        <div className="flex-1 overflow-auto bg-background p-4 md:p-6">
+          <div className="max-w-6xl mx-auto">
             {children}
           </div>
         </div>

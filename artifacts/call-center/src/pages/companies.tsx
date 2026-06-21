@@ -103,7 +103,8 @@ export default function Companies() {
       </div>
 
       <Card className="border-border">
-        <Table>
+        <div className="overflow-x-auto">
+        <Table className="min-w-[560px]">
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead>Company Name</TableHead>
@@ -189,6 +190,7 @@ export default function Companies() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

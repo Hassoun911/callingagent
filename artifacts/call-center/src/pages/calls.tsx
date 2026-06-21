@@ -399,8 +399,9 @@ export default function Calls() {
         </Select>
       </div>
 
-      <Card className="border-border overflow-hidden">
-        <Table>
+      <Card className="border-border">
+        <div className="overflow-x-auto">
+        <Table className="min-w-[800px]">
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead className="w-[150px]">Date / Time</TableHead>
@@ -517,6 +518,7 @@ export default function Calls() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </Card>
 
       <CallDetail

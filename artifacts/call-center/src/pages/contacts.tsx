@@ -124,7 +124,8 @@ export default function Contacts() {
       </div>
 
       <Card className="border-border">
-        <Table>
+        <div className="overflow-x-auto">
+        <Table className="min-w-[600px]">
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead>Name</TableHead>
@@ -216,6 +217,7 @@ export default function Contacts() {
             ))}
           </TableBody>
         </Table>
+        </div>
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -215,7 +215,7 @@ export default function Dashboard() {
           </div>
 
           {/* Secondary metrics — row 2 */}
-          <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <MiniCard label="Inbound" value={stats.inboundCalls} icon={PhoneIncoming} iconBg="bg-green-500/10" iconColor="text-green-400" href="/calls" />
             <MiniCard label="Outbound" value={stats.outboundCalls} icon={PhoneOutgoing} iconBg="bg-blue-500/10" iconColor="text-blue-400" href="/calls" />
             <MiniCard label="AI Answered" value={stats.aiAnswered} icon={Activity} iconBg="bg-purple-500/10" iconColor="text-purple-400" href="/calls" />
@@ -352,7 +352,7 @@ export default function Dashboard() {
       </div>
 
       {/* Quick access row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <Link href="/numbers">
           <div className="bg-card border border-border rounded-lg p-3.5 flex items-center gap-3 hover:border-primary/40 hover:bg-card/80 transition-all cursor-pointer group">
             <div className="p-2 rounded-md bg-blue-500/10"><Phone className="h-4 w-4 text-blue-400" /></div>
