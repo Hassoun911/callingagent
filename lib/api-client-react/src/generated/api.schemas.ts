@@ -535,6 +535,8 @@ export interface CallLog {
   actionRequired?: string | null;
   /** @nullable */
   priority?: string | null;
+  /** @nullable */
+  notes?: string | null;
   createdAt: string;
 }
 
@@ -947,6 +949,11 @@ export const ListCallLogsDirection = {
   inbound: 'inbound',
   outbound: 'outbound',
 } as const;
+
+export type UpdateCallLogNotesBody = {
+  /** @nullable */
+  notes: string | null;
+};
 
 export type GetRecentCallsParams = {
 limit?: number;

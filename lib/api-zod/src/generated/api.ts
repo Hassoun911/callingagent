@@ -401,6 +401,7 @@ export const ListCallLogsResponseItem = zod.object({
   "callSummary": zod.string().nullish(),
   "actionRequired": zod.string().nullish(),
   "priority": zod.string().nullish(),
+  "notes": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListCallLogsResponse = zod.array(ListCallLogsResponseItem)
@@ -432,6 +433,45 @@ export const GetCallLogResponse = zod.object({
   "callSummary": zod.string().nullish(),
   "actionRequired": zod.string().nullish(),
   "priority": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update notes on a call log
+ */
+export const UpdateCallLogNotesParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateCallLogNotesBody = zod.object({
+  "notes": zod.string().nullable()
+})
+
+export const UpdateCallLogNotesResponse = zod.object({
+  "id": zod.number(),
+  "phoneNumberId": zod.number().nullish(),
+  "twilioCallSid": zod.string().nullish(),
+  "direction": zod.enum(['inbound', 'outbound']),
+  "status": zod.string(),
+  "fromNumber": zod.string(),
+  "toNumber": zod.string(),
+  "duration": zod.number().nullish(),
+  "recordingUrl": zod.string().nullish(),
+  "recordingSid": zod.string().nullish(),
+  "transcription": zod.string().nullish(),
+  "contactId": zod.number().nullish(),
+  "contactName": zod.string().nullish(),
+  "callerIdName": zod.string().nullish(),
+  "answerMode": zod.string().nullish(),
+  "callerName": zod.string().nullish(),
+  "callerEmail": zod.string().nullish(),
+  "callType": zod.string().nullish(),
+  "callSummary": zod.string().nullish(),
+  "actionRequired": zod.string().nullish(),
+  "priority": zod.string().nullish(),
+  "notes": zod.string().nullish(),
   "createdAt": zod.string()
 })
 

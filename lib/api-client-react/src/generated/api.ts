@@ -62,7 +62,8 @@ import type {
   SmsMessage,
   StartCampaign200,
   TestCallInput,
-  TestCallResult
+  TestCallResult,
+  UpdateCallLogNotesBody
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1577,6 +1578,78 @@ export function useGetCallLog<TData = Awaited<ReturnType<typeof getCallLog>>, TE
 
 
 
+
+export const getUpdateCallLogNotesUrl = (id: number,) => {
+
+
+
+
+  return `/api/call-logs/${id}/notes`
+}
+
+/**
+ * @summary Update notes on a call log
+ */
+export const updateCallLogNotes = async (id: number,
+    updateCallLogNotesBody: UpdateCallLogNotesBody, options?: RequestInit): Promise<CallLog> => {
+
+  return customFetch<CallLog>(getUpdateCallLogNotesUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateCallLogNotesBody,)
+  }
+);}
+
+
+
+
+export const getUpdateCallLogNotesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCallLogNotes>>, TError,{id: number;data: BodyType<UpdateCallLogNotesBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCallLogNotes>>, TError,{id: number;data: BodyType<UpdateCallLogNotesBody>}, TContext> => {
+
+const mutationKey = ['updateCallLogNotes'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCallLogNotes>>, {id: number;data: BodyType<UpdateCallLogNotesBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCallLogNotes(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCallLogNotesMutationResult = NonNullable<Awaited<ReturnType<typeof updateCallLogNotes>>>
+    export type UpdateCallLogNotesMutationBody = BodyType<UpdateCallLogNotesBody>
+    export type UpdateCallLogNotesMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update notes on a call log
+ */
+export const useUpdateCallLogNotes = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCallLogNotes>>, TError,{id: number;data: BodyType<UpdateCallLogNotesBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCallLogNotes>>,
+        TError,
+        {id: number;data: BodyType<UpdateCallLogNotesBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateCallLogNotesMutationOptions(options));
+    }
 
 export const getGetRecordingUrlUrl = (id: number,) => {
 

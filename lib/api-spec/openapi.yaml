@@ -435,6 +435,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/CallLog"
 
+  /call-logs/{id}/notes:
+    patch:
+      operationId: updateCallLogNotes
+      tags: [call-logs]
+      summary: Update notes on a call log
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [notes]
+              properties:
+                notes:
+                  type: ["string", "null"]
+      responses:
+        "200":
+          description: Updated call log
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallLog"
+
   /call-logs/{id}/recording:
     get:
       operationId: getRecordingUrl
@@ -1489,6 +1518,8 @@ components:
         actionRequired:
           type: ["string", "null"]
         priority:
+          type: ["string", "null"]
+        notes:
           type: ["string", "null"]
         createdAt:
           type: string

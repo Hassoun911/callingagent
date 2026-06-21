@@ -45,5 +45,7 @@ export interface CallLog {
   actionRequired?: string | null;
   /** @nullable */
   priority?: string | null;
+  /** @nullable */
+  notes?: string | null;
   createdAt: string;
 }

@@ -116,6 +116,19 @@ router.get("/call-logs/:id/recording", async (req, res): Promise<void> => {
   await pump();
 });
 
+router.patch("/call-logs/:id/notes", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const { notes } = req.body as { notes: string | null };
+  const [updated] = await db
+    .update(callLogsTable)
+    .set({ notes: notes ?? null, updatedAt: new Date() })
+    .where(eq(callLogsTable.id, id))
+    .returning();
+  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+  res.json({ ...updated, createdAt: updated.createdAt.toISOString() });
+});
+
 router.delete("/call-logs", async (req, res): Promise<void> => {
   await db.delete(callLogsTable);
   res.json({ deleted: true });

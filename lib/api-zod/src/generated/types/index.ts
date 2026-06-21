@@ -81,3 +81,4 @@ export * from './smsMessageDirection';
 export * from './startCampaign200';
 export * from './testCallInput';
 export * from './testCallResult';
+export * from './updateCallLogNotesBody';

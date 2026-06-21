@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useListCallLogs } from "@workspace/api-client-react";
+import { useListCallLogs, useUpdateCallLogNotes } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PhoneIncoming, PhoneOutgoing, Play, Pause, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone, Loader2, Download, Trash2 } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Play, Pause, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone, Loader2, Download, Trash2, FileText, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -175,9 +175,47 @@ function PriorityBadge({ priority }: { priority: string | null | undefined }) {
   );
 }
 
-function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose: () => void }) {
+function CallDetail({ call, open, onClose, onNotesUpdate }: { call: any; open: boolean; onClose: () => void; onNotesUpdate?: (id: number, notes: string | null) => void }) {
   const hasSummary = call?.callSummary || call?.callerName || call?.callerEmail || call?.callType || call?.actionRequired;
   const hasRecording = !!(call?.recordingSid || call?.recordingUrl);
+
+  const [notes, setNotes] = useState<string>(call?.notes ?? "");
+  const [saved, setSaved] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const updateNotes = useUpdateCallLogNotes();
+
+  useEffect(() => {
+    setNotes(call?.notes ?? "");
+    setSaved(false);
+  }, [call?.id, call?.notes]);
+
+  const persistNotes = useCallback((value: string) => {
+    if (!call?.id) return;
+    updateNotes.mutate(
+      { id: call.id, data: { notes: value || null } },
+      {
+        onSuccess: (updated) => {
+          setSaved(true);
+          onNotesUpdate?.(call.id, updated.notes ?? null);
+          if (savedTimer.current) clearTimeout(savedTimer.current);
+          savedTimer.current = setTimeout(() => setSaved(false), 2000);
+        },
+      }
+    );
+  }, [call?.id, updateNotes, onNotesUpdate]);
+
+  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setNotes(val);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => persistNotes(val), 800);
+  };
+
+  const handleNotesBlur = () => {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    persistNotes(notes);
+  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -277,6 +315,28 @@ function CallDetail({ call, open, onClose }: { call: any; open: boolean; onClose
             </div>
           </div>
         )}
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <FileText className="h-3 w-3" />
+              Notes
+            </p>
+            {saved && (
+              <span className="flex items-center gap-1 text-xs text-emerald-400">
+                <Check className="h-3 w-3" /> Saved
+              </span>
+            )}
+          </div>
+          <textarea
+            value={notes}
+            onChange={handleNotesChange}
+            onBlur={handleNotesBlur}
+            placeholder="Add notes about this call..."
+            rows={4}
+            className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -525,6 +585,9 @@ export default function Calls() {
         call={selectedCall}
         open={!!selectedCall}
         onClose={() => setSelectedCall(null)}
+        onNotesUpdate={(id, notes) =>
+          setSelectedCall((prev: any) => prev?.id === id ? { ...prev, notes } : prev)
+        }
       />
 
       <AlertDialog open={confirmDeleteId !== null} onOpenChange={(o) => !o && setConfirmDeleteId(null)}>

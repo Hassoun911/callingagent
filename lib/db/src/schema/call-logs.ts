@@ -24,6 +24,7 @@ export const callLogsTable = pgTable("call_logs", {
   callSummary: text("call_summary"),
   actionRequired: text("action_required"),
   priority: text("priority"),
+  notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
