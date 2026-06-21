@@ -13,7 +13,6 @@ import {
   Target,
   Menu,
   X,
-  ChevronRight,
 } from "lucide-react";
 import { useWatches } from "@/hooks/use-watches";
 import { useListCompanies, useListPhoneNumbers } from "@workspace/api-client-react";
@@ -73,11 +72,7 @@ export function Layout({ children }: { children: ReactNode }) {
   }
 
   function NavContent({ onNav }: { onNav?: () => void }) {
-    const onCompanyPage = isActive("/companies") && !location.match(/^\/companies\/\d+/);
     const onCompanyDetail = !!location.match(/^\/companies\/\d+/);
-    const onNumberDetail = !!location.match(/^\/numbers\/\d+/);
-    const companiesAncestor = isActive("/numbers") || isActive("/campaigns");
-    const numbersAncestor = isActive("/campaigns");
 
     return (
       <>
@@ -103,73 +98,44 @@ export function Layout({ children }: { children: ReactNode }) {
           <SectionLabel label="Structure" />
 
           {/* Companies */}
-          <Link
-            href="/companies"
-            onClick={onNav}
-            className={navCls("/companies", companiesAncestor)}
-          >
+          <Link href="/companies" onClick={onNav} className={navCls("/companies")}>
             <Building2 className="h-4 w-4 flex-shrink-0" />
             Companies
-            {companiesAncestor && (
-              <ChevronRight className="h-3 w-3 ml-auto text-muted-foreground/40" />
-            )}
           </Link>
 
-          {/* ── Context tree: company name appears when drilling in ── */}
-          {contextCompany ? (
-            /* CONTEXTUAL: inside a company or one of its numbers */
-            <div className="ml-3 pl-3 border-l border-primary/25 space-y-0.5">
-              {/* Company name breadcrumb node */}
+          {/* Context: company name shown when drilling into a company or its numbers */}
+          {contextCompany && (
+            <div className="ml-4 space-y-0.5">
               <Link
                 href={`/companies/${contextCompany.id}`}
                 onClick={onNav}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors text-xs font-semibold truncate ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors truncate ${
                   onCompanyDetail
                     ? "bg-primary/10 text-primary"
-                    : "text-primary/70 hover:text-primary hover:bg-primary/5"
+                    : "text-primary/60 hover:text-primary hover:bg-primary/5"
                 }`}
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-current flex-shrink-0" />
                 <span className="truncate">{contextCompany.name}</span>
               </Link>
-
-              {/* Numbers — child of Company */}
-              <div className="ml-3 pl-3 border-l border-border/40 space-y-0.5">
-                <Link href="/numbers" onClick={onNav} className={navCls("/numbers", numbersAncestor)}>
-                  <Phone className="h-4 w-4 flex-shrink-0" />
-                  Numbers
-                  {(onNumberDetail || numbersAncestor) && (
-                    <ChevronRight className="h-3 w-3 ml-auto text-muted-foreground/40" />
-                  )}
-                </Link>
-
-                {/* Campaigns — child of Numbers */}
-                <div className="ml-3 pl-3 border-l border-border/40 space-y-0.5">
-                  <Link href="/campaigns" onClick={onNav} className={navCls("/campaigns")}>
-                    <Target className="h-4 w-4 flex-shrink-0" />
-                    Campaigns
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* DEFAULT: no company selected yet */
-            <div className="ml-3 pl-3 border-l border-border/40 space-y-0.5">
-              <Link href="/numbers" onClick={onNav} className={navCls("/numbers", numbersAncestor)}>
-                <Phone className="h-4 w-4 flex-shrink-0" />
-                Numbers
-                {numbersAncestor && (
-                  <ChevronRight className="h-3 w-3 ml-auto text-muted-foreground/40" />
-                )}
-              </Link>
-              <div className="ml-3 pl-3 border-l border-border/40 space-y-0.5">
-                <Link href="/campaigns" onClick={onNav} className={navCls("/campaigns")}>
-                  <Target className="h-4 w-4 flex-shrink-0" />
-                  Campaigns
-                </Link>
-              </div>
             </div>
           )}
+
+          {/* Numbers */}
+          <div className="ml-4 space-y-0.5">
+            <Link href="/numbers" onClick={onNav} className={navCls("/numbers")}>
+              <Phone className="h-4 w-4 flex-shrink-0" />
+              Numbers
+            </Link>
+          </div>
+
+          {/* Campaigns */}
+          <div className="ml-8 space-y-0.5">
+            <Link href="/campaigns" onClick={onNav} className={navCls("/campaigns")}>
+              <Target className="h-4 w-4 flex-shrink-0" />
+              Campaigns
+            </Link>
+          </div>
 
           {/* ── RECORDS ── */}
           <SectionLabel label="Records" />
