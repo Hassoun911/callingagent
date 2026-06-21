@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, desc, or } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db, contactsTable, companiesTable } from "@workspace/db";
 import {
   ListContactsResponse,
@@ -22,7 +22,7 @@ router.get("/contacts", async (req, res): Promise<void> => {
     return;
   }
 
-  const { search, companyId } = query.data;
+  const { search, companyId, forCompanyId } = query.data;
 
   let contacts = await db
     .select({
@@ -35,6 +35,8 @@ router.get("/contacts", async (req, res): Promise<void> => {
       companyName: companiesTable.name,
       notes: contactsTable.notes,
       tags: contactsTable.tags,
+      accessType: contactsTable.accessType,
+      allowedCompanyIds: contactsTable.allowedCompanyIds,
       createdAt: contactsTable.createdAt,
     })
     .from(contactsTable)
@@ -56,10 +58,57 @@ router.get("/contacts", async (req, res): Promise<void> => {
     contacts = contacts.filter(c => c.companyId === companyId);
   }
 
+  // forCompanyId: return contacts accessible to this company
+  // accessType="all" → always included; accessType="selected" → only if company is in allowedCompanyIds
+  if (forCompanyId) {
+    contacts = contacts.filter(c => {
+      if (c.accessType === "all" || !c.accessType) return true;
+      if (!c.allowedCompanyIds) return false;
+      const ids = c.allowedCompanyIds.split(",").map(s => parseInt(s.trim(), 10)).filter(Boolean);
+      return ids.includes(forCompanyId);
+    });
+  }
+
   res.json(ListContactsResponse.parse(contacts.map(c => ({
     ...c,
+    accessType: c.accessType ?? "all",
     createdAt: c.createdAt.toISOString(),
   }))));
+});
+
+router.post("/contacts/import", async (req, res): Promise<void> => {
+  const body = req.body;
+  if (!body || !Array.isArray(body.contacts)) {
+    res.status(400).json({ error: "contacts must be an array" });
+    return;
+  }
+
+  const contacts: any[] = body.contacts;
+  const accessType: string = body.accessType ?? "all";
+  const allowedCompanyIds: string | null = body.allowedCompanyIds ?? null;
+  let imported = 0;
+  const errors: string[] = [];
+
+  for (const contact of contacts) {
+    try {
+      await db.insert(contactsTable).values({
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        email: contact.email ?? null,
+        phone: contact.phone ?? null,
+        companyId: contact.companyId ?? null,
+        notes: contact.notes ?? null,
+        tags: contact.tags ?? null,
+        accessType: accessType ?? "all",
+        allowedCompanyIds: allowedCompanyIds ?? null,
+      });
+      imported++;
+    } catch (e: any) {
+      errors.push(`${contact.firstName} ${contact.lastName}: ${e.message ?? "unknown error"}`);
+    }
+  }
+
+  res.json({ imported, skipped: errors.length, errors });
 });
 
 router.post("/contacts", async (req, res): Promise<void> => {
@@ -70,7 +119,12 @@ router.post("/contacts", async (req, res): Promise<void> => {
   }
 
   const [contact] = await db.insert(contactsTable).values(parsed.data).returning();
-  res.status(201).json(GetContactResponse.parse({ ...contact, companyName: null, createdAt: contact.createdAt.toISOString() }));
+  res.status(201).json(GetContactResponse.parse({
+    ...contact,
+    companyName: null,
+    accessType: contact.accessType ?? "all",
+    createdAt: contact.createdAt.toISOString(),
+  }));
 });
 
 router.get("/contacts/:id", async (req, res): Promise<void> => {
@@ -91,6 +145,8 @@ router.get("/contacts/:id", async (req, res): Promise<void> => {
       companyName: companiesTable.name,
       notes: contactsTable.notes,
       tags: contactsTable.tags,
+      accessType: contactsTable.accessType,
+      allowedCompanyIds: contactsTable.allowedCompanyIds,
       createdAt: contactsTable.createdAt,
     })
     .from(contactsTable)
@@ -102,7 +158,7 @@ router.get("/contacts/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(GetContactResponse.parse({ ...contact, createdAt: contact.createdAt.toISOString() }));
+  res.json(GetContactResponse.parse({ ...contact, accessType: contact.accessType ?? "all", createdAt: contact.createdAt.toISOString() }));
 });
 
 router.patch("/contacts/:id", async (req, res): Promise<void> => {
@@ -127,6 +183,8 @@ router.patch("/contacts/:id", async (req, res): Promise<void> => {
   if (body.companyId !== undefined) updateData.companyId = body.companyId;
   if (body.notes !== undefined) updateData.notes = body.notes;
   if (body.tags !== undefined) updateData.tags = body.tags;
+  if (body.accessType !== undefined) updateData.accessType = body.accessType ?? "all";
+  if (body.allowedCompanyIds !== undefined) updateData.allowedCompanyIds = body.allowedCompanyIds;
 
   const [updated] = await db.update(contactsTable)
     .set(updateData)
@@ -138,7 +196,12 @@ router.patch("/contacts/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(UpdateContactResponse.parse({ ...updated, companyName: null, createdAt: updated.createdAt.toISOString() }));
+  res.json(UpdateContactResponse.parse({
+    ...updated,
+    companyName: null,
+    accessType: updated.accessType ?? "all",
+    createdAt: updated.createdAt.toISOString(),
+  }));
 });
 
 router.delete("/contacts/:id", async (req, res): Promise<void> => {

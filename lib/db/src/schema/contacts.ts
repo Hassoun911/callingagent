@@ -11,6 +11,8 @@ export const contactsTable = pgTable("contacts", {
   companyId: integer("company_id"),
   notes: text("notes"),
   tags: text("tags"),
+  accessType: text("access_type").notNull().default("all"), // "all" | "selected"
+  allowedCompanyIds: text("allowed_company_ids"), // comma-separated IDs e.g. "1,2,3"
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

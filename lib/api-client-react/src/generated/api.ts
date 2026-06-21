@@ -38,6 +38,8 @@ import type {
   CompanyInput,
   CompanyUpdate,
   Contact,
+  ContactImportInput,
+  ContactImportResult,
   ContactInput,
   ContactUpdate,
   DashboardStats,
@@ -884,6 +886,77 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getCreateContactMutationOptions(options));
+    }
+
+export const getImportContactsUrl = () => {
+
+
+
+
+  return `/api/contacts/import`
+}
+
+/**
+ * @summary Bulk import contacts from CSV data
+ */
+export const importContacts = async (contactImportInput: ContactImportInput, options?: RequestInit): Promise<ContactImportResult> => {
+
+  return customFetch<ContactImportResult>(getImportContactsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      contactImportInput,)
+  }
+);}
+
+
+
+
+export const getImportContactsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importContacts>>, TError,{data: BodyType<ContactImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importContacts>>, TError,{data: BodyType<ContactImportInput>}, TContext> => {
+
+const mutationKey = ['importContacts'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importContacts>>, {data: BodyType<ContactImportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  importContacts(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportContactsMutationResult = NonNullable<Awaited<ReturnType<typeof importContacts>>>
+    export type ImportContactsMutationBody = BodyType<ContactImportInput>
+    export type ImportContactsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Bulk import contacts from CSV data
+ */
+export const useImportContacts = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importContacts>>, TError,{data: BodyType<ContactImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importContacts>>,
+        TError,
+        {data: BodyType<ContactImportInput>},
+        TContext
+      > => {
+      return useMutation(getImportContactsMutationOptions(options));
     }
 
 export const getGetContactUrl = (id: number,) => {

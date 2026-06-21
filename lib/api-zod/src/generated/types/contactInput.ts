@@ -19,4 +19,8 @@ export interface ContactInput {
   notes?: string | null;
   /** @nullable */
   tags?: string | null;
+  /** @nullable */
+  accessType?: string | null;
+  /** @nullable */
+  allowedCompanyIds?: string | null;
 }

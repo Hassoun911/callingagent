@@ -223,6 +223,10 @@ paths:
           in: query
           schema:
             type: ["integer", "null"]
+        - name: forCompanyId
+          in: query
+          schema:
+            type: ["integer", "null"]
       responses:
         "200":
           description: Contacts
@@ -248,6 +252,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Contact"
+
+  /contacts/import:
+    post:
+      operationId: importContacts
+      tags: [contacts]
+      summary: Bulk import contacts from CSV data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactImportInput"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactImportResult"
 
   /contacts/{id}:
     get:
@@ -1318,7 +1341,7 @@ components:
 
     Contact:
       type: object
-      required: [id, firstName, lastName, createdAt]
+      required: [id, firstName, lastName, createdAt, accessType]
       properties:
         id:
           type: integer
@@ -1337,6 +1360,11 @@ components:
         notes:
           type: ["string", "null"]
         tags:
+          type: ["string", "null"]
+        accessType:
+          type: string
+          enum: [all, selected]
+        allowedCompanyIds:
           type: ["string", "null"]
         createdAt:
           type: string
@@ -1359,6 +1387,10 @@ components:
           type: ["string", "null"]
         tags:
           type: ["string", "null"]
+        accessType:
+          type: ["string", "null"]
+        allowedCompanyIds:
+          type: ["string", "null"]
 
     ContactUpdate:
       type: object
@@ -1377,6 +1409,36 @@ components:
           type: ["string", "null"]
         tags:
           type: ["string", "null"]
+        accessType:
+          type: ["string", "null"]
+        allowedCompanyIds:
+          type: ["string", "null"]
+
+    ContactImportInput:
+      type: object
+      required: [contacts]
+      properties:
+        contacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContactInput"
+        accessType:
+          type: ["string", "null"]
+        allowedCompanyIds:
+          type: ["string", "null"]
+
+    ContactImportResult:
+      type: object
+      required: [imported, skipped]
+      properties:
+        imported:
+          type: integer
+        skipped:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
 
     Company:
       type: object

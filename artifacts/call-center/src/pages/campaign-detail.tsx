@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useListContacts, useListCompanies } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,7 @@ import {
   ArrowLeft, Play, Pause, Phone, Trash2, Plus, Upload,
   ChevronDown, ChevronRight, ChevronLeft, CheckCircle2, XCircle, Clock,
   PhoneOff, AlertCircle, Volume2, RefreshCw, Settings2, FileText,
-  Calendar, Mic, Maximize2, Copy, Check, Download, CalendarClock, Pencil, X, Bot,
+  Calendar, Mic, Maximize2, Copy, Check, Download, CalendarClock, Pencil, X, Bot, Users2, Search,
 } from "lucide-react";
 
 interface Campaign {
@@ -1056,6 +1057,9 @@ export default function CampaignDetail() {
   const { toast } = useToast();
   const [showAddContact, setShowAddContact] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState("");
+  const [selectedLibraryIds, setSelectedLibraryIds] = useState<Set<number>>(new Set());
   const [showSettings, setShowSettings] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [showTestCall, setShowTestCall] = useState(false);
@@ -1093,6 +1097,11 @@ export default function CampaignDetail() {
       return r.json();
     },
   });
+
+  // CRM contact library — for "From Library" picker
+  const { data: libraryContacts = [] } = useListContacts(
+    showLibrary ? { search: librarySearch || undefined } : undefined
+  );
 
   const [settingsForm, setSettingsForm] = useState<Partial<Campaign>>({});
   const [editingScript, setEditingScript] = useState(false);
@@ -1376,6 +1385,10 @@ export default function CampaignDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1" onClick={() => { setShowLibrary(true); setSelectedLibraryIds(new Set()); }}>
+              <Users2 className="h-3 w-3" />
+              From Library
+            </Button>
             <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1" onClick={() => setShowImport(true)}>
               <Upload className="h-3 w-3" />
               Bulk Import
@@ -1466,6 +1479,104 @@ export default function CampaignDetail() {
               <Button variant="outline" onClick={() => setShowAddContact(false)}>Cancel</Button>
               <Button onClick={() => addContactMutation.mutate()} disabled={!newContact.name || !newContact.phone || addContactMutation.isPending}>
                 {addContactMutation.isPending ? "Adding..." : "Add Contact"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* From Library Dialog */}
+      <Dialog open={showLibrary} onOpenChange={v => { setShowLibrary(v); if (!v) { setLibrarySearch(""); setSelectedLibraryIds(new Set()); } }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col gap-0 p-0">
+          <div className="px-6 py-4 border-b border-border flex-shrink-0">
+            <DialogTitle>Add from Contact Library</DialogTitle>
+            <p className="text-xs text-muted-foreground mt-1">Select CRM contacts to add to this campaign.</p>
+          </div>
+          <div className="px-4 py-3 border-b border-border flex-shrink-0">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                className="w-full h-8 pl-8 pr-3 text-sm bg-background border border-border rounded-md outline-none focus:border-primary transition-colors"
+                placeholder="Search contacts..."
+                value={librarySearch}
+                onChange={e => setLibrarySearch(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {libraryContacts.length === 0 ? (
+              <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
+                {librarySearch ? "No contacts match your search." : "No contacts in library."}
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-secondary/20 sticky top-0">
+                  <tr>
+                    <th className="w-10 px-4 py-2" />
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Name</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Phone</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Company</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {libraryContacts.map(c => (
+                    <tr
+                      key={c.id}
+                      className="border-t border-border/50 cursor-pointer hover:bg-secondary/20 transition-colors"
+                      onClick={() => setSelectedLibraryIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(c.id)) next.delete(c.id); else next.add(c.id);
+                        return next;
+                      })}
+                    >
+                      <td className="px-4 py-2">
+                        <input
+                          type="checkbox"
+                          readOnly
+                          checked={selectedLibraryIds.has(c.id)}
+                          className="accent-primary h-3.5 w-3.5"
+                        />
+                      </td>
+                      <td className="px-3 py-2 font-medium">{c.firstName} {c.lastName}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{c.phone ?? "--"}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">{c.companyName ?? "--"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <div className="px-6 py-4 border-t border-border flex-shrink-0 flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">
+              {selectedLibraryIds.size > 0 ? `${selectedLibraryIds.size} selected` : "None selected"}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowLibrary(false)}>Cancel</Button>
+              <Button
+                size="sm"
+                disabled={selectedLibraryIds.size === 0}
+                onClick={async () => {
+                  const selected = libraryContacts.filter(c => selectedLibraryIds.has(c.id));
+                  let added = 0;
+                  for (const c of selected) {
+                    if (!c.phone) continue;
+                    try {
+                      await fetch(`${BASE}/api/campaigns/${campaignId}/contacts`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name: `${c.firstName} ${c.lastName}`, phone: c.phone }),
+                      });
+                      added++;
+                    } catch {}
+                  }
+                  qc.invalidateQueries({ queryKey: ["campaign-contacts", campaignId] });
+                  qc.invalidateQueries({ queryKey: ["campaign", campaignId] });
+                  setShowLibrary(false);
+                  setSelectedLibraryIds(new Set());
+                  toast({ title: `Added ${added} contact${added !== 1 ? "s" : ""} from library` });
+                }}
+              >
+                Add {selectedLibraryIds.size > 0 ? selectedLibraryIds.size : ""} Contact{selectedLibraryIds.size !== 1 ? "s" : ""}
               </Button>
             </div>
           </div>

@@ -354,6 +354,14 @@ export interface TestCallResult {
   status: string;
 }
 
+export type ContactAccessType = typeof ContactAccessType[keyof typeof ContactAccessType];
+
+
+export const ContactAccessType = {
+  all: 'all',
+  selected: 'selected',
+} as const;
+
 export interface Contact {
   id: number;
   firstName: string;
@@ -370,6 +378,9 @@ export interface Contact {
   notes?: string | null;
   /** @nullable */
   tags?: string | null;
+  accessType: ContactAccessType;
+  /** @nullable */
+  allowedCompanyIds?: string | null;
   createdAt: string;
 }
 
@@ -386,6 +397,10 @@ export interface ContactInput {
   notes?: string | null;
   /** @nullable */
   tags?: string | null;
+  /** @nullable */
+  accessType?: string | null;
+  /** @nullable */
+  allowedCompanyIds?: string | null;
 }
 
 export interface ContactUpdate {
@@ -403,6 +418,24 @@ export interface ContactUpdate {
   notes?: string | null;
   /** @nullable */
   tags?: string | null;
+  /** @nullable */
+  accessType?: string | null;
+  /** @nullable */
+  allowedCompanyIds?: string | null;
+}
+
+export interface ContactImportInput {
+  contacts: ContactInput[];
+  /** @nullable */
+  accessType?: string | null;
+  /** @nullable */
+  allowedCompanyIds?: string | null;
+}
+
+export interface ContactImportResult {
+  imported: number;
+  skipped: number;
+  errors?: string[];
 }
 
 export interface Company {
@@ -948,6 +981,10 @@ search?: string | null;
  * @nullable
  */
 companyId?: number | null;
+/**
+ * @nullable
+ */
+forCompanyId?: number | null;
 };
 
 export type ListCallLogsParams = {

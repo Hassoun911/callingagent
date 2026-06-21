@@ -238,7 +238,8 @@ export const TestCallResponse = zod.object({
  */
 export const ListContactsQueryParams = zod.object({
   "search": zod.coerce.string().nullish(),
-  "companyId": zod.coerce.number().nullish()
+  "companyId": zod.coerce.number().nullish(),
+  "forCompanyId": zod.coerce.number().nullish()
 })
 
 export const ListContactsResponseItem = zod.object({
@@ -251,6 +252,8 @@ export const ListContactsResponseItem = zod.object({
   "companyName": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "tags": zod.string().nullish(),
+  "accessType": zod.enum(['all', 'selected']),
+  "allowedCompanyIds": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListContactsResponse = zod.array(ListContactsResponseItem)
@@ -263,7 +266,35 @@ export const CreateContactBody = zod.object({
   "phone": zod.string().nullish(),
   "companyId": zod.number().nullish(),
   "notes": zod.string().nullish(),
-  "tags": zod.string().nullish()
+  "tags": zod.string().nullish(),
+  "accessType": zod.string().nullish(),
+  "allowedCompanyIds": zod.string().nullish()
+})
+
+
+/**
+ * @summary Bulk import contacts from CSV data
+ */
+export const ImportContactsBody = zod.object({
+  "contacts": zod.array(zod.object({
+  "firstName": zod.string(),
+  "lastName": zod.string(),
+  "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "companyId": zod.number().nullish(),
+  "notes": zod.string().nullish(),
+  "tags": zod.string().nullish(),
+  "accessType": zod.string().nullish(),
+  "allowedCompanyIds": zod.string().nullish()
+})),
+  "accessType": zod.string().nullish(),
+  "allowedCompanyIds": zod.string().nullish()
+})
+
+export const ImportContactsResponse = zod.object({
+  "imported": zod.number(),
+  "skipped": zod.number(),
+  "errors": zod.array(zod.string()).optional()
 })
 
 
@@ -281,6 +312,8 @@ export const GetContactResponse = zod.object({
   "companyName": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "tags": zod.string().nullish(),
+  "accessType": zod.enum(['all', 'selected']),
+  "allowedCompanyIds": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -296,7 +329,9 @@ export const UpdateContactBody = zod.object({
   "phone": zod.string().nullish(),
   "companyId": zod.number().nullish(),
   "notes": zod.string().nullish(),
-  "tags": zod.string().nullish()
+  "tags": zod.string().nullish(),
+  "accessType": zod.string().nullish(),
+  "allowedCompanyIds": zod.string().nullish()
 })
 
 export const UpdateContactResponse = zod.object({
@@ -309,6 +344,8 @@ export const UpdateContactResponse = zod.object({
   "companyName": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "tags": zod.string().nullish(),
+  "accessType": zod.enum(['all', 'selected']),
+  "allowedCompanyIds": zod.string().nullish(),
   "createdAt": zod.string()
 })
 

@@ -5,6 +5,7 @@
  * Call Center API
  * OpenAPI spec version: 0.1.0
  */
+import type { ContactAccessType } from './contactAccessType';
 
 export interface Contact {
   id: number;
@@ -22,5 +23,8 @@ export interface Contact {
   notes?: string | null;
   /** @nullable */
   tags?: string | null;
+  accessType: ContactAccessType;
+  /** @nullable */
+  allowedCompanyIds?: string | null;
   createdAt: string;
 }

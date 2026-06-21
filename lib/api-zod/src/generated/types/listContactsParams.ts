@@ -15,4 +15,8 @@ search?: string | null;
  * @nullable
  */
 companyId?: number | null;
+/**
+ * @nullable
+ */
+forCompanyId?: number | null;
 };
