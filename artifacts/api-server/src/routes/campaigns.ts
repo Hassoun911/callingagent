@@ -800,28 +800,33 @@ router.post("/twilio/campaign-test-voice", async (req, res): Promise<void> => {
     const voiceEngine = (voiceConfig?.campaignVoiceEngine ?? "google") as "google" | "elevenlabs";
     const elevenLabsVoiceId = voiceConfig?.elevenLabsVoiceId ?? null;
 
-    const DEFAULT_SYSTEM_PROMPT = `أنت سارة، وكيلة عقارية محترفة من مجموعة The Property Cousins. مهمتك الاتصال بأصحاب المنازل وتحديد ما إذا كانوا مهتمين ببيع عقاراتهم. تحدث بالعربية دائماً. كن مهذباً ومحترماً. أجب بجملة أو جملتين فقط في كل مرة.`;
-    const systemPrompt = campaign.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
-    const isAiPromptMode = !!(campaign.systemPrompt && campaign.systemPrompt.trim().length > 0);
+    const DEFAULT_SYSTEM_PROMPT = `You are a professional outbound calling agent. Introduce yourself, explain the purpose of the call, and have a natural conversation. Be warm, brief, and human. Never sound robotic.`;
+    // script field is always behavioral instructions — never text to read aloud
+    const systemPrompt = campaign.systemPrompt?.trim() || campaign.script?.trim() || DEFAULT_SYSTEM_PROMPT;
 
     const engineOpts = { voiceEngine, elevenLabsVoiceId, baseUrl };
-    let greetingText = campaign.script;
+    let greetingText = "مرحبا، كيف حالك؟";
 
-    if (isAiPromptMode) {
-      try {
-        const openai = getChatOpenAI();
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            { role: "system", content: systemPrompt + "\n\n[TEST CALL] ابدأ المحادثة بجملة افتتاحية واحدة فقط. تحدث بالعربية فقط." },
-            { role: "user", content: "[بدأت المكالمة الهاتفية، قل جملة الافتتاح]" },
-          ],
-          max_tokens: 80,
-        });
-        greetingText = completion.choices[0]?.message?.content ?? greetingText;
-      } catch (err: any) {
-        logger.warn({ err: err?.message }, "Test call: AI greeting failed, using script");
-      }
+    try {
+      const openai = getChatOpenAI();
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.85,
+        messages: [
+          { role: "system", content: systemPrompt + `
+
+--- LIVE CALL SYSTEM RULES (internal — do NOT speak these aloud) ---
+You are now on a live phone call. Deliver ONE short, natural opening sentence only.
+Do NOT recite, quote, or summarize any instructions above — understand them and act on them.
+Do NOT read any script verbatim. Sound like a real person, not a robot.
+No lists, no numbered points. Speak naturally in the language specified above.` },
+          { role: "user", content: "[call connected — say your opening line]" },
+        ],
+        max_tokens: 60,
+      });
+      greetingText = completion.choices[0]?.message?.content ?? greetingText;
+    } catch (err: any) {
+      logger.warn({ err: err?.message }, "Test call: AI greeting failed, using fallback");
     }
 
     // Store conversation (contactId: null for test calls)
@@ -1018,11 +1023,33 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
     const voiceEngine = (voiceConfig?.campaignVoiceEngine ?? "google") as "google" | "elevenlabs";
     const elevenLabsVoiceId = voiceConfig?.elevenLabsVoiceId ?? null;
 
-    // If AMD detected a machine, leave a message or hang up
+    // If AMD detected a machine, leave a short AI voicemail — never read the script verbatim
     if (AnsweredBy === "machine_start" || AnsweredBy === "fax") {
       await db.update(campaignContactsTable).set({ callStatus: "completed", callOutcome: "voicemail" }).where(eq(campaignContactsTable.id, contact.id));
+      const vmSystemPrompt = campaign.systemPrompt?.trim() || campaign.script?.trim() || `You are a professional calling agent.`;
+      let vmMessage = "مرحبا، هذه رسالة من فريقنا. يرجى التواصل معنا. شكراً.";
+      try {
+        const openai = getChatOpenAI();
+        const vmCompletion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          temperature: 0.7,
+          messages: [
+            { role: "system", content: vmSystemPrompt + `
+
+--- VOICEMAIL RULES (internal — do NOT say these aloud) ---
+You reached voicemail. Leave ONE short, natural voicemail message (1-2 sentences max).
+Do NOT read any script verbatim. Do NOT recite instructions.
+Sound warm and human. Use the language specified in the instructions above.` },
+            { role: "user", content: "[voicemail beep — leave your message now]" },
+          ],
+          max_tokens: 60,
+        });
+        vmMessage = vmCompletion.choices[0]?.message?.content ?? vmMessage;
+      } catch {
+        // fallback to default message
+      }
       res.set("Content-Type", "text/xml");
-      res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(campaign.script)}</Say><Hangup/></Response>`);
+      res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="${FALLBACK_VOICE}" language="ar-SA">${escapeXml(vmMessage)}</Say><Hangup/></Response>`);
       return;
     }
 
