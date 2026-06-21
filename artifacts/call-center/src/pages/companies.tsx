@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { 
   useListCompanies, 
   useCreateCompany, 
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Building2, Globe, Phone } from "lucide-react";
+import { Plus, Building2, Globe, Phone, Loader2, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +43,9 @@ export default function Companies() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<any>(null);
   const [selectedPhoneNumberId, setSelectedPhoneNumberId] = useState<string>("");
+  const [showInlineImport, setShowInlineImport] = useState(false);
+  const [inlineImportNumber, setInlineImportNumber] = useState("");
+  const [inlineImportLoading, setInlineImportLoading] = useState(false);
 
   // Only numbers not already linked to a company
   const unlinkdNumbers = allNumbers?.filter(n => !n.companyId) ?? [];
@@ -108,7 +111,36 @@ export default function Companies() {
       setFormData({ name: "", industry: "", website: "", phone: "", notes: "" });
       setSelectedPhoneNumberId("");
     }
+    setShowInlineImport(false);
+    setInlineImportNumber("");
     setDialogOpen(true);
+  };
+
+  const handleInlineImport = async () => {
+    const num = inlineImportNumber.trim();
+    if (!num) return;
+    setInlineImportLoading(true);
+    try {
+      const res = await fetch(`${BASE}/api/phone-numbers/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: num }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        toast({ title: body.error || "Import failed", variant: "destructive" });
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["listPhoneNumbers"] });
+      setSelectedPhoneNumberId(String(body.id));
+      setShowInlineImport(false);
+      setInlineImportNumber("");
+      toast({ title: `Imported ${body.number}` });
+    } catch {
+      toast({ title: "Import failed", variant: "destructive" });
+    } finally {
+      setInlineImportLoading(false);
+    }
   };
 
   const handleSave = () => {
@@ -272,6 +304,57 @@ export default function Companies() {
                     )}
                   </SelectContent>
                 </Select>
+
+                {!editingCompany && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground pt-0.5">
+                    <span>Number not listed?</span>
+                    <button
+                      type="button"
+                      className="text-primary hover:underline flex items-center gap-1"
+                      onClick={() => setShowInlineImport(v => !v)}
+                    >
+                      <Download className="h-3 w-3" />
+                      Import existing
+                    </button>
+                    <span className="text-border/60">|</span>
+                    <Link
+                      href="/numbers"
+                      className="text-primary hover:underline"
+                      onClick={() => setDialogOpen(false)}
+                    >
+                      Provision new
+                    </Link>
+                  </div>
+                )}
+
+                {!editingCompany && showInlineImport && (
+                  <div className="rounded border border-border bg-background/60 p-3 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Enter any number already in your Twilio account (E.164 format, e.g. +12125551234). Webhooks will be configured automatically.
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="+12125551234"
+                        value={inlineImportNumber}
+                        onChange={e => setInlineImportNumber(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && handleInlineImport()}
+                        className="bg-background font-mono text-sm flex-1"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleInlineImport}
+                        disabled={!inlineImportNumber.trim() || inlineImportLoading}
+                      >
+                        {inlineImportLoading
+                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          : "Import"
+                        }
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-xs text-muted-foreground">
                   Links one of your provisioned numbers to this company. You can also do this later from the company detail page.
                 </p>
