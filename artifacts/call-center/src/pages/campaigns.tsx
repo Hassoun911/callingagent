@@ -14,7 +14,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Play, Pause, Trash2, Users, ChevronRight, Target,
-  ChevronLeft, FileText, Phone,
+  ChevronLeft, FileText, Phone, CalendarClock,
 } from "lucide-react";
 
 interface Campaign {
@@ -26,12 +26,137 @@ interface Campaign {
   notificationEmail: string | null;
   status: "draft" | "active" | "paused" | "completed";
   maxCallDuration: number | null;
+  scheduleConfig: string | null;
   createdAt: string;
   updatedAt: string;
   totalContacts: number | null;
   pendingContacts: number | null;
   completedContacts: number | null;
   interestedContacts: number | null;
+}
+
+// ─── Schedule helpers (shared with campaign-detail) ───────────────────────────
+interface ScheduleSlot { days: number[]; startTime: string; endTime: string; }
+interface CampScheduleConfig { enabled: boolean; timezone: string; slots: ScheduleSlot[]; }
+
+const SCHED_TIMEZONES = [
+  { value: "UTC", label: "UTC" },
+  { value: "America/New_York", label: "Eastern (ET)" },
+  { value: "America/Chicago", label: "Central (CT)" },
+  { value: "America/Denver", label: "Mountain (MT)" },
+  { value: "America/Los_Angeles", label: "Pacific (PT)" },
+  { value: "America/Toronto", label: "Toronto (ET)" },
+  { value: "America/Vancouver", label: "Vancouver (PT)" },
+  { value: "Europe/London", label: "London (GMT)" },
+  { value: "Europe/Paris", label: "Paris (CET)" },
+  { value: "Europe/Berlin", label: "Berlin (CET)" },
+  { value: "Asia/Dubai", label: "Dubai (GST)" },
+  { value: "Asia/Riyadh", label: "Riyadh (AST)" },
+  { value: "Asia/Beirut", label: "Beirut (EET)" },
+  { value: "Australia/Sydney", label: "Sydney (AEDT)" },
+];
+const SCHED_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
+const SCHED_DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+function parseSched(raw: string | null | undefined): CampScheduleConfig {
+  try {
+    const p = JSON.parse(raw ?? "{}");
+    return { enabled: p.enabled ?? false, timezone: p.timezone ?? "UTC", slots: Array.isArray(p.slots) ? p.slots : [] };
+  } catch { return { enabled: false, timezone: "UTC", slots: [] }; }
+}
+
+function CampaignScheduleEditor({ value, onChange }: { value: string | null | undefined; onChange: (v: string) => void }) {
+  const cfg = parseSched(value);
+  function upd(next: CampScheduleConfig) { onChange(JSON.stringify(next)); }
+  return (
+    <div className="border border-border/50 rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2.5 bg-secondary/20">
+        <div className="flex items-center gap-2">
+          <CalendarClock className="h-4 w-4 text-blue-400" />
+          <span className="text-sm font-semibold">Auto-Schedule</span>
+          <span className="text-xs text-muted-foreground">(auto-starts campaign)</span>
+        </div>
+        <button
+          type="button"
+          aria-label="Toggle schedule"
+          className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full transition-colors ${cfg.enabled ? "bg-green-500" : "bg-secondary border border-border"}`}
+          onClick={() => upd({ ...cfg, enabled: !cfg.enabled })}
+        >
+          <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${cfg.enabled ? "translate-x-4" : "translate-x-0.5"}`} />
+        </button>
+      </div>
+      {cfg.enabled && (
+        <div className="p-3 space-y-3">
+          <div>
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Timezone</Label>
+            <select
+              className="mt-1 flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={cfg.timezone}
+              onChange={e => upd({ ...cfg, timezone: e.target.value })}
+            >
+              {SCHED_TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Time Slots</Label>
+            {cfg.slots.length === 0 && (
+              <p className="text-xs text-muted-foreground/60 italic py-1">No slots — campaign won't auto-run. Add a slot below.</p>
+            )}
+            {cfg.slots.map((slot, i) => (
+              <div key={i} className="border border-border/50 rounded-md p-2.5 space-y-2 bg-background/40">
+                <div className="flex items-center gap-1">
+                  {SCHED_DAYS.map((day, d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      title={SCHED_DAY_NAMES[d]}
+                      className={`h-6 w-6 rounded text-[10px] font-bold transition-colors ${slot.days.includes(d) ? "bg-green-500/20 text-green-400 border border-green-500/40" : "bg-secondary text-muted-foreground border border-transparent hover:border-border"}`}
+                      onClick={() => {
+                        const newDays = slot.days.includes(d) ? slot.days.filter(x => x !== d) : [...slot.days, d].sort((a, b) => a - b);
+                        upd({ ...cfg, slots: cfg.slots.map((s, j) => j === i ? { ...s, days: newDays } : s) });
+                      }}
+                    >{day}</button>
+                  ))}
+                  <button
+                    type="button"
+                    className="ml-auto text-muted-foreground/40 hover:text-red-400 transition-colors"
+                    onClick={() => upd({ ...cfg, slots: cfg.slots.filter((_, j) => j !== i) })}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">Start</label>
+                    <input type="time" value={slot.startTime}
+                      className="mt-0.5 flex h-7 w-full rounded border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      onChange={e => upd({ ...cfg, slots: cfg.slots.map((s, j) => j === i ? { ...s, startTime: e.target.value } : s) })}
+                    />
+                  </div>
+                  <span className="text-muted-foreground text-sm mt-4">–</span>
+                  <div className="flex-1">
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wide">End</label>
+                    <input type="time" value={slot.endTime}
+                      className="mt-0.5 flex h-7 w-full rounded border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                      onChange={e => upd({ ...cfg, slots: cfg.slots.map((s, j) => j === i ? { ...s, endTime: e.target.value } : s) })}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors mt-1"
+              onClick={() => upd({ ...cfg, slots: [...cfg.slots, { days: [1, 2, 3, 4, 5], startTime: "09:00", endTime: "17:00" }] })}
+            >
+              <Plus className="h-3 w-3" />
+              Add Time Slot
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface PhoneNumber {
@@ -682,6 +807,27 @@ export default function Campaigns() {
     onError: () => toast({ title: "Failed to delete campaign", variant: "destructive" }),
   });
 
+  const [schedulingCampaign, setSchedulingCampaign] = useState<Campaign | null>(null);
+  const [schedDraft, setSchedDraft] = useState<string | null>(null);
+
+  const updateScheduleMutation = useMutation({
+    mutationFn: async ({ id, scheduleConfig }: { id: number; scheduleConfig: string | null }) => {
+      const r = await fetch(`${BASE}/api/campaigns/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduleConfig }),
+      });
+      if (!r.ok) throw new Error("Failed to update schedule");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["campaigns"] });
+      setSchedulingCampaign(null);
+      toast({ title: "Schedule saved" });
+    },
+    onError: () => toast({ title: "Failed to save schedule", variant: "destructive" }),
+  });
+
   const statusMutation = useMutation({
     mutationFn: async ({ id, action }: { id: number; action: "start" | "pause" }) => {
       const r = await fetch(`${BASE}/api/campaigns/${id}/${action}`, { method: "POST" });
@@ -851,6 +997,15 @@ export default function Campaigns() {
                               {c.status === "paused" ? "Resume" : "Start"}
                             </Button>
                           ) : null}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className={`h-7 w-7 px-0 ${parseSched(c.scheduleConfig).enabled ? "text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
+                            title="Campaign schedule"
+                            onClick={() => { setSchedulingCampaign(c); setSchedDraft(c.scheduleConfig); }}
+                          >
+                            <CalendarClock className="h-3.5 w-3.5" />
+                          </Button>
                           <Link href={`/campaigns/${c.id}`}>
                             <Button size="sm" variant="ghost" className="h-7 px-2.5 text-xs gap-1">
                               <Users className="h-3 w-3" />
@@ -877,6 +1032,43 @@ export default function Campaigns() {
           </div>
         </>
       )}
+
+      {/* Schedule dialog */}
+      <Dialog open={!!schedulingCampaign} onOpenChange={open => { if (!open) setSchedulingCampaign(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 text-blue-400" />
+              Campaign Schedule — {schedulingCampaign?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="pt-2 space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Configure when this campaign dials automatically. The server checks every minute and starts or pauses based on the schedule.
+            </p>
+            <CampaignScheduleEditor
+              value={schedDraft}
+              onChange={v => setSchedDraft(v)}
+            />
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={() => setSchedulingCampaign(null)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (schedulingCampaign) {
+                    updateScheduleMutation.mutate({ id: schedulingCampaign.id, scheduleConfig: schedDraft });
+                  }
+                }}
+                disabled={updateScheduleMutation.isPending}
+              >
+                Save Schedule
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
