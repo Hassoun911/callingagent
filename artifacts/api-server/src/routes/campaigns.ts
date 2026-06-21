@@ -564,10 +564,30 @@ router.post("/campaigns/:id/contacts/import", async (req, res): Promise<void> =>
     let skipped = 0;
 
     for (const line of lines) {
-      const parts = line.split(/[,|\t]/).map((p: string) => p.trim());
-      const name = parts[0];
-      const phone = parts[1];
-      const address = parts[2] ?? null;
+      const parts = line.split(/[,|\t]/).map((p: string) => p.trim()).filter((p: string) => p.length > 0);
+      if (parts.length === 0) { skipped++; continue; }
+
+      let name: string;
+      let phone: string;
+      let address: string | null = null;
+
+      if (parts.length === 1) {
+        // Single value — if it looks like a phone number, use it as both name and phone
+        const single = parts[0];
+        const digits = single.replace(/\D/g, "");
+        if (digits.length >= 7) {
+          phone = single;
+          name = single;
+        } else {
+          skipped++;
+          continue;
+        }
+      } else {
+        name = parts[0];
+        phone = parts[1];
+        address = parts[2] ?? null;
+      }
+
       if (!name || !phone) { skipped++; continue; }
       try {
         await db.insert(campaignContactsTable).values({ campaignId: id, name, phone, address }).onConflictDoNothing();
