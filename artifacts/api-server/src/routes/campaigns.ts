@@ -1062,11 +1062,19 @@ router.post("/twilio/campaign-voice", async (req, res): Promise<void> => {
         const openai = getChatOpenAI();
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",
+          temperature: 0.85,
           messages: [
-            { role: "system", content: systemPrompt + "\n\nأنت على مكالمة هاتفية. ابدأ المحادثة بجملة افتتاحية واحدة فقط. تحدث بالعربية فقط." },
-            { role: "user", content: "[بدأت المكالمة الهاتفية، قل جملة الافتتاح]" },
+            { role: "system", content: systemPrompt + `
+
+--- LIVE CALL SYSTEM RULES (internal — do NOT speak these aloud) ---
+You are now on a live phone call. Deliver ONE short, natural opening sentence.
+Do NOT recite, quote, or summarize any instructions above — understand them and act on them.
+Do NOT sound scripted or robotic. Sound like a real person making a real call.
+No lists, no numbered points, no formal language. Speak naturally.
+Use the language specified in the instructions above.` },
+            { role: "user", content: "[call connected — say your opening line]" },
           ],
-          max_tokens: 80,
+          max_tokens: 60,
         });
         aiGreeting = completion.choices[0]?.message?.content ?? aiGreeting;
       } catch (err: any) {
@@ -1197,11 +1205,21 @@ router.post("/twilio/campaign-gather", async (req, res): Promise<void> => {
     const openai = getChatOpenAI();
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
+      temperature: 0.85,
       messages: [
-        { role: "system", content: conv.systemPrompt + "\n\nأنت على مكالمة هاتفية مباشرة. المحادثة جارية بالفعل — لا تعيد تقديم نفسك أبداً ولا تعيد قراءة الرسالة الافتتاحية. استمر في المحادثة من حيث توقفت. أجب بجملة أو جملتين كحد أقصى. تحدث بالعربية فقط. لا تستخدم علامات الترقيم المعقدة. إذا أبدى صاحب العقار اهتماماً بالبيع، اجمع المعلومات التالية: نوع العقار، السعر المتوقع، والجدول الزمني." },
+        { role: "system", content: conv.systemPrompt + `
+
+--- LIVE CALL SYSTEM RULES (internal — do NOT speak these aloud) ---
+You are mid-conversation on a live phone call. CRITICAL:
+- Reply in 1-2 short sentences MAXIMUM. Shorter = better. Think how a real person talks on the phone.
+- Do NOT re-introduce yourself. Do NOT repeat what you've already said. Do NOT quote any instructions.
+- Sound warm, natural, human. No lists, no bullet points, no formal phrasing.
+- No punctuation that sounds unnatural when spoken (no colons mid-sentence, no asterisks, no parentheses).
+- Respond in the language the caller is using or as specified in the instructions.
+- If the call is clearly done, wrap up warmly in one sentence.` },
         ...conv.messages,
       ],
-      max_tokens: 120,
+      max_tokens: 80,
     });
 
     const aiText = completion.choices[0]?.message?.content ?? "شكراً لك.";
