@@ -11,11 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Play, Pause, Phone, Trash2, Plus, Upload,
@@ -464,7 +459,7 @@ function CallLogEntry({ log, campaignId, onDeleted }: { log: CampaignCallLog; ca
   );
 }
 
-function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignContact; campaignId: number; onRefresh: () => void }) {
+function ContactRow({ contact, campaignId, campaignHasSchedule, onRefresh }: { contact: CampaignContact; campaignId: number; campaignHasSchedule: boolean; onRefresh: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [notesDraft, setNotesDraft] = useState(contact.userNotes ?? "");
   const [notesSaved, setNotesSaved] = useState(false);
@@ -506,12 +501,6 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
     staleTime: 0,
   });
 
-  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
-  const [schedDraft, setSchedDraft] = useState(
-    contact.scheduledCallAt
-      ? new Date(contact.scheduledCallAt).toISOString().slice(0, 16)
-      : ""
-  );
 
   const callMutation = useMutation({
     mutationFn: async () => {
@@ -616,49 +605,21 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
         {/* Actions */}
         <td className="px-3 py-3 text-right" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-1 justify-end">
-            {/* Schedule call time */}
-            <Popover open={showSchedulePicker} onOpenChange={setShowSchedulePicker}>
-              <PopoverTrigger asChild>
-                <Button
-                  size="sm" variant="ghost"
-                  className={`h-7 w-7 px-0 ${contact.scheduledCallAt ? "text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
-                  title={contact.scheduledCallAt ? `Scheduled: ${formatDateTime(contact.scheduledCallAt)}` : "Schedule call time"}
-                >
-                  <CalendarClock className="h-3.5 w-3.5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-3 space-y-3" align="end" onClick={e => e.stopPropagation()}>
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Schedule call for</div>
-                <input
-                  type="datetime-local"
-                  value={schedDraft}
-                  onChange={e => setSchedDraft(e.target.value)}
-                  className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-                <div className="flex gap-2 pt-1">
-                  <Button size="sm" className="h-7 flex-1 text-xs" onClick={() => {
-                    patchContactMutation.mutate({ scheduledCallAt: schedDraft ? new Date(schedDraft).toISOString() : null });
-                    setShowSchedulePicker(false);
-                  }}>Set</Button>
-                  {contact.scheduledCallAt && (
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
-                      setSchedDraft("");
-                      patchContactMutation.mutate({ scheduledCallAt: null });
-                      setShowSchedulePicker(false);
-                    }}>Clear</Button>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
-            {/* Skip / Unskip */}
+            {/* Include / exclude toggle — green = included in campaign run, muted = skipped */}
             <Button
               size="sm" variant="ghost"
-              className={`h-7 w-7 px-0 ${isSkipped ? "text-yellow-400" : "text-muted-foreground hover:text-yellow-400"}`}
-              title={isSkipped ? "Unskip — reset to pending" : "Skip this contact"}
+              className={`h-7 w-7 px-0 transition-colors ${
+                isSkipped
+                  ? "text-muted-foreground/40 hover:text-muted-foreground"
+                  : campaignHasSchedule
+                    ? "text-green-400 hover:text-muted-foreground"
+                    : "text-muted-foreground hover:text-green-400"
+              }`}
+              title={isSkipped ? "Click to include in campaign run" : "Click to exclude from campaign run"}
               onClick={() => patchContactMutation.mutate({ callStatus: isSkipped ? "pending" : "skipped" })}
               disabled={patchContactMutation.isPending || contact.callStatus === "calling" || contact.callStatus === "in_progress"}
             >
-              <XCircle className="h-3.5 w-3.5" />
+              <CalendarClock className="h-3.5 w-3.5" />
             </Button>
             {!isSkipped && contact.callStatus !== "calling" && contact.callStatus !== "in_progress" && (
               <Button
@@ -1191,7 +1152,7 @@ export default function CampaignDetail() {
             </thead>
             <tbody>
               {filteredContacts.map((c) => (
-                <ContactRow key={c.id} contact={c} campaignId={campaignId} onRefresh={refreshContacts} />
+                <ContactRow key={c.id} contact={c} campaignId={campaignId} campaignHasSchedule={parseSchedule(campaign.scheduleConfig).enabled} onRefresh={refreshContacts} />
               ))}
             </tbody>
           </table>
