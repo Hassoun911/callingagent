@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useGetDashboardStats, useGetRecentCalls } from "@workspace/api-client-react";
-import { Phone, Users, Clock, PhoneIncoming, PhoneOutgoing, Voicemail, Activity, Target, CalendarClock, MessageSquare, PhoneForwarded, Building2, ChevronRight, TrendingUp } from "lucide-react";
+import { Phone, Users, Clock, PhoneIncoming, PhoneOutgoing, Voicemail, Activity, Target, CalendarClock, MessageSquare, PhoneForwarded, Building2, ChevronRight, TrendingUp, ChevronDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useLocation } from "wouter";
 
@@ -107,6 +108,7 @@ function MiniCard({
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
+  const [activityOpen, setActivityOpen] = useState(false);
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: recentCalls, isLoading: callsLoading } = useGetRecentCalls({ limit: 6 });
 
@@ -395,71 +397,89 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      {/* Recent Activity */}
+      {/* Recent Activity — collapsed by default */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/20">
-          <div>
-            <div className="text-sm font-semibold">Recent Activity</div>
-            <div className="text-xs text-muted-foreground mt-0.5">Latest calls traversing the network</div>
+        <button
+          className="w-full flex items-center justify-between px-4 py-3 bg-secondary/20 hover:bg-secondary/40 transition-colors"
+          onClick={() => setActivityOpen(o => !o)}
+        >
+          <div className="flex items-center gap-2">
+            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${activityOpen ? "" : "-rotate-90"}`} />
+            <div className="text-left">
+              <div className="text-sm font-semibold">Recent Activity</div>
+              <div className="text-xs text-muted-foreground">Latest calls traversing the network</div>
+            </div>
           </div>
-          <Link href="/calls" className="text-xs text-primary hover:underline flex items-center gap-1">
-            View all
-            <ChevronRight className="h-3 w-3" />
-          </Link>
-        </div>
-        {callsLoading ? (
-          <div className="p-4 space-y-3">
-            {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-          </div>
-        ) : recentCalls?.length ? (
-          <div className="divide-y divide-border/50">
-            {recentCalls.map(call => (
-              <Link key={call.id} href="/calls">
-                <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/20 transition-colors cursor-pointer">
-                  <div className={`p-1.5 rounded-md border border-border ${call.direction === "inbound" ? "bg-green-500/5" : "bg-blue-500/5"}`}>
-                    {call.direction === "inbound" ? (
-                      <PhoneIncoming className="h-3.5 w-3.5 text-green-400" />
-                    ) : (
-                      <PhoneOutgoing className="h-3.5 w-3.5 text-blue-400" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-mono font-medium">
-                      {formatPhone(call.direction === "inbound" ? call.fromNumber : call.toNumber)}
+          {activityOpen && (
+            <Link
+              href="/calls"
+              className="text-xs text-primary hover:underline flex items-center gap-1 flex-shrink-0"
+              onClick={e => e.stopPropagation()}
+            >
+              View all
+              <ChevronRight className="h-3 w-3" />
+            </Link>
+          )}
+        </button>
+        {activityOpen && (
+          <>
+            {callsLoading && (
+              <div className="p-4 space-y-3">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            )}
+            {!callsLoading && recentCalls && recentCalls.length > 0 && (
+              <div className="divide-y divide-border/50">
+                {recentCalls.map(call => (
+                  <Link key={call.id} href="/calls">
+                    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/20 transition-colors cursor-pointer">
+                      <div className={`p-1.5 rounded-md border border-border ${call.direction === "inbound" ? "bg-green-500/5" : "bg-blue-500/5"}`}>
+                        {call.direction === "inbound" ? (
+                          <PhoneIncoming className="h-3.5 w-3.5 text-green-400" />
+                        ) : (
+                          <PhoneOutgoing className="h-3.5 w-3.5 text-blue-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-mono font-medium">
+                          {formatPhone(call.direction === "inbound" ? call.fromNumber : call.toNumber)}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {new Date(call.createdAt).toLocaleString(undefined, {
+                            month: "short", day: "numeric",
+                            hour: "2-digit", minute: "2-digit",
+                          })}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {call.duration ? (
+                          <span className="text-xs font-mono text-muted-foreground">
+                            {formatDuration(call.duration)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/40">—</span>
+                        )}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide ${
+                          call.status === "completed" ? "bg-green-500/10 text-green-400" :
+                          call.status === "no-answer" ? "bg-red-500/10 text-red-400" :
+                          "bg-secondary text-muted-foreground"
+                        }`}>
+                          {call.status}
+                        </span>
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30" />
+                      </div>
                     </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {new Date(call.createdAt).toLocaleString(undefined, {
-                        month: "short", day: "numeric",
-                        hour: "2-digit", minute: "2-digit",
-                      })}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {call.duration ? (
-                      <span className="text-xs font-mono text-muted-foreground">
-                        {formatDuration(call.duration)}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground/40">—</span>
-                    )}
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide ${
-                      call.status === "completed" ? "bg-green-500/10 text-green-400" :
-                      call.status === "no-answer" ? "bg-red-500/10 text-red-400" :
-                      "bg-secondary text-muted-foreground"
-                    }`}>
-                      {call.status}
-                    </span>
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30" />
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-32 text-muted-foreground gap-2">
-            <Phone className="h-6 w-6 opacity-25" />
-            <span className="text-xs">No recent calls</span>
-          </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+            {!callsLoading && (!recentCalls || recentCalls.length === 0) && (
+              <div className="flex flex-col items-center justify-center h-32 text-muted-foreground gap-2">
+                <Phone className="h-6 w-6 opacity-25" />
+                <span className="text-xs">No recent calls</span>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
