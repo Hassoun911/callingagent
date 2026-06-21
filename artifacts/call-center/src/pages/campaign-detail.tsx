@@ -1347,12 +1347,15 @@ export default function CampaignDetail() {
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Bulk Import Contacts</DialogTitle></DialogHeader>
           <div className="space-y-3 pt-2">
-            <p className="text-sm text-muted-foreground">Paste one contact per line. Phone-number-only lines are accepted — name defaults to the number.</p>
+            <p className="text-sm text-muted-foreground">Paste numbers one per line, or all on one line separated by commas. Mix with named contacts.</p>
             <div className="bg-secondary/30 rounded p-2 text-xs text-muted-foreground font-mono space-y-0.5">
-              <div>+15550001111</div>
+              <div className="text-foreground/60">— one per line —</div>
               <div>2263473180</div>
-              <div>Ahmed Al-Sayed, +15550002222, 123 King St Toronto</div>
-              <div>Omar Hassan | +15550003333 | 789 Bloor St</div>
+              <div>5199927726</div>
+              <div className="mt-1 text-foreground/60">— or all on one line —</div>
+              <div>2263473180, 5199927726, 5199916667</div>
+              <div className="mt-1 text-foreground/60">— or with names —</div>
+              <div>Ahmed Al-Sayed, +15550002222, 123 King St</div>
             </div>
             <Textarea
               className="min-h-[200px] font-mono text-xs"

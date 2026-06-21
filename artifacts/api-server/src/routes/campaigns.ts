@@ -563,31 +563,29 @@ router.post("/campaigns/:id/contacts/import", async (req, res): Promise<void> =>
     let imported = 0;
     let skipped = 0;
 
+    const looksLikePhone = (s: string) => s.replace(/\D/g, "").length >= 7;
+
     for (const line of lines) {
       const parts = line.split(/[,|\t]/).map((p: string) => p.trim()).filter((p: string) => p.length > 0);
       if (parts.length === 0) { skipped++; continue; }
 
-      let name: string;
-      let phone: string;
-      let address: string | null = null;
-
-      if (parts.length === 1) {
-        // Single value — if it looks like a phone number, use it as both name and phone
-        const single = parts[0];
-        const digits = single.replace(/\D/g, "");
-        if (digits.length >= 7) {
-          phone = single;
-          name = single;
-        } else {
-          skipped++;
-          continue;
+      // If every part on this line looks like a phone number, treat each as its own contact
+      if (parts.every(looksLikePhone)) {
+        for (const p of parts) {
+          try {
+            await db.insert(campaignContactsTable).values({ campaignId: id, name: p, phone: p, address: null }).onConflictDoNothing();
+            imported++;
+          } catch {
+            skipped++;
+          }
         }
-      } else {
-        name = parts[0];
-        phone = parts[1];
-        address = parts[2] ?? null;
+        continue;
       }
 
+      // Standard format: Name, Phone[, Address]
+      const name = parts[0];
+      const phone = parts[1];
+      const address = parts[2] ?? null;
       if (!name || !phone) { skipped++; continue; }
       try {
         await db.insert(campaignContactsTable).values({ campaignId: id, name, phone, address }).onConflictDoNothing();
