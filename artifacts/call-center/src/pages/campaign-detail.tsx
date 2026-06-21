@@ -28,6 +28,7 @@ interface Campaign {
   notificationEmail: string | null;
   status: "draft" | "active" | "paused" | "completed";
   maxCallDuration: number | null;
+  maxConcurrentCalls: number | null;
   scheduleConfig: string | null;
   createdAt: string;
   updatedAt: string;
@@ -43,7 +44,7 @@ interface CampaignContact {
   name: string;
   phone: string;
   address: string | null;
-  callStatus: "pending" | "calling" | "completed" | "no_answer" | "failed";
+  callStatus: "pending" | "calling" | "in_progress" | "completed" | "no_answer" | "failed" | "skipped";
   callOutcome: string | null;
   twilioCallSid: string | null;
   callSummary: string | null;
@@ -58,6 +59,7 @@ interface CampaignContact {
   additionalNotes: string | null;
   attemptCount: number | null;
   lastAttemptAt: string | null;
+  scheduledCallAt: string | null;
   userNotes: string | null;
   createdAt: string;
 }
@@ -94,14 +96,17 @@ function statusIcon(status: string, size = "h-3.5 w-3.5") {
   const map: Record<string, JSX.Element> = {
     pending: <Clock className={`${size} text-muted-foreground`} />,
     calling: <Phone className={`${size} text-yellow-400 animate-pulse`} />,
+    in_progress: <Phone className={`${size} text-emerald-400 animate-pulse`} />,
     completed: <CheckCircle2 className={`${size} text-green-400`} />,
     no_answer: <PhoneOff className={`${size} text-muted-foreground`} />,
     failed: <AlertCircle className={`${size} text-destructive`} />,
+    skipped: <XCircle className={`${size} text-muted-foreground/50`} />,
   };
   return map[status] ?? <Clock className={`${size} text-muted-foreground`} />;
 }
 
 function outcomeBadge(interestedInSelling: boolean | null, callStatus: string, callOutcome: string | null) {
+  if (callStatus === "skipped") return <span className="text-xs text-muted-foreground/50 italic">Skipped</span>;
   if (callStatus === "pending") return <span className="text-xs text-muted-foreground">Pending</span>;
   if (callStatus === "calling") return <span className="text-xs text-yellow-400 font-semibold animate-pulse">Ringing...</span>;
   if (callStatus === "in_progress") return (
@@ -496,6 +501,13 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
     staleTime: 0,
   });
 
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false);
+  const [schedDraft, setSchedDraft] = useState(
+    contact.scheduledCallAt
+      ? new Date(contact.scheduledCallAt).toISOString().slice(0, 16)
+      : ""
+  );
+
   const callMutation = useMutation({
     mutationFn: async () => {
       const r = await fetch(`${BASE}/api/campaigns/${campaignId}/contacts/${contact.id}/call`, { method: "POST" });
@@ -507,6 +519,22 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
       toast({ title: `Calling ${contact.name}...` });
     },
     onError: () => toast({ title: "Failed to initiate call", variant: "destructive" }),
+  });
+
+  const patchContactMutation = useMutation({
+    mutationFn: async (patch: Record<string, unknown>) => {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}/contacts/${contact.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) throw new Error("Failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["campaign-contacts", campaignId] });
+      qc.invalidateQueries({ queryKey: ["campaign", campaignId] });
+    },
+    onError: () => toast({ title: "Failed to update contact", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -523,6 +551,7 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
 
   const attemptCount = contact.attemptCount ?? 0;
   const isHot = contact.interestedInSelling === true;
+  const isSkipped = contact.callStatus === "skipped";
   const lastAttempt = contact.lastAttemptAt ? formatDateTime(contact.lastAttemptAt) : null;
 
   return (
@@ -582,7 +611,26 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
         {/* Actions */}
         <td className="px-3 py-3 text-right" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-1 justify-end">
-            {contact.callStatus !== "calling" && (
+            {/* Schedule call time */}
+            <Button
+              size="sm" variant="ghost"
+              className={`h-7 w-7 px-0 ${contact.scheduledCallAt ? "text-blue-400" : "text-muted-foreground hover:text-foreground"}`}
+              title={contact.scheduledCallAt ? `Scheduled: ${formatDateTime(contact.scheduledCallAt)}` : "Schedule call time"}
+              onClick={() => setShowSchedulePicker(p => !p)}
+            >
+              <CalendarClock className="h-3.5 w-3.5" />
+            </Button>
+            {/* Skip / Unskip */}
+            <Button
+              size="sm" variant="ghost"
+              className={`h-7 w-7 px-0 ${isSkipped ? "text-yellow-400" : "text-muted-foreground hover:text-yellow-400"}`}
+              title={isSkipped ? "Unskip — reset to pending" : "Skip this contact"}
+              onClick={() => patchContactMutation.mutate({ callStatus: isSkipped ? "pending" : "skipped" })}
+              disabled={patchContactMutation.isPending || contact.callStatus === "calling" || contact.callStatus === "in_progress"}
+            >
+              <XCircle className="h-3.5 w-3.5" />
+            </Button>
+            {!isSkipped && contact.callStatus !== "calling" && contact.callStatus !== "in_progress" && (
               <Button
                 size="sm" variant="ghost"
                 className="h-7 w-7 px-0 text-muted-foreground hover:text-foreground"
@@ -602,6 +650,28 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
+          {/* Schedule picker (inline dropdown) */}
+          {showSchedulePicker && (
+            <div className="mt-1.5 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+              <input
+                type="datetime-local"
+                value={schedDraft}
+                onChange={e => setSchedDraft(e.target.value)}
+                className="h-7 rounded border border-input bg-background px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <Button size="sm" className="h-7 px-2 text-xs" onClick={() => {
+                patchContactMutation.mutate({ scheduledCallAt: schedDraft ? new Date(schedDraft).toISOString() : null });
+                setShowSchedulePicker(false);
+              }}>Set</Button>
+              {contact.scheduledCallAt && (
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground" onClick={() => {
+                  setSchedDraft("");
+                  patchContactMutation.mutate({ scheduledCallAt: null });
+                  setShowSchedulePicker(false);
+                }}>Clear</Button>
+              )}
+            </div>
+          )}
         </td>
       </tr>
 
@@ -959,7 +1029,8 @@ export default function CampaignDetail() {
       filter === "pending" ? c.callStatus === "pending" :
       filter === "completed" ? c.callStatus === "completed" :
       filter === "interested" ? c.interestedInSelling === true :
-      filter === "no_answer" ? c.callStatus === "no_answer" : true;
+      filter === "no_answer" ? c.callStatus === "no_answer" :
+      filter === "skipped" ? c.callStatus === "skipped" : true;
     return matchSearch && matchFilter;
   });
 
@@ -995,7 +1066,7 @@ export default function CampaignDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="h-8 w-8 px-0" onClick={() => { setSettingsForm({ name: campaign.name, script: campaign.script, systemPrompt: campaign.systemPrompt, fromPhoneNumberId: campaign.fromPhoneNumberId, notificationEmail: campaign.notificationEmail, maxCallDuration: campaign.maxCallDuration, scheduleConfig: campaign.scheduleConfig }); setShowSettings(true); }}>
+          <Button variant="ghost" size="sm" className="h-8 w-8 px-0" onClick={() => { setSettingsForm({ name: campaign.name, script: campaign.script, systemPrompt: campaign.systemPrompt, fromPhoneNumberId: campaign.fromPhoneNumberId, notificationEmail: campaign.notificationEmail, maxCallDuration: campaign.maxCallDuration, maxConcurrentCalls: campaign.maxConcurrentCalls, scheduleConfig: campaign.scheduleConfig }); setShowSettings(true); }}>
             <Settings2 className="h-4 w-4" />
           </Button>
           <Button
@@ -1061,18 +1132,19 @@ export default function CampaignDetail() {
               className="h-7 w-48 text-xs"
             />
             <div className="flex gap-1">
-              {(["all", "pending", "interested", "completed", "no_answer"] as const).map(f => (
+              {(["all", "pending", "interested", "completed", "no_answer", "skipped"] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
                   className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
                     filter === f
                       ? f === "interested" ? "bg-green-500/15 text-green-400 border border-green-500/20"
+                      : f === "skipped" ? "bg-yellow-500/15 text-yellow-400 border border-yellow-500/20"
                       : "bg-primary/15 text-primary border border-primary/20"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   }`}
                 >
-                  {f === "all" ? "All" : f === "no_answer" ? "No Answer" : f === "interested" ? "Hot Leads" : f.charAt(0).toUpperCase() + f.slice(1)}
+                  {f === "all" ? "All" : f === "no_answer" ? "No Answer" : f === "interested" ? "Hot Leads" : f === "skipped" ? "Skipped" : f.charAt(0).toUpperCase() + f.slice(1)}
                 </button>
               ))}
             </div>
@@ -1211,23 +1283,29 @@ export default function CampaignDetail() {
                 </button>
               </div>
             )}
+            <div>
+              <Label className="text-green-400">From Phone Number</Label>
+              <select
+                className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={settingsForm.fromPhoneNumberId ?? ""}
+                onChange={e => setSettingsForm(f => ({ ...f, fromPhoneNumberId: e.target.value ? parseInt(e.target.value, 10) : null }))}
+              >
+                <option value="">Select a number...</option>
+                {phoneNumbers.map((p: PhoneNumber) => (
+                  <option key={p.id} value={p.id}>{p.friendlyName ?? p.number} — {p.number}</option>
+                ))}
+              </select>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-green-400">From Phone Number</Label>
-                <select
-                  className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  value={settingsForm.fromPhoneNumberId ?? ""}
-                  onChange={e => setSettingsForm(f => ({ ...f, fromPhoneNumberId: e.target.value ? parseInt(e.target.value, 10) : null }))}
-                >
-                  <option value="">Select a number...</option>
-                  {phoneNumbers.map((p: PhoneNumber) => (
-                    <option key={p.id} value={p.id}>{p.friendlyName ?? p.number} — {p.number}</option>
-                  ))}
-                </select>
+                <Label className="text-green-400">Max Call Duration (sec)</Label>
+                <p className="text-[11px] text-muted-foreground mt-0.5 mb-1">Max seconds per call before AI hangs up</p>
+                <Input className="mt-1" type="number" min="60" max="600" value={settingsForm.maxCallDuration ?? 300} onChange={e => setSettingsForm(f => ({ ...f, maxCallDuration: parseInt(e.target.value, 10) }))} />
               </div>
               <div>
-                <Label className="text-green-400">Max Call Duration (sec)</Label>
-                <Input className="mt-1" type="number" min="60" max="600" value={settingsForm.maxCallDuration ?? 300} onChange={e => setSettingsForm(f => ({ ...f, maxCallDuration: parseInt(e.target.value, 10) }))} />
+                <Label className="text-green-400">Max Concurrent Calls</Label>
+                <p className="text-[11px] text-muted-foreground mt-0.5 mb-1">How many calls to run simultaneously</p>
+                <Input className="mt-1" type="number" min="1" max="20" value={settingsForm.maxConcurrentCalls ?? 1} onChange={e => setSettingsForm(f => ({ ...f, maxConcurrentCalls: parseInt(e.target.value, 10) || 1 }))} />
               </div>
             </div>
             <div>

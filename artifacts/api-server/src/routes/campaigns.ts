@@ -495,7 +495,7 @@ router.get("/campaigns/:id", async (req, res): Promise<void> => {
 router.patch("/campaigns/:id", async (req, res): Promise<void> => {
   try {
     const id = parseInt(req.params.id, 10);
-    const { name, script, systemPrompt, fromPhoneNumberId, notificationEmail, status, maxCallDuration, scheduleConfig } = req.body;
+    const { name, script, systemPrompt, fromPhoneNumberId, notificationEmail, status, maxCallDuration, maxConcurrentCalls, scheduleConfig } = req.body;
     const updateData: any = {};
     if (name != null) updateData.name = name;
     if (script != null) updateData.script = script;
@@ -504,6 +504,7 @@ router.patch("/campaigns/:id", async (req, res): Promise<void> => {
     if (notificationEmail !== undefined) updateData.notificationEmail = notificationEmail;
     if (status != null) updateData.status = status;
     if (maxCallDuration != null) updateData.maxCallDuration = maxCallDuration;
+    if (maxConcurrentCalls != null) updateData.maxConcurrentCalls = maxConcurrentCalls;
     if (scheduleConfig !== undefined) updateData.scheduleConfig = scheduleConfig;
     const [campaign] = await db.update(campaignsTable).set(updateData).where(eq(campaignsTable.id, id)).returning();
     if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
@@ -532,7 +533,7 @@ router.get("/campaigns/:id/contacts", async (req, res): Promise<void> => {
     const contacts = await db.select().from(campaignContactsTable)
       .where(eq(campaignContactsTable.campaignId, id))
       .orderBy(campaignContactsTable.createdAt);
-    res.json(contacts.map(c => ({ ...c, createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString(), lastAttemptAt: c.lastAttemptAt?.toISOString() ?? null })));
+    res.json(contacts.map(c => ({ ...c, createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString(), lastAttemptAt: c.lastAttemptAt?.toISOString() ?? null, callbackAt: c.callbackAt?.toISOString() ?? null, scheduledCallAt: c.scheduledCallAt?.toISOString() ?? null })));
   } catch (err: any) {
     res.status(500).json({ error: "Failed to list contacts" });
   }
@@ -585,7 +586,7 @@ router.post("/campaigns/:id/contacts/import", async (req, res): Promise<void> =>
 router.patch("/campaigns/:id/contacts/:contactId", async (req, res): Promise<void> => {
   try {
     const contactId = parseInt(req.params.contactId, 10);
-    const { name, phone, address, callbackAt, calendarNotes, userNotes } = req.body;
+    const { name, phone, address, callbackAt, calendarNotes, userNotes, scheduledCallAt, callStatus } = req.body;
     const updateData: any = {};
     if (name != null) updateData.name = name;
     if (phone != null) updateData.phone = phone;
@@ -593,6 +594,9 @@ router.patch("/campaigns/:id/contacts/:contactId", async (req, res): Promise<voi
     if (callbackAt !== undefined) updateData.callbackAt = callbackAt ? new Date(callbackAt) : null;
     if (calendarNotes !== undefined) updateData.calendarNotes = calendarNotes;
     if (userNotes !== undefined) updateData.userNotes = userNotes ?? null;
+    if (scheduledCallAt !== undefined) updateData.scheduledCallAt = scheduledCallAt ? new Date(scheduledCallAt) : null;
+    // Allow skip / unskip (reset to pending)
+    if (callStatus === "skipped" || callStatus === "pending") updateData.callStatus = callStatus;
     const [contact] = await db.update(campaignContactsTable).set(updateData).where(eq(campaignContactsTable.id, contactId)).returning();
     if (!contact) { res.status(404).json({ error: "Contact not found" }); return; }
     res.json({
@@ -601,6 +605,7 @@ router.patch("/campaigns/:id/contacts/:contactId", async (req, res): Promise<voi
       updatedAt: contact.updatedAt.toISOString(),
       lastAttemptAt: contact.lastAttemptAt?.toISOString() ?? null,
       callbackAt: contact.callbackAt?.toISOString() ?? null,
+      scheduledCallAt: contact.scheduledCallAt?.toISOString() ?? null,
     });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to update contact" });
@@ -618,6 +623,59 @@ router.delete("/campaigns/:id/contacts/:contactId", async (req, res): Promise<vo
   }
 });
 
+// ─── Fire due contacts up to concurrent limit ─────────────────────────────────
+// Picks pending contacts whose scheduledCallAt is null or in the past, respects maxConcurrentCalls.
+async function fireDueContacts(campaign: any, fromNumber: string, baseUrl: string): Promise<number> {
+  const maxConcurrent = campaign.maxConcurrentCalls ?? 1;
+  const now = new Date();
+
+  // Count currently in-flight calls
+  const [countRow] = await db
+    .select({ cnt: sql<number>`count(*)::int` })
+    .from(campaignContactsTable)
+    .where(and(
+      eq(campaignContactsTable.campaignId, campaign.id),
+      sql`${campaignContactsTable.callStatus} IN ('calling', 'in_progress')`,
+    ));
+  const calling = countRow?.cnt ?? 0;
+  const slots = maxConcurrent - calling;
+  if (slots <= 0) return 0;
+
+  // Find due pending contacts (not skipped, scheduledCallAt null or past)
+  const due = await db.select().from(campaignContactsTable)
+    .where(and(
+      eq(campaignContactsTable.campaignId, campaign.id),
+      eq(campaignContactsTable.callStatus, "pending"),
+      sql`(${campaignContactsTable.scheduledCallAt} IS NULL OR ${campaignContactsTable.scheduledCallAt} <= ${now})`,
+    ))
+    .limit(slots);
+
+  let fired = 0;
+  for (const contact of due) {
+    try {
+      await initiateOutboundCall(contact, campaign, fromNumber, baseUrl);
+      fired++;
+      await new Promise(r => setTimeout(r, 500));
+    } catch (err: any) {
+      logger.error({ err: err?.message, contactId: contact.id }, "fireDueContacts: call failed");
+      await db.update(campaignContactsTable).set({ callStatus: "failed" }).where(eq(campaignContactsTable.id, contact.id));
+    }
+  }
+  return fired;
+}
+
+// Check if all contacts are done (pending = 0 AND no in-flight calls)
+async function checkCampaignComplete(campaignId: number): Promise<void> {
+  const [row] = await db
+    .select({ cnt: sql<number>`count(*) filter (where ${campaignContactsTable.callStatus} IN ('pending', 'calling', 'in_progress'))::int` })
+    .from(campaignContactsTable)
+    .where(eq(campaignContactsTable.campaignId, campaignId));
+  if ((row?.cnt ?? 1) === 0) {
+    await db.update(campaignsTable).set({ status: "completed" }).where(eq(campaignsTable.id, campaignId));
+    logger.info({ campaignId }, "Campaign completed — all contacts dialed");
+  }
+}
+
 // ─── Start campaign ───────────────────────────────────────────────────────────
 router.post("/campaigns/:id/start", async (req, res): Promise<void> => {
   try {
@@ -634,26 +692,12 @@ router.post("/campaigns/:id/start", async (req, res): Promise<void> => {
 
     await db.update(campaignsTable).set({ status: "active" }).where(eq(campaignsTable.id, id));
 
-    const pendingContacts = await db.select().from(campaignContactsTable)
-      .where(and(eq(campaignContactsTable.campaignId, id), eq(campaignContactsTable.callStatus, "pending")));
-
     const baseUrl = getBaseUrl(req);
-    let queued = 0;
-    for (const contact of pendingContacts) {
-      try {
-        await initiateOutboundCall(contact, campaign, fromNumber, baseUrl);
-        queued++;
-        await new Promise(r => setTimeout(r, 1000));
-        const [updated] = await db.select({ status: campaignsTable.status }).from(campaignsTable).where(eq(campaignsTable.id, id));
-        if (updated?.status !== "active") break;
-      } catch (err: any) {
-        logger.error({ err: err?.message, contactId: contact.id }, "Failed to initiate call for contact");
-        await db.update(campaignContactsTable).set({ callStatus: "failed" }).where(eq(campaignContactsTable.id, contact.id));
-      }
-    }
+    const queued = await fireDueContacts(campaign, fromNumber, baseUrl);
 
-    if (pendingContacts.length === 0 || queued === pendingContacts.length) {
-      await db.update(campaignsTable).set({ status: "completed" }).where(eq(campaignsTable.id, id));
+    // If nothing was fired, check if all done (all contacts may be scheduled in the future or skipped)
+    if (queued === 0) {
+      await checkCampaignComplete(id);
     }
 
     res.json({ queued });
@@ -1138,6 +1182,26 @@ router.post("/twilio/campaign-status", async (req, res): Promise<void> => {
       outboundCallLogMap.delete(CallSid);
 
       // Hot lead email is sent from the recording callback (once audio is ready)
+
+      // Fire next pending contacts up to concurrent limit (event-driven dialing)
+      if (campaign && campaign.status === "active") {
+        setImmediate(async () => {
+          try {
+            let fromNumber = "";
+            if (campaign.fromPhoneNumberId) {
+              const [pn] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, campaign.fromPhoneNumberId));
+              fromNumber = pn?.number ?? "";
+            }
+            if (fromNumber) {
+              const baseUrl = getPublicDomain() ?? "";
+              if (baseUrl) await fireDueContacts(campaign, fromNumber, baseUrl);
+            }
+            await checkCampaignComplete(campaign.id);
+          } catch (err: any) {
+            logger.error({ err: err?.message, campaignId: campaign.id }, "Error firing next contact after call completion");
+          }
+        });
+      }
     }
 
     res.sendStatus(200);
@@ -1252,75 +1316,60 @@ function isWithinScheduleWindow(config: CampaignScheduleConfig): boolean {
   return false;
 }
 
+async function getCampaignFromNumber(campaign: any): Promise<string> {
+  if (!campaign.fromPhoneNumberId) return "";
+  const [pn] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, campaign.fromPhoneNumberId));
+  return pn?.number ?? "";
+}
+
 async function autoStartCampaignScheduled(campaign: any): Promise<void> {
   const baseUrl = getPublicDomain();
-  if (!baseUrl) {
-    logger.warn({ campaignId: campaign.id }, "Scheduler: no public domain, cannot auto-start");
-    return;
-  }
-  let fromNumber = "";
-  if (campaign.fromPhoneNumberId) {
-    const [pn] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, campaign.fromPhoneNumberId));
-    fromNumber = pn?.number ?? "";
-  }
-  if (!fromNumber) {
-    logger.warn({ campaignId: campaign.id }, "Scheduler: no phone number configured");
-    return;
-  }
+  if (!baseUrl) { logger.warn({ campaignId: campaign.id }, "Scheduler: no public domain"); return; }
+  const fromNumber = await getCampaignFromNumber(campaign);
+  if (!fromNumber) { logger.warn({ campaignId: campaign.id }, "Scheduler: no phone number"); return; }
   await db.update(campaignsTable).set({ status: "active" }).where(eq(campaignsTable.id, campaign.id));
-  const pendingContacts = await db.select().from(campaignContactsTable)
-    .where(and(eq(campaignContactsTable.campaignId, campaign.id), eq(campaignContactsTable.callStatus, "pending")));
-  if (pendingContacts.length === 0) {
-    await db.update(campaignsTable).set({ status: "completed" }).where(eq(campaignsTable.id, campaign.id));
-    return;
-  }
-  logger.info({ campaignId: campaign.id, pending: pendingContacts.length }, "Scheduler auto-starting campaign");
-  (async () => {
-    for (const contact of pendingContacts) {
-      try {
-        const [current] = await db.select({ status: campaignsTable.status, scheduleConfig: campaignsTable.scheduleConfig })
-          .from(campaignsTable).where(eq(campaignsTable.id, campaign.id));
-        if (current?.status !== "active") break;
-        if (current.scheduleConfig) {
-          try {
-            const cfg: CampaignScheduleConfig = JSON.parse(current.scheduleConfig);
-            if (cfg.enabled && !isWithinScheduleWindow(cfg)) {
-              await db.update(campaignsTable).set({ status: "paused" }).where(eq(campaignsTable.id, campaign.id));
-              logger.info({ campaignId: campaign.id }, "Scheduler auto-paused mid-run (left window)");
-              break;
-            }
-          } catch { /* ignore parse errors */ }
-        }
-        await initiateOutboundCall(contact, campaign, fromNumber, baseUrl);
-        await new Promise(r => setTimeout(r, 1000));
-      } catch (err: any) {
-        logger.error({ err: err?.message, contactId: contact.id }, "Scheduler: call failed");
-        await db.update(campaignContactsTable).set({ callStatus: "failed" }).where(eq(campaignContactsTable.id, contact.id));
-      }
-    }
-    const remaining = await db.select().from(campaignContactsTable)
-      .where(and(eq(campaignContactsTable.campaignId, campaign.id), eq(campaignContactsTable.callStatus, "pending")));
-    if (remaining.length === 0) {
-      await db.update(campaignsTable).set({ status: "completed" }).where(eq(campaignsTable.id, campaign.id));
-    }
-  })().catch(err => logger.error({ err: err?.message, campaignId: campaign.id }, "Scheduler auto-start failed"));
+  const fired = await fireDueContacts(campaign, fromNumber, baseUrl);
+  logger.info({ campaignId: campaign.id, fired }, "Scheduler auto-started campaign");
+  if (fired === 0) await checkCampaignComplete(campaign.id);
 }
 
 setInterval(async () => {
   try {
     const allCampaigns = await db.select().from(campaignsTable)
-      .where(sql`schedule_config IS NOT NULL`);
+      .where(sql`status IN ('draft', 'paused', 'active')`);
+
     for (const campaign of allCampaigns) {
-      if (!campaign.scheduleConfig) continue;
-      let config: CampaignScheduleConfig;
-      try { config = JSON.parse(campaign.scheduleConfig); } catch { continue; }
-      if (!config.enabled || !config.slots?.length) continue;
-      const inWindow = isWithinScheduleWindow(config);
-      if (inWindow && (campaign.status === "draft" || campaign.status === "paused")) {
-        await autoStartCampaignScheduled(campaign);
-      } else if (!inWindow && campaign.status === "active") {
-        await db.update(campaignsTable).set({ status: "paused" }).where(eq(campaignsTable.id, campaign.id));
-        logger.info({ campaignId: campaign.id }, "Campaign auto-paused (outside schedule window)");
+      // ── Schedule-window auto-start/pause ───────────────────────────────────
+      if (campaign.scheduleConfig) {
+        try {
+          const cfg: CampaignScheduleConfig = JSON.parse(campaign.scheduleConfig);
+          if (cfg.enabled && cfg.slots?.length) {
+            const inWindow = isWithinScheduleWindow(cfg);
+            if (inWindow && (campaign.status === "draft" || campaign.status === "paused")) {
+              await autoStartCampaignScheduled(campaign);
+              continue; // handled — skip per-contact check below
+            } else if (!inWindow && campaign.status === "active") {
+              await db.update(campaignsTable).set({ status: "paused" }).where(eq(campaignsTable.id, campaign.id));
+              logger.info({ campaignId: campaign.id }, "Campaign auto-paused (outside schedule window)");
+              continue;
+            }
+          }
+        } catch { /* ignore parse errors */ }
+      }
+
+      // ── Per-contact scheduled calls for active campaigns ───────────────────
+      if (campaign.status === "active") {
+        try {
+          const fromNumber = await getCampaignFromNumber(campaign);
+          const baseUrl = getPublicDomain() ?? "";
+          if (fromNumber && baseUrl) {
+            const fired = await fireDueContacts(campaign, fromNumber, baseUrl);
+            if (fired > 0) logger.info({ campaignId: campaign.id, fired }, "Scheduler fired due contacts");
+            await checkCampaignComplete(campaign.id);
+          }
+        } catch (err: any) {
+          logger.error({ err: err?.message, campaignId: campaign.id }, "Scheduler: per-contact fire error");
+        }
       }
     }
   } catch (err: any) {
