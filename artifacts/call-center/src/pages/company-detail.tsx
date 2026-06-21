@@ -93,7 +93,8 @@ export default function CompanyDetail() {
 
   const { data: company, isLoading: companyLoading } = useGetCompany({ id: companyId });
   const { data: allNumbers } = useListPhoneNumbers();
-  const linkedNumber = allNumbers?.find(n => n.companyId === companyId) ?? null;
+  const linkedNumbers = allNumbers?.filter(n => n.companyId === companyId) ?? [];
+  const linkedNumber = linkedNumbers[0] ?? null;
 
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [extsLoading, setExtsLoading] = useState(true);
@@ -208,16 +209,14 @@ export default function CompanyDetail() {
     }
   }
 
-  async function handleUnlinkNumber() {
-    if (!linkedNumber) return;
-    await linkPhoneNumber(linkedNumber.id, null);
+  async function handleUnlinkNumber(phoneNumberId: number) {
+    await linkPhoneNumber(phoneNumberId, null);
     qc.invalidateQueries({ queryKey: ["listPhoneNumbers"] });
     toast({ title: "Phone number unlinked" });
   }
 
-  async function handleSetIvr(mode: string) {
-    if (!linkedNumber) return;
-    await setAnswerMode(linkedNumber.id, mode);
+  async function handleSetIvr(phoneNumberId: number, mode: string) {
+    await setAnswerMode(phoneNumberId, mode);
     qc.invalidateQueries({ queryKey: ["listPhoneNumbers"] });
     toast({ title: `Answer mode set to ${mode}` });
   }
@@ -292,74 +291,77 @@ export default function CompanyDetail() {
         )}
       </div>
 
-      {/* Phone Number */}
+      {/* Phone Numbers */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/20">
           <div className="flex items-center gap-2">
             <Phone className="h-4 w-4 text-blue-400" />
-            <span className="text-sm font-semibold">Phone Number</span>
+            <span className="text-sm font-semibold">Phone Numbers</span>
+            {linkedNumbers.length > 0 && (
+              <span className="text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded font-semibold">{linkedNumbers.length}</span>
+            )}
           </div>
-          {!linkedNumber && (
-            <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setLinkDialog(true)}>
-              <Plus className="h-3.5 w-3.5" /> Link Number
-            </Button>
-          )}
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setLinkDialog(true)}>
+            <Plus className="h-3.5 w-3.5" /> Link Number
+          </Button>
         </div>
 
-        {linkedNumber ? (
-          <div className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-mono text-sm font-medium">{formatPhone(linkedNumber.number)}</div>
-                {linkedNumber.friendlyName && (
-                  <div className="text-xs text-muted-foreground mt-0.5">{linkedNumber.friendlyName}</div>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Badge variant="outline" className={`text-[10px] ${
-                  linkedNumber.answerMode === "ivr" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
-                  linkedNumber.answerMode === "forward" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                  linkedNumber.answerMode === "ai_voice" ? "bg-green-500/10 text-green-400 border-green-500/20" :
-                  "bg-secondary text-muted-foreground"
-                }`}>
-                  {linkedNumber.answerMode === "ivr" ? "IVR / Extensions" : linkedNumber.answerMode}
-                </Badge>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button size="sm" variant={linkedNumber.answerMode === "ivr" ? "default" : "outline"} className="h-7 text-xs gap-1" onClick={() => handleSetIvr("ivr")}>
-                <Hash className="h-3.5 w-3.5" /> IVR / Extensions
-              </Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => navigate(`/numbers/${linkedNumber.id}`)}>
-                Configure
-                <ChevronRight className="h-3 w-3" />
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground gap-1 ml-auto">
-                    Unlink
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="bg-card border-border">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Unlink Phone Number</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will remove the association between {company.name} and {linkedNumber.number}. The number will still exist in your account.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleUnlinkNumber}>Unlink</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          </div>
-        ) : (
+        {linkedNumbers.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-24 text-muted-foreground gap-2">
             <Phone className="h-6 w-6 opacity-25" />
-            <span className="text-xs">No phone number linked.</span>
+            <span className="text-xs">No phone numbers linked. Link a number to enable inbound calling.</span>
+          </div>
+        ) : (
+          <div className="divide-y divide-border/50">
+            {linkedNumbers.map(ln => (
+              <div key={ln.id} className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-mono text-sm font-medium">{formatPhone(ln.number)}</div>
+                    {ln.friendlyName && (
+                      <div className="text-xs text-muted-foreground mt-0.5">{ln.friendlyName}</div>
+                    )}
+                  </div>
+                  <Badge variant="outline" className={`text-[10px] ${
+                    (ln.answerMode as string) === "ivr" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
+                    ln.answerMode === "forward" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                    ln.answerMode === "ai_voice" ? "bg-green-500/10 text-green-400 border-green-500/20" :
+                    "bg-secondary text-muted-foreground"
+                  }`}>
+                    {(ln.answerMode as string) === "ivr" ? "IVR / Extensions" : ln.answerMode}
+                  </Badge>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant={(ln.answerMode as string) === "ivr" ? "default" : "outline"} className="h-7 text-xs gap-1" onClick={() => handleSetIvr(ln.id, "ivr")}>
+                    <Hash className="h-3.5 w-3.5" /> IVR / Extensions
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => navigate(`/numbers/${ln.id}`)}>
+                    Number &amp; Campaigns
+                    <ChevronRight className="h-3 w-3" />
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground gap-1 ml-auto">
+                        Unlink
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-card border-border">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Unlink Phone Number</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will remove the association between {company.name} and {ln.number}. The number will still exist in your account.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleUnlinkNumber(ln.id)}>Unlink</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -379,7 +381,7 @@ export default function CompanyDetail() {
           </Button>
         </div>
 
-        {!linkedNumber && (
+        {linkedNumbers.length === 0 && (
           <div className="px-4 py-3 bg-yellow-500/5 border-b border-yellow-500/10 text-xs text-yellow-400 flex items-center gap-2">
             <Phone className="h-3.5 w-3.5 flex-shrink-0" />
             Link a phone number above and set it to IVR mode for extensions to activate.
@@ -445,7 +447,7 @@ export default function CompanyDetail() {
           </div>
         )}
 
-        {linkedNumber && extensions.length > 0 && linkedNumber.answerMode !== "ivr" && (
+        {linkedNumbers.length > 0 && extensions.length > 0 && !linkedNumbers.some(n => (n.answerMode as string) === "ivr") && (
           <div className="px-4 py-3 border-t border-border bg-yellow-500/5 text-xs text-yellow-400 flex items-center gap-2">
             <Hash className="h-3.5 w-3.5 flex-shrink-0" />
             Extensions configured but answer mode is not set to IVR. Click "IVR / Extensions" above to activate.

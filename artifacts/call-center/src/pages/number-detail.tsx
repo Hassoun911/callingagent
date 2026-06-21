@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { 
   useGetPhoneNumber, 
   useUpdatePhoneNumber, 
@@ -8,14 +8,15 @@ import {
   useTestCall,
   useGetPhoneNumberTwilioStatus,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck, MessageSquare, Keyboard, Mic, Mail, Globe } from "lucide-react";
+import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck, MessageSquare, Keyboard, Mic, Mail, Globe, Plus, ChevronRight, Play, Pause, Users } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -61,6 +62,50 @@ export default function NumberDetail() {
     }
   });
   const testCallMutation = useTestCall();
+  const [, navigate] = useLocation();
+
+  const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+  const { data: campaigns, refetch: refetchCampaigns } = useQuery({
+    queryKey: ["campaigns-for-number", numId],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/campaigns?phoneNumberId=${numId}`);
+      if (!r.ok) throw new Error("Failed to fetch campaigns");
+      return r.json() as Promise<Array<{
+        id: number; name: string; status: string; script: string | null;
+        totalContacts: number; pendingContacts: number; completedContacts: number; interestedContacts: number;
+        createdAt: string;
+      }>>;
+    },
+    enabled: !isNaN(numId),
+  });
+
+  const [newCampaignDialog, setNewCampaignDialog] = useState(false);
+  const [newCampaignName, setNewCampaignName] = useState("");
+  const [newCampaignScript, setNewCampaignScript] = useState("");
+  const [creatingCampaign, setCreatingCampaign] = useState(false);
+
+  async function handleCreateCampaign() {
+    if (!newCampaignName.trim()) return;
+    setCreatingCampaign(true);
+    try {
+      const r = await fetch(`${BASE}/api/campaigns`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCampaignName.trim(), script: newCampaignScript.trim() || "AI outreach campaign.", fromPhoneNumberId: numId }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      const created = await r.json();
+      setNewCampaignDialog(false);
+      setNewCampaignName("");
+      setNewCampaignScript("");
+      refetchCampaigns();
+      navigate(`/campaigns/${created.id}`);
+    } catch (err: any) {
+      toast({ title: "Failed to create campaign", description: err.message, variant: "destructive" });
+    } finally {
+      setCreatingCampaign(false);
+    }
+  }
 
   const [formData, setFormData] = useState<any>({});
   const initRef = useRef(false);
@@ -675,6 +720,102 @@ export default function NumberDetail() {
           </Card>
         </div>
       </div>
+
+      {/* ── Campaigns ── */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/20">
+          <div className="flex items-center gap-2">
+            <Play className="h-4 w-4 text-green-400" />
+            <span className="text-sm font-semibold">Campaigns</span>
+            {campaigns && campaigns.length > 0 && (
+              <span className="text-xs bg-green-500/10 text-green-400 border border-green-500/20 px-1.5 py-0.5 rounded font-semibold">{campaigns.length}</span>
+            )}
+          </div>
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setNewCampaignDialog(true)}>
+            <Plus className="h-3.5 w-3.5" /> New Campaign
+          </Button>
+        </div>
+
+        {!campaigns ? (
+          <div className="p-4 space-y-2">
+            {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+          </div>
+        ) : campaigns.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-24 text-muted-foreground gap-2">
+            <Play className="h-6 w-6 opacity-25" />
+            <span className="text-xs">No campaigns yet. Create one to start outbound calling from this number.</span>
+          </div>
+        ) : (
+          <div className="divide-y divide-border/50">
+            {campaigns.map(c => (
+              <div
+                key={c.id}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 cursor-pointer transition-colors group"
+                onClick={() => navigate(`/campaigns/${c.id}`)}
+              >
+                <div className={`h-2 w-2 rounded-full flex-shrink-0 ${
+                  c.status === "active" ? "bg-green-400" :
+                  c.status === "paused" ? "bg-yellow-400" :
+                  c.status === "completed" ? "bg-blue-400" :
+                  "bg-muted-foreground/40"
+                }`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium truncate">{c.name}</span>
+                    <Badge variant="outline" className={`text-[10px] flex-shrink-0 ${
+                      c.status === "active" ? "bg-green-500/10 text-green-400 border-green-500/20" :
+                      c.status === "paused" ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" :
+                      c.status === "completed" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                      "bg-secondary text-muted-foreground"
+                    }`}>{c.status}</Badge>
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><Users className="h-3 w-3" />{c.totalContacts} contacts</span>
+                    {c.completedContacts > 0 && <span>{c.completedContacts} called</span>}
+                    {c.interestedContacts > 0 && <span className="text-green-400">{c.interestedContacts} interested</span>}
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors flex-shrink-0" />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* New Campaign Dialog */}
+      <Dialog open={newCampaignDialog} onOpenChange={setNewCampaignDialog}>
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader><DialogTitle>New Campaign</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>Campaign Name</Label>
+              <Input
+                autoFocus
+                placeholder="e.g. Father's Day Outreach"
+                value={newCampaignName}
+                onChange={e => setNewCampaignName(e.target.value)}
+                className="bg-background"
+                onKeyDown={e => e.key === "Enter" && handleCreateCampaign()}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>AI Script / Instructions <span className="text-muted-foreground font-normal">(optional — can edit later)</span></Label>
+              <Textarea
+                placeholder="e.g. You are Sarah from Acme Corp. Your job is to..."
+                value={newCampaignScript}
+                onChange={e => setNewCampaignScript(e.target.value)}
+                className="bg-background h-24 text-sm resize-none"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setNewCampaignDialog(false)}>Cancel</Button>
+              <Button onClick={handleCreateCampaign} disabled={!newCampaignName.trim() || creatingCampaign}>
+                {creatingCampaign ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Campaign"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

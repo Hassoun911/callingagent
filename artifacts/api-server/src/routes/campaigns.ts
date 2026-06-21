@@ -333,7 +333,10 @@ router.post("/campaigns/test-email", async (req, res): Promise<void> => {
 // ─── List campaigns ──────────────────────────────────────────────────────────
 router.get("/campaigns", async (req, res): Promise<void> => {
   try {
-    const campaigns = await db.select().from(campaignsTable).orderBy(desc(campaignsTable.createdAt));
+    const phoneNumberId = req.query.phoneNumberId ? parseInt(req.query.phoneNumberId as string, 10) : null;
+    const campaigns = phoneNumberId
+      ? await db.select().from(campaignsTable).where(eq(campaignsTable.fromPhoneNumberId, phoneNumberId)).orderBy(desc(campaignsTable.createdAt))
+      : await db.select().from(campaignsTable).orderBy(desc(campaignsTable.createdAt));
     const counts = await db
       .select({
         campaignId: campaignContactsTable.campaignId,
