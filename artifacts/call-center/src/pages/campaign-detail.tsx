@@ -1119,7 +1119,6 @@ export default function CampaignDetail() {
       qc.invalidateQueries({ queryKey: ["campaign-contacts", campaignId] });
       qc.invalidateQueries({ queryKey: ["campaign", campaignId] });
       setShowImport(false);
-      setImportText("");
       toast({ title: `Imported ${data.imported} contacts${data.skipped > 0 ? ` (${data.skipped} skipped)` : ""}` });
     },
     onError: () => toast({ title: "Import failed", variant: "destructive" }),
