@@ -334,7 +334,7 @@ export default function Dashboard() {
                           ? "bg-green-500/15 text-green-400"
                           : "bg-orange-500/15 text-orange-400"
                       }`}>
-                        {e.eventType === "hot_lead" ? "Hot Lead" : "Callback"}
+                        {e.eventType === "hot_lead" ? "🔥 Hot Lead" : "📞 Callback"}
                       </div>
                       {dateStr && (
                         <div className={`text-[10px] mt-0.5 ${isToday ? "text-orange-400 font-semibold" : "text-muted-foreground"}`}>

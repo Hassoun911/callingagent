@@ -313,11 +313,11 @@ function CalendarTab() {
       <div className="flex items-center gap-5 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
-          Hot Lead
+          🔥 Hot Lead
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
-          Callback Requested
+          📞 Callback
         </span>
       </div>
 
@@ -345,7 +345,7 @@ function CalendarTab() {
                         : "bg-orange-500/15 text-orange-400"
                     }`}
                   >
-                    {e.eventType === "hot_lead" ? "Hot Lead" : "Callback"}
+                    {e.eventType === "hot_lead" ? "🔥 Hot Lead" : "📞 Callback"}
                   </span>
                   <span className="font-medium text-sm truncate">{e.name}</span>
                   <span className="text-xs text-muted-foreground font-mono flex-shrink-0">{e.phone}</span>
@@ -391,7 +391,7 @@ function CalendarTab() {
                       : "bg-orange-500/15 text-orange-400"
                   }`}
                 >
-                  {selectedEvent.eventType === "hot_lead" ? "Hot Lead" : "Callback"}
+                  {selectedEvent.eventType === "hot_lead" ? "🔥 Hot Lead" : "📞 Callback"}
                 </span>
                 {selectedEvent.name}
               </DialogTitle>
