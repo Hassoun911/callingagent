@@ -110,9 +110,13 @@ function statusIcon(status: string, size = "h-3.5 w-3.5") {
   return map[status] ?? <Clock className={`${size} text-muted-foreground`} />;
 }
 
-function outcomeBadge(interestedInSelling: boolean | null, callStatus: string, callOutcome: string | null) {
+function outcomeBadge(interestedInSelling: boolean | null, callStatus: string, callOutcome: string | null, attemptCount?: number) {
   if (callStatus === "skipped") return <span className="text-xs text-muted-foreground/50 italic">Skipped</span>;
-  if (callStatus === "pending") return <span className="text-xs text-muted-foreground">Pending</span>;
+  if (callStatus === "pending") {
+    if (attemptCount && attemptCount > 0)
+      return <span className="text-xs text-muted-foreground/60 italic">No outcome</span>;
+    return <span className="text-xs text-muted-foreground">Pending</span>;
+  }
   if (callStatus === "calling") return <span className="text-xs text-yellow-400 font-semibold animate-pulse">Ringing...</span>;
   if (callStatus === "in_progress") return (
     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
@@ -604,7 +608,7 @@ function ContactRow({ contact, campaignId, campaignHasSchedule, onRefresh }: { c
         <td className="px-3 py-3">
           <div className="flex items-center gap-1.5">
             {statusIcon(contact.callStatus)}
-            {outcomeBadge(contact.interestedInSelling, contact.callStatus, contact.callOutcome)}
+            {outcomeBadge(contact.interestedInSelling, contact.callStatus, contact.callOutcome, contact.attemptCount ?? 0)}
           </div>
         </td>
 
