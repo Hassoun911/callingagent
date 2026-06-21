@@ -757,6 +757,21 @@ paths:
                   skipped:
                     type: integer
 
+  /campaigns/calendar:
+    get:
+      operationId: getCampaignCalendar
+      tags: [campaigns]
+      summary: Get all calendar events (callbacks and hot leads) across campaigns
+      responses:
+        "200":
+          description: List of calendar events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalendarEvent"
+
   /campaigns/{id}/contacts/{contactId}:
     patch:
       operationId: updateCampaignContact
@@ -778,7 +793,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CampaignContactInput"
+              $ref: "#/components/schemas/CampaignContactUpdate"
       responses:
         "200":
           description: Updated
@@ -1629,6 +1644,10 @@ components:
           type: ["integer", "null"]
         lastAttemptAt:
           type: ["string", "null"]
+        callbackAt:
+          type: ["string", "null"]
+        calendarNotes:
+          type: ["string", "null"]
         createdAt:
           type: string
 
@@ -1641,6 +1660,48 @@ components:
         phone:
           type: string
         address:
+          type: ["string", "null"]
+
+    CampaignContactUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        address:
+          type: ["string", "null"]
+        callbackAt:
+          type: ["string", "null"]
+        calendarNotes:
+          type: ["string", "null"]
+
+    CalendarEvent:
+      type: object
+      required: [id, campaignId, campaignName, name, phone, eventType]
+      properties:
+        id:
+          type: integer
+        campaignId:
+          type: integer
+        campaignName:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        callOutcome:
+          type: ["string", "null"]
+        callSummary:
+          type: ["string", "null"]
+        eventType:
+          type: string
+          enum: [hot_lead, callback]
+        callbackAt:
+          type: ["string", "null"]
+        calendarNotes:
+          type: ["string", "null"]
+        lastAttemptAt:
           type: ["string", "null"]
 
     CampaignContactBulkImport:

@@ -36,6 +36,8 @@ export const campaignContactsTable = pgTable("campaign_contacts", {
   additionalNotes: text("additional_notes"),
   attemptCount: integer("attempt_count").default(0),
   lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+  callbackAt: timestamp("callback_at", { withTimezone: true }),
+  calendarNotes: text("calendar_notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

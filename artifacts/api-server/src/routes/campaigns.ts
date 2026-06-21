@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, or } from "drizzle-orm";
 import {
   db,
   campaignsTable,
@@ -382,6 +382,52 @@ router.post("/campaigns", async (req, res): Promise<void> => {
 });
 
 // ─── Get campaign ────────────────────────────────────────────────────────────
+// ─── Calendar events (callbacks + hot leads) ──────────────────────────────────
+router.get("/campaigns/calendar", async (req, res): Promise<void> => {
+  try {
+    const rows = await db
+      .select({
+        id: campaignContactsTable.id,
+        campaignId: campaignContactsTable.campaignId,
+        campaignName: campaignsTable.name,
+        name: campaignContactsTable.name,
+        phone: campaignContactsTable.phone,
+        callOutcome: campaignContactsTable.callOutcome,
+        callSummary: campaignContactsTable.callSummary,
+        callbackAt: campaignContactsTable.callbackAt,
+        calendarNotes: campaignContactsTable.calendarNotes,
+        lastAttemptAt: campaignContactsTable.lastAttemptAt,
+      })
+      .from(campaignContactsTable)
+      .innerJoin(campaignsTable, eq(campaignContactsTable.campaignId, campaignsTable.id))
+      .where(
+        or(
+          eq(campaignContactsTable.callOutcome, "callback_requested"),
+          eq(campaignContactsTable.callOutcome, "hot_lead"),
+          eq(campaignContactsTable.callOutcome, "interested"),
+        )
+      )
+      .orderBy(desc(campaignContactsTable.lastAttemptAt));
+
+    res.json(rows.map(r => ({
+      id: r.id,
+      campaignId: r.campaignId,
+      campaignName: r.campaignName,
+      name: r.name,
+      phone: r.phone,
+      callOutcome: r.callOutcome,
+      callSummary: r.callSummary,
+      eventType: (r.callOutcome === "hot_lead" || r.callOutcome === "interested") ? "hot_lead" : "callback",
+      callbackAt: r.callbackAt?.toISOString() ?? null,
+      calendarNotes: r.calendarNotes ?? null,
+      lastAttemptAt: r.lastAttemptAt?.toISOString() ?? null,
+    })));
+  } catch (err: any) {
+    req.log.error({ err: err?.message }, "Failed to get calendar events");
+    res.status(500).json({ error: "Failed to get calendar events" });
+  }
+});
+
 router.get("/campaigns/:id", async (req, res): Promise<void> => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -495,14 +541,22 @@ router.post("/campaigns/:id/contacts/import", async (req, res): Promise<void> =>
 router.patch("/campaigns/:id/contacts/:contactId", async (req, res): Promise<void> => {
   try {
     const contactId = parseInt(req.params.contactId, 10);
-    const { name, phone, address } = req.body;
+    const { name, phone, address, callbackAt, calendarNotes } = req.body;
     const updateData: any = {};
     if (name != null) updateData.name = name;
     if (phone != null) updateData.phone = phone;
     if (address !== undefined) updateData.address = address;
+    if (callbackAt !== undefined) updateData.callbackAt = callbackAt ? new Date(callbackAt) : null;
+    if (calendarNotes !== undefined) updateData.calendarNotes = calendarNotes;
     const [contact] = await db.update(campaignContactsTable).set(updateData).where(eq(campaignContactsTable.id, contactId)).returning();
     if (!contact) { res.status(404).json({ error: "Contact not found" }); return; }
-    res.json({ ...contact, createdAt: contact.createdAt.toISOString(), updatedAt: contact.updatedAt.toISOString(), lastAttemptAt: contact.lastAttemptAt?.toISOString() ?? null });
+    res.json({
+      ...contact,
+      createdAt: contact.createdAt.toISOString(),
+      updatedAt: contact.updatedAt.toISOString(),
+      lastAttemptAt: contact.lastAttemptAt?.toISOString() ?? null,
+      callbackAt: contact.callbackAt?.toISOString() ?? null,
+    });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to update contact" });
   }
