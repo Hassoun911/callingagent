@@ -122,7 +122,7 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
   }
 
   return (
-    <div className="flex items-center gap-1.5" style={{ width: 200 }}>
+    <div className="flex items-center gap-1.5" style={{ width: 140 }}>
       <button
         onClick={toggle}
         className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-muted hover:bg-muted/60 border border-border/60 transition-colors"
@@ -138,28 +138,32 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
         />
       </div>
 
-      {playing || currentTime > 0 ? (
+      {(playing || currentTime > 0) && (
         <span className="text-[10px] font-mono text-muted-foreground tabular-nums shrink-0 whitespace-nowrap">
           {fmtTime(currentTime)}
         </span>
-      ) : null}
-
-      <a
-        href={src}
-        download
-        onClick={(e) => e.stopPropagation()}
-        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors ml-1"
-        title="Download recording"
-      >
-        <Download className="h-3 w-3" />
-      </a>
+      )}
     </div>
   );
 }
 
 function RecordingPlayer({ callId, hasRecording }: { callId: number; hasRecording: boolean }) {
   if (!hasRecording) return <span className="text-muted-foreground text-xs">--</span>;
-  return <AudioPlayer src={`/api/call-logs/${callId}/recording`} />;
+  const src = `/api/call-logs/${callId}/recording`;
+  return (
+    <div className="flex items-center gap-2">
+      <AudioPlayer src={src} />
+      <a
+        href={src}
+        download
+        onClick={(e) => e.stopPropagation()}
+        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+        title="Download recording"
+      >
+        <Download className="h-3.5 w-3.5" />
+      </a>
+    </div>
+  );
 }
 
 function PriorityBadge({ priority }: { priority: string | null | undefined }) {
