@@ -16,6 +16,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useWatches } from "@/hooks/use-watches";
+import { useListCompanies, useListPhoneNumbers } from "@workspace/api-client-react";
 
 function NotificationBell() {
   const { data: watches } = useWatches();
@@ -36,14 +37,30 @@ export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const { data: companies } = useListCompanies();
+  const { data: allNumbers } = useListPhoneNumbers();
+
+  // Derive active company from current route
+  const activeCompanyId = (() => {
+    const cm = location.match(/^\/companies\/(\d+)/);
+    if (cm) return parseInt(cm[1]);
+    const nm = location.match(/^\/numbers\/(\d+)/);
+    if (nm) {
+      const numId = parseInt(nm[1]);
+      return allNumbers?.find(n => n.id === numId)?.companyId ?? null;
+    }
+    return null;
+  })();
+  const contextCompany = activeCompanyId ? companies?.find(c => c.id === activeCompanyId) : null;
+
   function isActive(href: string) {
     return location === href || (href !== "/" && location.startsWith(href));
   }
 
-  function navCls(href: string, ancestor = false) {
+  function navCls(href: string, asAncestor = false) {
     const active = isActive(href);
     if (active) return "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors bg-primary/10 text-primary";
-    if (ancestor) return "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground/70 hover:text-foreground hover:bg-secondary/50";
+    if (asAncestor) return "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground/60 hover:text-foreground hover:bg-secondary/50";
     return "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary/50";
   }
 
@@ -56,6 +73,9 @@ export function Layout({ children }: { children: ReactNode }) {
   }
 
   function NavContent({ onNav }: { onNav?: () => void }) {
+    const onCompanyPage = isActive("/companies") && !location.match(/^\/companies\/\d+/);
+    const onCompanyDetail = !!location.match(/^\/companies\/\d+/);
+    const onNumberDetail = !!location.match(/^\/numbers\/\d+/);
     const companiesAncestor = isActive("/numbers") || isActive("/campaigns");
     const numbersAncestor = isActive("/campaigns");
 
@@ -83,32 +103,73 @@ export function Layout({ children }: { children: ReactNode }) {
           <SectionLabel label="Structure" />
 
           {/* Companies */}
-          <Link href="/companies" onClick={onNav} className={navCls("/companies", companiesAncestor)}>
+          <Link
+            href="/companies"
+            onClick={onNav}
+            className={navCls("/companies", companiesAncestor)}
+          >
             <Building2 className="h-4 w-4 flex-shrink-0" />
             Companies
-            {companiesAncestor && !isActive("/companies") && (
+            {companiesAncestor && (
               <ChevronRight className="h-3 w-3 ml-auto text-muted-foreground/40" />
             )}
           </Link>
 
-          {/* Numbers — child of Companies */}
-          <div className="ml-3 pl-3 border-l border-border/40 space-y-0.5">
-            <Link href="/numbers" onClick={onNav} className={navCls("/numbers", numbersAncestor)}>
-              <Phone className="h-4 w-4 flex-shrink-0" />
-              Numbers
-              {numbersAncestor && !isActive("/numbers") && (
-                <ChevronRight className="h-3 w-3 ml-auto text-muted-foreground/40" />
-              )}
-            </Link>
-
-            {/* Campaigns — child of Numbers */}
-            <div className="ml-3 pl-3 border-l border-border/40 space-y-0.5">
-              <Link href="/campaigns" onClick={onNav} className={navCls("/campaigns")}>
-                <Target className="h-4 w-4 flex-shrink-0" />
-                Campaigns
+          {/* ── Context tree: company name appears when drilling in ── */}
+          {contextCompany ? (
+            /* CONTEXTUAL: inside a company or one of its numbers */
+            <div className="ml-3 pl-3 border-l border-primary/25 space-y-0.5">
+              {/* Company name breadcrumb node */}
+              <Link
+                href={`/companies/${contextCompany.id}`}
+                onClick={onNav}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors text-xs font-semibold truncate ${
+                  onCompanyDetail
+                    ? "bg-primary/10 text-primary"
+                    : "text-primary/70 hover:text-primary hover:bg-primary/5"
+                }`}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-current flex-shrink-0" />
+                <span className="truncate">{contextCompany.name}</span>
               </Link>
+
+              {/* Numbers — child of Company */}
+              <div className="ml-3 pl-3 border-l border-border/40 space-y-0.5">
+                <Link href="/numbers" onClick={onNav} className={navCls("/numbers", numbersAncestor)}>
+                  <Phone className="h-4 w-4 flex-shrink-0" />
+                  Numbers
+                  {(onNumberDetail || numbersAncestor) && (
+                    <ChevronRight className="h-3 w-3 ml-auto text-muted-foreground/40" />
+                  )}
+                </Link>
+
+                {/* Campaigns — child of Numbers */}
+                <div className="ml-3 pl-3 border-l border-border/40 space-y-0.5">
+                  <Link href="/campaigns" onClick={onNav} className={navCls("/campaigns")}>
+                    <Target className="h-4 w-4 flex-shrink-0" />
+                    Campaigns
+                  </Link>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* DEFAULT: no company selected yet */
+            <div className="ml-3 pl-3 border-l border-border/40 space-y-0.5">
+              <Link href="/numbers" onClick={onNav} className={navCls("/numbers", numbersAncestor)}>
+                <Phone className="h-4 w-4 flex-shrink-0" />
+                Numbers
+                {numbersAncestor && (
+                  <ChevronRight className="h-3 w-3 ml-auto text-muted-foreground/40" />
+                )}
+              </Link>
+              <div className="ml-3 pl-3 border-l border-border/40 space-y-0.5">
+                <Link href="/campaigns" onClick={onNav} className={navCls("/campaigns")}>
+                  <Target className="h-4 w-4 flex-shrink-0" />
+                  Campaigns
+                </Link>
+              </div>
+            </div>
+          )}
 
           {/* ── RECORDS ── */}
           <SectionLabel label="Records" />
