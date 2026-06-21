@@ -130,7 +130,7 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
         <Icon className={`h-2.5 w-2.5 ${Icon === Play ? "ml-px" : ""} ${Icon === Loader2 ? "animate-spin text-muted-foreground" : ""}`} />
       </button>
 
-      <div ref={trackRef} onClick={seek} className="relative h-[3px] flex-1 bg-border rounded-full cursor-pointer group">
+      <div ref={trackRef} onClick={seek} className="relative h-[3px] w-20 shrink-0 bg-border rounded-full cursor-pointer group">
         <div className="absolute inset-y-0 left-0 bg-cyan-500 rounded-full transition-none" style={{ width: `${progress}%` }} />
         <div
           className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cyan-400 border border-background opacity-0 group-hover:opacity-100 transition-opacity"
@@ -550,7 +550,7 @@ export default function Calls() {
 
       <Card className="border-border">
         <div className="overflow-x-auto">
-        <Table className="w-full table-fixed">
+        <Table className="min-w-[960px]">
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead className="w-[130px]">Date / Time</TableHead>
