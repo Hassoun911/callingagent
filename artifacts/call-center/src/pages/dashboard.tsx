@@ -96,7 +96,7 @@ function MiniCard({
           <Icon className={`h-4 w-4 ${iconColor}`} />
         </div>
         <div className="min-w-0">
-          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide truncate">{label}</div>
+          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide leading-tight">{label}</div>
           <div className="text-xl font-bold font-mono leading-tight group-hover:text-primary transition-colors">{value}</div>
         </div>
         <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-primary/60 ml-auto flex-shrink-0 transition-colors" />
