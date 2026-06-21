@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Phone, Plus, Hash, Settings, PhoneForwarded, Bot, Voicemail, Ban, AlertCircle, Bell, BellOff, Trash2, Eye } from "lucide-react";
+import { Phone, Plus, Hash, Settings, PhoneForwarded, Bot, Voicemail, Ban, AlertCircle, Bell, BellOff, Trash2, Eye, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -33,6 +33,36 @@ export default function Numbers() {
   const [tollFree, setTollFree] = useState(false);
   const [searched, setSearched] = useState(false);
   const [watchesOpen, setWatchesOpen] = useState(false);
+  const [provisionTab, setProvisionTab] = useState<"provision" | "import">("provision");
+  const [importNumber, setImportNumber] = useState("");
+  const [importFriendlyName, setImportFriendlyName] = useState("");
+  const [importing, setImporting] = useState(false);
+
+  const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+  const handleImport = async () => {
+    const num = importNumber.trim();
+    if (!num) { toast({ title: "Enter a phone number", variant: "destructive" }); return; }
+    setImporting(true);
+    try {
+      const r = await fetch(`${BASE}/api/phone-numbers/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number: num, friendlyName: importFriendlyName.trim() || undefined }),
+      });
+      const json = await r.json();
+      if (!r.ok) { toast({ title: json.error ?? "Import failed", variant: "destructive" }); return; }
+      queryClient.invalidateQueries({ queryKey: getListPhoneNumbersQueryKey() });
+      setSearchOpen(false);
+      setImportNumber("");
+      setImportFriendlyName("");
+      toast({ title: "Number imported", description: `${num} is now active in Vanguard.OPS` });
+    } catch (err: any) {
+      toast({ title: err.message ?? "Import failed", variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const { data: availableNumbers, isLoading: searchLoading, refetch: search, error: searchError } = useSearchAvailableNumbers(
     {
@@ -132,18 +162,73 @@ export default function Numbers() {
           {/* Provision dialog */}
           <Dialog open={searchOpen} onOpenChange={(open) => {
             setSearchOpen(open);
-            if (!open) { setAreaCode(""); setCity(""); setSearched(false); setTollFree(false); setCountry("US"); }
+            if (!open) { setAreaCode(""); setCity(""); setSearched(false); setTollFree(false); setCountry("US"); setProvisionTab("provision"); }
           }}>
             <DialogTrigger asChild>
               <Button className="gap-2"><Plus className="h-4 w-4" />Provision Number</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-2xl bg-card border-border">
               <DialogHeader>
-                <DialogTitle>Provision New Number</DialogTitle>
+                <DialogTitle>{provisionTab === "import" ? "Import Existing Number" : "Provision New Number"}</DialogTitle>
                 <DialogDescription>
-                  Search by area code or city. Can't find one? Set a watch and we'll alert you when it's available.
+                  {provisionTab === "import"
+                    ? "Enter a number already in your Twilio account. We'll configure the webhooks automatically."
+                    : "Search by area code or city. Can't find one? Set a watch and we'll alert you when it's available."}
                 </DialogDescription>
               </DialogHeader>
+
+              {/* Tab switcher */}
+              <div className="flex gap-1 bg-secondary/40 rounded-md p-1 w-fit">
+                <button
+                  onClick={() => setProvisionTab("provision")}
+                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${provisionTab === "provision" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <span className="flex items-center gap-1.5"><Plus className="h-3 w-3" />Provision New</span>
+                </button>
+                <button
+                  onClick={() => setProvisionTab("import")}
+                  className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${provisionTab === "import" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  <span className="flex items-center gap-1.5"><Download className="h-3 w-3" />Import Existing</span>
+                </button>
+              </div>
+
+              {provisionTab === "import" ? (
+                <div className="space-y-4 pt-1">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Phone Number (E.164)</Label>
+                    <Input
+                      placeholder="+15551234567"
+                      value={importNumber}
+                      onChange={e => setImportNumber(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleImport()}
+                      className="font-mono bg-background text-base"
+                    />
+                    <p className="text-xs text-muted-foreground">Must be a number already purchased in your Twilio account. E.164 format: +1 followed by 10 digits.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground uppercase tracking-wider">Display Name <span className="normal-case">(optional)</span></Label>
+                    <Input
+                      placeholder="e.g. Main Office Line"
+                      value={importFriendlyName}
+                      onChange={e => setImportFriendlyName(e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
+                  <div className="rounded-md border border-border bg-secondary/20 px-4 py-3 text-xs text-muted-foreground space-y-1">
+                    <p className="font-medium text-foreground">What happens on import:</p>
+                    <ul className="space-y-0.5 list-disc list-inside">
+                      <li>Number is verified against your Twilio account</li>
+                      <li>Voice, status, and SMS webhooks are updated to point at Vanguard.OPS</li>
+                      <li>Number appears in your active lines list, ready to configure</li>
+                    </ul>
+                  </div>
+                  <Button className="w-full gap-2" onClick={handleImport} disabled={importing || !importNumber.trim()}>
+                    <Download className="h-4 w-4" />
+                    {importing ? "Importing…" : "Import Number"}
+                  </Button>
+                </div>
+              ) : (
               <div className="space-y-4 pt-2">
                 {/* Search controls */}
                 <div className="grid grid-cols-2 gap-3">
@@ -296,6 +381,7 @@ export default function Numbers() {
                   </p>
                 )}
               </div>
+              )}
             </DialogContent>
           </Dialog>
         </div>

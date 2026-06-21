@@ -122,6 +122,79 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
   }
 });
 
+// Import an existing Twilio number into Vanguard.OPS
+router.post("/phone-numbers/import", async (req, res): Promise<void> => {
+  const { number, friendlyName } = req.body ?? {};
+  if (!number || typeof number !== "string") {
+    res.status(400).json({ error: "number is required (E.164 format, e.g. +15551234567)" });
+    return;
+  }
+
+  let client;
+  try {
+    client = getTwilioClient();
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+    return;
+  }
+
+  // Look up the number in the Twilio account
+  let incomingNumbers: any[];
+  try {
+    incomingNumbers = await client.incomingPhoneNumbers.list({ phoneNumber: number });
+  } catch (err: any) {
+    req.log.error({ err }, "Twilio lookup failed");
+    res.status(500).json({ error: "Failed to query Twilio: " + (err.message ?? "unknown") });
+    return;
+  }
+
+  if (!incomingNumbers || incomingNumbers.length === 0) {
+    res.status(404).json({ error: `${number} was not found in your Twilio account. Make sure the number is already purchased there before importing.` });
+    return;
+  }
+
+  const twilioNum = incomingNumbers[0];
+  const baseUrl = getBaseUrl(req);
+
+  // Update webhook URLs on the Twilio number to point at our system
+  try {
+    await client.incomingPhoneNumbers(twilioNum.sid).update({
+      voiceUrl: `${baseUrl}/api/twilio/voice`,
+      voiceMethod: "POST",
+      statusCallback: `${baseUrl}/api/twilio/status`,
+      statusCallbackMethod: "POST",
+      smsUrl: `${baseUrl}/api/twilio/sms`,
+      smsMethod: "POST",
+    });
+  } catch (err: any) {
+    req.log.error({ err }, "Failed to update Twilio webhooks on imported number");
+    res.status(500).json({ error: "Found number but failed to configure webhooks: " + (err.message ?? "unknown") });
+    return;
+  }
+
+  // Check if already imported
+  const existing = await db.select().from(phoneNumbersTable)
+    .where(eq(phoneNumbersTable.number, number));
+  if (existing.length > 0) {
+    res.status(409).json({ error: `${number} is already in your Vanguard.OPS account.` });
+    return;
+  }
+
+  const displayName = friendlyName || twilioNum.friendlyName || number;
+  const [inserted] = await db.insert(phoneNumbersTable).values({
+    number,
+    twilioSid: twilioNum.sid,
+    friendlyName: displayName,
+    callerIdName: displayName,
+    answerMode: "forward",
+  }).returning();
+
+  res.status(201).json(GetPhoneNumberResponse.parse({
+    ...inserted,
+    createdAt: inserted.createdAt.toISOString(),
+  }));
+});
+
 router.post("/phone-numbers", async (req, res): Promise<void> => {
   const parsed = ProvisionPhoneNumberBody.safeParse(req.body);
   if (!parsed.success) {
