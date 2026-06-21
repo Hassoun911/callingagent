@@ -327,33 +327,43 @@ export default function CompanyDetail() {
       </div>
 
       {/* Company info */}
-      <div className="bg-card border border-border rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-        {(company as any).email && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Mail className="h-3.5 w-3.5 flex-shrink-0" />
-            <span>{(company as any).email}</span>
+      {((company as any).email || company.phone || company.website || (company as any).notes) && (
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-border bg-secondary/20">
+            <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Contact Info</span>
           </div>
-        )}
-        {company.phone && (
-          <div className="flex items-center gap-2 text-muted-foreground font-mono">
-            <Phone className="h-3.5 w-3.5 flex-shrink-0" />
-            <span>{company.phone}</span>
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            {(company as any).email && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Mail className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="text-xs text-muted-foreground/60 mr-1">Email</span>
+                <span>{(company as any).email}</span>
+              </div>
+            )}
+            {company.phone && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Phone className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="text-xs text-muted-foreground/60 mr-1">Contact Phone</span>
+                <span className="font-mono">{company.phone}</span>
+              </div>
+            )}
+            {company.website && (
+              <div className="flex items-center gap-2">
+                <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground/60 mr-1">Website</span>
+                <a href={`https://${company.website.replace(/^https?:\/\//, "")}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  {company.website}
+                </a>
+              </div>
+            )}
+            {(company as any).notes && (
+              <div className="sm:col-span-2 text-muted-foreground text-xs bg-secondary/30 rounded px-3 py-2">
+                {(company as any).notes}
+              </div>
+            )}
           </div>
-        )}
-        {company.website && (
-          <div className="flex items-center gap-2">
-            <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-            <a href={`https://${company.website.replace(/^https?:\/\//, "")}`} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-              {company.website}
-            </a>
-          </div>
-        )}
-        {(company as any).notes && (
-          <div className="sm:col-span-2 text-muted-foreground text-xs bg-secondary/30 rounded px-3 py-2">
-            {(company as any).notes}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Phone Numbers */}
       <div className="bg-card border border-border rounded-lg overflow-hidden">
