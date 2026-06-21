@@ -108,7 +108,7 @@ function MiniCard({
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(true);
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: recentCalls, isLoading: callsLoading } = useGetRecentCalls({ limit: 6 });
 
@@ -430,64 +430,76 @@ export default function Dashboard() {
             )}
             {!callsLoading && recentCalls && recentCalls.length > 0 && (
               <div className="divide-y divide-border/50">
-                {recentCalls.map(call => (
-                  <Link key={call.id} href="/calls">
-                    <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/20 transition-colors cursor-pointer">
-                      <div className={`p-1.5 rounded-md border border-border ${call.direction === "inbound" ? "bg-green-500/5" : "bg-blue-500/5"}`}>
-                        {call.direction === "inbound" ? (
-                          <PhoneIncoming className="h-3.5 w-3.5 text-green-400" />
-                        ) : (
-                          <PhoneOutgoing className="h-3.5 w-3.5 text-blue-400" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-mono font-medium">
-                            {formatPhone(call.direction === "inbound" ? call.fromNumber : call.toNumber)}
-                          </span>
-                          <span className={`text-[9px] px-1 py-0.5 rounded font-bold uppercase tracking-widest ${
-                            call.direction === "inbound"
-                              ? "bg-green-500/10 text-green-400"
-                              : "bg-blue-500/10 text-blue-400"
+                {recentCalls.map(call => {
+                  const isInbound = call.direction === "inbound";
+                  const externalNumber = isInbound ? call.fromNumber : call.toNumber;
+                  const callerLabel = call.callerName || call.contactName || call.callerIdName || null;
+                  const lineName = call.phoneFriendlyName || call.phoneNumber || null;
+                  const lineLabel = call.companyName
+                    ? `${call.companyName}${lineName ? ` · ${lineName}` : ""}`
+                    : lineName;
+                  return (
+                    <Link key={call.id} href="/calls">
+                      <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/20 transition-colors cursor-pointer">
+                        {/* Direction icon */}
+                        <div className={`flex-shrink-0 p-1.5 rounded-md border border-border ${isInbound ? "bg-green-500/5" : "bg-blue-500/5"}`}>
+                          {isInbound
+                            ? <PhoneIncoming className="h-3.5 w-3.5 text-green-400" />
+                            : <PhoneOutgoing className="h-3.5 w-3.5 text-blue-400" />
+                          }
+                        </div>
+
+                        {/* Main info */}
+                        <div className="flex-1 min-w-0">
+                          {/* Row 1: direction badge + external number + caller name */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-[9px] px-1 py-0.5 rounded font-bold uppercase tracking-widest flex-shrink-0 ${
+                              isInbound ? "bg-green-500/10 text-green-400" : "bg-blue-500/10 text-blue-400"
+                            }`}>
+                              {isInbound ? "IN" : "OUT"}
+                            </span>
+                            <span className="text-sm font-mono font-medium">{formatPhone(externalNumber)}</span>
+                            {callerLabel && (
+                              <span className="text-xs text-muted-foreground truncate">— {callerLabel}</span>
+                            )}
+                          </div>
+                          {/* Row 2: via line · company · timestamp */}
+                          <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-0.5">
+                            {lineLabel && (
+                              <>
+                                <span className="text-muted-foreground/50">via</span>
+                                <span className="font-medium text-foreground/55 truncate max-w-[150px]">{lineLabel}</span>
+                                <span className="text-border/60">·</span>
+                              </>
+                            )}
+                            <span>
+                              {new Date(call.createdAt).toLocaleString(undefined, {
+                                month: "short", day: "numeric",
+                                hour: "2-digit", minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Right side: duration + status + chevron */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {call.duration
+                            ? <span className="text-xs font-mono text-muted-foreground">{formatDuration(call.duration)}</span>
+                            : <span className="text-xs text-muted-foreground/30">—</span>
+                          }
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide ${
+                            call.status === "completed" ? "bg-green-500/10 text-green-400" :
+                            call.status === "no-answer" ? "bg-red-500/10 text-red-400" :
+                            "bg-secondary text-muted-foreground"
                           }`}>
-                            {call.direction === "inbound" ? "IN" : "OUT"}
+                            {call.status}
                           </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                          {call.companyName && (
-                            <>
-                              <span className="font-medium text-foreground/60 truncate max-w-[120px]">{call.companyName}</span>
-                              <span className="text-border">·</span>
-                            </>
-                          )}
-                          <span>
-                            {new Date(call.createdAt).toLocaleString(undefined, {
-                              month: "short", day: "numeric",
-                              hour: "2-digit", minute: "2-digit",
-                            })}
-                          </span>
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30" />
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {call.duration ? (
-                          <span className="text-xs font-mono text-muted-foreground">
-                            {formatDuration(call.duration)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground/40">—</span>
-                        )}
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide ${
-                          call.status === "completed" ? "bg-green-500/10 text-green-400" :
-                          call.status === "no-answer" ? "bg-red-500/10 text-red-400" :
-                          "bg-secondary text-muted-foreground"
-                        }`}>
-                          {call.status}
-                        </span>
-                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30" />
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             )}
             {!callsLoading && (!recentCalls || recentCalls.length === 0) && (
