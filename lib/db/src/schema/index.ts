@@ -7,3 +7,4 @@ export * from "./number-watches";
 export * from "./sms-messages";
 export * from "./campaigns";
 export * from "./auth";
+export * from "./extensions";

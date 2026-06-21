@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { 
   useListCompanies, 
   useCreateCompany, 
@@ -23,6 +24,7 @@ export default function Companies() {
   const { data: companies, isLoading } = useListCompanies();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<any>(null);
@@ -135,7 +137,7 @@ export default function Companies() {
                 </TableCell>
               </TableRow>
             ) : companies?.map((company) => (
-              <TableRow key={company.id} className="border-border">
+              <TableRow key={company.id} className="border-border cursor-pointer hover:bg-secondary/30" onClick={() => navigate(`/companies/${company.id}`)}>
                 <TableCell className="font-medium text-foreground">
                   {company.name}
                 </TableCell>

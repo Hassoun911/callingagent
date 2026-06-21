@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable, contactsTable, smsMessagesTable } from "@workspace/db";
+import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable, contactsTable, smsMessagesTable, extensionsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
 import twilio from "twilio";
@@ -517,7 +517,45 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
 
   let twiml = "";
 
-  if (answerMode === "forward" && forwardTo) {
+  if (answerMode === "ivr") {
+    let companyName: string | null = null;
+    let extensions: typeof extensionsTable.$inferSelect[] = [];
+    if (phoneNumber?.companyId) {
+      const [co] = await db.select().from(companiesTable).where(eq(companiesTable.id, phoneNumber.companyId));
+      companyName = co?.name ?? null;
+      extensions = await db.select().from(extensionsTable)
+        .where(eq(extensionsTable.companyId, phoneNumber.companyId));
+      extensions = extensions.filter(e => e.enabled);
+    }
+    const greeting = companyName ? `Thank you for calling ${companyName}.` : "Thank you for calling.";
+    const extLines = extensions.sort((a, b) => a.digit.localeCompare(b.digit))
+      .map(e => `Press ${e.digit} for ${e.name}.`).join(" ");
+    const menuText = extLines ? `${greeting} ${extLines} Press 0 to leave a voicemail.` : `${greeting} Please leave a message after the tone.`;
+    const gatherUrl = `${baseUrl}/api/twilio/ivr-gather?phoneNumberId=${phoneNumber?.id ?? ""}`;
+    if (extensions.length === 0) {
+      const vmGreeting = phoneNumber?.voicemailGreeting ?? "Please leave a message after the tone.";
+      const audioId = await generateTts(vmGreeting);
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  ${playOrSay(audioId, vmGreeting, baseUrl)}
+  <Record maxLength="120" action="${baseUrl}/api/twilio/recording" transcribe="true" transcribeCallback="${baseUrl}/api/twilio/transcription" />
+</Response>`;
+    } else {
+      const menuAudioId = await generateTts(menuText);
+      const repeatAudioId = await generateTts(`I didn't get that. ${menuText}`);
+      twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  ${playOrSay(menuAudioId, menuText, baseUrl)}
+  <Gather numDigits="1" action="${gatherUrl}" method="POST" timeout="10">
+  </Gather>
+  ${playOrSay(repeatAudioId, `I didn't get that. ${menuText}`, baseUrl)}
+  <Gather numDigits="1" action="${gatherUrl}" method="POST" timeout="10">
+  </Gather>
+  <Hangup/>
+</Response>`;
+    }
+
+  } else if (answerMode === "forward" && forwardTo) {
     const forwardCallerId = phoneNumber?.forwardCallerId ?? "caller";
     // When "line" is selected, explicitly set callerId to the Twilio number.
     // When "caller" is selected, omit callerId — Twilio cannot use an unverified
@@ -664,6 +702,72 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
   <Say voice="${TWILIO_FALLBACK_VOICE}">Thank you for calling. We are unable to take your call right now. Please try again later.</Say>
 </Response>`);
     }
+  }
+});
+
+// ─── IVR digit gather callback ───────────────────────────────────────────────
+router.post("/twilio/ivr-gather", async (req, res): Promise<void> => {
+  const { Digits, To, From } = req.body;
+  const phoneNumberId = parseInt(req.query.phoneNumberId as string, 10);
+  res.set("Content-Type", "text/xml");
+  try {
+    const baseUrl = process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : `${req.protocol}://${req.get("host")}`;
+
+    if (!phoneNumberId || isNaN(phoneNumberId)) {
+      res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
+      return;
+    }
+    const [phoneNumber] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, phoneNumberId));
+    if (!phoneNumber?.companyId) {
+      res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
+      return;
+    }
+
+    // Digit 0 → voicemail
+    if (Digits === "0") {
+      const greeting = phoneNumber.voicemailGreeting ?? "Please leave a message after the tone.";
+      const audioId = await generateTts(greeting);
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  ${playOrSay(audioId, greeting, baseUrl)}
+  <Record maxLength="120" action="${baseUrl}/api/twilio/recording" transcribe="true" transcribeCallback="${baseUrl}/api/twilio/transcription" />
+</Response>`);
+      return;
+    }
+
+    const extensions = await db.select().from(extensionsTable)
+      .where(eq(extensionsTable.companyId, phoneNumber.companyId));
+    const ext = extensions.find(e => e.digit === Digits && e.enabled);
+
+    if (!ext) {
+      const audioId = await generateTts("That extension was not found. Please try again.");
+      // Re-serve the IVR menu
+      const gatherUrl = `${baseUrl}/api/twilio/ivr-gather?phoneNumberId=${phoneNumberId}`;
+      res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  ${playOrSay(audioId, "That extension was not found. Please try again.", baseUrl)}
+  <Gather numDigits="1" action="${gatherUrl}" method="POST" timeout="10">
+  </Gather>
+  <Hangup/>
+</Response>`);
+      return;
+    }
+
+    const connectMsg = `Connecting you to ${ext.name}. Please hold.`;
+    const audioId = await generateTts(connectMsg);
+    const recordAttr = ` record="record-from-answer-dual-channel" recordingStatusCallback="${baseUrl}/api/twilio/recording" recordingStatusCallbackMethod="POST"`;
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  ${playOrSay(audioId, connectMsg, baseUrl)}
+  <Dial${recordAttr} callerId="${To ?? ""}">
+    <Number>${escapeXml(ext.forwardTo)}</Number>
+  </Dial>
+</Response>`);
+  } catch (err: any) {
+    req.log.error({ err: err?.message }, "IVR gather error");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
   }
 });
 

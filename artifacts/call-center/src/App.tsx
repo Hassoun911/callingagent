@@ -12,6 +12,7 @@ import NumberDetail from "@/pages/number-detail";
 import Calls from "@/pages/calls";
 import Contacts from "@/pages/contacts";
 import Companies from "@/pages/companies";
+import CompanyDetail from "@/pages/company-detail";
 import Settings from "@/pages/settings";
 import Billing from "@/pages/billing";
 import Messages from "@/pages/messages";
@@ -148,6 +149,7 @@ function Router() {
         <Route path="/numbers/:id" component={NumberDetail} />
         <Route path="/calls" component={Calls} />
         <Route path="/contacts" component={Contacts} />
+        <Route path="/companies/:id" component={CompanyDetail} />
         <Route path="/companies" component={Companies} />
         <Route path="/settings" component={Settings} />
         <Route path="/billing" component={Billing} />
