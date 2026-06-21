@@ -515,7 +515,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/CallLog"
+                  $ref: "#/components/schemas/RecentCallItem"
 
   /sms:
     get:
@@ -1377,6 +1377,64 @@ components:
         website:
           type: ["string", "null"]
         notes:
+          type: ["string", "null"]
+
+    RecentCallItem:
+      type: object
+      required: [id, direction, status, fromNumber, toNumber, createdAt]
+      properties:
+        id:
+          type: integer
+        phoneNumberId:
+          type: ["integer", "null"]
+        twilioCallSid:
+          type: ["string", "null"]
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        status:
+          type: string
+        fromNumber:
+          type: string
+        toNumber:
+          type: string
+        duration:
+          type: ["integer", "null"]
+        recordingUrl:
+          type: ["string", "null"]
+        recordingSid:
+          type: ["string", "null"]
+        transcription:
+          type: ["string", "null"]
+        contactId:
+          type: ["integer", "null"]
+        contactName:
+          type: ["string", "null"]
+        callerIdName:
+          type: ["string", "null"]
+        answerMode:
+          type: ["string", "null"]
+        callerName:
+          type: ["string", "null"]
+        callerEmail:
+          type: ["string", "null"]
+        callType:
+          type: ["string", "null"]
+        callSummary:
+          type: ["string", "null"]
+        actionRequired:
+          type: ["string", "null"]
+        priority:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        companyId:
+          type: ["integer", "null"]
+        companyName:
+          type: ["string", "null"]
+        phoneNumber:
+          type: ["string", "null"]
+        phoneFriendlyName:
           type: ["string", "null"]
 
     CallLog:

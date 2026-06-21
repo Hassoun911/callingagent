@@ -25,11 +25,13 @@ import type {
   AuthUserEnvelope,
   AvailableNumber,
   BeginBrowserLoginParams,
+  CalendarEvent,
   CallLog,
   Campaign,
   CampaignContact,
   CampaignContactBulkImport,
   CampaignContactInput,
+  CampaignContactUpdate,
   CampaignInput,
   CampaignUpdate,
   Company,
@@ -53,6 +55,7 @@ import type {
   PhoneNumberInput,
   PhoneNumberTwilioStatus,
   PhoneNumberUpdate,
+  RecentCallItem,
   RecordingUrl,
   SearchAvailableNumbersParams,
   SendSmsBody,
@@ -1889,9 +1892,9 @@ export const getGetRecentCallsUrl = (params?: GetRecentCallsParams,) => {
 /**
  * @summary Get recent call activity feed
  */
-export const getRecentCalls = async (params?: GetRecentCallsParams, options?: RequestInit): Promise<CallLog[]> => {
+export const getRecentCalls = async (params?: GetRecentCallsParams, options?: RequestInit): Promise<RecentCallItem[]> => {
 
-  return customFetch<CallLog[]>(getGetRecentCallsUrl(params),
+  return customFetch<RecentCallItem[]>(getGetRecentCallsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2775,6 +2778,83 @@ export const useImportCampaignContacts = <TError = ErrorType<unknown>,
       return useMutation(getImportCampaignContactsMutationOptions(options));
     }
 
+export const getGetCampaignCalendarUrl = () => {
+
+
+
+
+  return `/api/campaigns/calendar`
+}
+
+/**
+ * @summary Get all calendar events (callbacks and hot leads) across campaigns
+ */
+export const getCampaignCalendar = async ( options?: RequestInit): Promise<CalendarEvent[]> => {
+
+  return customFetch<CalendarEvent[]>(getGetCampaignCalendarUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCampaignCalendarQueryKey = () => {
+    return [
+    `/api/campaigns/calendar`
+    ] as const;
+    }
+
+
+export const getGetCampaignCalendarQueryOptions = <TData = Awaited<ReturnType<typeof getCampaignCalendar>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCampaignCalendar>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCampaignCalendarQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCampaignCalendar>>> = ({ signal }) => getCampaignCalendar({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCampaignCalendar>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCampaignCalendarQueryResult = NonNullable<Awaited<ReturnType<typeof getCampaignCalendar>>>
+export type GetCampaignCalendarQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get all calendar events (callbacks and hot leads) across campaigns
+ */
+
+export function useGetCampaignCalendar<TData = Awaited<ReturnType<typeof getCampaignCalendar>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCampaignCalendar>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCampaignCalendarQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getUpdateCampaignContactUrl = (id: number,
     contactId: number,) => {
 
@@ -2789,7 +2869,7 @@ export const getUpdateCampaignContactUrl = (id: number,
  */
 export const updateCampaignContact = async (id: number,
     contactId: number,
-    campaignContactInput: CampaignContactInput, options?: RequestInit): Promise<CampaignContact> => {
+    campaignContactUpdate: CampaignContactUpdate, options?: RequestInit): Promise<CampaignContact> => {
 
   return customFetch<CampaignContact>(getUpdateCampaignContactUrl(id,contactId),
   {
@@ -2797,7 +2877,7 @@ export const updateCampaignContact = async (id: number,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      campaignContactInput,)
+      campaignContactUpdate,)
   }
 );}
 
@@ -2805,8 +2885,8 @@ export const updateCampaignContact = async (id: number,
 
 
 export const getUpdateCampaignContactMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCampaignContact>>, TError,{id: number;contactId: number;data: BodyType<CampaignContactInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateCampaignContact>>, TError,{id: number;contactId: number;data: BodyType<CampaignContactInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCampaignContact>>, TError,{id: number;contactId: number;data: BodyType<CampaignContactUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCampaignContact>>, TError,{id: number;contactId: number;data: BodyType<CampaignContactUpdate>}, TContext> => {
 
 const mutationKey = ['updateCampaignContact'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -2818,7 +2898,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCampaignContact>>, {id: number;contactId: number;data: BodyType<CampaignContactInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCampaignContact>>, {id: number;contactId: number;data: BodyType<CampaignContactUpdate>}> = (props) => {
           const {id,contactId,data} = props ?? {};
 
           return  updateCampaignContact(id,contactId,data,requestOptions)
@@ -2832,18 +2912,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type UpdateCampaignContactMutationResult = NonNullable<Awaited<ReturnType<typeof updateCampaignContact>>>
-    export type UpdateCampaignContactMutationBody = BodyType<CampaignContactInput>
+    export type UpdateCampaignContactMutationBody = BodyType<CampaignContactUpdate>
     export type UpdateCampaignContactMutationError = ErrorType<unknown>
 
     /**
  * @summary Update a campaign contact
  */
 export const useUpdateCampaignContact = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCampaignContact>>, TError,{id: number;contactId: number;data: BodyType<CampaignContactInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCampaignContact>>, TError,{id: number;contactId: number;data: BodyType<CampaignContactUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateCampaignContact>>,
         TError,
-        {id: number;contactId: number;data: BodyType<CampaignContactInput>},
+        {id: number;contactId: number;data: BodyType<CampaignContactUpdate>},
         TContext
       > => {
       return useMutation(getUpdateCampaignContactMutationOptions(options));

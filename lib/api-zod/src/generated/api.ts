@@ -545,7 +545,11 @@ export const GetRecentCallsResponseItem = zod.object({
   "callSummary": zod.string().nullish(),
   "actionRequired": zod.string().nullish(),
   "priority": zod.string().nullish(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "companyId": zod.number().nullish(),
+  "companyName": zod.string().nullish(),
+  "phoneNumber": zod.string().nullish(),
+  "phoneFriendlyName": zod.string().nullish()
 })
 export const GetRecentCallsResponse = zod.array(GetRecentCallsResponseItem)
 
@@ -747,6 +751,8 @@ export const ListCampaignContactsResponseItem = zod.object({
   "additionalNotes": zod.string().nullish(),
   "attemptCount": zod.number().nullish(),
   "lastAttemptAt": zod.string().nullish(),
+  "callbackAt": zod.string().nullish(),
+  "calendarNotes": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListCampaignContactsResponse = zod.array(ListCampaignContactsResponseItem)
@@ -784,6 +790,25 @@ export const ImportCampaignContactsResponse = zod.object({
 
 
 /**
+ * @summary Get all calendar events (callbacks and hot leads) across campaigns
+ */
+export const GetCampaignCalendarResponseItem = zod.object({
+  "id": zod.number(),
+  "campaignId": zod.number(),
+  "campaignName": zod.string(),
+  "name": zod.string(),
+  "phone": zod.string(),
+  "callOutcome": zod.string().nullish(),
+  "callSummary": zod.string().nullish(),
+  "eventType": zod.enum(['hot_lead', 'callback']),
+  "callbackAt": zod.string().nullish(),
+  "calendarNotes": zod.string().nullish(),
+  "lastAttemptAt": zod.string().nullish()
+})
+export const GetCampaignCalendarResponse = zod.array(GetCampaignCalendarResponseItem)
+
+
+/**
  * @summary Update a campaign contact
  */
 export const UpdateCampaignContactParams = zod.object({
@@ -792,9 +817,11 @@ export const UpdateCampaignContactParams = zod.object({
 })
 
 export const UpdateCampaignContactBody = zod.object({
-  "name": zod.string(),
-  "phone": zod.string(),
-  "address": zod.string().nullish()
+  "name": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "address": zod.string().nullish(),
+  "callbackAt": zod.string().nullish(),
+  "calendarNotes": zod.string().nullish()
 })
 
 export const UpdateCampaignContactResponse = zod.object({
@@ -818,6 +845,8 @@ export const UpdateCampaignContactResponse = zod.object({
   "additionalNotes": zod.string().nullish(),
   "attemptCount": zod.number().nullish(),
   "lastAttemptAt": zod.string().nullish(),
+  "callbackAt": zod.string().nullish(),
+  "calendarNotes": zod.string().nullish(),
   "createdAt": zod.string()
 })
 

@@ -43,5 +43,9 @@ export interface CampaignContact {
   attemptCount?: number | null;
   /** @nullable */
   lastAttemptAt?: string | null;
+  /** @nullable */
+  callbackAt?: string | null;
+  /** @nullable */
+  calendarNotes?: string | null;
   createdAt: string;
 }

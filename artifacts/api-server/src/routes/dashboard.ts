@@ -61,7 +61,40 @@ router.get("/dashboard/recent-calls", async (req, res): Promise<void> => {
   }
 
   const limit = query.data.limit ?? 10;
-  const logs = await db.select().from(callLogsTable).orderBy(desc(callLogsTable.createdAt)).limit(limit);
+  const logs = await db
+    .select({
+      id: callLogsTable.id,
+      phoneNumberId: callLogsTable.phoneNumberId,
+      twilioCallSid: callLogsTable.twilioCallSid,
+      direction: callLogsTable.direction,
+      status: callLogsTable.status,
+      fromNumber: callLogsTable.fromNumber,
+      toNumber: callLogsTable.toNumber,
+      duration: callLogsTable.duration,
+      recordingUrl: callLogsTable.recordingUrl,
+      recordingSid: callLogsTable.recordingSid,
+      transcription: callLogsTable.transcription,
+      contactId: callLogsTable.contactId,
+      contactName: callLogsTable.contactName,
+      callerIdName: callLogsTable.callerIdName,
+      answerMode: callLogsTable.answerMode,
+      callerName: callLogsTable.callerName,
+      callerEmail: callLogsTable.callerEmail,
+      callType: callLogsTable.callType,
+      callSummary: callLogsTable.callSummary,
+      actionRequired: callLogsTable.actionRequired,
+      priority: callLogsTable.priority,
+      createdAt: callLogsTable.createdAt,
+      companyId: companiesTable.id,
+      companyName: companiesTable.name,
+      phoneNumber: phoneNumbersTable.number,
+      phoneFriendlyName: phoneNumbersTable.friendlyName,
+    })
+    .from(callLogsTable)
+    .leftJoin(phoneNumbersTable, eq(callLogsTable.phoneNumberId, phoneNumbersTable.id))
+    .leftJoin(companiesTable, eq(phoneNumbersTable.companyId, companiesTable.id))
+    .orderBy(desc(callLogsTable.createdAt))
+    .limit(limit);
 
   res.json(GetRecentCallsResponse.parse(logs.map(l => ({
     ...l,

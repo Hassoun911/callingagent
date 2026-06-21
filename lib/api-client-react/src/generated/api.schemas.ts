@@ -426,6 +426,63 @@ export interface CompanyUpdate {
   notes?: string | null;
 }
 
+export type RecentCallItemDirection = typeof RecentCallItemDirection[keyof typeof RecentCallItemDirection];
+
+
+export const RecentCallItemDirection = {
+  inbound: 'inbound',
+  outbound: 'outbound',
+} as const;
+
+export interface RecentCallItem {
+  id: number;
+  /** @nullable */
+  phoneNumberId?: number | null;
+  /** @nullable */
+  twilioCallSid?: string | null;
+  direction: RecentCallItemDirection;
+  status: string;
+  fromNumber: string;
+  toNumber: string;
+  /** @nullable */
+  duration?: number | null;
+  /** @nullable */
+  recordingUrl?: string | null;
+  /** @nullable */
+  recordingSid?: string | null;
+  /** @nullable */
+  transcription?: string | null;
+  /** @nullable */
+  contactId?: number | null;
+  /** @nullable */
+  contactName?: string | null;
+  /** @nullable */
+  callerIdName?: string | null;
+  /** @nullable */
+  answerMode?: string | null;
+  /** @nullable */
+  callerName?: string | null;
+  /** @nullable */
+  callerEmail?: string | null;
+  /** @nullable */
+  callType?: string | null;
+  /** @nullable */
+  callSummary?: string | null;
+  /** @nullable */
+  actionRequired?: string | null;
+  /** @nullable */
+  priority?: string | null;
+  createdAt: string;
+  /** @nullable */
+  companyId?: number | null;
+  /** @nullable */
+  companyName?: string | null;
+  /** @nullable */
+  phoneNumber?: string | null;
+  /** @nullable */
+  phoneFriendlyName?: string | null;
+}
+
 export type CallLogDirection = typeof CallLogDirection[keyof typeof CallLogDirection];
 
 
@@ -730,6 +787,10 @@ export interface CampaignContact {
   attemptCount?: number | null;
   /** @nullable */
   lastAttemptAt?: string | null;
+  /** @nullable */
+  callbackAt?: string | null;
+  /** @nullable */
+  calendarNotes?: string | null;
   createdAt: string;
 }
 
@@ -738,6 +799,44 @@ export interface CampaignContactInput {
   phone: string;
   /** @nullable */
   address?: string | null;
+}
+
+export interface CampaignContactUpdate {
+  name?: string;
+  phone?: string;
+  /** @nullable */
+  address?: string | null;
+  /** @nullable */
+  callbackAt?: string | null;
+  /** @nullable */
+  calendarNotes?: string | null;
+}
+
+export type CalendarEventEventType = typeof CalendarEventEventType[keyof typeof CalendarEventEventType];
+
+
+export const CalendarEventEventType = {
+  hot_lead: 'hot_lead',
+  callback: 'callback',
+} as const;
+
+export interface CalendarEvent {
+  id: number;
+  campaignId: number;
+  campaignName: string;
+  name: string;
+  phone: string;
+  /** @nullable */
+  callOutcome?: string | null;
+  /** @nullable */
+  callSummary?: string | null;
+  eventType: CalendarEventEventType;
+  /** @nullable */
+  callbackAt?: string | null;
+  /** @nullable */
+  calendarNotes?: string | null;
+  /** @nullable */
+  lastAttemptAt?: string | null;
 }
 
 export interface CampaignContactBulkImport {

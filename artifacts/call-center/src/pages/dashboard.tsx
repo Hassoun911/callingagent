@@ -441,14 +441,31 @@ export default function Dashboard() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-mono font-medium">
-                          {formatPhone(call.direction === "inbound" ? call.fromNumber : call.toNumber)}
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-mono font-medium">
+                            {formatPhone(call.direction === "inbound" ? call.fromNumber : call.toNumber)}
+                          </span>
+                          <span className={`text-[9px] px-1 py-0.5 rounded font-bold uppercase tracking-widest ${
+                            call.direction === "inbound"
+                              ? "bg-green-500/10 text-green-400"
+                              : "bg-blue-500/10 text-blue-400"
+                          }`}>
+                            {call.direction === "inbound" ? "IN" : "OUT"}
+                          </span>
                         </div>
-                        <div className="text-[11px] text-muted-foreground">
-                          {new Date(call.createdAt).toLocaleString(undefined, {
-                            month: "short", day: "numeric",
-                            hour: "2-digit", minute: "2-digit",
-                          })}
+                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          {call.companyName && (
+                            <>
+                              <span className="font-medium text-foreground/60 truncate max-w-[120px]">{call.companyName}</span>
+                              <span className="text-border">·</span>
+                            </>
+                          )}
+                          <span>
+                            {new Date(call.createdAt).toLocaleString(undefined, {
+                              month: "short", day: "numeric",
+                              hour: "2-digit", minute: "2-digit",
+                            })}
+                          </span>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
