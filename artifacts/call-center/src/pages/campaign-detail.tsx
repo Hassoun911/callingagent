@@ -1058,6 +1058,8 @@ export default function CampaignDetail() {
   const [showImport, setShowImport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [showTestCall, setShowTestCall] = useState(false);
+  const [testCallNumber, setTestCallNumber] = useState("");
   const [newContact, setNewContact] = useState({ name: "", phone: "", address: "" });
   const [importText, setImportText] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "completed" | "interested" | "no_answer" | "skipped">("all");
@@ -1108,6 +1110,24 @@ export default function CampaignDetail() {
       else toast({ title: "Campaign paused" });
     },
     onError: (_, action) => toast({ title: `Failed to ${action} campaign`, variant: "destructive" }),
+  });
+
+  const testCallMutation = useMutation({
+    mutationFn: async (toNumber: string) => {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}/test-call`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toNumber }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "Failed");
+      return data as { callSid: string };
+    },
+    onSuccess: () => {
+      toast({ title: "Test call initiated — your phone should ring shortly" });
+      setShowTestCall(false);
+    },
+    onError: (err: Error) => toast({ title: `Test call failed: ${err.message}`, variant: "destructive" }),
   });
 
   const addContactMutation = useMutation({
@@ -1227,6 +1247,9 @@ export default function CampaignDetail() {
             onClick={() => setShowSchedule(true)}
           >
             <CalendarClock className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 px-3" title="Test Call" onClick={() => setShowTestCall(true)}>
+            <Phone className="h-3.5 w-3.5" />
           </Button>
           <Button variant="outline" size="sm" className="h-8 px-3" onClick={refreshContacts}>
             <RefreshCw className="h-3.5 w-3.5" />
@@ -1348,6 +1371,37 @@ export default function CampaignDetail() {
       </div>
 
       {/* Add Contact Dialog */}
+      {/* Test Call Dialog */}
+      <Dialog open={showTestCall} onOpenChange={setShowTestCall}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Test Call</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <p className="text-sm text-muted-foreground">Calls your phone right now using this campaign's AI script — ignores the campaign schedule. Nothing is recorded in the contact list.</p>
+            <div>
+              <Label className="text-green-400">Phone Number to Call</Label>
+              <Input
+                className="mt-1 font-mono"
+                value={testCallNumber}
+                onChange={e => setTestCallNumber(e.target.value)}
+                placeholder="+15190000000"
+                onKeyDown={e => { if (e.key === "Enter" && testCallNumber) testCallMutation.mutate(testCallNumber); }}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-1 border-t border-border">
+              <Button variant="outline" onClick={() => setShowTestCall(false)}>Cancel</Button>
+              <Button
+                onClick={() => testCallMutation.mutate(testCallNumber)}
+                disabled={!testCallNumber || testCallMutation.isPending}
+                className="gap-1.5"
+              >
+                <Phone className="h-3.5 w-3.5" />
+                {testCallMutation.isPending ? "Calling..." : "Call Now"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showAddContact} onOpenChange={setShowAddContact}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Add Contact</DialogTitle></DialogHeader>

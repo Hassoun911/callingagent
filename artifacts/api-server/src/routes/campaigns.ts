@@ -745,6 +745,113 @@ router.post("/campaigns/:id/start", async (req, res): Promise<void> => {
   }
 });
 
+// ─── Test call ────────────────────────────────────────────────────────────────
+router.post("/campaigns/:id/test-call", async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { toNumber } = req.body;
+    if (!toNumber) { res.status(400).json({ error: "toNumber is required" }); return; }
+
+    const [campaign] = await db.select().from(campaignsTable).where(eq(campaignsTable.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+    if (!campaign.fromPhoneNumberId) { res.status(400).json({ error: "No phone number configured for this campaign" }); return; }
+
+    const [pn] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, campaign.fromPhoneNumberId));
+    if (!pn?.number) { res.status(400).json({ error: "Phone number not found" }); return; }
+
+    const client = getTwilioClient();
+    const baseUrl = getBaseUrl(req);
+
+    const call = await client.calls.create({
+      to: toNumber,
+      from: pn.number,
+      url: `${baseUrl}/api/twilio/campaign-test-voice?campaignId=${id}`,
+      statusCallback: `${baseUrl}/api/twilio/campaign-status`,
+      statusCallbackEvent: ["completed"],
+      statusCallbackMethod: "POST",
+      method: "POST",
+    });
+
+    logger.info({ callSid: call.sid, campaignId: id, to: toNumber }, "Test call initiated");
+    res.json({ callSid: call.sid });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "Failed to initiate test call");
+    res.status(500).json({ error: err?.message ?? "Failed to initiate test call" });
+  }
+});
+
+// ─── Test call voice webhook ──────────────────────────────────────────────────
+router.post("/twilio/campaign-test-voice", async (req, res): Promise<void> => {
+  const { CallSid } = req.body;
+  const { campaignId } = req.query as Record<string, string>;
+  const baseUrl = getBaseUrl(req);
+  try {
+    const [campaign] = await db.select().from(campaignsTable).where(eq(campaignsTable.id, parseInt(campaignId, 10)));
+    if (!campaign) {
+      res.set("Content-Type", "text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say>Campaign not found.</Say><Hangup/></Response>`);
+      return;
+    }
+
+    const [voiceConfig] = await db.select().from(aiVoiceConfigTable);
+    const voiceEngine = (voiceConfig?.campaignVoiceEngine ?? "google") as "google" | "elevenlabs";
+    const elevenLabsVoiceId = voiceConfig?.elevenLabsVoiceId ?? null;
+
+    const DEFAULT_SYSTEM_PROMPT = `أنت سارة، وكيلة عقارية محترفة من مجموعة The Property Cousins. مهمتك الاتصال بأصحاب المنازل وتحديد ما إذا كانوا مهتمين ببيع عقاراتهم. تحدث بالعربية دائماً. كن مهذباً ومحترماً. أجب بجملة أو جملتين فقط في كل مرة.`;
+    const systemPrompt = campaign.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
+    const isAiPromptMode = !!(campaign.systemPrompt && campaign.systemPrompt.trim().length > 0);
+
+    const engineOpts = { voiceEngine, elevenLabsVoiceId, baseUrl };
+    let greetingText = campaign.script;
+
+    if (isAiPromptMode) {
+      try {
+        const openai = getChatOpenAI();
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: systemPrompt + "\n\n[TEST CALL] ابدأ المحادثة بجملة افتتاحية واحدة فقط. تحدث بالعربية فقط." },
+            { role: "user", content: "[بدأت المكالمة الهاتفية، قل جملة الافتتاح]" },
+          ],
+          max_tokens: 80,
+        });
+        greetingText = completion.choices[0]?.message?.content ?? greetingText;
+      } catch (err: any) {
+        logger.warn({ err: err?.message }, "Test call: AI greeting failed, using script");
+      }
+    }
+
+    // Store conversation (contactId: null for test calls)
+    outboundConversations.set(CallSid, {
+      contactId: null as any,
+      campaignId: campaign.id,
+      messages: [{ role: "assistant", content: greetingText }],
+      systemPrompt,
+      startedAt: Date.now(),
+      maxDuration: campaign.maxCallDuration ?? 180,
+      baseUrl,
+      voice: "Google.ar-XA-Neural2-C",
+      voiceEngine,
+      elevenLabsVoiceId,
+    });
+
+    const greetingBlock = await renderSpeech(greetingText, engineOpts);
+    res.set("Content-Type", "text/xml");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  ${greetingBlock}
+  <Gather input="speech" timeout="10" speechTimeout="auto" language="ar-SA" action="${baseUrl}/api/twilio/campaign-gather" method="POST">
+  </Gather>
+  <Say voice="${FALLBACK_VOICE}" language="ar-SA">لم أسمعك. شكراً لك وإلى اللقاء.</Say>
+  <Hangup/>
+</Response>`);
+  } catch (err: any) {
+    logger.error({ err: err?.message, CallSid }, "Error in campaign-test-voice");
+    res.set("Content-Type", "text/xml");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say>An error occurred.</Say><Hangup/></Response>`);
+  }
+});
+
 // ─── Pause campaign ───────────────────────────────────────────────────────────
 router.post("/campaigns/:id/pause", async (req, res): Promise<void> => {
   try {
