@@ -91,7 +91,7 @@ export default function CompanyDetail() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  const { data: company, isLoading: companyLoading } = useGetCompany({ id: companyId });
+  const { data: company, isLoading: companyLoading } = useGetCompany(companyId);
   const { data: allNumbers } = useListPhoneNumbers();
   const linkedNumbers = allNumbers?.filter(n => n.companyId === companyId) ?? [];
   const linkedNumber = linkedNumbers[0] ?? null;
