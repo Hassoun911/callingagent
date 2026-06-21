@@ -4,13 +4,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PhoneIncoming, PhoneOutgoing, Play, Pause, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone, Loader2, Download, Trash2, FileText, Check } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Play, Pause, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone, Loader2, Download, Trash2, FileText, Check, StickyNote } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 
 /** Format an E.164 number to a human-readable North American format. */
 function formatPhone(raw: string | null | undefined): string {
@@ -121,7 +122,7 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
   }
 
   return (
-    <div className="flex items-center gap-1.5" style={{ width: 180 }}>
+    <div className="flex items-center gap-1.5" style={{ minWidth: 210 }}>
       <button
         onClick={toggle}
         className="shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-muted hover:bg-muted/60 border border-border/60 transition-colors"
@@ -172,6 +173,101 @@ function PriorityBadge({ priority }: { priority: string | null | undefined }) {
     <Badge variant="outline" className={`text-xs font-medium ${styles[priority] ?? "bg-secondary text-muted-foreground"}`}>
       {priority}
     </Badge>
+  );
+}
+
+function NoteIconButton({ callId, note, onOpen }: {
+  callId: number;
+  note: string | null;
+  onOpen: (target: { id: number; note: string | null }) => void;
+}) {
+  const hasNote = !!note;
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onOpen({ id: callId, note }); }}
+      className={`p-1 rounded transition-all ${hasNote ? "text-amber-400 hover:text-amber-300 opacity-100" : "text-muted-foreground hover:text-amber-400 opacity-0 group-hover:opacity-100"}`}
+      title={hasNote ? "View note" : "Add note"}
+    >
+      <StickyNote className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
+function NoteDialog({ callId, initialNote, open, onClose, onSaved }: {
+  callId: number;
+  initialNote: string | null;
+  open: boolean;
+  onClose: () => void;
+  onSaved: (callId: number, note: string | null) => void;
+}) {
+  const [draft, setDraft] = useState(initialNote ?? "");
+  const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(!initialNote);
+
+  useEffect(() => {
+    setDraft(initialNote ?? "");
+    setEditMode(!initialNote);
+  }, [callId, initialNote, open]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await fetch(`/api/call-logs/${callId}/notes`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: draft.trim() || null }),
+      });
+      onSaved(callId, draft.trim() || null);
+      setEditMode(false);
+      if (!draft.trim()) onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const isReadMode = !!initialNote && !editMode;
+  const dialogTitle = isReadMode ? "Note" : initialNote ? "Edit Note" : "Add Note";
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider">
+            <StickyNote className="h-4 w-4 text-amber-400" />
+            {dialogTitle}
+          </DialogTitle>
+        </DialogHeader>
+        {isReadMode && (
+          <div className="space-y-4">
+            <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap bg-muted/30 border border-border/40 rounded-lg p-4 min-h-[80px]">
+              {initialNote}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setEditMode(true)}>Edit</Button>
+              <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+            </div>
+          </div>
+        )}
+        {!isReadMode && (
+          <div className="space-y-4">
+            <Textarea
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              placeholder="Enter a note about this call..."
+              rows={5}
+              className="resize-none bg-background/60"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+              <Button size="sm" onClick={save} disabled={saving}>
+                {saving ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -351,6 +447,8 @@ export default function Calls() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [clearConfirm, setClearConfirm] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [noteTarget, setNoteTarget] = useState<{ id: number; note: string | null } | null>(null);
+  const [localNotes, setLocalNotes] = useState<Record<number, string | null>>({});
 
   const { data: calls, isLoading, refetch } = useListCallLogs({
     direction: direction === "all" ? undefined : direction,
@@ -475,20 +573,21 @@ export default function Calls() {
               <TableHead>Recording</TableHead>
               <TableHead className="w-8"></TableHead>
               <TableHead className="w-8"></TableHead>
+              <TableHead className="w-8"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               [...Array(5)].map((_, i) => (
                 <TableRow key={i} className="border-border">
-                  {[...Array(11)].map((_, j) => (
+                  {[...Array(12)].map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : filtered?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={12} className="text-center py-12 text-muted-foreground">
                   No call logs found.
                 </TableCell>
               </TableRow>
@@ -562,6 +661,13 @@ export default function Calls() {
                   )}
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
+                  <NoteIconButton
+                    callId={call.id}
+                    note={call.id in localNotes ? localNotes[call.id] : ((call as any).notes ?? null)}
+                    onOpen={setNoteTarget}
+                  />
+                </TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(call.id); }}
                     disabled={deletingId === call.id}
@@ -585,10 +691,24 @@ export default function Calls() {
         call={selectedCall}
         open={!!selectedCall}
         onClose={() => setSelectedCall(null)}
-        onNotesUpdate={(id, notes) =>
-          setSelectedCall((prev: any) => prev?.id === id ? { ...prev, notes } : prev)
-        }
+        onNotesUpdate={(id, notes) => {
+          setSelectedCall((prev: any) => prev?.id === id ? { ...prev, notes } : prev);
+          setLocalNotes(prev => ({ ...prev, [id]: notes }));
+        }}
       />
+
+      {noteTarget && (
+        <NoteDialog
+          callId={noteTarget.id}
+          initialNote={noteTarget.note}
+          open={!!noteTarget}
+          onClose={() => setNoteTarget(null)}
+          onSaved={(id, note) => {
+            setLocalNotes(prev => ({ ...prev, [id]: note }));
+            setNoteTarget(prev => prev?.id === id ? { ...prev, note } : prev);
+          }}
+        />
+      )}
 
       <AlertDialog open={confirmDeleteId !== null} onOpenChange={(o) => !o && setConfirmDeleteId(null)}>
         <AlertDialogContent className="bg-card border-border">
