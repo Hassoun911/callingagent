@@ -620,13 +620,14 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
 
   } else if (answerMode === "ai_voice") {
     const [aiConfig] = await db.select().from(aiVoiceConfigTable);
-    const language = aiConfig?.language ?? "en-US";
-    const ttsVoice = aiConfig?.voice ?? "nova";
-    const voiceStyle = aiConfig?.voiceStyle ?? "";
+    // Per-number settings take priority over global defaults
+    const language = phoneNumber?.aiLanguage || aiConfig?.language || "en-US";
+    const ttsVoice = phoneNumber?.aiVoice || aiConfig?.voice || "nova";
+    const voiceStyle = phoneNumber?.aiSpeakingStyle || aiConfig?.voiceStyle || "";
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
     const speechTimeout = aiConfig?.speechTimeout ?? 1.0;
     const maxTokens = aiConfig?.maxTokens ?? 100;
-    const greetingText = aiConfig?.greeting?.trim() || "Hello, thank you for calling. How can I help you today?";
+    const greetingText = phoneNumber?.aiGreeting?.trim() || aiConfig?.greeting?.trim() || "Hello, thank you for calling. How can I help you today?";
 
     // Resolve company name for template substitution
     let companyName: string | null = null;

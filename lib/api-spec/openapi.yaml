@@ -1138,6 +1138,14 @@ components:
           type: ["string", "null"]
         aiSystemPrompt:
           type: ["string", "null"]
+        aiVoice:
+          type: ["string", "null"]
+        aiLanguage:
+          type: ["string", "null"]
+        aiGreeting:
+          type: ["string", "null"]
+        aiSpeakingStyle:
+          type: ["string", "null"]
         voicemailGreeting:
           type: ["string", "null"]
         notificationEmail:
@@ -1187,6 +1195,14 @@ components:
           type: ["string", "null"]
         aiSystemPrompt:
           type: ["string", "null"]
+        aiVoice:
+          type: ["string", "null"]
+        aiLanguage:
+          type: ["string", "null"]
+        aiGreeting:
+          type: ["string", "null"]
+        aiSpeakingStyle:
+          type: ["string", "null"]
         voicemailGreeting:
           type: ["string", "null"]
         notificationEmail:
@@ -1225,6 +1241,14 @@ components:
         holdMessage:
           type: ["string", "null"]
         aiSystemPrompt:
+          type: ["string", "null"]
+        aiVoice:
+          type: ["string", "null"]
+        aiLanguage:
+          type: ["string", "null"]
+        aiGreeting:
+          type: ["string", "null"]
+        aiSpeakingStyle:
           type: ["string", "null"]
         voicemailGreeting:
           type: ["string", "null"]

@@ -15,13 +15,34 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck, MessageSquare, Keyboard, Mic, Mail } from "lucide-react";
+import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck, MessageSquare, Keyboard, Mic, Mail, Globe } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const PRESET_HOLD = "Connecting your call, please hold.";
+
+const VOICES = [
+  { id: "coral",   name: "Coral",   gender: "Female", desc: "Natural, warm" },
+  { id: "nova",    name: "Nova",    gender: "Female", desc: "Energetic, bright" },
+  { id: "shimmer", name: "Shimmer", gender: "Female", desc: "Soft, clear" },
+  { id: "alloy",   name: "Alloy",   gender: "Female", desc: "Neutral, balanced" },
+  { id: "ash",     name: "Ash",     gender: "Male",   desc: "Clear, professional" },
+  { id: "sage",    name: "Sage",    gender: "Male",   desc: "Measured, thoughtful" },
+  { id: "ballad",  name: "Ballad",  gender: "Male",   desc: "Smooth, engaging" },
+  { id: "verse",   name: "Verse",   gender: "Male",   desc: "Dynamic, versatile" },
+  { id: "echo",    name: "Echo",    gender: "Male",   desc: "Warm, conversational" },
+  { id: "onyx",    name: "Onyx",    gender: "Male",   desc: "Deep, authoritative" },
+];
+
+const LANGUAGES = [
+  { id: "en-US", label: "English (US)",          flag: "EN" },
+  { id: "ar-LB", label: "Arabic (Lebanon)",      flag: "AR" },
+  { id: "ar-SA", label: "Arabic (Saudi Arabia)", flag: "AR" },
+];
 
 export default function NumberDetail() {
   const { id } = useParams();
@@ -70,6 +91,10 @@ export default function NumberDetail() {
         forwardNoAnswerAction: number.forwardNoAnswerAction || "personal_voicemail",
         holdMessage: number.holdMessage ?? "",
         aiSystemPrompt: number.aiSystemPrompt || "",
+        aiVoice: number.aiVoice || "",
+        aiLanguage: number.aiLanguage || "",
+        aiGreeting: number.aiGreeting || "",
+        aiSpeakingStyle: number.aiSpeakingStyle || "",
         voicemailGreeting: number.voicemailGreeting || "",
         notificationEmail: number.notificationEmail || ""
       });
@@ -388,16 +413,94 @@ export default function NumberDetail() {
                 })()}
 
                 {formData.answerMode === 'ai_voice' && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="space-y-5 animate-in fade-in slide-in-from-top-2 duration-300 border border-border rounded-md p-4 bg-background/40">
+                    <div className="flex items-center gap-2 text-primary">
+                      <Bot className="h-4 w-4" />
+                      <span className="text-sm font-semibold">AI Voice Settings</span>
+                      <span className="ml-auto text-xs text-muted-foreground">Leave blank to use global defaults</span>
+                    </div>
+
+                    {/* Voice + Language row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5 text-muted-foreground text-xs uppercase tracking-wide"><Mic className="h-3 w-3" />Voice</Label>
+                        <Select value={formData.aiVoice || "__default__"} onValueChange={v => setFormData({...formData, aiVoice: v === "__default__" ? "" : v})}>
+                          <SelectTrigger className="bg-background">
+                            <SelectValue placeholder="Global default" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__default__"><span className="text-muted-foreground">Global default</span></SelectItem>
+                            {VOICES.filter(v => v.gender === "Female").map(v => (
+                              <SelectItem key={v.id} value={v.id}>
+                                <span className="font-medium">{v.name}</span>
+                                <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0 border-pink-500/30 text-pink-400">F</Badge>
+                                <span className="text-muted-foreground text-xs ml-2">{v.desc}</span>
+                              </SelectItem>
+                            ))}
+                            {VOICES.filter(v => v.gender === "Male").map(v => (
+                              <SelectItem key={v.id} value={v.id}>
+                                <span className="font-medium">{v.name}</span>
+                                <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0 border-blue-500/30 text-blue-400">M</Badge>
+                                <span className="text-muted-foreground text-xs ml-2">{v.desc}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5 text-muted-foreground text-xs uppercase tracking-wide"><Globe className="h-3 w-3" />Language</Label>
+                        <Select value={formData.aiLanguage || "__default__"} onValueChange={v => setFormData({...formData, aiLanguage: v === "__default__" ? "" : v})}>
+                          <SelectTrigger className="bg-background">
+                            <SelectValue placeholder="Global default" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__default__"><span className="text-muted-foreground">Global default</span></SelectItem>
+                            {LANGUAGES.map(l => (
+                              <SelectItem key={l.id} value={l.id}>
+                                <span className="font-mono text-xs bg-muted px-1 rounded mr-2">{l.flag}</span>
+                                {l.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Speaking Style */}
                     <div className="space-y-2">
-                      <Label className="text-green-400">AI System Prompt (Optional Override)</Label>
-                      <Textarea 
-                        placeholder="Leave blank to use global AI settings, or provide a specific prompt for this line..." 
-                        value={formData.aiSystemPrompt} 
+                      <Label className="text-muted-foreground text-xs uppercase tracking-wide">Speaking Style</Label>
+                      <Textarea
+                        placeholder="e.g. Speak warmly and naturally, use brief pauses, sound professional but approachable. (Leave blank to use global default)"
+                        value={formData.aiSpeakingStyle}
+                        onChange={(e) => setFormData({...formData, aiSpeakingStyle: e.target.value})}
+                        className="h-16 bg-background text-sm resize-none"
+                      />
+                      <p className="text-xs text-muted-foreground">Instructions to shape tone and delivery of this number's AI agent.</p>
+                    </div>
+
+                    {/* Initial Greeting */}
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground text-xs uppercase tracking-wide">Initial Greeting</Label>
+                      <Input
+                        placeholder="e.g. Thank you for calling Acme Corp, this is Sarah. How can I help? (Leave blank to use global default)"
+                        value={formData.aiGreeting}
+                        onChange={(e) => setFormData({...formData, aiGreeting: e.target.value})}
+                        className="bg-background text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">First sentence spoken when this number answers.</p>
+                    </div>
+
+                    {/* System Prompt */}
+                    <div className="space-y-2">
+                      <Label className="text-muted-foreground text-xs uppercase tracking-wide">System Prompt (Instructions)</Label>
+                      <Textarea
+                        placeholder="You are Sarah from Acme Corp. Your role is to assist callers with... (Leave blank to use global default)"
+                        value={formData.aiSystemPrompt}
                         onChange={(e) => setFormData({...formData, aiSystemPrompt: e.target.value})}
                         className="h-40 bg-background font-mono text-sm"
                       />
-                      <p className="text-xs text-muted-foreground">Overrides the global AI prompt for calls to this specific number.</p>
+                      <p className="text-xs text-muted-foreground">Core AI instructions for this number. Overrides the global system prompt.</p>
                     </div>
                   </div>
                 )}

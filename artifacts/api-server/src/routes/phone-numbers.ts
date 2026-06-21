@@ -310,6 +310,10 @@ router.patch("/phone-numbers/:id", async (req, res): Promise<void> => {
   if (body.ringCount != null) updateData.ringCount = body.ringCount;
   if (body.answerMode != null) updateData.answerMode = body.answerMode;
   if (body.aiSystemPrompt !== undefined) updateData.aiSystemPrompt = body.aiSystemPrompt;
+  if (body.aiVoice !== undefined) updateData.aiVoice = body.aiVoice ?? null;
+  if (body.aiLanguage !== undefined) updateData.aiLanguage = body.aiLanguage ?? null;
+  if (body.aiGreeting !== undefined) updateData.aiGreeting = body.aiGreeting ?? null;
+  if (body.aiSpeakingStyle !== undefined) updateData.aiSpeakingStyle = body.aiSpeakingStyle ?? null;
   if (body.voicemailGreeting !== undefined) updateData.voicemailGreeting = body.voicemailGreeting;
   if (body.isActive != null) updateData.isActive = body.isActive;
   if (body.forwardCallerId != null) updateData.forwardCallerId = body.forwardCallerId;

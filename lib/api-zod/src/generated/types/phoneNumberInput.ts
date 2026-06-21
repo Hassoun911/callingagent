@@ -33,6 +33,14 @@ export interface PhoneNumberInput {
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */
+  aiVoice?: string | null;
+  /** @nullable */
+  aiLanguage?: string | null;
+  /** @nullable */
+  aiGreeting?: string | null;
+  /** @nullable */
+  aiSpeakingStyle?: string | null;
+  /** @nullable */
   voicemailGreeting?: string | null;
   /** @nullable */
   notificationEmail?: string | null;

@@ -34,6 +34,14 @@ export interface PhoneNumber {
   /** @nullable */
   aiSystemPrompt?: string | null;
   /** @nullable */
+  aiVoice?: string | null;
+  /** @nullable */
+  aiLanguage?: string | null;
+  /** @nullable */
+  aiGreeting?: string | null;
+  /** @nullable */
+  aiSpeakingStyle?: string | null;
+  /** @nullable */
   voicemailGreeting?: string | null;
   /** @nullable */
   notificationEmail?: string | null;

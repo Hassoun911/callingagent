@@ -138,11 +138,11 @@ export default function Settings() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">AI Voice Settings</h1>
-          <p className="text-muted-foreground mt-1">Global configuration for AI answering agents.</p>
+          <p className="text-muted-foreground mt-1">Default AI configuration for incoming calls. Each phone number can override these settings individually.</p>
         </div>
         <Button onClick={handleSave} disabled={updateMutation.isPending} className="gap-2">
           <Save className="h-4 w-4" />
-          Save Global Config
+          Save Defaults
         </Button>
       </div>
 
