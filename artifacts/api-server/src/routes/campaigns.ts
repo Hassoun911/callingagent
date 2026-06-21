@@ -397,6 +397,8 @@ router.get("/campaigns/calendar", async (req, res): Promise<void> => {
         callbackAt: campaignContactsTable.callbackAt,
         calendarNotes: campaignContactsTable.calendarNotes,
         lastAttemptAt: campaignContactsTable.lastAttemptAt,
+        recordingUrl: campaignContactsTable.recordingUrl,
+        recordingSid: campaignContactsTable.recordingSid,
       })
       .from(campaignContactsTable)
       .innerJoin(campaignsTable, eq(campaignContactsTable.campaignId, campaignsTable.id))
@@ -421,6 +423,7 @@ router.get("/campaigns/calendar", async (req, res): Promise<void> => {
       callbackAt: r.callbackAt?.toISOString() ?? null,
       calendarNotes: r.calendarNotes ?? null,
       lastAttemptAt: r.lastAttemptAt?.toISOString() ?? null,
+      hasRecording: !!(r.recordingUrl || r.recordingSid),
     })));
   } catch (err: any) {
     req.log.error({ err: err?.message }, "Failed to get calendar events");

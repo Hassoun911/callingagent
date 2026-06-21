@@ -52,6 +52,7 @@ interface CalendarEvent {
   callbackAt: string | null;
   calendarNotes: string | null;
   lastAttemptAt: string | null;
+  hasRecording: boolean;
 }
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -419,6 +420,22 @@ function CalendarTab() {
                   <div className="text-sm bg-secondary/30 rounded-md p-3 text-foreground/80 leading-relaxed">
                     {selectedEvent.callSummary}
                   </div>
+                </div>
+              )}
+
+              {selectedEvent.hasRecording && (
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
+                    Call Recording
+                  </div>
+                  <audio
+                    controls
+                    className="w-full h-9 rounded-md"
+                    src={`${BASE}/api/campaigns/${selectedEvent.campaignId}/contacts/${selectedEvent.id}/recording`}
+                    preload="none"
+                  >
+                    Your browser does not support audio playback.
+                  </audio>
                 </div>
               )}
 
