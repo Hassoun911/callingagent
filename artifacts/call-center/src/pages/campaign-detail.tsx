@@ -479,7 +479,20 @@ function getMonthDays(year: number, month: number): (Date | null)[] {
 const TIME_SLOTS = [7,8,9,10,11,12,13,14,15,16,17,18,19,20,21];
 function fmtHour(h: number) { return h === 12 ? "12 PM" : h > 12 ? `${h-12} PM` : `${h} AM`; }
 
-function ContactRow({ contact, campaignId, campaignHasSchedule, onRefresh }: { contact: CampaignContact; campaignId: number; campaignHasSchedule: boolean; onRefresh: () => void }) {
+function fmtSlotTime(t: string) {
+  const [hStr, mStr] = t.split(":");
+  const h = parseInt(hStr, 10), m = parseInt(mStr, 10);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return m === 0 ? `${h12} ${ampm}` : `${h12}:${mStr} ${ampm}`;
+}
+const DAY_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+function fmtSlot(slot: ScheduleSlot) {
+  const days = slot.days.map(d => DAY_SHORT[d]).join("/");
+  return `${days} ${fmtSlotTime(slot.startTime)}–${fmtSlotTime(slot.endTime)}`;
+}
+
+function ContactRow({ contact, campaignId, campaignHasSchedule, campaignScheduleSlots, onRefresh }: { contact: CampaignContact; campaignId: number; campaignHasSchedule: boolean; campaignScheduleSlots: ScheduleSlot[]; onRefresh: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [notesDraft, setNotesDraft] = useState(contact.userNotes ?? "");
   const [notesSaved, setNotesSaved] = useState(false);
@@ -623,11 +636,13 @@ function ContactRow({ contact, campaignId, campaignHasSchedule, onRefresh }: { c
             {lastAttempt
               ? <span>{lastAttempt}</span>
               : <span className="text-muted-foreground/50">Never</span>}
-            {contact.scheduledCallAt && (
-              <span className="text-blue-400 font-medium">
-                {formatDateTime(contact.scheduledCallAt)}
-              </span>
-            )}
+            {contact.scheduledCallAt
+              ? <span className="text-blue-400 font-medium">{formatDateTime(contact.scheduledCallAt)}</span>
+              : campaignHasSchedule && campaignScheduleSlots.length > 0 && (
+                <span className="text-blue-400/70 font-medium">
+                  {campaignScheduleSlots.map(fmtSlot).join(", ")}
+                </span>
+              )}
           </div>
         </td>
 
@@ -656,7 +671,7 @@ function ContactRow({ contact, campaignId, campaignHasSchedule, onRefresh }: { c
                       : contact.scheduledCallAt
                         ? "text-blue-400 hover:text-blue-300"
                         : campaignHasSchedule
-                          ? "text-green-400 hover:text-green-300"
+                          ? "text-blue-400/60 hover:text-blue-300"
                           : "text-muted-foreground hover:text-green-400"
                   }`}
                   title={
@@ -1045,7 +1060,7 @@ export default function CampaignDetail() {
   const [showSchedule, setShowSchedule] = useState(false);
   const [newContact, setNewContact] = useState({ name: "", phone: "", address: "" });
   const [importText, setImportText] = useState("");
-  const [filter, setFilter] = useState<"all" | "pending" | "completed" | "interested" | "no_answer">("all");
+  const [filter, setFilter] = useState<"all" | "pending" | "completed" | "interested" | "no_answer" | "skipped">("all");
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data: campaign, isLoading: campLoading } = useQuery<Campaign>({
@@ -1318,7 +1333,7 @@ export default function CampaignDetail() {
             </thead>
             <tbody>
               {filteredContacts.map((c) => (
-                <ContactRow key={c.id} contact={c} campaignId={campaignId} campaignHasSchedule={parseSchedule(campaign.scheduleConfig).enabled} onRefresh={refreshContacts} />
+                <ContactRow key={c.id} contact={c} campaignId={campaignId} campaignHasSchedule={parseSchedule(campaign.scheduleConfig).enabled} campaignScheduleSlots={parseSchedule(campaign.scheduleConfig).slots} onRefresh={refreshContacts} />
               ))}
             </tbody>
           </table>
