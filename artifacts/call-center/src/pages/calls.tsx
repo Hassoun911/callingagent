@@ -631,18 +631,28 @@ export default function Calls() {
                   <PriorityBadge priority={call.priority} />
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center gap-2">
-                    <RecordingPlayer callId={call.id} hasRecording={!!(call.recordingSid || call.recordingUrl)} />
-                    {!!(call.recordingSid || call.recordingUrl) && (
-                      <a
-                        href={`/api/call-logs/${call.id}/recording`}
-                        download
-                        onClick={(e) => e.stopPropagation()}
-                        className="shrink-0 text-cyan-500 hover:text-cyan-300 transition-colors"
-                        title="Download recording"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                      </a>
+                  <div className="flex items-center gap-2.5">
+                    {!!(call.recordingSid || call.recordingUrl) ? (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedCall(call); }}
+                          className="shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-muted hover:bg-primary/20 border border-border/60 transition-colors"
+                          title="Play recording (opens detail)"
+                        >
+                          <Play className="h-2.5 w-2.5 ml-px" />
+                        </button>
+                        <a
+                          href={`/api/call-logs/${call.id}/recording`}
+                          download
+                          onClick={(e) => e.stopPropagation()}
+                          className="shrink-0 text-cyan-500 hover:text-cyan-300 transition-colors"
+                          title="Download recording"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </a>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">--</span>
                     )}
                     <button
                       onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(call.id); }}
