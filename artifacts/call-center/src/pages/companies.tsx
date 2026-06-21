@@ -5,29 +5,47 @@ import {
   useCreateCompany, 
   useUpdateCompany, 
   useDeleteCompany,
-  getListCompaniesQueryKey
+  getListCompaniesQueryKey,
+  useListPhoneNumbers,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Building2, Globe, Phone, Edit, Trash2 } from "lucide-react";
+import { Plus, Building2, Globe, Phone } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Trash2, Edit } from "lucide-react";
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+async function linkPhoneNumber(phoneNumberId: number, companyId: number) {
+  await fetch(`${BASE}/api/phone-numbers/${phoneNumberId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ companyId }),
+  });
+}
 
 export default function Companies() {
   const { data: companies, isLoading } = useListCompanies();
+  const { data: allNumbers } = useListPhoneNumbers();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<any>(null);
+  const [selectedPhoneNumberId, setSelectedPhoneNumberId] = useState<string>("");
+
+  // Only numbers not already linked to a company
+  const unlinkdNumbers = allNumbers?.filter(n => !n.companyId) ?? [];
   
   const [formData, setFormData] = useState({
     name: "",
@@ -39,9 +57,18 @@ export default function Companies() {
 
   const createMutation = useCreateCompany({
     mutation: {
-      onSuccess: () => {
+      onSuccess: async (newCompany: any) => {
+        if (selectedPhoneNumberId) {
+          try {
+            await linkPhoneNumber(parseInt(selectedPhoneNumberId, 10), newCompany.id);
+            queryClient.invalidateQueries({ queryKey: ["listPhoneNumbers"] });
+          } catch {
+            toast({ title: "Company created, but failed to link phone number", variant: "destructive" });
+          }
+        }
         queryClient.invalidateQueries({ queryKey: getListCompaniesQueryKey() });
         setDialogOpen(false);
+        setSelectedPhoneNumberId("");
         toast({ title: "Company created" });
       }
     }
@@ -66,7 +93,7 @@ export default function Companies() {
     }
   });
 
-  const handleOpenDialog = (company = null) => {
+  const handleOpenDialog = (company: any = null) => {
     if (company) {
       setEditingCompany(company);
       setFormData({
@@ -79,6 +106,7 @@ export default function Companies() {
     } else {
       setEditingCompany(null);
       setFormData({ name: "", industry: "", website: "", phone: "", notes: "" });
+      setSelectedPhoneNumberId("");
     }
     setDialogOpen(true);
   };
@@ -221,6 +249,34 @@ export default function Companies() {
                 <Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="bg-background font-mono" />
               </div>
             </div>
+
+            {!editingCompany && (
+              <div className="space-y-2">
+                <Label>
+                  Provisioned Phone Number
+                  <span className="text-muted-foreground text-xs ml-2">(optional)</span>
+                </Label>
+                <Select value={selectedPhoneNumberId} onValueChange={setSelectedPhoneNumberId}>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select a number to link..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {unlinkdNumbers.map(n => (
+                      <SelectItem key={n.id} value={String(n.id)}>
+                        {n.friendlyName ? `${n.friendlyName} — ${n.number}` : n.number}
+                      </SelectItem>
+                    ))}
+                    {unlinkdNumbers.length === 0 && (
+                      <SelectItem value="__empty" disabled>No unlinked numbers available</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Links one of your provisioned numbers to this company. You can also do this later from the company detail page.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Notes</Label>
