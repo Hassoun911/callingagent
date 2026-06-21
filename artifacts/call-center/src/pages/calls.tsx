@@ -550,18 +550,18 @@ export default function Calls() {
 
       <Card className="border-border">
         <div className="overflow-x-auto">
-        <Table className="min-w-[1000px]">
+        <Table className="w-full table-fixed">
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
-              <TableHead className="w-[150px]">Date / Time</TableHead>
-              <TableHead>Direction</TableHead>
-              <TableHead>From</TableHead>
-              <TableHead>Caller</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Duration</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Priority</TableHead>
-              <TableHead className="w-[160px]">Recording</TableHead>
+              <TableHead className="w-[130px]">Date / Time</TableHead>
+              <TableHead className="w-[70px]">Direction</TableHead>
+              <TableHead className="w-[110px]">From</TableHead>
+              <TableHead className="w-[100px]">Caller</TableHead>
+              <TableHead className="w-[90px]">Type</TableHead>
+              <TableHead className="w-[70px]">Duration</TableHead>
+              <TableHead className="w-[100px]">Status</TableHead>
+              <TableHead className="w-[85px]">Priority</TableHead>
+              <TableHead className="w-[155px]">Recording</TableHead>
               <TableHead className="w-[90px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -569,14 +569,14 @@ export default function Calls() {
             {isLoading ? (
               [...Array(5)].map((_, i) => (
                 <TableRow key={i} className="border-border">
-                  {[...Array(12)].map((_, j) => (
+                  {[...Array(10)].map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : filtered?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
                   No call logs found.
                 </TableCell>
               </TableRow>
