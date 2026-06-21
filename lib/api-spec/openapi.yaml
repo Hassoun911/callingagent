@@ -324,6 +324,84 @@ paths:
         "204":
           description: Deleted
 
+  /platform-users:
+    get:
+      operationId: listPlatformUsers
+      tags: [users]
+      parameters:
+        - name: companyId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListPlatformUsersResponse"
+    post:
+      operationId: createPlatformUser
+      tags: [users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePlatformUserBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformUser"
+
+  /platform-users/{id}:
+    patch:
+      operationId: updatePlatformUser
+      tags: [users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePlatformUserBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformUser"
+    delete:
+      operationId: deletePlatformUser
+      tags: [users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+
   /companies:
     get:
       operationId: listCompanies
@@ -1061,7 +1139,7 @@ components:
   schemas:
     AuthUser:
       type: object
-      required: [id, email, firstName, lastName, profileImageUrl]
+      required: [id, email, firstName, lastName, profileImageUrl, role, companyId]
       properties:
         id:
           type: string
@@ -1073,6 +1151,69 @@ components:
           type: [string, 'null']
         profileImageUrl:
           type: [string, 'null']
+        role:
+          type: string
+          enum: [super_admin, company_admin, company_user]
+        companyId:
+          type: [integer, 'null']
+    PlatformUser:
+      type: object
+      required: [id, username, role, isActive, createdAt]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: [string, 'null']
+        role:
+          type: string
+          enum: [super_admin, company_admin, company_user]
+        companyId:
+          type: [integer, 'null']
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+    ListPlatformUsersResponse:
+      type: array
+      items:
+        $ref: '#/components/schemas/PlatformUser'
+    CreatePlatformUserBody:
+      type: object
+      required: [username, password, role]
+      properties:
+        username:
+          type: string
+        email:
+          type: [string, 'null']
+        password:
+          type: string
+        role:
+          type: string
+          enum: [company_admin, company_user]
+        companyId:
+          type: [integer, 'null']
+    UpdatePlatformUserBody:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: [string, 'null']
+        password:
+          type: [string, 'null']
+        role:
+          type: string
+          enum: [company_admin, company_user]
+        isActive:
+          type: boolean
+    GetPlatformUserParams:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: integer
     AuthUserEnvelope:
       type: object
       required: [user]

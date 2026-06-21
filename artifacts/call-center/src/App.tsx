@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { useState, useEffect, useCallback, createContext, useContext } from "react";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
+import CompanyPortal from "@/pages/company-portal";
 
 // Pages
 import Dashboard from "@/pages/dashboard";
@@ -29,9 +30,28 @@ const queryClient = new QueryClient({
   },
 });
 
-interface AuthUser {
+export interface AuthUser {
   id: string;
   firstName: string | null;
+  email: string | null;
+  role: "super_admin" | "company_admin" | "company_user";
+  companyId: number | null;
+}
+
+interface AuthContextValue {
+  user: AuthUser | null;
+  logout: () => Promise<void>;
+  refetch: () => Promise<void>;
+}
+
+export const AuthContext = createContext<AuthContextValue>({
+  user: null,
+  logout: async () => {},
+  refetch: async () => {},
+});
+
+export function useAuthContext() {
+  return useContext(AuthContext);
 }
 
 function useAuth() {
@@ -140,7 +160,7 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function Router() {
+function AdminRouter() {
   return (
     <Layout>
       <Switch>
@@ -162,8 +182,22 @@ function Router() {
   );
 }
 
-function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isLoading, isAuthenticated, refetch } = useAuth();
+function PortalRedirect({ user }: { user: AuthUser }) {
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    navigate("/portal");
+  }, [navigate]);
+  return (
+    <Switch>
+      <Route path="/portal" component={() => <CompanyPortal user={user} />} />
+      <Route component={() => <CompanyPortal user={user} />} />
+    </Switch>
+  );
+}
+
+function AuthGate({ children }: { children?: React.ReactNode }) {
+  const { isLoading, isAuthenticated, user, logout, refetch } = useAuth();
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
@@ -171,19 +205,30 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  if (!isAuthenticated) return <LoginScreen onSuccess={refetch} />;
-  return <>{children}</>;
+
+  if (!isAuthenticated || !user) {
+    return <LoginScreen onSuccess={refetch} />;
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, logout, refetch }}>
+      {user.role === "super_admin"
+        ? children
+        : <PortalRedirect user={user} />
+      }
+    </AuthContext.Provider>
+  );
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthGate>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-        </AuthGate>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <AuthGate>
+            <AdminRouter />
+          </AuthGate>
+        </WouterRouter>
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

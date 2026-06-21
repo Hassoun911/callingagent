@@ -5,6 +5,15 @@
  * Call Center API
  * OpenAPI spec version: 0.1.0
  */
+export type AuthUserRole = typeof AuthUserRole[keyof typeof AuthUserRole];
+
+
+export const AuthUserRole = {
+  super_admin: 'super_admin',
+  company_admin: 'company_admin',
+  company_user: 'company_user',
+} as const;
+
 export interface AuthUser {
   id: string;
   /** @nullable */
@@ -15,6 +24,72 @@ export interface AuthUser {
   lastName: string | null;
   /** @nullable */
   profileImageUrl: string | null;
+  role: AuthUserRole;
+  /** @nullable */
+  companyId: number | null;
+}
+
+export type PlatformUserRole = typeof PlatformUserRole[keyof typeof PlatformUserRole];
+
+
+export const PlatformUserRole = {
+  super_admin: 'super_admin',
+  company_admin: 'company_admin',
+  company_user: 'company_user',
+} as const;
+
+export interface PlatformUser {
+  id: number;
+  username: string;
+  /** @nullable */
+  email?: string | null;
+  role: PlatformUserRole;
+  /** @nullable */
+  companyId?: number | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export type ListPlatformUsersResponse = PlatformUser[];
+
+export type CreatePlatformUserBodyRole = typeof CreatePlatformUserBodyRole[keyof typeof CreatePlatformUserBodyRole];
+
+
+export const CreatePlatformUserBodyRole = {
+  company_admin: 'company_admin',
+  company_user: 'company_user',
+} as const;
+
+export interface CreatePlatformUserBody {
+  username: string;
+  /** @nullable */
+  email?: string | null;
+  password: string;
+  role: CreatePlatformUserBodyRole;
+  /** @nullable */
+  companyId?: number | null;
+}
+
+export type UpdatePlatformUserBodyRole = typeof UpdatePlatformUserBodyRole[keyof typeof UpdatePlatformUserBodyRole];
+
+
+export const UpdatePlatformUserBodyRole = {
+  company_admin: 'company_admin',
+  company_user: 'company_user',
+} as const;
+
+export interface UpdatePlatformUserBody {
+  username?: string;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  password?: string | null;
+  role?: UpdatePlatformUserBodyRole;
+  isActive?: boolean;
+}
+
+export interface GetPlatformUserParams {
+  id: number;
 }
 
 export interface AuthUserEnvelope {
@@ -985,6 +1060,14 @@ companyId?: number | null;
  * @nullable
  */
 forCompanyId?: number | null;
+};
+
+export type ListPlatformUsersParams = {
+companyId?: number;
+};
+
+export type DeletePlatformUser200 = {
+  ok: boolean;
 };
 
 export type ListCallLogsParams = {

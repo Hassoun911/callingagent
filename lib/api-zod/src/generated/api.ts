@@ -355,6 +355,63 @@ export const DeleteContactParams = zod.object({
 })
 
 
+export const ListPlatformUsersQueryParams = zod.object({
+  "companyId": zod.coerce.number().optional()
+})
+
+export const ListPlatformUsersResponseItem = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "email": zod.string().nullish(),
+  "role": zod.enum(['super_admin', 'company_admin', 'company_user']),
+  "companyId": zod.number().nullish(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string()
+})
+export const ListPlatformUsersResponse = zod.array(ListPlatformUsersResponseItem)
+
+
+export const CreatePlatformUserBody = zod.object({
+  "username": zod.string(),
+  "email": zod.string().nullish(),
+  "password": zod.string(),
+  "role": zod.enum(['company_admin', 'company_user']),
+  "companyId": zod.number().nullish()
+})
+
+
+export const UpdatePlatformUserParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdatePlatformUserBody = zod.object({
+  "username": zod.string().optional(),
+  "email": zod.string().nullish(),
+  "password": zod.string().nullish(),
+  "role": zod.enum(['company_admin', 'company_user']).optional(),
+  "isActive": zod.boolean().optional()
+})
+
+export const UpdatePlatformUserResponse = zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "email": zod.string().nullish(),
+  "role": zod.enum(['super_admin', 'company_admin', 'company_user']),
+  "companyId": zod.number().nullish(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.string()
+})
+
+
+export const DeletePlatformUserParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeletePlatformUserResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
 export const ListCompaniesResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
@@ -1002,7 +1059,9 @@ export const GetCurrentAuthUserResponse = zod.object({
   "email": zod.string().nullable(),
   "firstName": zod.string().nullable(),
   "lastName": zod.string().nullable(),
-  "profileImageUrl": zod.string().nullable()
+  "profileImageUrl": zod.string().nullable(),
+  "role": zod.enum(['super_admin', 'company_admin', 'company_user']),
+  "companyId": zod.number().nullable()
 }),zod.null()])
 })
 

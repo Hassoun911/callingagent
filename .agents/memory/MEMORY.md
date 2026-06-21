@@ -1,0 +1,1 @@
+- [Multi-tenant Architecture](multi-tenant-arch.md) — company CRM is fully operational but scoped; only phone provisioning is super_admin-only

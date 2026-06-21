@@ -13,11 +13,13 @@ import watchesRouter from "./watches";
 import smsRouter from "./sms";
 import campaignsRouter from "./campaigns";
 import extensionsRouter from "./extensions";
+import platformUsersRouter from "./platform-users";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(platformUsersRouter);
 router.use(phoneNumbersRouter);
 router.use(contactsRouter);
 router.use(companiesRouter);

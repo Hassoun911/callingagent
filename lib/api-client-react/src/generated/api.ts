@@ -42,13 +42,17 @@ import type {
   ContactImportResult,
   ContactInput,
   ContactUpdate,
+  CreatePlatformUserBody,
   DashboardStats,
+  DeletePlatformUser200,
   GetRecentCallsParams,
   GetSmsUnreadCount200,
   HealthStatus,
   ImportCampaignContacts200,
   ListCallLogsParams,
   ListContactsParams,
+  ListPlatformUsersParams,
+  ListPlatformUsersResponse,
   ListSmsMessagesParams,
   LogoutSuccess,
   MobileTokenExchangeRequest,
@@ -57,6 +61,7 @@ import type {
   PhoneNumberInput,
   PhoneNumberTwilioStatus,
   PhoneNumberUpdate,
+  PlatformUser,
   RecentCallItem,
   RecordingUrl,
   SearchAvailableNumbersParams,
@@ -65,7 +70,8 @@ import type {
   StartCampaign200,
   TestCallInput,
   TestCallResult,
-  UpdateCallLogNotesBody
+  UpdateCallLogNotesBody,
+  UpdatePlatformUserBody
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1158,6 +1164,279 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getDeleteContactMutationOptions(options));
+    }
+
+export const getListPlatformUsersUrl = (params?: ListPlatformUsersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/platform-users?${stringifiedParams}` : `/api/platform-users`
+}
+
+export const listPlatformUsers = async (params?: ListPlatformUsersParams, options?: RequestInit): Promise<ListPlatformUsersResponse> => {
+
+  return customFetch<ListPlatformUsersResponse>(getListPlatformUsersUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPlatformUsersQueryKey = (params?: ListPlatformUsersParams,) => {
+    return [
+    `/api/platform-users`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListPlatformUsersQueryOptions = <TData = Awaited<ReturnType<typeof listPlatformUsers>>, TError = ErrorType<unknown>>(params?: ListPlatformUsersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPlatformUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPlatformUsersQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPlatformUsers>>> = ({ signal }) => listPlatformUsers(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPlatformUsers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPlatformUsersQueryResult = NonNullable<Awaited<ReturnType<typeof listPlatformUsers>>>
+export type ListPlatformUsersQueryError = ErrorType<unknown>
+
+
+
+export function useListPlatformUsers<TData = Awaited<ReturnType<typeof listPlatformUsers>>, TError = ErrorType<unknown>>(
+ params?: ListPlatformUsersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPlatformUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPlatformUsersQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreatePlatformUserUrl = () => {
+
+
+
+
+  return `/api/platform-users`
+}
+
+export const createPlatformUser = async (createPlatformUserBody: CreatePlatformUserBody, options?: RequestInit): Promise<PlatformUser> => {
+
+  return customFetch<PlatformUser>(getCreatePlatformUserUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createPlatformUserBody,)
+  }
+);}
+
+
+
+
+export const getCreatePlatformUserMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPlatformUser>>, TError,{data: BodyType<CreatePlatformUserBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPlatformUser>>, TError,{data: BodyType<CreatePlatformUserBody>}, TContext> => {
+
+const mutationKey = ['createPlatformUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPlatformUser>>, {data: BodyType<CreatePlatformUserBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPlatformUser(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePlatformUserMutationResult = NonNullable<Awaited<ReturnType<typeof createPlatformUser>>>
+    export type CreatePlatformUserMutationBody = BodyType<CreatePlatformUserBody>
+    export type CreatePlatformUserMutationError = ErrorType<unknown>
+
+    export const useCreatePlatformUser = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPlatformUser>>, TError,{data: BodyType<CreatePlatformUserBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPlatformUser>>,
+        TError,
+        {data: BodyType<CreatePlatformUserBody>},
+        TContext
+      > => {
+      return useMutation(getCreatePlatformUserMutationOptions(options));
+    }
+
+export const getUpdatePlatformUserUrl = (id: number,) => {
+
+
+
+
+  return `/api/platform-users/${id}`
+}
+
+export const updatePlatformUser = async (id: number,
+    updatePlatformUserBody: UpdatePlatformUserBody, options?: RequestInit): Promise<PlatformUser> => {
+
+  return customFetch<PlatformUser>(getUpdatePlatformUserUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updatePlatformUserBody,)
+  }
+);}
+
+
+
+
+export const getUpdatePlatformUserMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePlatformUser>>, TError,{id: number;data: BodyType<UpdatePlatformUserBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updatePlatformUser>>, TError,{id: number;data: BodyType<UpdatePlatformUserBody>}, TContext> => {
+
+const mutationKey = ['updatePlatformUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updatePlatformUser>>, {id: number;data: BodyType<UpdatePlatformUserBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updatePlatformUser(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdatePlatformUserMutationResult = NonNullable<Awaited<ReturnType<typeof updatePlatformUser>>>
+    export type UpdatePlatformUserMutationBody = BodyType<UpdatePlatformUserBody>
+    export type UpdatePlatformUserMutationError = ErrorType<unknown>
+
+    export const useUpdatePlatformUser = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePlatformUser>>, TError,{id: number;data: BodyType<UpdatePlatformUserBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updatePlatformUser>>,
+        TError,
+        {id: number;data: BodyType<UpdatePlatformUserBody>},
+        TContext
+      > => {
+      return useMutation(getUpdatePlatformUserMutationOptions(options));
+    }
+
+export const getDeletePlatformUserUrl = (id: number,) => {
+
+
+
+
+  return `/api/platform-users/${id}`
+}
+
+export const deletePlatformUser = async (id: number, options?: RequestInit): Promise<DeletePlatformUser200> => {
+
+  return customFetch<DeletePlatformUser200>(getDeletePlatformUserUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeletePlatformUserMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePlatformUser>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePlatformUser>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deletePlatformUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePlatformUser>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deletePlatformUser(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePlatformUserMutationResult = NonNullable<Awaited<ReturnType<typeof deletePlatformUser>>>
+
+    export type DeletePlatformUserMutationError = ErrorType<unknown>
+
+    export const useDeletePlatformUser = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePlatformUser>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deletePlatformUser>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeletePlatformUserMutationOptions(options));
     }
 
 export const getListCompaniesUrl = () => {

@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
+import { db, platformUsersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import {
   clearSession,
   getSessionId,
@@ -8,6 +10,7 @@ import {
   SESSION_TTL,
   type SessionData,
 } from "../lib/auth";
+import { verifyPassword } from "../lib/password";
 
 const router: IRouter = Router();
 
@@ -42,6 +45,48 @@ router.get("/auth/user", (req: Request, res: Response) => {
 router.post("/login", async (req: Request, res: Response): Promise<void> => {
   const { username, password } = req.body ?? {};
 
+  if (typeof username !== "string" || typeof password !== "string") {
+    res.status(400).json({ error: "Username and password required." });
+    return;
+  }
+
+  // 1. Check platform_users table first
+  const [platformUser] = await db
+    .select()
+    .from(platformUsersTable)
+    .where(eq(platformUsersTable.username, username));
+
+  if (platformUser) {
+    if (!platformUser.isActive) {
+      await new Promise(r => setTimeout(r, 500));
+      res.status(401).json({ error: "Account is disabled." });
+      return;
+    }
+    const valid = await verifyPassword(password, platformUser.passwordHash);
+    if (!valid) {
+      await new Promise(r => setTimeout(r, 500));
+      res.status(401).json({ error: "Invalid username or password." });
+      return;
+    }
+    const sessionData: SessionData = {
+      user: {
+        id: platformUser.id.toString(),
+        email: platformUser.email ?? null,
+        firstName: platformUser.username,
+        lastName: null,
+        profileImageUrl: null,
+        role: platformUser.role as "company_admin" | "company_user",
+        companyId: platformUser.companyId ?? null,
+      },
+      access_token: crypto.randomBytes(16).toString("hex"),
+    };
+    const sid = await createSession(sessionData);
+    setSessionCookie(res, sid);
+    res.json({ ok: true, role: platformUser.role, companyId: platformUser.companyId ?? null });
+    return;
+  }
+
+  // 2. Fall back to env-var super admin
   const adminUsername = process.env.ADMIN_USERNAME;
   const adminPassword = process.env.ADMIN_PASSWORD;
 
@@ -51,8 +96,6 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
   }
 
   const valid =
-    typeof username === "string" &&
-    typeof password === "string" &&
     timingSafeEqual(username, adminUsername) &&
     timingSafeEqual(password, adminPassword);
 
@@ -69,13 +112,15 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       firstName: adminUsername,
       lastName: null,
       profileImageUrl: null,
+      role: "super_admin",
+      companyId: null,
     },
     access_token: crypto.randomBytes(16).toString("hex"),
   };
 
   const sid = await createSession(sessionData);
   setSessionCookie(res, sid);
-  res.json({ ok: true });
+  res.json({ ok: true, role: "super_admin", companyId: null });
 });
 
 router.post("/logout", async (req: Request, res: Response): Promise<void> => {

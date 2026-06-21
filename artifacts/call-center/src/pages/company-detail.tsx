@@ -22,6 +22,7 @@ import {
 import {
   ArrowLeft, Building2, Phone, Globe, Mail, Edit, Plus, Trash2,
   ChevronRight, Hash, PhoneForwarded, ToggleLeft, ToggleRight,
+  Users, Shield,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -110,6 +111,14 @@ export default function CompanyDetail() {
   const [selectedNumberId, setSelectedNumberId] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
+  type PortalUser = { id: number; username: string; email: string | null; role: string; isActive: boolean };
+  const [portalUsers, setPortalUsers] = useState<PortalUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [userDialog, setUserDialog] = useState(false);
+  const [userForm, setUserForm] = useState({ username: "", email: "", password: "", role: "company_user" });
+  const [savingUser, setSavingUser] = useState(false);
+  const [userError, setUserError] = useState("");
+
   const updateCompany = useUpdateCompany({
     mutation: {
       onSuccess: () => {
@@ -142,6 +151,61 @@ export default function CompanyDetail() {
         .finally(() => setExtsLoading(false));
     }
   }, [companyId]);
+
+  async function loadPortalUsers() {
+    setUsersLoading(true);
+    try {
+      const r = await fetch(`${BASE}/api/platform-users?companyId=${companyId}`, { credentials: "include" });
+      if (r.ok) setPortalUsers(await r.json());
+    } finally {
+      setUsersLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!isNaN(companyId)) loadPortalUsers();
+  }, [companyId]);
+
+  async function handleAddUser(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingUser(true);
+    setUserError("");
+    try {
+      const r = await fetch(`${BASE}/api/platform-users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ...userForm, companyId, email: userForm.email || null }),
+      });
+      if (!r.ok) {
+        const d = await r.json();
+        setUserError(d.error ?? "Failed to create user");
+      } else {
+        setUserDialog(false);
+        setUserForm({ username: "", email: "", password: "", role: "company_user" });
+        loadPortalUsers();
+        toast({ title: "User created" });
+      }
+    } finally {
+      setSavingUser(false);
+    }
+  }
+
+  async function toggleUserActive(userId: number, isActive: boolean) {
+    await fetch(`${BASE}/api/platform-users/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ isActive: !isActive }),
+    });
+    loadPortalUsers();
+  }
+
+  async function deletePortalUser(userId: number) {
+    await fetch(`${BASE}/api/platform-users/${userId}`, { method: "DELETE", credentials: "include" });
+    loadPortalUsers();
+    toast({ title: "User deleted" });
+  }
 
   function openNewExt() {
     setEditingExt(null);
@@ -454,6 +518,121 @@ export default function CompanyDetail() {
           </div>
         )}
       </div>
+
+      {/* Portal Users */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/20">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-blue-400" />
+            <span className="text-sm font-semibold">Portal Users</span>
+            {portalUsers.length > 0 && (
+              <span className="text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded font-semibold">{portalUsers.length}</span>
+            )}
+          </div>
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => { setUserError(""); setUserDialog(true); }}>
+            <Plus className="h-3.5 w-3.5" /> Add User
+          </Button>
+        </div>
+        <div className="px-4 py-2 bg-blue-500/5 border-b border-blue-500/10 text-xs text-blue-300/70 flex items-center gap-2">
+          <Shield className="h-3.5 w-3.5 flex-shrink-0" />
+          Users created here can log into the company portal at their dedicated link.
+        </div>
+        {usersLoading ? (
+          <div className="p-4 space-y-2">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+        ) : portalUsers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-20 text-muted-foreground gap-1">
+            <Users className="h-5 w-5 opacity-25" />
+            <span className="text-xs">No portal users yet.</span>
+          </div>
+        ) : (
+          <div className="divide-y divide-border/50">
+            {portalUsers.map(u => (
+              <div key={u.id} className="flex items-center gap-3 px-4 py-2.5">
+                <div className="h-7 w-7 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-bold text-blue-400">{u.username[0].toUpperCase()}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{u.username}</span>
+                    <span className="text-[10px] bg-secondary text-muted-foreground px-1.5 py-0.5 rounded capitalize">
+                      {u.role === "company_admin" ? "Admin" : "User"}
+                    </span>
+                    {!u.isActive && <span className="text-[10px] bg-destructive/10 text-destructive px-1.5 py-0.5 rounded">Disabled</span>}
+                  </div>
+                  {u.email && <p className="text-xs text-muted-foreground">{u.email}</p>}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button onClick={() => toggleUserActive(u.id, u.isActive)}
+                    className="text-xs text-muted-foreground hover:text-foreground underline">
+                    {u.isActive ? "Disable" : "Enable"}
+                  </button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <button className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-card border-border">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete User</AlertDialogTitle>
+                        <AlertDialogDescription>Delete user "{u.username}"? They will no longer be able to log in.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction className="bg-destructive" onClick={() => deletePortalUser(u.id)}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Add user dialog */}
+      <Dialog open={userDialog} onOpenChange={setUserDialog}>
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader><DialogTitle>Add Portal User</DialogTitle></DialogHeader>
+          <form onSubmit={handleAddUser} className="space-y-3 pt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Username *</Label>
+                <input required value={userForm.username} onChange={e => setUserForm(f => ({ ...f, username: e.target.value }))}
+                  className="w-full mt-1 bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground focus:outline-none focus:border-primary"
+                  placeholder="username" />
+              </div>
+              <div>
+                <Label>Role</Label>
+                <Select value={userForm.role} onValueChange={v => setUserForm(f => ({ ...f, role: v }))}>
+                  <SelectTrigger className="mt-1 bg-background"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="company_user">User</SelectItem>
+                    <SelectItem value="company_admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Email <span className="text-muted-foreground text-xs">(optional)</span></Label>
+              <input type="email" value={userForm.email} onChange={e => setUserForm(f => ({ ...f, email: e.target.value }))}
+                className="w-full mt-1 bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground focus:outline-none focus:border-primary"
+                placeholder="user@company.com" />
+            </div>
+            <div>
+              <Label>Password *</Label>
+              <input required type="password" value={userForm.password} onChange={e => setUserForm(f => ({ ...f, password: e.target.value }))}
+                className="w-full mt-1 bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground focus:outline-none focus:border-primary"
+                placeholder="password" />
+            </div>
+            {userError && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{userError}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="outline" onClick={() => setUserDialog(false)}>Cancel</Button>
+              <Button type="submit" disabled={savingUser}>{savingUser ? "Creating..." : "Create User"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit company dialog */}
       <Dialog open={editingCompany} onOpenChange={setEditingCompany}>
