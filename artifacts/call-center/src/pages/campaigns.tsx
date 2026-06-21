@@ -302,7 +302,7 @@ function CalendarTab() {
   return (
     <div className="space-y-5">
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <button
           onClick={() => setStatsPopup("hotLeads")}
           className="bg-card border border-border rounded-lg px-4 py-3 text-left hover:border-green-500/30 transition-colors"

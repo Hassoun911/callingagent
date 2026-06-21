@@ -584,13 +584,14 @@ router.post("/campaigns/:id/contacts/import", async (req, res): Promise<void> =>
 router.patch("/campaigns/:id/contacts/:contactId", async (req, res): Promise<void> => {
   try {
     const contactId = parseInt(req.params.contactId, 10);
-    const { name, phone, address, callbackAt, calendarNotes } = req.body;
+    const { name, phone, address, callbackAt, calendarNotes, userNotes } = req.body;
     const updateData: any = {};
     if (name != null) updateData.name = name;
     if (phone != null) updateData.phone = phone;
     if (address !== undefined) updateData.address = address;
     if (callbackAt !== undefined) updateData.callbackAt = callbackAt ? new Date(callbackAt) : null;
     if (calendarNotes !== undefined) updateData.calendarNotes = calendarNotes;
+    if (userNotes !== undefined) updateData.userNotes = userNotes ?? null;
     const [contact] = await db.update(campaignContactsTable).set(updateData).where(eq(campaignContactsTable.id, contactId)).returning();
     if (!contact) { res.status(404).json({ error: "Contact not found" }); return; }
     res.json({

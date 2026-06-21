@@ -57,6 +57,7 @@ interface CampaignContact {
   additionalNotes: string | null;
   attemptCount: number | null;
   lastAttemptAt: string | null;
+  userNotes: string | null;
   createdAt: string;
 }
 
@@ -454,8 +455,33 @@ function CallLogEntry({ log, campaignId, onDeleted }: { log: CampaignCallLog; ca
 
 function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignContact; campaignId: number; onRefresh: () => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [notesDraft, setNotesDraft] = useState(contact.userNotes ?? "");
+  const [notesSaved, setNotesSaved] = useState(false);
+  const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
+
+  async function saveNotes(value: string) {
+    try {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}/contacts/${contact.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userNotes: value || null }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      setNotesSaved(true);
+      setTimeout(() => setNotesSaved(false), 2000);
+      qc.invalidateQueries({ queryKey: ["campaign-contacts", campaignId] });
+    } catch {
+      toast({ title: "Failed to save notes", variant: "destructive" });
+    }
+  }
+
+  function handleNotesChange(val: string) {
+    setNotesDraft(val);
+    if (notesTimerRef.current) clearTimeout(notesTimerRef.current);
+    notesTimerRef.current = setTimeout(() => saveNotes(val), 1200);
+  }
 
   const { data: callLogs = [], isLoading: logsLoading } = useQuery<CampaignCallLog[]>({
     queryKey: ["call-logs", contact.id],
@@ -577,27 +603,48 @@ function ContactRow({ contact, campaignId, onRefresh }: { contact: CampaignConta
         </td>
       </tr>
 
-      {/* Expanded: call history */}
+      {/* Expanded: notes + call history */}
       {expanded && (
         <tr className="border-b border-border/40">
-          <td colSpan={8} className="px-6 py-3 bg-secondary/10">
-            {logsLoading ? (
-              <div className="text-xs text-muted-foreground py-2">Loading call history...</div>
-            ) : callLogs.length === 0 ? (
-              <div className="text-xs text-muted-foreground py-2 italic">No calls made yet for this contact.</div>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Mic className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Call History — {callLogs.length} {callLogs.length === 1 ? "attempt" : "attempts"}
-                  </span>
+          <td colSpan={8} className="px-6 py-4 bg-secondary/10">
+            <div className="space-y-4">
+              {/* Notes section */}
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <FileText className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Notes</span>
+                  {notesSaved && <span className="text-[10px] text-green-400 tracking-wider">Saved</span>}
                 </div>
-                {callLogs.map(log => (
-                  <CallLogEntry key={log.id} log={log} campaignId={campaignId} onDeleted={() => qc.invalidateQueries({ queryKey: ["call-logs", contact.id] })} />
-                ))}
+                <Textarea
+                  value={notesDraft}
+                  onChange={e => handleNotesChange(e.target.value)}
+                  onBlur={() => { if (notesTimerRef.current) { clearTimeout(notesTimerRef.current); notesTimerRef.current = null; } saveNotes(notesDraft); }}
+                  placeholder="Add notes about this contact..."
+                  rows={3}
+                  className="text-sm bg-background/60 border-border/50 resize-none w-full"
+                  onClick={e => e.stopPropagation()}
+                />
               </div>
-            )}
+
+              {/* Call history */}
+              {logsLoading ? (
+                <div className="text-xs text-muted-foreground py-2">Loading call history...</div>
+              ) : callLogs.length === 0 ? (
+                <div className="text-xs text-muted-foreground italic">No calls made yet for this contact.</div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Mic className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Call History — {callLogs.length} {callLogs.length === 1 ? "attempt" : "attempts"}
+                    </span>
+                  </div>
+                  {callLogs.map(log => (
+                    <CallLogEntry key={log.id} log={log} campaignId={campaignId} onDeleted={() => qc.invalidateQueries({ queryKey: ["call-logs", contact.id] })} />
+                  ))}
+                </div>
+              )}
+            </div>
           </td>
         </tr>
       )}
