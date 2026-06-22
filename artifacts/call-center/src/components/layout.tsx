@@ -207,15 +207,27 @@ export function Layout({ children }: { children: ReactNode }) {
 
           {/* ── RECORDS ── */}
           <SectionLabel label="Records" />
-          <Link href="/calls" onClick={onNav} className={navCls("/calls")}>
+          <Link
+            href={contextCompany ? `/calls?companyId=${contextCompany.id}` : "/calls"}
+            onClick={onNav}
+            className={navCls(contextCompany ? `/calls?companyId=${contextCompany.id}` : "/calls")}
+          >
             <PhoneCall className="h-4 w-4 flex-shrink-0" />
             Call Logs
           </Link>
-          <Link href="/contacts" onClick={onNav} className={navCls("/contacts")}>
+          <Link
+            href={contextCompany ? `/contacts?companyId=${contextCompany.id}` : "/contacts"}
+            onClick={onNav}
+            className={navCls(contextCompany ? `/contacts?companyId=${contextCompany.id}` : "/contacts")}
+          >
             <Users className="h-4 w-4 flex-shrink-0" />
             Contacts
           </Link>
-          <Link href="/messages" onClick={onNav} className={navCls("/messages")}>
+          <Link
+            href={contextCompany ? `/messages?companyId=${contextCompany.id}` : "/messages"}
+            onClick={onNav}
+            className={navCls(contextCompany ? `/messages?companyId=${contextCompany.id}` : "/messages")}
+          >
             <MessageSquare className="h-4 w-4 flex-shrink-0" />
             Messages
           </Link>

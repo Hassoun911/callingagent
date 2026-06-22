@@ -81,7 +81,15 @@ export default function Messages() {
   const [replyText, setReplyText] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
 
-  const { data: numbers } = useListPhoneNumbers();
+  const scopedCompanyId = (() => {
+    const v = new URLSearchParams(window.location.search).get("companyId");
+    return v ? parseInt(v, 10) : null;
+  })();
+
+  const { data: allNumbers } = useListPhoneNumbers();
+  const numbers = scopedCompanyId !== null
+    ? allNumbers?.filter(n => (n as any).companyId === scopedCompanyId)
+    : allNumbers;
   const { data: allMessages, isLoading } = useListSmsMessages({ limit: 500 });
   const { mutateAsync: sendSms, isPending: sending } = useSendSms();
 
@@ -104,7 +112,10 @@ export default function Messages() {
     }
   }, [threadMessages.length, selected]);
 
+  const companyLineNumbers = new Set(numbers?.map(n => n.number) ?? []);
+
   const conversations = buildConversations(allMessages ?? []).filter(c => {
+    if (scopedCompanyId !== null && !companyLineNumbers.has(c.lineNumber)) return false;
     const matchSearch = !search ||
       formatPhone(c.contactNumber).includes(search) ||
       c.contactNumber.includes(search) ||
