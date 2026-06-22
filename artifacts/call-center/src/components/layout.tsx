@@ -190,6 +190,18 @@ export function Layout({ children }: { children: ReactNode }) {
                 <MessageSquare className="h-3 w-3 flex-shrink-0" />
                 Messages
               </Link>
+              <Link
+                href={`/settings?companyId=${contextCompany.id}`}
+                onClick={onNav}
+                className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${
+                  isActive(`/settings?companyId=${contextCompany.id}`)
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                <Settings className="h-3 w-3 flex-shrink-0" />
+                AI Settings
+              </Link>
               {allNumbers?.filter(n => n.companyId === contextCompany.id).map(n => {
                 const numActive = activeNumberId === n.id;
                 return (
@@ -231,10 +243,6 @@ export function Layout({ children }: { children: ReactNode }) {
 
           {/* ── SYSTEM ── */}
           <SectionLabel label="System" />
-          <Link href="/settings" onClick={onNav} className={navCls("/settings")}>
-            <Settings className="h-4 w-4 flex-shrink-0" />
-            AI Settings
-          </Link>
           <Link href="/billing" onClick={onNav} className={navCls("/billing")}>
             <CreditCard className="h-4 w-4 flex-shrink-0" />
             Billing
