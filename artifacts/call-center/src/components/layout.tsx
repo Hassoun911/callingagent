@@ -166,6 +166,30 @@ export function Layout({ children }: { children: ReactNode }) {
                 <Users className="h-3 w-3 flex-shrink-0" />
                 Contacts
               </Link>
+              <Link
+                href={`/calls?companyId=${contextCompany.id}`}
+                onClick={onNav}
+                className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${
+                  isActive(`/calls?companyId=${contextCompany.id}`)
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                <PhoneCall className="h-3 w-3 flex-shrink-0" />
+                Call Logs
+              </Link>
+              <Link
+                href={`/messages?companyId=${contextCompany.id}`}
+                onClick={onNav}
+                className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${
+                  isActive(`/messages?companyId=${contextCompany.id}`)
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                <MessageSquare className="h-3 w-3 flex-shrink-0" />
+                Messages
+              </Link>
               {allNumbers?.filter(n => n.companyId === contextCompany.id).map(n => {
                 const numActive = activeNumberId === n.id;
                 return (
@@ -204,33 +228,6 @@ export function Layout({ children }: { children: ReactNode }) {
               })}
             </div>
           )}
-
-          {/* ── RECORDS ── */}
-          <SectionLabel label="Records" />
-          <Link
-            href={contextCompany ? `/calls?companyId=${contextCompany.id}` : "/calls"}
-            onClick={onNav}
-            className={navCls(contextCompany ? `/calls?companyId=${contextCompany.id}` : "/calls")}
-          >
-            <PhoneCall className="h-4 w-4 flex-shrink-0" />
-            Call Logs
-          </Link>
-          <Link
-            href={contextCompany ? `/contacts?companyId=${contextCompany.id}` : "/contacts"}
-            onClick={onNav}
-            className={navCls(contextCompany ? `/contacts?companyId=${contextCompany.id}` : "/contacts")}
-          >
-            <Users className="h-4 w-4 flex-shrink-0" />
-            Contacts
-          </Link>
-          <Link
-            href={contextCompany ? `/messages?companyId=${contextCompany.id}` : "/messages"}
-            onClick={onNav}
-            className={navCls(contextCompany ? `/messages?companyId=${contextCompany.id}` : "/messages")}
-          >
-            <MessageSquare className="h-4 w-4 flex-shrink-0" />
-            Messages
-          </Link>
 
           {/* ── SYSTEM ── */}
           <SectionLabel label="System" />
