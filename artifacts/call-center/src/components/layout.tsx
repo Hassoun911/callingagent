@@ -154,6 +154,19 @@ export function Layout({ children }: { children: ReactNode }) {
                 <Building2 className="h-3 w-3 flex-shrink-0" />
                 <span className="truncate">{contextCompany.name}</span>
               </Link>
+              {/* Contacts scoped to this company */}
+              <Link
+                href={`/contacts?companyId=${contextCompany.id}`}
+                onClick={onNav}
+                className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-md text-xs transition-colors ${
+                  isActive(`/contacts?companyId=${contextCompany.id}`)
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                <Users className="h-3 w-3 flex-shrink-0" />
+                Contacts
+              </Link>
               {/* Each number with its own sub-items */}
               {allNumbers?.filter(n => n.companyId === contextCompany.id).map(n => {
                 const numActive = activeNumberId === n.id;

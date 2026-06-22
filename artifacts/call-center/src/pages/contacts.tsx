@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useLocation } from "wouter";
 import {
   useListContacts,
   useCreateContact,
@@ -15,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Plus, User, Building, Mail, Phone, Edit, Trash2, Upload, Globe, Lock } from "lucide-react";
+import { Search, Plus, User, Building, Mail, Phone, Edit, Trash2, Upload, Globe, Lock, Building2, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -81,9 +82,17 @@ function parseCSV(text: string): Array<{ firstName: string; lastName: string; ph
 }
 
 export default function Contacts() {
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
-  const { data: contacts, isLoading } = useListContacts({ search });
+
+  const scopedCompanyId = (() => {
+    const v = new URLSearchParams(window.location.search).get("companyId");
+    return v ? parseInt(v) : undefined;
+  })();
+
+  const { data: contacts, isLoading } = useListContacts({ search, companyId: scopedCompanyId });
   const { data: companies } = useListCompanies();
+  const scopedCompany = scopedCompanyId ? companies?.find(c => c.id === scopedCompanyId) : null;
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -274,8 +283,27 @@ export default function Contacts() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Contacts</h1>
-          <p className="text-muted-foreground mt-1">CRM contact library. Control which companies can use each contact in campaigns.</p>
+          {scopedCompany && (
+            <div className="flex items-center gap-2 mb-1.5">
+              <button
+                onClick={() => navigate(`/companies/${scopedCompany.id}`)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                {scopedCompany.name}
+              </button>
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
+              <span className="text-xs text-foreground font-medium">Contacts</span>
+            </div>
+          )}
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            {scopedCompany ? `${scopedCompany.name} Contacts` : "Contacts"}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {scopedCompany
+              ? `Contacts associated with ${scopedCompany.name}`
+              : "CRM contact library. Control which companies can use each contact in campaigns."}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <input
