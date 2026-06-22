@@ -103,8 +103,8 @@ export function Layout({ children }: { children: ReactNode }) {
             Companies
           </Link>
 
-          {/* Context: company name shown when drilling into a company or its numbers */}
-          {contextCompany && (
+          {/* Context: company name + its numbers shown when drilling into a company or its numbers */}
+          {contextCompany ? (
             <div className="ml-4 space-y-0.5">
               <Link
                 href={`/companies/${contextCompany.id}`}
@@ -115,27 +115,49 @@ export function Layout({ children }: { children: ReactNode }) {
                     : "text-primary/60 hover:text-primary hover:bg-primary/5"
                 }`}
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-current flex-shrink-0" />
+                <Building2 className="h-3 w-3 flex-shrink-0" />
                 <span className="truncate">{contextCompany.name}</span>
               </Link>
+              {/* Numbers linked to this company */}
+              {allNumbers?.filter(n => n.companyId === contextCompany.id).map(n => (
+                <Link
+                  key={n.id}
+                  href={`/numbers/${n.id}`}
+                  onClick={onNav}
+                  className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-md text-xs transition-colors truncate ${
+                    isActive(`/numbers/${n.id}`)
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  }`}
+                >
+                  <Phone className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate font-mono">{n.friendlyName || n.number}</span>
+                </Link>
+              ))}
+              {/* Campaigns */}
+              <Link href="/campaigns" onClick={onNav} className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-md text-xs transition-colors ${isActive("/campaigns") ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"}`}>
+                <Target className="h-3 w-3 flex-shrink-0" />
+                Campaigns
+              </Link>
             </div>
+          ) : (
+            <>
+              {/* Numbers */}
+              <div className="ml-4 space-y-0.5">
+                <Link href="/numbers" onClick={onNav} className={navCls("/numbers")}>
+                  <Phone className="h-4 w-4 flex-shrink-0" />
+                  Numbers
+                </Link>
+              </div>
+              {/* Campaigns */}
+              <div className="ml-8 space-y-0.5">
+                <Link href="/campaigns" onClick={onNav} className={navCls("/campaigns")}>
+                  <Target className="h-4 w-4 flex-shrink-0" />
+                  Campaigns
+                </Link>
+              </div>
+            </>
           )}
-
-          {/* Numbers */}
-          <div className="ml-4 space-y-0.5">
-            <Link href="/numbers" onClick={onNav} className={navCls("/numbers")}>
-              <Phone className="h-4 w-4 flex-shrink-0" />
-              Numbers
-            </Link>
-          </div>
-
-          {/* Campaigns */}
-          <div className="ml-8 space-y-0.5">
-            <Link href="/campaigns" onClick={onNav} className={navCls("/campaigns")}>
-              <Target className="h-4 w-4 flex-shrink-0" />
-              Campaigns
-            </Link>
-          </div>
 
           {/* ── RECORDS ── */}
           <SectionLabel label="Records" />

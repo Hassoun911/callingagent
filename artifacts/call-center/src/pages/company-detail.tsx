@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
-import { useQueryClient } from "@tanstack/react-query";
-import { useGetCompany, useUpdateCompany, getListCompaniesQueryKey, useListPhoneNumbers } from "@workspace/api-client-react";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import {
+  useGetCompany, useUpdateCompany, getListCompaniesQueryKey, useListPhoneNumbers,
+  useGetPhoneNumber, useUpdatePhoneNumber, getGetPhoneNumberQueryKey,
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,8 +24,8 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft, Building2, Phone, Globe, Mail, Edit, Plus, Trash2,
-  ChevronRight, Hash, PhoneForwarded, ToggleLeft, ToggleRight,
-  Users, Shield,
+  ChevronRight, Hash, PhoneForwarded, Bot, Voicemail, Ban, Target,
+  Settings2, Save, Loader2, Users, Shield, ChevronDown,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -79,6 +82,234 @@ async function setAnswerMode(phoneNumberId: number, answerMode: string): Promise
   });
 }
 
+function NumberConfigPanel({ numberId, companyName }: { numberId: number; companyName: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
+  const { data: number, isLoading } = useGetPhoneNumber(numberId);
+  const updateMutation = useUpdatePhoneNumber();
+  const initRef = useRef(false);
+
+  const [form, setForm] = useState<any>({});
+
+  const campaigns = useQuery({
+    queryKey: ["campaigns-for-number", numberId],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/campaigns?phoneNumberId=${numberId}`);
+      if (!r.ok) throw new Error("failed");
+      return r.json() as Promise<Array<{ id: number; name: string; status: string; totalContacts: number }>>;
+    },
+    enabled: !!numberId,
+  });
+
+  useEffect(() => {
+    initRef.current = false;
+  }, [numberId]);
+
+  useEffect(() => {
+    if (number && !initRef.current) {
+      setForm({
+        friendlyName: number.friendlyName || "",
+        callerIdName: number.callerIdName || "",
+        forwardTo: number.forwardTo || "",
+        ringCount: number.ringCount || 4,
+        answerMode: number.answerMode || "forward",
+        aiSystemPrompt: number.aiSystemPrompt || "",
+        aiGreeting: number.aiGreeting || "",
+        aiVoice: number.aiVoice || "",
+        voicemailGreeting: number.voicemailGreeting || "",
+        notificationEmail: number.notificationEmail || "",
+      });
+      initRef.current = true;
+    }
+  }, [number]);
+
+  function handleSave() {
+    updateMutation.mutate({ id: numberId, data: form }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetPhoneNumberQueryKey(numberId) });
+        toast({ title: "Number configuration saved" });
+      },
+      onError: (err: any) => {
+        toast({ title: "Save failed", description: err.message, variant: "destructive" });
+      },
+    });
+  }
+
+  if (isLoading) return <div className="p-4"><Skeleton className="h-32 w-full" /></div>;
+  if (!number) return null;
+
+  const mode = form.answerMode || "forward";
+
+  const MODES = [
+    { id: "forward",   label: "Forward",  icon: PhoneForwarded, color: "text-blue-400" },
+    { id: "ai_voice",  label: "AI Voice", icon: Bot,            color: "text-green-400" },
+    { id: "voicemail", label: "Voicemail",icon: Voicemail,      color: "text-yellow-400" },
+    { id: "ivr",       label: "IVR",      icon: Hash,           color: "text-purple-400" },
+    { id: "reject",    label: "Reject",   icon: Ban,            color: "text-red-400" },
+  ];
+
+  return (
+    <div className="border-t border-border/50 bg-secondary/10 p-5 space-y-5">
+      {/* Row 1: Friendly name + Caller ID */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Display Name</Label>
+          <Input
+            className="h-8 text-xs bg-background border-border"
+            value={form.friendlyName}
+            onChange={e => setForm((f: any) => ({ ...f, friendlyName: e.target.value }))}
+            placeholder="e.g. Sales Line"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Caller ID Name</Label>
+          <Input
+            className="h-8 text-xs bg-background border-border"
+            value={form.callerIdName}
+            onChange={e => setForm((f: any) => ({ ...f, callerIdName: e.target.value }))}
+            placeholder={companyName}
+          />
+        </div>
+      </div>
+
+      {/* Row 2: Answer Mode */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Answer Mode</Label>
+        <div className="flex flex-wrap gap-2">
+          {MODES.map(m => {
+            const Icon = m.icon;
+            const active = mode === m.id;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setForm((f: any) => ({ ...f, answerMode: m.id }))}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                  active
+                    ? `bg-primary/10 border-primary/40 text-primary`
+                    : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-border/80"
+                }`}
+              >
+                <Icon className={`h-3.5 w-3.5 ${active ? "text-primary" : m.color}`} />
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Mode-specific fields */}
+      {mode === "forward" && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Forward To</Label>
+            <Input
+              className="h-8 text-xs bg-background border-border font-mono"
+              value={form.forwardTo}
+              onChange={e => setForm((f: any) => ({ ...f, forwardTo: e.target.value }))}
+              placeholder="+1 555 000 0000"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Ring Count: {form.ringCount}</Label>
+            <input
+              type="range" min={1} max={10} value={form.ringCount}
+              onChange={e => setForm((f: any) => ({ ...f, ringCount: Number(e.target.value) }))}
+              className="w-full accent-primary h-1.5 mt-2"
+            />
+          </div>
+        </div>
+      )}
+
+      {mode === "ai_voice" && (
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">AI Greeting</Label>
+            <Input
+              className="h-8 text-xs bg-background border-border"
+              value={form.aiGreeting}
+              onChange={e => setForm((f: any) => ({ ...f, aiGreeting: e.target.value }))}
+              placeholder="Thank you for calling..."
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">AI System Prompt</Label>
+            <Textarea
+              className="text-xs bg-background border-border resize-none"
+              rows={4}
+              value={form.aiSystemPrompt}
+              onChange={e => setForm((f: any) => ({ ...f, aiSystemPrompt: e.target.value }))}
+              placeholder="You are a helpful assistant for..."
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Notification Email</Label>
+            <Input
+              className="h-8 text-xs bg-background border-border"
+              value={form.notificationEmail}
+              onChange={e => setForm((f: any) => ({ ...f, notificationEmail: e.target.value }))}
+              placeholder="alerts@company.com"
+            />
+          </div>
+        </div>
+      )}
+
+      {(mode === "voicemail" || mode === "ai_voice") && (
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Voicemail Greeting</Label>
+          <Input
+            className="h-8 text-xs bg-background border-border"
+            value={form.voicemailGreeting}
+            onChange={e => setForm((f: any) => ({ ...f, voicemailGreeting: e.target.value }))}
+            placeholder="Please leave a message..."
+          />
+        </div>
+      )}
+
+      {/* Campaigns */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <Target className="h-3.5 w-3.5" /> Campaigns
+            {campaigns.data && campaigns.data.length > 0 && (
+              <span className="ml-1 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold">{campaigns.data.length}</span>
+            )}
+          </Label>
+          <button
+            onClick={() => navigate(`/numbers/${numberId}`)}
+            className="text-xs text-primary hover:underline flex items-center gap-1"
+          >
+            Manage <ChevronRight className="h-3 w-3" />
+          </button>
+        </div>
+        {campaigns.data && campaigns.data.length > 0 ? (
+          <div className="space-y-1">
+            {campaigns.data.map(c => (
+              <div key={c.id} className="flex items-center justify-between bg-background border border-border rounded px-3 py-1.5 text-xs">
+                <span className="text-foreground font-medium">{c.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`capitalize text-[10px] px-1.5 py-0.5 rounded ${c.status === "active" ? "bg-green-500/10 text-green-400" : "bg-secondary text-muted-foreground"}`}>{c.status}</span>
+                  <button onClick={() => navigate(`/campaigns/${c.id}`)} className="text-primary hover:underline">Open</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">No campaigns yet.</p>
+        )}
+      </div>
+
+      {/* Save */}
+      <div className="flex justify-end pt-1">
+        <Button size="sm" className="h-7 text-xs gap-1.5" onClick={handleSave} disabled={updateMutation.isPending}>
+          {updateMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+          Save Changes
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function formatPhone(n: string) {
   const d = n.replace(/\D/g, "");
   if (d.length === 11 && d[0] === "1") return `+1 (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
@@ -110,6 +341,7 @@ export default function CompanyDetail() {
   const [linkDialog, setLinkDialog] = useState(false);
   const [selectedNumberId, setSelectedNumberId] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [expandedNumberId, setExpandedNumberId] = useState<number | null>(null);
 
   type PortalUser = { id: number; username: string; email: string | null; role: string; isActive: boolean };
   const [portalUsers, setPortalUsers] = useState<PortalUser[]>([]);
@@ -387,55 +619,63 @@ export default function CompanyDetail() {
           </div>
         ) : (
           <div className="divide-y divide-border/50">
-            {linkedNumbers.map(ln => (
-              <div key={ln.id} className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-mono text-sm font-medium">{formatPhone(ln.number)}</div>
-                    {ln.friendlyName && (
-                      <div className="text-xs text-muted-foreground mt-0.5">{ln.friendlyName}</div>
-                    )}
+            {linkedNumbers.map(ln => {
+              const isExpanded = expandedNumberId === ln.id;
+              return (
+                <div key={ln.id}>
+                  {/* Number header row */}
+                  <div className="p-4 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-mono text-sm font-medium">{formatPhone(ln.number)}</div>
+                      {ln.friendlyName && (
+                        <div className="text-xs text-muted-foreground mt-0.5">{ln.friendlyName}</div>
+                      )}
+                    </div>
+                    <Badge variant="outline" className={`text-[10px] flex-shrink-0 ${
+                      (ln.answerMode as string) === "ivr" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
+                      ln.answerMode === "forward" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                      ln.answerMode === "ai_voice" ? "bg-green-500/10 text-green-400 border-green-500/20" :
+                      "bg-secondary text-muted-foreground"
+                    }`}>
+                      {(ln.answerMode as string) === "ivr" ? "IVR" : ln.answerMode?.replace("_", " ")}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant={isExpanded ? "default" : "outline"}
+                      className="h-7 text-xs gap-1.5 flex-shrink-0"
+                      onClick={() => setExpandedNumberId(isExpanded ? null : ln.id)}
+                    >
+                      <Settings2 className="h-3.5 w-3.5" />
+                      Configure
+                      <ChevronDown className={`h-3 w-3 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground flex-shrink-0">
+                          Unlink
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-card border-border">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Unlink Phone Number</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will remove the association between {company.name} and {ln.number}. The number will still exist in your account.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleUnlinkNumber(ln.id)}>Unlink</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
-                  <Badge variant="outline" className={`text-[10px] ${
-                    (ln.answerMode as string) === "ivr" ? "bg-purple-500/10 text-purple-400 border-purple-500/20" :
-                    ln.answerMode === "forward" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                    ln.answerMode === "ai_voice" ? "bg-green-500/10 text-green-400 border-green-500/20" :
-                    "bg-secondary text-muted-foreground"
-                  }`}>
-                    {(ln.answerMode as string) === "ivr" ? "IVR / Extensions" : ln.answerMode}
-                  </Badge>
+                  {/* Inline config panel */}
+                  {isExpanded && (
+                    <NumberConfigPanel numberId={ln.id} companyName={company.name} />
+                  )}
                 </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant={(ln.answerMode as string) === "ivr" ? "default" : "outline"} className="h-7 text-xs gap-1" onClick={() => handleSetIvr(ln.id, "ivr")}>
-                    <Hash className="h-3.5 w-3.5" /> IVR / Extensions
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => navigate(`/numbers/${ln.id}`)}>
-                    Number &amp; Campaigns
-                    <ChevronRight className="h-3 w-3" />
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground gap-1 ml-auto">
-                        Unlink
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="bg-card border-border">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Unlink Phone Number</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will remove the association between {company.name} and {ln.number}. The number will still exist in your account.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleUnlinkNumber(ln.id)}>Unlink</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
