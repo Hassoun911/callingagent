@@ -205,18 +205,6 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           )}
 
-          {/* Phone Numbers — flat top-level link */}
-          <Link href="/numbers" onClick={onNav} className={navCls("/numbers")}>
-            <Phone className="h-4 w-4 flex-shrink-0" />
-            Phone Numbers
-          </Link>
-
-          {/* Campaigns — flat top-level link */}
-          <Link href="/campaigns" onClick={onNav} className={navCls("/campaigns")}>
-            <Target className="h-4 w-4 flex-shrink-0" />
-            Campaigns
-          </Link>
-
           {/* ── RECORDS ── */}
           <SectionLabel label="Records" />
           <Link href="/calls" onClick={onNav} className={navCls("/calls")}>
