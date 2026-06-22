@@ -1240,6 +1240,9 @@ export default function CampaignDetail() {
   if (!campaign) return <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">Campaign not found.</div>;
 
   const canStart = campaign.status !== "active" && campaign.status !== "completed" && (campaign.totalContacts ?? 0) > 0 && !!campaign.fromPhoneNumberId;
+  const scriptFullText = campaign.systemPrompt?.trim() || campaign.script || "";
+  const scriptFirstLine = scriptFullText.split("\n")[0] ?? "";
+  const scriptHasMore = scriptFullText.length > scriptFirstLine.length;
 
   return (
     <div className="space-y-5">
@@ -1386,13 +1389,18 @@ export default function CampaignDetail() {
           />
         ) : (
           <div
-            className="text-sm text-foreground leading-relaxed whitespace-pre-wrap cursor-pointer hover:opacity-80 transition-opacity"
+            className="text-sm text-foreground cursor-pointer hover:opacity-80 transition-opacity flex items-baseline gap-2 min-w-0"
             onClick={() => {
-              setScriptDraft(campaign.systemPrompt?.trim() || campaign.script || "");
+              setScriptDraft(scriptFullText);
               setEditingScript(true);
             }}
           >
-            {campaign.systemPrompt?.trim() || campaign.script || (
+            {scriptFullText ? (
+              <>
+                <span className="truncate">{scriptFirstLine}</span>
+                {scriptHasMore && <span className="text-[10px] text-muted-foreground flex-shrink-0">click to expand</span>}
+              </>
+            ) : (
               <span className="text-muted-foreground italic">No AI script configured. Click Edit to add instructions for the AI agent on this campaign.</span>
             )}
           </div>
