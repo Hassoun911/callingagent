@@ -759,6 +759,12 @@ export default function Campaigns() {
     return v ? parseInt(v) : null;
   })();
 
+  // Number scope from ?numberId= query param
+  const scopedNumberId = (() => {
+    const v = new URLSearchParams(window.location.search).get("numberId");
+    return v ? parseInt(v) : null;
+  })();
+
   const { data: companies = [] } = useListCompanies();
   const scopedCompany = scopedCompanyId ? companies.find(c => c.id === scopedCompanyId) : null;
 
@@ -773,6 +779,8 @@ export default function Campaigns() {
     queryFn: fetchPhoneNumbers,
   });
 
+  const scopedNumber = scopedNumberId ? phoneNumbers.find(n => n.id === scopedNumberId) : null;
+
   // When scoped to a company, only show campaigns linked to that company's numbers
   const companyLinkedNumberIds = useMemo(() => {
     if (!scopedCompanyId) return null;
@@ -784,9 +792,13 @@ export default function Campaigns() {
   const companyHasNoLinkedNumbers = scopedCompanyId != null && companyLinkedNumberIds != null && companyLinkedNumberIds.size === 0;
 
   const visibleCampaigns = useMemo(() => {
+    // Narrowest scope first: specific number
+    if (scopedNumberId) {
+      return campaigns.filter(c => c.fromPhoneNumberId === scopedNumberId);
+    }
     if (!scopedCompanyId || companyHasNoLinkedNumbers) return campaigns;
     return campaigns.filter(c => c.fromPhoneNumberId != null && companyLinkedNumberIds!.has(c.fromPhoneNumberId));
-  }, [campaigns, companyLinkedNumberIds, scopedCompanyId, companyHasNoLinkedNumbers]);
+  }, [campaigns, companyLinkedNumberIds, scopedCompanyId, companyHasNoLinkedNumbers, scopedNumberId]);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof form) => {
@@ -888,15 +900,33 @@ export default function Campaigns() {
                 <Building2 className="h-3.5 w-3.5" />
                 {scopedCompany.name}
               </button>
+              {scopedNumber && (
+                <>
+                  <span className="text-muted-foreground/40 text-xs">/</span>
+                  <button
+                    onClick={() => navigate(`/numbers/${scopedNumber.id}`)}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors font-mono"
+                  >
+                    <Phone className="h-3.5 w-3.5" />
+                    {scopedNumber.number}
+                  </button>
+                </>
+              )}
               <span className="text-muted-foreground/40 text-xs">/</span>
               <span className="text-xs text-foreground font-medium">Campaigns</span>
             </div>
           )}
           <h1 className="text-2xl font-bold tracking-tight text-green-400">
-            {scopedCompany ? `${scopedCompany.name} Campaigns` : "Campaigns"}
+            {scopedNumber
+              ? `Campaigns — ${scopedNumber.friendlyName || scopedNumber.number}`
+              : scopedCompany
+              ? `${scopedCompany.name} Campaigns`
+              : "Campaigns"}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {scopedCompany
+            {scopedNumber
+              ? `Outbound campaigns running from ${scopedNumber.number}`
+              : scopedCompany
               ? `Outbound campaigns running on ${scopedCompany.name}'s phone numbers`
               : "Outbound cold calling — AI-powered seller qualification"}
           </p>
@@ -993,7 +1023,7 @@ export default function Campaigns() {
                     >
                       <td className="px-4 py-3">
                         <Link
-                          href={`/campaigns/${c.id}${scopedCompanyId ? `?companyId=${scopedCompanyId}` : ""}`}
+                          href={`/campaigns/${c.id}${scopedCompanyId ? `?companyId=${scopedCompanyId}${scopedNumberId ? `&numberId=${scopedNumberId}` : ""}` : ""}`}
                           className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1.5 group"
                         >
                           {c.name}

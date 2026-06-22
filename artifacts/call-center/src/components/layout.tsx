@@ -54,10 +54,33 @@ export function Layout({ children }: { children: ReactNode }) {
   })();
   const contextCompany = activeCompanyId ? companies?.find(c => c.id === activeCompanyId) : null;
 
+  // Active number: from /numbers/:id URL or ?numberId= param
+  const activeNumberId = (() => {
+    const nm = location.match(/^\/numbers\/(\d+)/);
+    if (nm) return parseInt(nm[1]);
+    const qp = new URLSearchParams(window.location.search).get("numberId");
+    if (qp) return parseInt(qp);
+    return null;
+  })();
+
+  function formatPhone(raw: string): string {
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length === 11 && digits[0] === "1") {
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+    return raw;
+  }
+
   function isActive(href: string) {
     const [hrefPath, hrefSearch] = href.split("?");
     if (hrefSearch) {
-      return location === hrefPath && window.location.search.includes(hrefSearch);
+      if (location !== hrefPath) return false;
+      const hrefParams = new URLSearchParams(hrefSearch);
+      const curParams = new URLSearchParams(window.location.search);
+      for (const [k, v] of hrefParams.entries()) {
+        if (curParams.get(k) !== v) return false;
+      }
+      return true;
     }
     // When there's a ?companyId= param active, don't highlight the generic top-level links
     if (
@@ -131,31 +154,44 @@ export function Layout({ children }: { children: ReactNode }) {
                 <Building2 className="h-3 w-3 flex-shrink-0" />
                 <span className="truncate">{contextCompany.name}</span>
               </Link>
-              {/* Numbers linked to this company */}
-              {allNumbers?.filter(n => n.companyId === contextCompany.id).map(n => (
-                <Link
-                  key={n.id}
-                  href={`/numbers/${n.id}`}
-                  onClick={onNav}
-                  className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-md text-xs transition-colors truncate ${
-                    isActive(`/numbers/${n.id}`)
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                  }`}
-                >
-                  <Phone className="h-3 w-3 flex-shrink-0" />
-                  <span className="truncate font-mono">{n.friendlyName || n.number}</span>
-                </Link>
-              ))}
-              {/* Campaigns — scoped to this company */}
-              <Link
-                href={`/campaigns?companyId=${contextCompany.id}`}
-                onClick={onNav}
-                className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-md text-xs transition-colors ${isActive(`/campaigns?companyId=${contextCompany.id}`) ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"}`}
-              >
-                <Target className="h-3 w-3 flex-shrink-0" />
-                Campaigns
-              </Link>
+              {/* Each number with its own sub-items */}
+              {allNumbers?.filter(n => n.companyId === contextCompany.id).map(n => {
+                const numActive = activeNumberId === n.id;
+                return (
+                  <div key={n.id} className="ml-2 space-y-0.5">
+                    <Link
+                      href={`/numbers/${n.id}`}
+                      onClick={onNav}
+                      className={`flex items-start gap-2 px-3 py-1.5 rounded-md text-xs transition-colors ${
+                        numActive
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                      }`}
+                    >
+                      <Phone className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <div className="font-mono truncate">{formatPhone(n.number)}</div>
+                        {n.friendlyName && (
+                          <div className="text-[10px] text-muted-foreground/70 truncate">{n.friendlyName}</div>
+                        )}
+                      </div>
+                    </Link>
+                    {/* Campaigns scoped to this number */}
+                    <Link
+                      href={`/campaigns?companyId=${contextCompany.id}&numberId=${n.id}`}
+                      onClick={onNav}
+                      className={`flex items-center gap-2 px-3 py-1 ml-3 rounded-md text-xs transition-colors ${
+                        isActive(`/campaigns?companyId=${contextCompany.id}&numberId=${n.id}`)
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                      }`}
+                    >
+                      <Target className="h-3 w-3 flex-shrink-0" />
+                      Campaigns
+                    </Link>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <>

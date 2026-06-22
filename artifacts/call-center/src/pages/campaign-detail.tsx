@@ -1055,6 +1055,7 @@ export default function CampaignDetail() {
   const [, navigate] = useLocation();
   const scopedCompanyId = new URLSearchParams(window.location.search).get("companyId");
   const scopedCompanyIdNum = scopedCompanyId ? parseInt(scopedCompanyId, 10) : null;
+  const scopedNumberId = new URLSearchParams(window.location.search).get("numberId");
   const qc = useQueryClient();
   const { toast } = useToast();
   const [showAddContact, setShowAddContact] = useState(false);
@@ -1249,14 +1250,27 @@ export default function CampaignDetail() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
-          <Button variant="ghost" size="sm" className="h-8 w-8 px-0 mt-0.5" onClick={() => navigate(scopedCompanyId ? `/campaigns?companyId=${scopedCompanyId}` : "/campaigns")}>
+          <Button variant="ghost" size="sm" className="h-8 w-8 px-0 mt-0.5" onClick={() => {
+            if (scopedCompanyId) {
+              const qs = scopedNumberId ? `?companyId=${scopedCompanyId}&numberId=${scopedNumberId}` : `?companyId=${scopedCompanyId}`;
+              navigate(`/campaigns${qs}`);
+            } else {
+              navigate("/campaigns");
+            }
+          }}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
             {scopedCompanyId && (
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-0.5">
                 <Building2 className="h-3 w-3" />
-                <span>Company</span>
+                <span>{scopedCompany?.name ?? "Company"}</span>
+                {scopedNumberId && (
+                  <>
+                    <ChevronRight className="h-3 w-3" />
+                    <span className="font-mono">{phoneNumbers.find(p => p.id === parseInt(scopedNumberId, 10))?.number ?? "Number"}</span>
+                  </>
+                )}
                 <ChevronRight className="h-3 w-3" />
                 <span>Campaigns</span>
                 <ChevronRight className="h-3 w-3" />
