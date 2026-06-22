@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, contactsTable, companiesTable } from "@workspace/db";
+import { getCompanyScope } from "../lib/scope";
 import {
   ListContactsResponse,
   ListContactsQueryParams,
@@ -22,7 +23,14 @@ router.get("/contacts", async (req, res): Promise<void> => {
     return;
   }
 
-  const { search, companyId, forCompanyId } = query.data;
+  const { search, forCompanyId } = query.data;
+  let { companyId } = query.data;
+
+  // Company-scoped users can only see their own company's contacts
+  const scopedCompanyId = getCompanyScope(req);
+  if (scopedCompanyId !== null) {
+    companyId = scopedCompanyId;
+  }
 
   let contacts = await db
     .select({

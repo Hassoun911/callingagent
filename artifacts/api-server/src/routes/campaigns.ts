@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc, sql, or } from "drizzle-orm";
+import { getCompanyScope } from "../lib/scope";
 import {
   db,
   campaignsTable,
@@ -334,9 +335,27 @@ router.post("/campaigns/test-email", async (req, res): Promise<void> => {
 router.get("/campaigns", async (req, res): Promise<void> => {
   try {
     const phoneNumberId = req.query.phoneNumberId ? parseInt(req.query.phoneNumberId as string, 10) : null;
-    const campaigns = phoneNumberId
+
+    // Company-scoped users can only see campaigns for their own phone numbers
+    const companyId = getCompanyScope(req);
+    let allowedNumberIds: number[] | null = null;
+    if (companyId !== null) {
+      const myNumbers = await db
+        .select({ id: phoneNumbersTable.id })
+        .from(phoneNumbersTable)
+        .where(eq(phoneNumbersTable.companyId, companyId));
+      allowedNumberIds = myNumbers.map(n => n.id);
+    }
+
+    let campaigns = phoneNumberId
       ? await db.select().from(campaignsTable).where(eq(campaignsTable.fromPhoneNumberId, phoneNumberId)).orderBy(desc(campaignsTable.createdAt))
       : await db.select().from(campaignsTable).orderBy(desc(campaignsTable.createdAt));
+
+    if (allowedNumberIds !== null) {
+      campaigns = campaigns.filter(c =>
+        c.fromPhoneNumberId !== null && allowedNumberIds!.includes(c.fromPhoneNumberId)
+      );
+    }
     const counts = await db
       .select({
         campaignId: campaignContactsTable.campaignId,

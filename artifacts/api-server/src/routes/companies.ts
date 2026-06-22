@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, companiesTable } from "@workspace/db";
+import { getCompanyScope, isCompanyScoped, isCompanyAdmin } from "../lib/scope";
 import {
   ListCompaniesResponse,
   GetCompanyResponse,
@@ -14,8 +15,12 @@ import {
 
 const router: IRouter = Router();
 
-router.get("/companies", async (_req, res): Promise<void> => {
-  const companies = await db.select().from(companiesTable).orderBy(desc(companiesTable.createdAt));
+router.get("/companies", async (req, res): Promise<void> => {
+  const companyId = getCompanyScope(req);
+  let companies = await db.select().from(companiesTable).orderBy(desc(companiesTable.createdAt));
+  if (companyId !== null) {
+    companies = companies.filter(c => c.id === companyId);
+  }
   res.json(ListCompaniesResponse.parse(companies.map(c => ({
     ...c,
     createdAt: c.createdAt.toISOString(),
@@ -23,6 +28,10 @@ router.get("/companies", async (_req, res): Promise<void> => {
 });
 
 router.post("/companies", async (req, res): Promise<void> => {
+  if (isCompanyScoped(req)) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
   const parsed = CreateCompanyBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -40,6 +49,12 @@ router.get("/companies/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const companyId = getCompanyScope(req);
+  if (companyId !== null && params.data.id !== companyId) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
   const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, params.data.id));
   if (!company) {
     res.status(404).json({ error: "Company not found" });
@@ -53,6 +68,12 @@ router.patch("/companies/:id", async (req, res): Promise<void> => {
   const params = UpdateCompanyParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const companyId = getCompanyScope(req);
+  if (companyId !== null && (!isCompanyAdmin(req) || params.data.id !== companyId)) {
+    res.status(403).json({ error: "Access denied" });
     return;
   }
 
@@ -85,6 +106,11 @@ router.patch("/companies/:id", async (req, res): Promise<void> => {
 });
 
 router.delete("/companies/:id", async (req, res): Promise<void> => {
+  if (isCompanyScoped(req)) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
   const params = DeleteCompanyParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

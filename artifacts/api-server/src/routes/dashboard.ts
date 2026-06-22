@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
-import { desc, eq, gte, sql } from "drizzle-orm";
+import { desc, eq, gte, sql, inArray } from "drizzle-orm";
+import { getCompanyScope } from "../lib/scope";
 import {
   db,
   phoneNumbersTable,
@@ -18,33 +19,77 @@ import {
 
 const router: IRouter = Router();
 
-router.get("/dashboard/stats", async (_req, res): Promise<void> => {
-  const [phoneStats] = await db.select({
-    totalNumbers: sql<number>`count(*)::int`,
-    activeNumbers: sql<number>`count(*) filter (where ${phoneNumbersTable.isActive})::int`,
-  }).from(phoneNumbersTable);
+router.get("/dashboard/stats", async (req, res): Promise<void> => {
+  const companyId = getCompanyScope(req);
+
+  // Resolve which phone number IDs to scope to
+  let scopedNumberIds: number[] | null = null;
+  if (companyId !== null) {
+    const myNumbers = await db
+      .select({ id: phoneNumbersTable.id })
+      .from(phoneNumbersTable)
+      .where(eq(phoneNumbersTable.companyId, companyId));
+    scopedNumberIds = myNumbers.map(n => n.id);
+  }
+
+  const phoneNumbersQuery = companyId !== null
+    ? db.select({
+        totalNumbers: sql<number>`count(*)::int`,
+        activeNumbers: sql<number>`count(*) filter (where ${phoneNumbersTable.isActive})::int`,
+      }).from(phoneNumbersTable).where(eq(phoneNumbersTable.companyId, companyId))
+    : db.select({
+        totalNumbers: sql<number>`count(*)::int`,
+        activeNumbers: sql<number>`count(*) filter (where ${phoneNumbersTable.isActive})::int`,
+      }).from(phoneNumbersTable);
+
+  const [phoneStats] = await phoneNumbersQuery;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [callStats] = await db.select({
-    totalCalls: sql<number>`count(*)::int`,
-    callsToday: sql<number>`count(*) filter (where ${callLogsTable.createdAt} >= ${today.toISOString()})::int`,
-    avgDuration: sql<number>`coalesce(avg(${callLogsTable.duration}) filter (where ${callLogsTable.duration} is not null), 0)::int`,
-    inboundCalls: sql<number>`count(*) filter (where ${callLogsTable.direction} = 'inbound')::int`,
-    outboundCalls: sql<number>`count(*) filter (where ${callLogsTable.direction} = 'outbound')::int`,
-    aiAnswered: sql<number>`count(*) filter (where ${callLogsTable.answerMode} = 'ai_voice')::int`,
-    voicemailCount: sql<number>`count(*) filter (where ${callLogsTable.answerMode} = 'voicemail')::int`,
-    forwardedCalls: sql<number>`count(*) filter (where ${callLogsTable.answerMode} = 'forward')::int`,
-  }).from(callLogsTable);
+  const callLogsQuery = scopedNumberIds !== null && scopedNumberIds.length > 0
+    ? db.select({
+        totalCalls: sql<number>`count(*)::int`,
+        callsToday: sql<number>`count(*) filter (where ${callLogsTable.createdAt} >= ${today.toISOString()})::int`,
+        avgDuration: sql<number>`coalesce(avg(${callLogsTable.duration}) filter (where ${callLogsTable.duration} is not null), 0)::int`,
+        inboundCalls: sql<number>`count(*) filter (where ${callLogsTable.direction} = 'inbound')::int`,
+        outboundCalls: sql<number>`count(*) filter (where ${callLogsTable.direction} = 'outbound')::int`,
+        aiAnswered: sql<number>`count(*) filter (where ${callLogsTable.answerMode} = 'ai_voice')::int`,
+        voicemailCount: sql<number>`count(*) filter (where ${callLogsTable.answerMode} = 'voicemail')::int`,
+        forwardedCalls: sql<number>`count(*) filter (where ${callLogsTable.answerMode} = 'forward')::int`,
+      }).from(callLogsTable).where(inArray(callLogsTable.phoneNumberId, scopedNumberIds))
+    : scopedNumberIds !== null
+      ? db.select({
+          totalCalls: sql<number>`0::int`,
+          callsToday: sql<number>`0::int`,
+          avgDuration: sql<number>`0::int`,
+          inboundCalls: sql<number>`0::int`,
+          outboundCalls: sql<number>`0::int`,
+          aiAnswered: sql<number>`0::int`,
+          voicemailCount: sql<number>`0::int`,
+          forwardedCalls: sql<number>`0::int`,
+        }).from(callLogsTable).limit(1)
+      : db.select({
+          totalCalls: sql<number>`count(*)::int`,
+          callsToday: sql<number>`count(*) filter (where ${callLogsTable.createdAt} >= ${today.toISOString()})::int`,
+          avgDuration: sql<number>`coalesce(avg(${callLogsTable.duration}) filter (where ${callLogsTable.duration} is not null), 0)::int`,
+          inboundCalls: sql<number>`count(*) filter (where ${callLogsTable.direction} = 'inbound')::int`,
+          outboundCalls: sql<number>`count(*) filter (where ${callLogsTable.direction} = 'outbound')::int`,
+          aiAnswered: sql<number>`count(*) filter (where ${callLogsTable.answerMode} = 'ai_voice')::int`,
+          voicemailCount: sql<number>`count(*) filter (where ${callLogsTable.answerMode} = 'voicemail')::int`,
+          forwardedCalls: sql<number>`count(*) filter (where ${callLogsTable.answerMode} = 'forward')::int`,
+        }).from(callLogsTable);
 
-  const [contactCount] = await db.select({
-    totalContacts: sql<number>`count(*)::int`,
-  }).from(contactsTable);
+  const [callStats] = await callLogsQuery;
 
-  const [companyCount] = await db.select({
-    totalCompanies: sql<number>`count(*)::int`,
-  }).from(companiesTable);
+  const contactsQuery = companyId !== null
+    ? db.select({ totalContacts: sql<number>`count(*)::int` }).from(contactsTable).where(eq(contactsTable.companyId, companyId))
+    : db.select({ totalContacts: sql<number>`count(*)::int` }).from(contactsTable);
+  const [contactCount] = await contactsQuery;
+
+  const [companyCount] = companyId !== null
+    ? [{ totalCompanies: 1 }]
+    : await db.select({ totalCompanies: sql<number>`count(*)::int` }).from(companiesTable);
 
   res.json(GetDashboardStatsResponse.parse({
     totalNumbers: phoneStats?.totalNumbers ?? 0,

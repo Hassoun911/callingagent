@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, phoneNumbersTable } from "@workspace/db";
+import { getCompanyScope } from "../lib/scope";
 import {
   ListPhoneNumbersResponse,
   GetPhoneNumberResponse,
@@ -37,7 +38,11 @@ function getBaseUrl(req: any): string {
 }
 
 router.get("/phone-numbers", async (req, res): Promise<void> => {
-  const numbers = await db.select().from(phoneNumbersTable).orderBy(desc(phoneNumbersTable.createdAt));
+  const companyId = getCompanyScope(req);
+  let numbers = await db.select().from(phoneNumbersTable).orderBy(desc(phoneNumbersTable.createdAt));
+  if (companyId !== null) {
+    numbers = numbers.filter(n => n.companyId === companyId);
+  }
   res.json(ListPhoneNumbersResponse.parse(numbers.map(n => ({
     ...n,
     createdAt: n.createdAt.toISOString(),
@@ -282,6 +287,12 @@ router.get("/phone-numbers/:id", async (req, res): Promise<void> => {
   const [number] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, params.data.id));
   if (!number) {
     res.status(404).json({ error: "Phone number not found" });
+    return;
+  }
+
+  const companyId = getCompanyScope(req);
+  if (companyId !== null && number.companyId !== companyId) {
+    res.status(403).json({ error: "Access denied" });
     return;
   }
 

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
-import { db, callLogsTable } from "@workspace/db";
+import { eq, desc, inArray } from "drizzle-orm";
+import { db, callLogsTable, phoneNumbersTable } from "@workspace/db";
+import { getCompanyScope } from "../lib/scope";
 import {
   ListCallLogsResponse,
   ListCallLogsQueryParams,
@@ -29,8 +30,22 @@ router.get("/call-logs", async (req, res): Promise<void> => {
 
   const { phoneNumberId, direction, status, limit = 50 } = query.data;
 
+  // Determine which phone number IDs this user is allowed to see
+  const companyId = getCompanyScope(req);
+  let allowedNumberIds: number[] | null = null;
+  if (companyId !== null) {
+    const myNumbers = await db
+      .select({ id: phoneNumbersTable.id })
+      .from(phoneNumbersTable)
+      .where(eq(phoneNumbersTable.companyId, companyId));
+    allowedNumberIds = myNumbers.map(n => n.id);
+  }
+
   let logs = await db.select().from(callLogsTable).orderBy(desc(callLogsTable.createdAt)).limit(limit);
 
+  if (allowedNumberIds !== null) {
+    logs = logs.filter(l => l.phoneNumberId !== null && allowedNumberIds!.includes(l.phoneNumberId));
+  }
   if (phoneNumberId) logs = logs.filter(l => l.phoneNumberId === phoneNumberId);
   if (direction) logs = logs.filter(l => l.direction === direction);
   if (status) logs = logs.filter(l => l.status === status);
