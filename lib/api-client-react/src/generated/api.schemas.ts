@@ -1083,6 +1083,10 @@ direction?: ListCallLogsDirection;
  * @nullable
  */
 status?: string | null;
+/**
+ * @nullable
+ */
+companyId?: number | null;
 limit?: number;
 };
 

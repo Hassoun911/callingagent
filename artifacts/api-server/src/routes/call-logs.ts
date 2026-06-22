@@ -28,16 +28,19 @@ router.get("/call-logs", async (req, res): Promise<void> => {
     return;
   }
 
-  const { phoneNumberId, direction, status, limit = 50 } = query.data;
+  const { phoneNumberId, direction, status, limit = 50, companyId: filterCompanyId } = query.data;
 
   // Determine which phone number IDs this user is allowed to see
-  const companyId = getCompanyScope(req);
+  const scopedCompanyId = getCompanyScope(req);
+  // Super-admin can optionally filter by a specific company via query param
+  const effectiveCompanyId = scopedCompanyId ?? filterCompanyId ?? null;
+
   let allowedNumberIds: number[] | null = null;
-  if (companyId !== null) {
+  if (effectiveCompanyId !== null) {
     const myNumbers = await db
       .select({ id: phoneNumbersTable.id })
       .from(phoneNumbersTable)
-      .where(eq(phoneNumbersTable.companyId, companyId));
+      .where(eq(phoneNumbersTable.companyId, effectiveCompanyId));
     allowedNumberIds = myNumbers.map(n => n.id);
   }
 

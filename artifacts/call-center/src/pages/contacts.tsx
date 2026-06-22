@@ -176,7 +176,7 @@ export default function Contacts() {
       });
     } else {
       setEditingContact(null);
-      setFormData({ firstName: "", lastName: "", email: "", phone: "", companyId: "none", tags: "", accessType: "all", allowedCompanyIds: [] });
+      setFormData({ firstName: "", lastName: "", email: "", phone: "", companyId: scopedCompanyId ? scopedCompanyId.toString() : "none", tags: "", accessType: "all", allowedCompanyIds: [] });
     }
     setDialogOpen(true);
   }

@@ -490,6 +490,7 @@ export const ListCallLogsQueryParams = zod.object({
   "phoneNumberId": zod.coerce.number().nullish(),
   "direction": zod.union([zod.literal('inbound'),zod.literal('outbound'),zod.literal(null)]).nullish(),
   "status": zod.coerce.string().nullish(),
+  "companyId": zod.coerce.number().nullish(),
   "limit": zod.coerce.number().default(listCallLogsQueryLimitDefault)
 })
 
