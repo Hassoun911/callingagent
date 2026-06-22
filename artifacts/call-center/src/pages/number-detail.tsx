@@ -673,7 +673,7 @@ export default function NumberDetail() {
                   {twilioStatus.dateCreated && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Purchased</span>
-                      <span className="text-xs font-mono">{new Date(twilioStatus.dateCreated).toLocaleDateString()}</span>
+                      <span className="text-xs font-mono">{new Date(twilioStatus.dateCreated).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" })}</span>
                     </div>
                   )}
                   <div className="pt-1 border-t border-border">

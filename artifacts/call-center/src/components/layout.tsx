@@ -285,7 +285,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <NotificationBell />
             <div className="hidden sm:block font-mono text-xs text-muted-foreground">
               {new Date().toLocaleTimeString("en-US", {
-                timeZone: "America/Toronto",
+                timeZone: "America/New_York",
                 hour: "2-digit",
                 minute: "2-digit",
                 second: "2-digit",

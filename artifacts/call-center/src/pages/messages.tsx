@@ -26,18 +26,20 @@ function formatPhone(raw: string | null | undefined): string {
   return raw;
 }
 
+const ET = "America/New_York";
+
 function formatTime(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
-  if (diffDays === 0) return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 0) return d.toLocaleTimeString("en-US", { timeZone: ET, hour: "2-digit", minute: "2-digit" });
   if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return d.toLocaleDateString("en-US", { weekday: "short" });
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (diffDays < 7) return d.toLocaleDateString("en-US", { timeZone: ET, weekday: "short" });
+  return d.toLocaleDateString("en-US", { timeZone: ET, month: "short", day: "numeric" });
 }
 
 function formatFull(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("en-US", { timeZone: ET, hour: "2-digit", minute: "2-digit" });
 }
 
 interface Conversation {

@@ -610,7 +610,7 @@ function CalendarTab() {
                   <span className="text-xs text-muted-foreground flex-1 truncate text-right">{e.campaignName}</span>
                   {dateStr && (
                     <span className="text-xs text-muted-foreground font-mono flex-shrink-0">
-                      {new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                      {new Date(dateStr).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })}
                     </span>
                   )}
                   {e.calendarNotes && (
@@ -618,7 +618,7 @@ function CalendarTab() {
                   )}
                   {e.callbackAt && (
                     <span className="text-[10px] bg-orange-500/10 text-orange-400 px-1.5 py-0.5 rounded flex-shrink-0">
-                      {new Date(e.callbackAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(e.callbackAt).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" })}
                     </span>
                   )}
                 </div>
@@ -993,7 +993,7 @@ export default function Campaigns() {
                     >
                       <td className="px-4 py-3">
                         <Link
-                          href={`/campaigns/${c.id}`}
+                          href={`/campaigns/${c.id}${scopedCompanyId ? `?companyId=${scopedCompanyId}` : ""}`}
                           className="font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1.5 group"
                         >
                           {c.name}
@@ -1024,7 +1024,7 @@ export default function Campaigns() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {new Date(c.createdAt).toLocaleDateString()}
+                        {new Date(c.createdAt).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" })}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center gap-1.5 justify-end">
@@ -1060,7 +1060,7 @@ export default function Campaigns() {
                           >
                             <CalendarClock className="h-3.5 w-3.5" />
                           </Button>
-                          <Link href={`/campaigns/${c.id}`}>
+                          <Link href={`/campaigns/${c.id}${scopedCompanyId ? `?companyId=${scopedCompanyId}` : ""}`}>
                             <Button size="sm" variant="ghost" className="h-7 px-2.5 text-xs gap-1">
                               <Users className="h-3 w-3" />
                               Contacts

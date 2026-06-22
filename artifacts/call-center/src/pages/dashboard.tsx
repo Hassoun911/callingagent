@@ -340,8 +340,8 @@ export default function Dashboard() {
                       </div>
                       {dateStr && (
                         <div className={`text-[10px] mt-0.5 ${isToday ? "text-orange-400 font-semibold" : "text-muted-foreground"}`}>
-                          {isToday ? "Today" : new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                          {e.callbackAt && ` · ${new Date(e.callbackAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`}
+                          {isToday ? "Today" : new Date(dateStr).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })}
+                          {e.callbackAt && ` · ${new Date(e.callbackAt).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" })}`}
                         </div>
                       )}
                     </div>
@@ -475,7 +475,8 @@ export default function Dashboard() {
                               </>
                             )}
                             <span>
-                              {new Date(call.createdAt).toLocaleString(undefined, {
+                              {new Date(call.createdAt).toLocaleString("en-US", {
+                                timeZone: "America/New_York",
                                 month: "short", day: "numeric",
                                 hour: "2-digit", minute: "2-digit",
                               })}

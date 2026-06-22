@@ -100,7 +100,7 @@ export default function Billing() {
       {currency === "CAD" && fxData && (
         <p className="text-[11px] text-muted-foreground -mt-3">
           Rate: 1 USD = {fxData.rate.toFixed(4)} CAD
-          {fxData.updatedAt ? ` · ${new Date(fxData.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
+          {fxData.updatedAt ? ` · ${new Date(fxData.updatedAt).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" })}` : ""}
         </p>
       )}
 

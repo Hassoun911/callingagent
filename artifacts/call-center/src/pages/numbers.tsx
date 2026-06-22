@@ -530,7 +530,7 @@ export default function Numbers() {
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {w.lastChecked
-                      ? `Last checked ${new Date(w.lastChecked).toLocaleTimeString()}`
+                      ? `Last checked ${new Date(w.lastChecked).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" })}`
                       : "Not yet checked"}
                     {w.foundNumbers.length > 0 && ` · ${w.foundNumbers.length} numbers available`}
                   </p>

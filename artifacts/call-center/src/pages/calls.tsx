@@ -626,7 +626,7 @@ export default function Calls() {
               >
                 <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                   {new Date(call.createdAt).toLocaleString("en-US", {
-                    timeZone: "America/Toronto",
+                    timeZone: "America/New_York",
                     month: "short", day: "numeric",
                     hour: "numeric", minute: "2-digit",
                   })}

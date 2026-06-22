@@ -22,7 +22,7 @@ import {
   ArrowLeft, Play, Pause, Phone, Trash2, Plus, Upload,
   ChevronDown, ChevronRight, ChevronLeft, CheckCircle2, XCircle, Clock,
   PhoneOff, AlertCircle, Volume2, RefreshCw, Settings2, FileText,
-  Calendar, Mic, Maximize2, Copy, Check, Download, CalendarClock, Pencil, X, Bot, Users2, Search,
+  Calendar, Mic, Maximize2, Copy, Check, Download, CalendarClock, Pencil, X, Bot, Users2, Search, Building2,
 } from "lucide-react";
 
 interface Campaign {
@@ -153,14 +153,14 @@ function formatTime(secs: number): string {
 }
 
 function formatDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" });
+  return new Date(iso).toLocaleDateString("en-US", {
+    timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric",
+  });
 }
 
 function formatDateTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleString("en-CA", {
-    month: "short", day: "numeric",
+  return new Date(iso).toLocaleString("en-US", {
+    timeZone: "America/New_York", month: "short", day: "numeric",
     hour: "2-digit", minute: "2-digit", hour12: true,
   });
 }
@@ -1053,6 +1053,8 @@ export default function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
   const campaignId = parseInt(id, 10);
   const [, navigate] = useLocation();
+  const scopedCompanyId = new URLSearchParams(window.location.search).get("companyId");
+  const scopedCompanyIdNum = scopedCompanyId ? parseInt(scopedCompanyId, 10) : null;
   const qc = useQueryClient();
   const { toast } = useToast();
   const [showAddContact, setShowAddContact] = useState(false);
@@ -1068,6 +1070,9 @@ export default function CampaignDetail() {
   const [importText, setImportText] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "completed" | "interested" | "no_answer" | "skipped">("all");
   const [searchTerm, setSearchTerm] = useState("");
+
+  const { data: companies = [] } = useListCompanies();
+  const scopedCompany = scopedCompanyIdNum ? companies.find((c: any) => c.id === scopedCompanyIdNum) : null;
 
   const { data: campaign, isLoading: campLoading } = useQuery<Campaign>({
     queryKey: ["campaign", campaignId],
@@ -1225,10 +1230,19 @@ export default function CampaignDetail() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
-          <Button variant="ghost" size="sm" className="h-8 w-8 px-0 mt-0.5" onClick={() => navigate("/campaigns")}>
+          <Button variant="ghost" size="sm" className="h-8 w-8 px-0 mt-0.5" onClick={() => navigate(scopedCompanyId ? `/campaigns?companyId=${scopedCompanyId}` : "/campaigns")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
+            {scopedCompanyId && (
+              <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-0.5">
+                <Building2 className="h-3 w-3" />
+                <span>Company</span>
+                <ChevronRight className="h-3 w-3" />
+                <span>Campaigns</span>
+                <ChevronRight className="h-3 w-3" />
+              </div>
+            )}
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl font-bold tracking-tight text-green-400">{campaign.name}</h1>
               <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
