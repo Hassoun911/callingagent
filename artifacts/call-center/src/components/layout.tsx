@@ -39,7 +39,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { data: companies } = useListCompanies();
   const { data: allNumbers } = useListPhoneNumbers();
 
-  // Derive active company from current route
+  // Derive active company from current route or ?companyId= query param
   const activeCompanyId = (() => {
     const cm = location.match(/^\/companies\/(\d+)/);
     if (cm) return parseInt(cm[1]);
@@ -48,11 +48,21 @@ export function Layout({ children }: { children: ReactNode }) {
       const numId = parseInt(nm[1]);
       return allNumbers?.find(n => n.id === numId)?.companyId ?? null;
     }
+    const qp = new URLSearchParams(window.location.search).get("companyId");
+    if (qp) return parseInt(qp);
     return null;
   })();
   const contextCompany = activeCompanyId ? companies?.find(c => c.id === activeCompanyId) : null;
 
   function isActive(href: string) {
+    const [hrefPath, hrefSearch] = href.split("?");
+    if (hrefSearch) {
+      return location === hrefPath && window.location.search.includes(hrefSearch);
+    }
+    // When there's a ?companyId= param active, don't highlight the generic /campaigns or /numbers links
+    if ((href === "/campaigns" || href === "/numbers") && window.location.search.includes("companyId=")) {
+      return false;
+    }
     return location === href || (href !== "/" && location.startsWith(href));
   }
 
@@ -134,8 +144,12 @@ export function Layout({ children }: { children: ReactNode }) {
                   <span className="truncate font-mono">{n.friendlyName || n.number}</span>
                 </Link>
               ))}
-              {/* Campaigns */}
-              <Link href="/campaigns" onClick={onNav} className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-md text-xs transition-colors ${isActive("/campaigns") ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"}`}>
+              {/* Campaigns — scoped to this company */}
+              <Link
+                href={`/campaigns?companyId=${contextCompany.id}`}
+                onClick={onNav}
+                className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-md text-xs transition-colors ${isActive(`/campaigns?companyId=${contextCompany.id}`) ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"}`}
+              >
                 <Target className="h-3 w-3 flex-shrink-0" />
                 Campaigns
               </Link>

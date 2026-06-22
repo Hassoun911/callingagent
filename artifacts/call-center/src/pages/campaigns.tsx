@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useListCompanies } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Play, Pause, Trash2, Users, ChevronRight, Target,
-  ChevronLeft, FileText, Phone, CalendarClock,
+  ChevronLeft, FileText, Phone, CalendarClock, Building2,
 } from "lucide-react";
 
 interface Campaign {
@@ -740,6 +741,7 @@ function CalendarTab() {
 export default function Campaigns() {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<"campaigns" | "calendar">("campaigns");
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({
@@ -751,6 +753,15 @@ export default function Campaigns() {
     maxCallDuration: "300",
   });
 
+  // Company scope from ?companyId= query param
+  const scopedCompanyId = (() => {
+    const v = new URLSearchParams(window.location.search).get("companyId");
+    return v ? parseInt(v) : null;
+  })();
+
+  const { data: companies = [] } = useListCompanies();
+  const scopedCompany = scopedCompanyId ? companies.find(c => c.id === scopedCompanyId) : null;
+
   const { data: campaigns = [], isLoading } = useQuery({
     queryKey: ["campaigns"],
     queryFn: fetchCampaigns,
@@ -761,6 +772,15 @@ export default function Campaigns() {
     queryKey: ["phone-numbers"],
     queryFn: fetchPhoneNumbers,
   });
+
+  // When scoped to a company, only show campaigns linked to that company's numbers
+  const visibleCampaigns = useMemo(() => {
+    if (!scopedCompanyId) return campaigns;
+    const companyNumberIds = new Set(
+      phoneNumbers.filter(n => (n as any).companyId === scopedCompanyId).map(n => n.id)
+    );
+    return campaigns.filter(c => c.fromPhoneNumberId != null && companyNumberIds.has(c.fromPhoneNumberId));
+  }, [campaigns, phoneNumbers, scopedCompanyId]);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof form) => {
@@ -844,18 +864,35 @@ export default function Campaigns() {
       toast({ title: `Failed to ${vars.action} campaign`, variant: "destructive" }),
   });
 
-  const totalContacts = campaigns.reduce((s, c) => s + (c.totalContacts ?? 0), 0);
-  const totalInterested = campaigns.reduce((s, c) => s + (c.interestedContacts ?? 0), 0);
-  const activeCampaigns = campaigns.filter(c => c.status === "active").length;
+  const totalContacts = visibleCampaigns.reduce((s, c) => s + (c.totalContacts ?? 0), 0);
+  const totalInterested = visibleCampaigns.reduce((s, c) => s + (c.interestedContacts ?? 0), 0);
+  const activeCampaigns = visibleCampaigns.filter(c => c.status === "active").length;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-green-400">Campaigns</h1>
+          {scopedCompany && (
+            <div className="flex items-center gap-2 mb-1.5">
+              <button
+                onClick={() => navigate(`/companies/${scopedCompany.id}`)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                {scopedCompany.name}
+              </button>
+              <span className="text-muted-foreground/40 text-xs">/</span>
+              <span className="text-xs text-foreground font-medium">Campaigns</span>
+            </div>
+          )}
+          <h1 className="text-2xl font-bold tracking-tight text-green-400">
+            {scopedCompany ? `${scopedCompany.name} Campaigns` : "Campaigns"}
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Outbound cold calling — AI-powered seller qualification
+            {scopedCompany
+              ? `Outbound campaigns running on ${scopedCompany.name}'s phone numbers`
+              : "Outbound cold calling — AI-powered seller qualification"}
           </p>
         </div>
         {activeTab === "campaigns" && (
@@ -911,10 +948,14 @@ export default function Campaigns() {
               <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">
                 Loading campaigns...
               </div>
-            ) : campaigns.length === 0 ? (
+            ) : visibleCampaigns.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-3">
                 <Target className="h-8 w-8 opacity-30" />
-                <div className="text-sm">No campaigns yet. Create your first to start dialing.</div>
+                <div className="text-sm">
+                  {scopedCompany
+                    ? `No campaigns for ${scopedCompany.name} yet. Create one to start dialing.`
+                    : "No campaigns yet. Create your first to start dialing."}
+                </div>
                 <Button size="sm" onClick={() => setShowCreate(true)} variant="outline">
                   Create Campaign
                 </Button>
@@ -932,7 +973,7 @@ export default function Campaigns() {
                   </tr>
                 </thead>
                 <tbody>
-                  {campaigns.map((c, i) => (
+                  {visibleCampaigns.map((c, i) => (
                     <tr
                       key={c.id}
                       className={`border-b border-border/50 hover:bg-secondary/20 transition-colors ${i % 2 === 0 ? "" : "bg-secondary/5"}`}
