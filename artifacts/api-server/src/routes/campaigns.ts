@@ -748,6 +748,52 @@ router.post("/campaigns/:id/start", async (req, res): Promise<void> => {
   }
 });
 
+// ─── Retry no-answer contacts ─────────────────────────────────────────────────
+router.post("/campaigns/:id/retry-no-answer", async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const [campaign] = await db.select().from(campaignsTable).where(eq(campaignsTable.id, id));
+    if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+    let fromNumber = "";
+    if (campaign.fromPhoneNumberId) {
+      const [pn] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, campaign.fromPhoneNumberId));
+      fromNumber = pn?.number ?? "";
+    }
+    if (!fromNumber) { res.status(400).json({ error: "No phone number configured for this campaign" }); return; }
+
+    // Reset all no-answer contacts back to pending
+    const reset = await db.update(campaignContactsTable).set({
+      callStatus: "pending",
+      callOutcome: null,
+      callDuration: null,
+      callSummary: null,
+      transcription: null,
+      interestedInSelling: null,
+      scheduledCallAt: null,
+    }).where(and(
+      eq(campaignContactsTable.campaignId, id),
+      eq(campaignContactsTable.callOutcome, "no_answer"),
+    )).returning({ id: campaignContactsTable.id });
+
+    if (reset.length === 0) {
+      res.json({ queued: 0, reset: 0, message: "No no-answer contacts to retry" });
+      return;
+    }
+
+    // Re-activate campaign and fire the reset contacts
+    await db.update(campaignsTable).set({ status: "active" }).where(eq(campaignsTable.id, id));
+    const baseUrl = getBaseUrl(req);
+    const queued = await fireDueContacts({ ...campaign, status: "active" }, fromNumber, baseUrl);
+
+    logger.info({ campaignId: id, reset: reset.length, queued }, "Retrying no-answer contacts");
+    res.json({ queued, reset: reset.length });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "Failed to retry no-answer contacts");
+    res.status(500).json({ error: "Failed to retry no-answer contacts" });
+  }
+});
+
 // ─── Test call ────────────────────────────────────────────────────────────────
 router.post("/campaigns/:id/test-call", async (req, res): Promise<void> => {
   try {

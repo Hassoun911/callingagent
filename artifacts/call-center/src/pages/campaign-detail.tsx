@@ -1128,6 +1128,22 @@ export default function CampaignDetail() {
     onError: (_, action) => toast({ title: `Failed to ${action} campaign`, variant: "destructive" }),
   });
 
+  const retryNoAnswerMutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`${BASE}/api/campaigns/${campaignId}/retry-no-answer`, { method: "POST" });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "Failed");
+      return data as { queued: number; reset: number };
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["campaign", campaignId] });
+      qc.invalidateQueries({ queryKey: ["campaign-contacts", campaignId] });
+      qc.invalidateQueries({ queryKey: ["campaigns"] });
+      toast({ title: `Retrying ${data.reset} no-answer contacts — ${data.queued} calls queued` });
+    },
+    onError: (err: Error) => toast({ title: `Failed: ${err.message}`, variant: "destructive" }),
+  });
+
   const testCallMutation = useMutation({
     mutationFn: async (toNumber: string) => {
       const r = await fetch(`${BASE}/api/campaigns/${campaignId}/test-call`, {
@@ -1290,6 +1306,23 @@ export default function CampaignDetail() {
               {campaign.status === "paused" ? "Resume" : "Start Dialing"}
             </Button>
           )}
+          {(() => {
+            const noAnswerCount = contacts.filter(c => c.callOutcome === "no_answer").length;
+            if (noAnswerCount === 0) return null;
+            return (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5 border-orange-500/30 text-orange-400 hover:bg-orange-500/10 hover:text-orange-300"
+                onClick={() => retryNoAnswerMutation.mutate()}
+                disabled={retryNoAnswerMutation.isPending || campaign.status === "active"}
+                title={campaign.status === "active" ? "Pause campaign first" : `Re-call ${noAnswerCount} no-answer contacts`}
+              >
+                <Phone className="h-3.5 w-3.5" />
+                Retry No Answer ({noAnswerCount})
+              </Button>
+            );
+          })()}
         </div>
       </div>
 
