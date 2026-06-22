@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, phoneNumbersTable, aiVoiceConfigTable } from "@workspace/db";
+import { db, phoneNumbersTable, aiVoiceConfigTable, companiesTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -84,11 +84,13 @@ router.get("/costs", async (req, res): Promise<void> => {
   try {
     const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
 
-    // Fetch provisioned numbers from DB in parallel with overall usage
-    const [overallRecords, numbers] = await Promise.all([
+    // Fetch provisioned numbers + companies from DB in parallel with overall usage
+    const [overallRecords, numbers, companies] = await Promise.all([
       fetchTwilioUsage(accountSid!, auth),
       db.select().from(phoneNumbersTable),
+      db.select().from(companiesTable),
     ]);
+    const companyMap = new Map(companies.map(c => [c.id, c.name]));
 
     if (overallRecords) {
       const currency = overallRecords[0]?.price_unit ?? "USD";
@@ -130,6 +132,8 @@ router.get("/costs", async (req, res): Promise<void> => {
               return {
                 phoneNumber:  num.number,
                 friendlyName: num.friendlyName,
+                companyId:    num.companyId ?? null,
+                companyName:  num.companyId ? (companyMap.get(num.companyId) ?? null) : null,
                 cost: numTotal,
                 breakdown: numBreakdown,
               };
