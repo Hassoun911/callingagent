@@ -1104,9 +1104,11 @@ export default function CampaignDetail() {
     },
   });
 
-  // CRM contact library — for "From Library" picker
+  // CRM contact library — for "From Library" picker, scoped to the current company
   const { data: libraryContacts = [] } = useListContacts(
-    showLibrary ? { search: librarySearch || undefined } : undefined
+    showLibrary
+      ? { search: librarySearch || undefined, companyId: scopedCompanyIdNum ?? undefined }
+      : undefined
   );
 
   const [settingsForm, setSettingsForm] = useState<Partial<Campaign>>({});
