@@ -56,6 +56,7 @@ export default function Companies() {
     if (!q || !companies) return companies ?? [];
     return companies.filter(c =>
       (c.name?.toLowerCase().includes(q)) ||
+      ((c as any).ownerName?.toLowerCase().includes(q)) ||
       (c.industry?.toLowerCase().includes(q)) ||
       (c.phone?.toLowerCase().includes(q)) ||
       (c.email?.toLowerCase().includes(q)) ||
@@ -66,6 +67,7 @@ export default function Companies() {
   
   const [formData, setFormData] = useState({
     name: "",
+    ownerName: "",
     industry: "",
     website: "",
     phone: "",
@@ -115,6 +117,7 @@ export default function Companies() {
       setEditingCompany(company);
       setFormData({
         name: company.name,
+        ownerName: company.ownerName || "",
         industry: company.industry || "",
         website: company.website || "",
         phone: company.phone || "",
@@ -122,7 +125,7 @@ export default function Companies() {
       });
     } else {
       setEditingCompany(null);
-      setFormData({ name: "", industry: "", website: "", phone: "", notes: "" });
+      setFormData({ name: "", ownerName: "", industry: "", website: "", phone: "", notes: "" });
       setSelectedPhoneNumberId("");
     }
     setShowInlineImport(false);
@@ -231,8 +234,11 @@ export default function Companies() {
               </TableRow>
             ) : filteredCompanies.map((company) => (
               <TableRow key={company.id} className="border-border cursor-pointer hover:bg-secondary/30" onClick={() => navigate(`/companies/${company.id}`)}>
-                <TableCell className="font-medium text-foreground">
-                  {company.name}
+                <TableCell>
+                  <div className="font-medium text-foreground">{company.name}</div>
+                  {(company as any).ownerName && (
+                    <div className="text-xs text-muted-foreground mt-0.5">{(company as any).ownerName}</div>
+                  )}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {company.industry || '--'}
@@ -298,10 +304,16 @@ export default function Companies() {
               <Label>Company Name</Label>
               <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-background" />
             </div>
-            
-            <div className="space-y-2">
-              <Label>Industry</Label>
-              <Input value={formData.industry} onChange={e => setFormData({...formData, industry: e.target.value})} className="bg-background" />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Owner Name</Label>
+                <Input value={formData.ownerName} onChange={e => setFormData({...formData, ownerName: e.target.value})} className="bg-background" placeholder="e.g. Jane Smith" />
+              </div>
+              <div className="space-y-2">
+                <Label>Industry</Label>
+                <Input value={formData.industry} onChange={e => setFormData({...formData, industry: e.target.value})} className="bg-background" placeholder="e.g. Dental, Real Estate" />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

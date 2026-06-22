@@ -517,6 +517,8 @@ export interface Company {
   id: number;
   name: string;
   /** @nullable */
+  ownerName?: string | null;
+  /** @nullable */
   industry?: string | null;
   /** @nullable */
   phone?: string | null;
@@ -532,6 +534,8 @@ export interface Company {
 export interface CompanyInput {
   name: string;
   /** @nullable */
+  ownerName?: string | null;
+  /** @nullable */
   industry?: string | null;
   /** @nullable */
   phone?: string | null;
@@ -546,6 +550,8 @@ export interface CompanyInput {
 export interface CompanyUpdate {
   /** @nullable */
   name?: string | null;
+  /** @nullable */
+  ownerName?: string | null;
   /** @nullable */
   industry?: string | null;
   /** @nullable */

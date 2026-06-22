@@ -10,6 +10,8 @@ export interface CompanyUpdate {
   /** @nullable */
   name?: string | null;
   /** @nullable */
+  ownerName?: string | null;
+  /** @nullable */
   industry?: string | null;
   /** @nullable */
   phone?: string | null;

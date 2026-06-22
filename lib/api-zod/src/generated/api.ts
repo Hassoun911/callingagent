@@ -415,6 +415,7 @@ export const DeletePlatformUserResponse = zod.object({
 export const ListCompaniesResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
+  "ownerName": zod.string().nullish(),
   "industry": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),
@@ -427,6 +428,7 @@ export const ListCompaniesResponse = zod.array(ListCompaniesResponseItem)
 
 export const CreateCompanyBody = zod.object({
   "name": zod.string(),
+  "ownerName": zod.string().nullish(),
   "industry": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),
@@ -442,6 +444,7 @@ export const GetCompanyParams = zod.object({
 export const GetCompanyResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
+  "ownerName": zod.string().nullish(),
   "industry": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),
@@ -457,6 +460,7 @@ export const UpdateCompanyParams = zod.object({
 
 export const UpdateCompanyBody = zod.object({
   "name": zod.string().nullish(),
+  "ownerName": zod.string().nullish(),
   "industry": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),
@@ -467,6 +471,7 @@ export const UpdateCompanyBody = zod.object({
 export const UpdateCompanyResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
+  "ownerName": zod.string().nullish(),
   "industry": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),

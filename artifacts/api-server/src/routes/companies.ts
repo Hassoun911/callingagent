@@ -86,6 +86,7 @@ router.patch("/companies/:id", async (req, res): Promise<void> => {
   const updateData: any = {};
   const body = parsed.data;
   if (body.name != null) updateData.name = body.name;
+  if (body.ownerName !== undefined) updateData.ownerName = body.ownerName;
   if (body.industry !== undefined) updateData.industry = body.industry;
   if (body.phone !== undefined) updateData.phone = body.phone;
   if (body.email !== undefined) updateData.email = body.email;

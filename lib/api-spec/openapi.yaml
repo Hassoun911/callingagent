@@ -1593,6 +1593,8 @@ components:
           type: integer
         name:
           type: string
+        ownerName:
+          type: ["string", "null"]
         industry:
           type: ["string", "null"]
         phone:
@@ -1612,6 +1614,8 @@ components:
       properties:
         name:
           type: string
+        ownerName:
+          type: ["string", "null"]
         industry:
           type: ["string", "null"]
         phone:
@@ -1627,6 +1631,8 @@ components:
       type: object
       properties:
         name:
+          type: ["string", "null"]
+        ownerName:
           type: ["string", "null"]
         industry:
           type: ["string", "null"]

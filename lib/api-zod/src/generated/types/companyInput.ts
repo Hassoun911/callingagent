@@ -9,6 +9,8 @@
 export interface CompanyInput {
   name: string;
   /** @nullable */
+  ownerName?: string | null;
+  /** @nullable */
   industry?: string | null;
   /** @nullable */
   phone?: string | null;
