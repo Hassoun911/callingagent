@@ -45,7 +45,7 @@ export default function Billing() {
   const { data: costs, isLoading, refetch, isFetching } = useQuery<CostData>({
     queryKey: ["costs"],
     queryFn: () => fetch("/api/costs").then(r => r.json()),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
     refetchOnWindowFocus: false,
   });
 
