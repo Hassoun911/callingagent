@@ -156,24 +156,6 @@ export function Layout({ children }: { children: ReactNode }) {
                 <Target className="h-3 w-3 flex-shrink-0" />
                 Campaigns
               </Link>
-              {/* Call Logs — scoped to this company */}
-              <Link
-                href={`/calls?companyId=${contextCompany.id}`}
-                onClick={onNav}
-                className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-md text-xs transition-colors ${isActive(`/calls?companyId=${contextCompany.id}`) ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"}`}
-              >
-                <PhoneCall className="h-3 w-3 flex-shrink-0" />
-                Call Logs
-              </Link>
-              {/* AI Settings — scoped to this company */}
-              <Link
-                href={`/settings?companyId=${contextCompany.id}`}
-                onClick={onNav}
-                className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-md text-xs transition-colors ${isActive(`/settings?companyId=${contextCompany.id}`) ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"}`}
-              >
-                <Settings className="h-3 w-3 flex-shrink-0" />
-                AI Settings
-              </Link>
             </div>
           ) : (
             <>
@@ -196,10 +178,18 @@ export function Layout({ children }: { children: ReactNode }) {
 
           {/* ── RECORDS ── */}
           <SectionLabel label="Records" />
-          <Link href="/calls" onClick={onNav} className={navCls("/calls")}>
-            <PhoneCall className="h-4 w-4 flex-shrink-0" />
-            Call Logs
-          </Link>
+          {/* Call Logs: scoped to company when in context, global otherwise */}
+          {contextCompany ? (
+            <Link href={`/calls?companyId=${contextCompany.id}`} onClick={onNav} className={navCls(`/calls?companyId=${contextCompany.id}`)}>
+              <PhoneCall className="h-4 w-4 flex-shrink-0" />
+              Call Logs
+            </Link>
+          ) : (
+            <Link href="/calls" onClick={onNav} className={navCls("/calls")}>
+              <PhoneCall className="h-4 w-4 flex-shrink-0" />
+              Call Logs
+            </Link>
+          )}
           <Link href="/contacts" onClick={onNav} className={navCls("/contacts")}>
             <Users className="h-4 w-4 flex-shrink-0" />
             Contacts
@@ -211,10 +201,18 @@ export function Layout({ children }: { children: ReactNode }) {
 
           {/* ── SYSTEM ── */}
           <SectionLabel label="System" />
-          <Link href="/settings" onClick={onNav} className={navCls("/settings")}>
-            <Settings className="h-4 w-4 flex-shrink-0" />
-            AI Settings
-          </Link>
+          {/* AI Settings: scoped to company when in context, global otherwise */}
+          {contextCompany ? (
+            <Link href={`/settings?companyId=${contextCompany.id}`} onClick={onNav} className={navCls(`/settings?companyId=${contextCompany.id}`)}>
+              <Settings className="h-4 w-4 flex-shrink-0" />
+              AI Settings
+            </Link>
+          ) : (
+            <Link href="/settings" onClick={onNav} className={navCls("/settings")}>
+              <Settings className="h-4 w-4 flex-shrink-0" />
+              AI Settings
+            </Link>
+          )}
           <Link href="/billing" onClick={onNav} className={navCls("/billing")}>
             <CreditCard className="h-4 w-4 flex-shrink-0" />
             Billing
