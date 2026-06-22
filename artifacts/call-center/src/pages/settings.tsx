@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Bot, Save, Mic2, Globe, Eye, EyeOff, Zap, Waves, Building2 } from "lucide-react";
+import { Bot, Save, Mic2, Globe, Eye, EyeOff, Zap, Waves, Building2, Play, Square, Loader2 } from "lucide-react";
 
 const VOICES = [
   { id: "coral",   name: "Coral",   gender: "Female", desc: "Natural, warm — best for calls" },
@@ -77,6 +77,47 @@ export default function Settings() {
   })();
   const scopedCompany = scopedCompanyId ? companies?.find(c => c.id === scopedCompanyId) : null;
   const [showPreview, setShowPreview] = useState(false);
+  const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
+  const [loadingVoice, setLoadingVoice] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const playVoicePreview = async (e: React.MouseEvent, voiceId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (previewingVoice === voiceId) {
+      audioRef.current?.pause();
+      setPreviewingVoice(null);
+      return;
+    }
+
+    audioRef.current?.pause();
+    setPreviewingVoice(null);
+    setLoadingVoice(voiceId);
+
+    try {
+      const res = await fetch(`/api/ai-voice/preview?voice=${voiceId}`);
+      if (!res.ok) throw new Error("Preview failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => {
+        setPreviewingVoice(null);
+        URL.revokeObjectURL(url);
+      };
+      audio.onerror = () => {
+        setPreviewingVoice(null);
+        URL.revokeObjectURL(url);
+      };
+      setLoadingVoice(null);
+      setPreviewingVoice(voiceId);
+      audio.play();
+    } catch {
+      setLoadingVoice(null);
+      setPreviewingVoice(null);
+    }
+  };
 
   const [formData, setFormData] = useState<any>({
     voice: "",
@@ -211,11 +252,31 @@ export default function Settings() {
                     <div key={gender}>
                       <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{gender}</div>
                       {VOICES.filter(v => v.gender === gender).map(v => (
-                        <SelectItem key={v.id} value={v.id}>
-                          <div className="flex items-center gap-2">
-                            <Mic2 className="h-4 w-4 text-muted-foreground" />
+                        <SelectItem key={v.id} value={v.id} className="pr-2">
+                          <div className="flex items-center gap-2 w-full">
+                            <Mic2 className="h-4 w-4 text-muted-foreground shrink-0" />
                             <span className="font-medium">{v.name}</span>
                             <span className="text-muted-foreground text-xs">— {v.desc}</span>
+                            <button
+                              type="button"
+                              onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                              onClick={(e) => playVoicePreview(e, v.id)}
+                              className={`ml-auto shrink-0 flex items-center justify-center h-6 w-6 rounded transition-colors ${
+                                previewingVoice === v.id
+                                  ? "bg-green-500/20 text-green-400 hover:bg-red-500/20 hover:text-red-400"
+                                  : loadingVoice === v.id
+                                  ? "text-muted-foreground"
+                                  : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                              }`}
+                            >
+                              {loadingVoice === v.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : previewingVoice === v.id ? (
+                                <Square className="h-3 w-3 fill-current" />
+                              ) : (
+                                <Play className="h-3.5 w-3.5 fill-current" />
+                              )}
+                            </button>
                           </div>
                         </SelectItem>
                       ))}
