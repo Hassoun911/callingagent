@@ -774,13 +774,19 @@ export default function Campaigns() {
   });
 
   // When scoped to a company, only show campaigns linked to that company's numbers
-  const visibleCampaigns = useMemo(() => {
-    if (!scopedCompanyId) return campaigns;
-    const companyNumberIds = new Set(
+  const companyLinkedNumberIds = useMemo(() => {
+    if (!scopedCompanyId) return null;
+    return new Set(
       phoneNumbers.filter(n => (n as any).companyId === scopedCompanyId).map(n => n.id)
     );
-    return campaigns.filter(c => c.fromPhoneNumberId != null && companyNumberIds.has(c.fromPhoneNumberId));
-  }, [campaigns, phoneNumbers, scopedCompanyId]);
+  }, [phoneNumbers, scopedCompanyId]);
+
+  const companyHasNoLinkedNumbers = scopedCompanyId != null && companyLinkedNumberIds != null && companyLinkedNumberIds.size === 0;
+
+  const visibleCampaigns = useMemo(() => {
+    if (!scopedCompanyId || companyHasNoLinkedNumbers) return campaigns;
+    return campaigns.filter(c => c.fromPhoneNumberId != null && companyLinkedNumberIds!.has(c.fromPhoneNumberId));
+  }, [campaigns, companyLinkedNumberIds, scopedCompanyId, companyHasNoLinkedNumbers]);
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof form) => {
@@ -924,6 +930,13 @@ export default function Campaigns() {
         <CalendarTab />
       ) : (
         <>
+          {/* No linked numbers notice */}
+          {companyHasNoLinkedNumbers && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 text-yellow-400 text-sm">
+              <span className="font-medium">No phone numbers linked to {scopedCompany?.name}.</span>
+              <span className="text-yellow-400/70">Showing all campaigns. Link numbers to this company on the company detail page to scope results.</span>
+            </div>
+          )}
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3">
             {[

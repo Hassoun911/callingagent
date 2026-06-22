@@ -441,9 +441,13 @@ export default function Calls() {
   const { data: companies = [] } = useListCompanies();
   const { data: phoneNumbers = [] } = useListPhoneNumbers();
   const scopedCompany = scopedCompanyId ? companies.find(c => c.id === scopedCompanyId) : null;
-  const companyNumberSet = scopedCompanyId
-    ? new Set(phoneNumbers.filter(n => (n as any).companyId === scopedCompanyId).map(n => n.number))
+  const companyLinkedNumbers = scopedCompanyId
+    ? phoneNumbers.filter(n => (n as any).companyId === scopedCompanyId)
     : null;
+  const companyNumberSet = companyLinkedNumbers && companyLinkedNumbers.length > 0
+    ? new Set(companyLinkedNumbers.map(n => n.number))
+    : null;
+  const companyHasNoLinkedNumbers = scopedCompanyId != null && companyLinkedNumbers != null && companyLinkedNumbers.length === 0;
 
   const { data: calls, isLoading, refetch } = useListCallLogs({
     direction: direction === "all" ? undefined : direction,
@@ -452,7 +456,7 @@ export default function Calls() {
   });
 
   const filtered = calls?.filter((c) => {
-    // Company scope — keep only calls involving this company's numbers
+    // Company scope — keep only calls involving this company's numbers (skip filter if no numbers linked)
     if (companyNumberSet && !companyNumberSet.has(c.toNumber) && !companyNumberSet.has(c.fromNumber)) {
       return false;
     }
@@ -540,6 +544,14 @@ export default function Calls() {
           Clear All
         </Button>
       </div>
+
+      {/* No linked numbers notice */}
+      {companyHasNoLinkedNumbers && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 text-yellow-400 text-sm">
+          <span className="font-medium">No phone numbers linked to {scopedCompany?.name}.</span>
+          <span className="text-yellow-400/70">Showing all calls. Link numbers on the company detail page to scope results.</span>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3 bg-card/50 p-4 border border-border rounded-lg">
         <div className="flex-1 relative">
