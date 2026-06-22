@@ -26,6 +26,7 @@ import {
   ArrowLeft, Building2, Phone, Globe, Mail, Edit, Plus, Trash2,
   ChevronRight, Hash, PhoneForwarded, Bot, Voicemail, Ban, Target,
   Settings2, Save, Loader2, Users, Shield, ChevronDown, Copy, Check,
+  Eye, EyeOff,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -350,6 +351,7 @@ export default function CompanyDetail() {
   const [userForm, setUserForm] = useState({ username: "", email: "", password: "", role: "company_user" });
   const [savingUser, setSavingUser] = useState(false);
   const [userError, setUserError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
   const updateCompany = useUpdateCompany({
@@ -887,9 +889,24 @@ export default function CompanyDetail() {
             </div>
             <div>
               <Label>Password *</Label>
-              <input required type="password" value={userForm.password} onChange={e => setUserForm(f => ({ ...f, password: e.target.value }))}
-                className="w-full mt-1 bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground focus:outline-none focus:border-primary"
-                placeholder="password" />
+              <div className="relative mt-1">
+                <input
+                  required
+                  type={showPassword ? "text" : "password"}
+                  value={userForm.password}
+                  onChange={e => setUserForm(f => ({ ...f, password: e.target.value }))}
+                  className="w-full bg-background border border-border rounded-md px-3 py-1.5 pr-9 text-sm text-foreground focus:outline-none focus:border-primary"
+                  placeholder="password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             {userError && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{userError}</p>}
             <div className="flex justify-end gap-2 pt-1">
