@@ -130,35 +130,34 @@ export function Layout({ children }: { children: ReactNode }) {
             Dashboard
           </Link>
 
-          {/* ── STRUCTURE ── */}
-          <SectionLabel label="Structure" />
+          {/* ── OPERATIONS ── */}
+          <SectionLabel label="Operations" />
 
-          {/* Companies */}
+          {/* Companies — always flat at top level */}
           <Link href="/companies" onClick={onNav} className={navCls("/companies")}>
             <Building2 className="h-4 w-4 flex-shrink-0" />
             Companies
           </Link>
 
-          {/* Context: company name + its numbers shown when drilling into a company or its numbers */}
-          {contextCompany ? (
-            <div className="ml-4 space-y-0.5">
+          {/* Company context tree: only shown when inside a specific company */}
+          {contextCompany && (
+            <div className="ml-3 space-y-0.5 border-l border-border/50 pl-3">
               <Link
                 href={`/companies/${contextCompany.id}`}
                 onClick={onNav}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors truncate ${
+                className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-semibold transition-colors truncate ${
                   onCompanyDetail
                     ? "bg-primary/10 text-primary"
-                    : "text-primary/60 hover:text-primary hover:bg-primary/5"
+                    : "text-primary/70 hover:text-primary hover:bg-primary/5"
                 }`}
               >
                 <Building2 className="h-3 w-3 flex-shrink-0" />
                 <span className="truncate">{contextCompany.name}</span>
               </Link>
-              {/* Contacts scoped to this company */}
               <Link
                 href={`/contacts?companyId=${contextCompany.id}`}
                 onClick={onNav}
-                className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-md text-xs transition-colors ${
+                className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${
                   isActive(`/contacts?companyId=${contextCompany.id}`)
                     ? "bg-primary/10 text-primary font-medium"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -167,15 +166,14 @@ export function Layout({ children }: { children: ReactNode }) {
                 <Users className="h-3 w-3 flex-shrink-0" />
                 Contacts
               </Link>
-              {/* Each number with its own sub-items */}
               {allNumbers?.filter(n => n.companyId === contextCompany.id).map(n => {
                 const numActive = activeNumberId === n.id;
                 return (
-                  <div key={n.id} className="ml-2 space-y-0.5">
+                  <div key={n.id} className="space-y-0.5">
                     <Link
                       href={`/numbers/${n.id}`}
                       onClick={onNav}
-                      className={`flex items-start gap-2 px-3 py-1.5 rounded-md text-xs transition-colors ${
+                      className={`flex items-start gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${
                         numActive
                           ? "bg-primary/10 text-primary font-medium"
                           : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -185,15 +183,14 @@ export function Layout({ children }: { children: ReactNode }) {
                       <div className="min-w-0">
                         <div className="font-mono truncate">{formatPhone(n.number)}</div>
                         {n.friendlyName && (
-                          <div className="text-[10px] text-muted-foreground/70 truncate">{n.friendlyName}</div>
+                          <div className="text-[10px] text-muted-foreground/60 truncate">{n.friendlyName}</div>
                         )}
                       </div>
                     </Link>
-                    {/* Campaigns scoped to this number */}
                     <Link
                       href={`/campaigns?companyId=${contextCompany.id}&numberId=${n.id}`}
                       onClick={onNav}
-                      className={`flex items-center gap-2 px-3 py-1 ml-3 rounded-md text-xs transition-colors ${
+                      className={`flex items-center gap-2 px-2 py-1 ml-4 rounded-md text-xs transition-colors ${
                         isActive(`/campaigns?companyId=${contextCompany.id}&numberId=${n.id}`)
                           ? "bg-primary/10 text-primary font-medium"
                           : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -206,39 +203,26 @@ export function Layout({ children }: { children: ReactNode }) {
                 );
               })}
             </div>
-          ) : (
-            <>
-              {/* Numbers */}
-              <div className="ml-4 space-y-0.5">
-                <Link href="/numbers" onClick={onNav} className={navCls("/numbers")}>
-                  <Phone className="h-4 w-4 flex-shrink-0" />
-                  Numbers
-                </Link>
-              </div>
-              {/* Campaigns */}
-              <div className="ml-8 space-y-0.5">
-                <Link href="/campaigns" onClick={onNav} className={navCls("/campaigns")}>
-                  <Target className="h-4 w-4 flex-shrink-0" />
-                  Campaigns
-                </Link>
-              </div>
-            </>
           )}
+
+          {/* Phone Numbers — flat top-level link */}
+          <Link href="/numbers" onClick={onNav} className={navCls("/numbers")}>
+            <Phone className="h-4 w-4 flex-shrink-0" />
+            Phone Numbers
+          </Link>
+
+          {/* Campaigns — flat top-level link */}
+          <Link href="/campaigns" onClick={onNav} className={navCls("/campaigns")}>
+            <Target className="h-4 w-4 flex-shrink-0" />
+            Campaigns
+          </Link>
 
           {/* ── RECORDS ── */}
           <SectionLabel label="Records" />
-          {/* Call Logs: scoped to company when in context, global otherwise */}
-          {contextCompany ? (
-            <Link href={`/calls?companyId=${contextCompany.id}`} onClick={onNav} className={navCls(`/calls?companyId=${contextCompany.id}`)}>
-              <PhoneCall className="h-4 w-4 flex-shrink-0" />
-              Call Logs
-            </Link>
-          ) : (
-            <Link href="/calls" onClick={onNav} className={navCls("/calls")}>
-              <PhoneCall className="h-4 w-4 flex-shrink-0" />
-              Call Logs
-            </Link>
-          )}
+          <Link href="/calls" onClick={onNav} className={navCls("/calls")}>
+            <PhoneCall className="h-4 w-4 flex-shrink-0" />
+            Call Logs
+          </Link>
           <Link href="/contacts" onClick={onNav} className={navCls("/contacts")}>
             <Users className="h-4 w-4 flex-shrink-0" />
             Contacts
@@ -250,18 +234,10 @@ export function Layout({ children }: { children: ReactNode }) {
 
           {/* ── SYSTEM ── */}
           <SectionLabel label="System" />
-          {/* AI Settings: scoped to company when in context, global otherwise */}
-          {contextCompany ? (
-            <Link href={`/settings?companyId=${contextCompany.id}`} onClick={onNav} className={navCls(`/settings?companyId=${contextCompany.id}`)}>
-              <Settings className="h-4 w-4 flex-shrink-0" />
-              AI Settings
-            </Link>
-          ) : (
-            <Link href="/settings" onClick={onNav} className={navCls("/settings")}>
-              <Settings className="h-4 w-4 flex-shrink-0" />
-              AI Settings
-            </Link>
-          )}
+          <Link href="/settings" onClick={onNav} className={navCls("/settings")}>
+            <Settings className="h-4 w-4 flex-shrink-0" />
+            AI Settings
+          </Link>
           <Link href="/billing" onClick={onNav} className={navCls("/billing")}>
             <CreditCard className="h-4 w-4 flex-shrink-0" />
             Billing
