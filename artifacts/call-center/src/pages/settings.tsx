@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { 
   useGetAiVoiceConfig, 
   useUpdateAiVoiceConfig,
@@ -16,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Bot, Save, Mic2, Globe, Eye, EyeOff, Zap, Waves } from "lucide-react";
+import { Bot, Save, Mic2, Globe, Eye, EyeOff, Zap, Waves, Building2 } from "lucide-react";
 
 const VOICES = [
   { id: "coral",   name: "Coral",   gender: "Female", desc: "Natural, warm — best for calls" },
@@ -61,12 +62,20 @@ function resolvePromptTemplate(
 }
 
 export default function Settings() {
+  const [, navigate] = useLocation();
   const { data: config, isLoading } = useGetAiVoiceConfig();
   const { data: phoneNumbers } = useListPhoneNumbers();
   const { data: companies } = useListCompanies();
   const updateMutation = useUpdateAiVoiceConfig();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Company scope from ?companyId= query param
+  const scopedCompanyId = (() => {
+    const v = new URLSearchParams(window.location.search).get("companyId");
+    return v ? parseInt(v) : null;
+  })();
+  const scopedCompany = scopedCompanyId ? companies?.find(c => c.id === scopedCompanyId) : null;
   const [showPreview, setShowPreview] = useState(false);
 
   const [formData, setFormData] = useState<any>({
@@ -101,11 +110,14 @@ export default function Settings() {
     }
   }, [config]);
 
-  // Resolve template vars for the live preview using the first phone number's company
-  const firstNumber = phoneNumbers?.[0];
-  const linkedCompany = firstNumber?.companyId
-    ? companies?.find((c: any) => c.id === firstNumber.companyId)
+  // Resolve template vars for the live preview — prefer scoped company's first number
+  const scopedNumbers = scopedCompanyId
+    ? phoneNumbers?.filter(n => (n as any).companyId === scopedCompanyId)
     : null;
+  const firstNumber = scopedNumbers?.length ? scopedNumbers[0] : phoneNumbers?.[0];
+  const linkedCompany = scopedCompany ?? (firstNumber?.companyId
+    ? companies?.find((c: any) => c.id === firstNumber.companyId)
+    : null);
   const previewCompanyName = linkedCompany?.name ?? firstNumber?.callerIdName ?? null;
   const previewPhoneNumber = firstNumber?.number ?? null;
 
@@ -137,8 +149,27 @@ export default function Settings() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">AI Voice Settings</h1>
-          <p className="text-muted-foreground mt-1">Default AI configuration for incoming calls. Each phone number can override these settings individually.</p>
+          {scopedCompany && (
+            <div className="flex items-center gap-2 mb-1.5">
+              <button
+                onClick={() => navigate(`/companies/${scopedCompany.id}`)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                {scopedCompany.name}
+              </button>
+              <span className="text-muted-foreground/40 text-xs">/</span>
+              <span className="text-xs text-foreground font-medium">AI Settings</span>
+            </div>
+          )}
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            {scopedCompany ? `${scopedCompany.name} — AI Voice Settings` : "AI Voice Settings"}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {scopedCompany
+              ? `Global AI defaults — prompt preview uses ${scopedCompany.name}'s numbers. Per-number overrides configured on each number.`
+              : "Default AI configuration for incoming calls. Each phone number can override these settings individually."}
+          </p>
         </div>
         <Button onClick={handleSave} disabled={updateMutation.isPending} className="gap-2">
           <Save className="h-4 w-4" />

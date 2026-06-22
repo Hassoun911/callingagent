@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useListCallLogs, useUpdateCallLogNotes } from "@workspace/api-client-react";
+import { useLocation } from "wouter";
+import { useListCallLogs, useUpdateCallLogNotes, useListPhoneNumbers, useListCompanies } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PhoneIncoming, PhoneOutgoing, Play, Pause, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone, Loader2, Download, Trash2, FileText, Check, StickyNote } from "lucide-react";
+import { PhoneIncoming, PhoneOutgoing, Play, Pause, Search, User, Mail, Tag, AlertCircle, ChevronRight, Phone, Loader2, Download, Trash2, FileText, Check, StickyNote, Building2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -420,6 +421,7 @@ function CallDetail({ call, open, onClose, onNotesUpdate }: { call: any; open: b
 }
 
 export default function Calls() {
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [direction, setDirection] = useState<"inbound" | "outbound" | "all">("all");
   const [status, setStatus] = useState<string>("all");
@@ -431,6 +433,18 @@ export default function Calls() {
   const [noteTarget, setNoteTarget] = useState<{ id: number; note: string | null } | null>(null);
   const [localNotes, setLocalNotes] = useState<Record<number, string | null>>({});
 
+  // Company scope from ?companyId= query param
+  const scopedCompanyId = (() => {
+    const v = new URLSearchParams(window.location.search).get("companyId");
+    return v ? parseInt(v) : null;
+  })();
+  const { data: companies = [] } = useListCompanies();
+  const { data: phoneNumbers = [] } = useListPhoneNumbers();
+  const scopedCompany = scopedCompanyId ? companies.find(c => c.id === scopedCompanyId) : null;
+  const companyNumberSet = scopedCompanyId
+    ? new Set(phoneNumbers.filter(n => (n as any).companyId === scopedCompanyId).map(n => n.number))
+    : null;
+
   const { data: calls, isLoading, refetch } = useListCallLogs({
     direction: direction === "all" ? undefined : direction,
     status: status === "all" ? undefined : status,
@@ -438,6 +452,10 @@ export default function Calls() {
   });
 
   const filtered = calls?.filter((c) => {
+    // Company scope — keep only calls involving this company's numbers
+    if (companyNumberSet && !companyNumberSet.has(c.toNumber) && !companyNumberSet.has(c.fromNumber)) {
+      return false;
+    }
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -489,8 +507,27 @@ export default function Calls() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Call Logs</h1>
-          <p className="text-muted-foreground mt-1">Audit log of all communications with AI-extracted summaries.</p>
+          {scopedCompany && (
+            <div className="flex items-center gap-2 mb-1.5">
+              <button
+                onClick={() => navigate(`/companies/${scopedCompany.id}`)}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                {scopedCompany.name}
+              </button>
+              <span className="text-muted-foreground/40 text-xs">/</span>
+              <span className="text-xs text-foreground font-medium">Call Logs</span>
+            </div>
+          )}
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            {scopedCompany ? `${scopedCompany.name} — Call Logs` : "Call Logs"}
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {scopedCompany
+              ? `Calls on ${scopedCompany.name}'s phone numbers.`
+              : "Audit log of all communications with AI-extracted summaries."}
+          </p>
         </div>
         <Button
           variant="destructive"

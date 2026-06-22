@@ -59,8 +59,11 @@ export function Layout({ children }: { children: ReactNode }) {
     if (hrefSearch) {
       return location === hrefPath && window.location.search.includes(hrefSearch);
     }
-    // When there's a ?companyId= param active, don't highlight the generic /campaigns or /numbers links
-    if ((href === "/campaigns" || href === "/numbers") && window.location.search.includes("companyId=")) {
+    // When there's a ?companyId= param active, don't highlight the generic top-level links
+    if (
+      (href === "/campaigns" || href === "/numbers" || href === "/calls" || href === "/settings") &&
+      window.location.search.includes("companyId=")
+    ) {
       return false;
     }
     return location === href || (href !== "/" && location.startsWith(href));
@@ -152,6 +155,24 @@ export function Layout({ children }: { children: ReactNode }) {
               >
                 <Target className="h-3 w-3 flex-shrink-0" />
                 Campaigns
+              </Link>
+              {/* Call Logs — scoped to this company */}
+              <Link
+                href={`/calls?companyId=${contextCompany.id}`}
+                onClick={onNav}
+                className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-md text-xs transition-colors ${isActive(`/calls?companyId=${contextCompany.id}`) ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"}`}
+              >
+                <PhoneCall className="h-3 w-3 flex-shrink-0" />
+                Call Logs
+              </Link>
+              {/* AI Settings — scoped to this company */}
+              <Link
+                href={`/settings?companyId=${contextCompany.id}`}
+                onClick={onNav}
+                className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-md text-xs transition-colors ${isActive(`/settings?companyId=${contextCompany.id}`) ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"}`}
+              >
+                <Settings className="h-3 w-3 flex-shrink-0" />
+                AI Settings
               </Link>
             </div>
           ) : (
