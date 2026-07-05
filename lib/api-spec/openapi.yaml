@@ -1892,6 +1892,14 @@ components:
           type: ["string", "null"]
         previewUrl:
           type: ["string", "null"]
+        language:
+          type: ["string", "null"]
+          description: Primary language code for this voice (e.g. "en", "ar")
+        languages:
+          type: array
+          items:
+            type: string
+          description: All language codes this voice can speak (from verified/multilingual models)
 
     DashboardStats:
       type: object

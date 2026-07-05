@@ -679,7 +679,9 @@ export const ListElevenLabsVoicesResponse = zod.object({
   "accent": zod.string().nullish(),
   "gender": zod.string().nullish(),
   "description": zod.string().nullish(),
-  "previewUrl": zod.string().nullish()
+  "previewUrl": zod.string().nullish(),
+  "language": zod.string().nullish().describe('Primary language code for this voice (e.g. \"en\", \"ar\")'),
+  "languages": zod.array(zod.string()).optional().describe('All language codes this voice can speak (from verified\/multilingual models)')
 }))
 })
 

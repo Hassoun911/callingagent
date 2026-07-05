@@ -46,6 +46,19 @@ const LANGUAGES = [
   { id: "ar-SA", label: "Arabic (Saudi Arabia)", flag: "AR" },
 ];
 
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English", ar: "Arabic", fr: "French", de: "German", es: "Spanish",
+  it: "Italian", pt: "Portuguese", nl: "Dutch", zh: "Chinese", ja: "Japanese",
+  ko: "Korean", hi: "Hindi", ru: "Russian", tr: "Turkish", pl: "Polish",
+  sv: "Swedish", cs: "Czech", sk: "Slovak", ro: "Romanian", uk: "Ukrainian",
+  vi: "Vietnamese", ms: "Malay", fil: "Filipino", no: "Norwegian", hr: "Croatian",
+};
+
+function languageLabel(code?: string | null): string {
+  if (!code) return "";
+  return LANGUAGE_NAMES[code.toLowerCase()] ?? code.toUpperCase();
+}
+
 export default function NumberDetail() {
   const { id } = useParams();
   const numId = Number(id);
@@ -569,7 +582,15 @@ export default function NumberDetail() {
                                 <SelectItem key={v.voiceId} value={v.voiceId} className="pr-2">
                                   <div className="flex items-center gap-2 w-full">
                                     <span className="font-medium">{v.name}</span>
+                                    {v.language && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-primary/15 text-primary uppercase tracking-wide">
+                                        {languageLabel(v.language)}
+                                      </span>
+                                    )}
                                     {v.accent && <span className="text-muted-foreground text-xs">— {v.accent}</span>}
+                                    {!!v.languages?.length && v.languages.length > 1 && (
+                                      <span className="text-muted-foreground text-xs">+{v.languages.length - 1} more</span>
+                                    )}
                                     <button
                                       type="button"
                                       onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}

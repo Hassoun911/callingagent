@@ -19,4 +19,11 @@ export interface ElevenLabsVoice {
   description?: string | null;
   /** @nullable */
   previewUrl?: string | null;
+  /**
+     * Primary language code for this voice (e.g. "en", "ar")
+     * @nullable
+     */
+  language?: string | null;
+  /** All language codes this voice can speak (from verified/multilingual models) */
+  languages?: string[];
 }

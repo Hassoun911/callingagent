@@ -95,12 +95,26 @@ router.get("/ai-voice/elevenlabs-voices", async (_req, res): Promise<void> => {
       return;
     }
     const data: any = await resp.json();
-    const voices = (data.voices ?? []).map((v: any) => ({
-      voiceId: v.voice_id,
-      name: v.name,
-      previewUrl: v.preview_url ?? null,
-      category: v.category ?? null,
-    }));
+    const voices = (data.voices ?? []).map((v: any) => {
+      const verifiedLanguages: string[] = Array.isArray(v.verified_languages)
+        ? Array.from(new Set(v.verified_languages.map((l: any) => l.language).filter(Boolean)))
+        : [];
+      const primaryLanguage = v.labels?.language ?? verifiedLanguages[0] ?? null;
+      const languages = primaryLanguage
+        ? Array.from(new Set([primaryLanguage, ...verifiedLanguages]))
+        : verifiedLanguages;
+      return {
+        voiceId: v.voice_id,
+        name: v.name,
+        previewUrl: v.preview_url ?? null,
+        category: v.category ?? null,
+        accent: v.labels?.accent ?? null,
+        gender: v.labels?.gender ?? null,
+        description: v.description ?? null,
+        language: primaryLanguage,
+        languages,
+      };
+    });
     res.json(ListElevenLabsVoicesResponse.parse({ voices }));
   } catch (err: any) {
     res.status(502).json({ error: err?.message ?? "Failed to fetch ElevenLabs voices" });
