@@ -243,6 +243,9 @@ router.post("/phone-numbers", async (req, res): Promise<void> => {
     ringCount: data.ringCount ?? 4,
     answerMode: data.answerMode,
     aiSystemPrompt: data.aiSystemPrompt ?? null,
+    aiVoice: data.aiVoice ?? null,
+    aiVoiceEngine: data.aiVoiceEngine ?? null,
+    aiElevenLabsVoiceId: data.aiElevenLabsVoiceId ?? null,
     voicemailGreeting: data.voicemailGreeting ?? null,
   }).returning();
 
@@ -322,6 +325,8 @@ router.patch("/phone-numbers/:id", async (req, res): Promise<void> => {
   if (body.answerMode != null) updateData.answerMode = body.answerMode;
   if (body.aiSystemPrompt !== undefined) updateData.aiSystemPrompt = body.aiSystemPrompt;
   if (body.aiVoice !== undefined) updateData.aiVoice = body.aiVoice ?? null;
+  if (body.aiVoiceEngine !== undefined) updateData.aiVoiceEngine = body.aiVoiceEngine ?? null;
+  if (body.aiElevenLabsVoiceId !== undefined) updateData.aiElevenLabsVoiceId = body.aiElevenLabsVoiceId ?? null;
   if (body.aiLanguage !== undefined) updateData.aiLanguage = body.aiLanguage ?? null;
   if (body.aiGreeting !== undefined) updateData.aiGreeting = body.aiGreeting ?? null;
   if (body.aiSpeakingStyle !== undefined) updateData.aiSpeakingStyle = body.aiSpeakingStyle ?? null;

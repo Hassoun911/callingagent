@@ -14,6 +14,7 @@ export const aiVoiceConfigTable = pgTable("ai_voice_config", {
   voiceStyle: text("voice_style").notNull().default("Speak naturally and warmly, like a real person — not a recording. Use natural conversational pauses. Vary your pace slightly. Sound professional but approachable."),
   campaignVoiceEngine: text("campaign_voice_engine").notNull().default("google"),
   elevenLabsVoiceId: text("eleven_labs_voice_id"),
+  aiVoiceEngine: text("ai_voice_engine").notNull().default("openai"),
   openaiCreditBalance: doublePrecision("openai_credit_balance"),
   openaiCreditUpdatedAt: timestamp("openai_credit_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

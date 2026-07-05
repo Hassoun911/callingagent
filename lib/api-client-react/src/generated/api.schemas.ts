@@ -166,6 +166,17 @@ export const PhoneNumberForwardNoAnswerAction = {
   ai_voice: 'ai_voice',
 } as const;
 
+/**
+ * @nullable
+ */
+export type PhoneNumberAiVoiceEngine = typeof PhoneNumberAiVoiceEngine[keyof typeof PhoneNumberAiVoiceEngine] | null;
+
+
+export const PhoneNumberAiVoiceEngine = {
+  openai: 'openai',
+  elevenlabs: 'elevenlabs',
+} as const;
+
 export interface PhoneNumber {
   id: number;
   number: string;
@@ -190,6 +201,10 @@ export interface PhoneNumber {
   aiSystemPrompt?: string | null;
   /** @nullable */
   aiVoice?: string | null;
+  /** @nullable */
+  aiVoiceEngine?: PhoneNumberAiVoiceEngine;
+  /** @nullable */
+  aiElevenLabsVoiceId?: string | null;
   /** @nullable */
   aiLanguage?: string | null;
   /** @nullable */
@@ -250,6 +265,17 @@ export const PhoneNumberInputForwardNoAnswerAction = {
   ai_voice: 'ai_voice',
 } as const;
 
+/**
+ * @nullable
+ */
+export type PhoneNumberInputAiVoiceEngine = typeof PhoneNumberInputAiVoiceEngine[keyof typeof PhoneNumberInputAiVoiceEngine] | null;
+
+
+export const PhoneNumberInputAiVoiceEngine = {
+  openai: 'openai',
+  elevenlabs: 'elevenlabs',
+} as const;
+
 export interface PhoneNumberInput {
   number: string;
   /** @nullable */
@@ -273,6 +299,10 @@ export interface PhoneNumberInput {
   aiSystemPrompt?: string | null;
   /** @nullable */
   aiVoice?: string | null;
+  /** @nullable */
+  aiVoiceEngine?: PhoneNumberInputAiVoiceEngine;
+  /** @nullable */
+  aiElevenLabsVoiceId?: string | null;
   /** @nullable */
   aiLanguage?: string | null;
   /** @nullable */
@@ -346,6 +376,17 @@ export const PhoneNumberUpdateForwardNoAnswerAction = {
   ai_voice: 'ai_voice',
 } as const;
 
+/**
+ * @nullable
+ */
+export type PhoneNumberUpdateAiVoiceEngine = typeof PhoneNumberUpdateAiVoiceEngine[keyof typeof PhoneNumberUpdateAiVoiceEngine] | null;
+
+
+export const PhoneNumberUpdateAiVoiceEngine = {
+  openai: 'openai',
+  elevenlabs: 'elevenlabs',
+} as const;
+
 export interface PhoneNumberUpdate {
   /** @nullable */
   friendlyName?: string | null;
@@ -375,6 +416,10 @@ export interface PhoneNumberUpdate {
   aiSystemPrompt?: string | null;
   /** @nullable */
   aiVoice?: string | null;
+  /** @nullable */
+  aiVoiceEngine?: PhoneNumberUpdateAiVoiceEngine;
+  /** @nullable */
+  aiElevenLabsVoiceId?: string | null;
   /** @nullable */
   aiLanguage?: string | null;
   /** @nullable */
@@ -721,6 +766,17 @@ export const AiVoiceConfigCampaignVoiceEngine = {
   elevenlabs: 'elevenlabs',
 } as const;
 
+/**
+ * Global default TTS engine used for inbound AI voice answering
+ */
+export type AiVoiceConfigAiVoiceEngine = typeof AiVoiceConfigAiVoiceEngine[keyof typeof AiVoiceConfigAiVoiceEngine];
+
+
+export const AiVoiceConfigAiVoiceEngine = {
+  openai: 'openai',
+  elevenlabs: 'elevenlabs',
+} as const;
+
 export interface AiVoiceConfig {
   id: number;
   voice: AiVoiceConfigVoice;
@@ -738,6 +794,8 @@ export interface AiVoiceConfig {
   campaignVoiceEngine?: AiVoiceConfigCampaignVoiceEngine;
   /** ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs */
   elevenLabsVoiceId?: string | null;
+  /** Global default TTS engine used for inbound AI voice answering */
+  aiVoiceEngine?: AiVoiceConfigAiVoiceEngine;
 }
 
 /**
@@ -783,6 +841,17 @@ export const AiVoiceConfigUpdateCampaignVoiceEngine = {
   elevenlabs: 'elevenlabs',
 } as const;
 
+/**
+ * @nullable
+ */
+export type AiVoiceConfigUpdateAiVoiceEngine = typeof AiVoiceConfigUpdateAiVoiceEngine[keyof typeof AiVoiceConfigUpdateAiVoiceEngine] | null;
+
+
+export const AiVoiceConfigUpdateAiVoiceEngine = {
+  openai: 'openai',
+  elevenlabs: 'elevenlabs',
+} as const;
+
 export interface AiVoiceConfigUpdate {
   /** @nullable */
   voice?: AiVoiceConfigUpdateVoice;
@@ -804,6 +873,23 @@ export interface AiVoiceConfigUpdate {
   campaignVoiceEngine?: AiVoiceConfigUpdateCampaignVoiceEngine;
   /** @nullable */
   elevenLabsVoiceId?: string | null;
+  /** @nullable */
+  aiVoiceEngine?: AiVoiceConfigUpdateAiVoiceEngine;
+}
+
+export interface ElevenLabsVoice {
+  voiceId: string;
+  name: string;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  accent?: string | null;
+  /** @nullable */
+  gender?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  previewUrl?: string | null;
 }
 
 export interface DashboardStats {
@@ -1107,6 +1193,10 @@ export const ListCallLogsDirection = {
 export type UpdateCallLogNotesBody = {
   /** @nullable */
   notes: string | null;
+};
+
+export type ListElevenLabsVoices200 = {
+  voices: ElevenLabsVoice[];
 };
 
 export type GetRecentCallsParams = {

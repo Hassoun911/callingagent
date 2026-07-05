@@ -617,6 +617,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/AiVoiceConfig"
 
+  /ai-voice/elevenlabs-voices:
+    get:
+      operationId: listElevenLabsVoices
+      tags: [ai-voice]
+      summary: List available ElevenLabs voices for the configured account
+      responses:
+        "200":
+          description: ElevenLabs voices
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [voices]
+                properties:
+                  voices:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ElevenLabsVoice"
+
   /dashboard/stats:
     get:
       operationId: getDashboardStats
@@ -1308,6 +1327,11 @@ components:
           type: ["string", "null"]
         aiVoice:
           type: ["string", "null"]
+        aiVoiceEngine:
+          type: ["string", "null"]
+          enum: [openai, elevenlabs, null]
+        aiElevenLabsVoiceId:
+          type: ["string", "null"]
         aiLanguage:
           type: ["string", "null"]
         aiGreeting:
@@ -1365,6 +1389,11 @@ components:
           type: ["string", "null"]
         aiVoice:
           type: ["string", "null"]
+        aiVoiceEngine:
+          type: ["string", "null"]
+          enum: [openai, elevenlabs, null]
+        aiElevenLabsVoiceId:
+          type: ["string", "null"]
         aiLanguage:
           type: ["string", "null"]
         aiGreeting:
@@ -1411,6 +1440,11 @@ components:
         aiSystemPrompt:
           type: ["string", "null"]
         aiVoice:
+          type: ["string", "null"]
+        aiVoiceEngine:
+          type: ["string", "null"]
+          enum: [openai, elevenlabs, null]
+        aiElevenLabsVoiceId:
           type: ["string", "null"]
         aiLanguage:
           type: ["string", "null"]
@@ -1805,6 +1839,10 @@ components:
           type: string
           nullable: true
           description: ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs
+        aiVoiceEngine:
+          type: string
+          enum: [openai, elevenlabs]
+          description: Global default TTS engine used for inbound AI voice answering
 
     AiVoiceConfigUpdate:
       type: object
@@ -1831,6 +1869,28 @@ components:
           type: ["string", "null"]
           enum: [google, elevenlabs, null]
         elevenLabsVoiceId:
+          type: ["string", "null"]
+        aiVoiceEngine:
+          type: ["string", "null"]
+          enum: [openai, elevenlabs, null]
+
+    ElevenLabsVoice:
+      type: object
+      required: [voiceId, name]
+      properties:
+        voiceId:
+          type: string
+        name:
+          type: string
+        category:
+          type: ["string", "null"]
+        accent:
+          type: ["string", "null"]
+        gender:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        previewUrl:
           type: ["string", "null"]
 
     DashboardStats:

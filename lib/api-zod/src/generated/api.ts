@@ -37,6 +37,8 @@ export const ListPhoneNumbersResponseItem = zod.object({
   "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "aiVoice": zod.string().nullish(),
+  "aiVoiceEngine": zod.union([zod.literal('openai'),zod.literal('elevenlabs'),zod.literal(null)]).nullish(),
+  "aiElevenLabsVoiceId": zod.string().nullish(),
   "aiLanguage": zod.string().nullish(),
   "aiGreeting": zod.string().nullish(),
   "aiSpeakingStyle": zod.string().nullish(),
@@ -70,6 +72,8 @@ export const ProvisionPhoneNumberBody = zod.object({
   "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "aiVoice": zod.string().nullish(),
+  "aiVoiceEngine": zod.union([zod.literal('openai'),zod.literal('elevenlabs'),zod.literal(null)]).nullish(),
+  "aiElevenLabsVoiceId": zod.string().nullish(),
   "aiLanguage": zod.string().nullish(),
   "aiGreeting": zod.string().nullish(),
   "aiSpeakingStyle": zod.string().nullish(),
@@ -146,6 +150,8 @@ export const GetPhoneNumberResponse = zod.object({
   "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "aiVoice": zod.string().nullish(),
+  "aiVoiceEngine": zod.union([zod.literal('openai'),zod.literal('elevenlabs'),zod.literal(null)]).nullish(),
+  "aiElevenLabsVoiceId": zod.string().nullish(),
   "aiLanguage": zod.string().nullish(),
   "aiGreeting": zod.string().nullish(),
   "aiSpeakingStyle": zod.string().nullish(),
@@ -175,6 +181,8 @@ export const UpdatePhoneNumberBody = zod.object({
   "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "aiVoice": zod.string().nullish(),
+  "aiVoiceEngine": zod.union([zod.literal('openai'),zod.literal('elevenlabs'),zod.literal(null)]).nullish(),
+  "aiElevenLabsVoiceId": zod.string().nullish(),
   "aiLanguage": zod.string().nullish(),
   "aiGreeting": zod.string().nullish(),
   "aiSpeakingStyle": zod.string().nullish(),
@@ -201,6 +209,8 @@ export const UpdatePhoneNumberResponse = zod.object({
   "holdMessage": zod.string().nullish(),
   "aiSystemPrompt": zod.string().nullish(),
   "aiVoice": zod.string().nullish(),
+  "aiVoiceEngine": zod.union([zod.literal('openai'),zod.literal('elevenlabs'),zod.literal(null)]).nullish(),
+  "aiElevenLabsVoiceId": zod.string().nullish(),
   "aiLanguage": zod.string().nullish(),
   "aiGreeting": zod.string().nullish(),
   "aiSpeakingStyle": zod.string().nullish(),
@@ -623,7 +633,8 @@ export const GetAiVoiceConfigResponse = zod.object({
   "maxTokens": zod.number().optional().describe('Max tokens per AI response — lower is faster and more concise'),
   "voiceStyle": zod.string().optional().describe('Speaking style instructions passed to the TTS model for a more human sound'),
   "campaignVoiceEngine": zod.enum(['google', 'elevenlabs']).optional().describe('TTS engine used for outbound campaign calls'),
-  "elevenLabsVoiceId": zod.string().nullish().describe('ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs')
+  "elevenLabsVoiceId": zod.string().nullish().describe('ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs'),
+  "aiVoiceEngine": zod.enum(['openai', 'elevenlabs']).optional().describe('Global default TTS engine used for inbound AI voice answering')
 })
 
 
@@ -637,7 +648,8 @@ export const UpdateAiVoiceConfigBody = zod.object({
   "maxTokens": zod.number().nullish(),
   "voiceStyle": zod.string().nullish(),
   "campaignVoiceEngine": zod.union([zod.literal('google'),zod.literal('elevenlabs'),zod.literal(null)]).nullish(),
-  "elevenLabsVoiceId": zod.string().nullish()
+  "elevenLabsVoiceId": zod.string().nullish(),
+  "aiVoiceEngine": zod.union([zod.literal('openai'),zod.literal('elevenlabs'),zod.literal(null)]).nullish()
 })
 
 export const UpdateAiVoiceConfigResponse = zod.object({
@@ -651,7 +663,24 @@ export const UpdateAiVoiceConfigResponse = zod.object({
   "maxTokens": zod.number().optional().describe('Max tokens per AI response — lower is faster and more concise'),
   "voiceStyle": zod.string().optional().describe('Speaking style instructions passed to the TTS model for a more human sound'),
   "campaignVoiceEngine": zod.enum(['google', 'elevenlabs']).optional().describe('TTS engine used for outbound campaign calls'),
-  "elevenLabsVoiceId": zod.string().nullish().describe('ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs')
+  "elevenLabsVoiceId": zod.string().nullish().describe('ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs'),
+  "aiVoiceEngine": zod.enum(['openai', 'elevenlabs']).optional().describe('Global default TTS engine used for inbound AI voice answering')
+})
+
+
+/**
+ * @summary List available ElevenLabs voices for the configured account
+ */
+export const ListElevenLabsVoicesResponse = zod.object({
+  "voices": zod.array(zod.object({
+  "voiceId": zod.string(),
+  "name": zod.string(),
+  "category": zod.string().nullish(),
+  "accent": zod.string().nullish(),
+  "gender": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "previewUrl": zod.string().nullish()
+}))
 })
 
 

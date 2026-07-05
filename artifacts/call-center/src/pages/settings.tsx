@@ -6,6 +6,7 @@ import {
   getGetAiVoiceConfigQueryKey,
   useListPhoneNumbers,
   useListCompanies,
+  useListElevenLabsVoices,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -66,6 +67,7 @@ export default function Settings() {
   const { data: config, isLoading } = useGetAiVoiceConfig();
   const { data: phoneNumbers } = useListPhoneNumbers();
   const { data: companies } = useListCompanies();
+  const { data: elevenLabsVoices } = useListElevenLabsVoices();
   const updateMutation = useUpdateAiVoiceConfig();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -81,11 +83,12 @@ export default function Settings() {
   const [loadingVoice, setLoadingVoice] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const playVoicePreview = async (e: React.MouseEvent, voiceId: string) => {
+  const playVoicePreview = async (e: React.MouseEvent, voiceId: string, engine: "openai" | "elevenlabs" = "openai") => {
     e.preventDefault();
     e.stopPropagation();
+    const key = engine === "elevenlabs" ? `elevenlabs:${voiceId}` : voiceId;
 
-    if (previewingVoice === voiceId) {
+    if (previewingVoice === key) {
       audioRef.current?.pause();
       setPreviewingVoice(null);
       return;
@@ -93,25 +96,28 @@ export default function Settings() {
 
     audioRef.current?.pause();
     setPreviewingVoice(null);
-    setLoadingVoice(voiceId);
+    setLoadingVoice(key);
 
     try {
-      const res = await fetch(`/api/ai-voice/preview?voice=${voiceId}`);
+      const url = engine === "elevenlabs"
+        ? `/api/ai-voice/preview?engine=elevenlabs&voiceId=${encodeURIComponent(voiceId)}`
+        : `/api/ai-voice/preview?voice=${voiceId}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Preview failed");
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
+      const objectUrl = URL.createObjectURL(blob);
+      const audio = new Audio(objectUrl);
       audioRef.current = audio;
       audio.onended = () => {
         setPreviewingVoice(null);
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(objectUrl);
       };
       audio.onerror = () => {
         setPreviewingVoice(null);
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(objectUrl);
       };
       setLoadingVoice(null);
-      setPreviewingVoice(voiceId);
+      setPreviewingVoice(key);
       audio.play();
     } catch {
       setLoadingVoice(null);
@@ -130,6 +136,7 @@ export default function Settings() {
     maxTokens: 100,
     campaignVoiceEngine: "google",
     elevenLabsVoiceId: "",
+    aiVoiceEngine: "openai",
   });
   const initRef = useRef(false);
 
@@ -146,6 +153,7 @@ export default function Settings() {
         maxTokens: config.maxTokens ?? 100,
         campaignVoiceEngine: (config as any).campaignVoiceEngine ?? "google",
         elevenLabsVoiceId: (config as any).elevenLabsVoiceId ?? "",
+        aiVoiceEngine: (config as any).aiVoiceEngine ?? "openai",
       });
       initRef.current = true;
     }
@@ -228,50 +236,79 @@ export default function Settings() {
         </CardHeader>
         <CardContent className="space-y-6">
 
+          {/* AI Voice Answering Engine */}
+          <div className="space-y-2">
+            <Label className="text-green-400">Voice Engine</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, aiVoiceEngine: "openai" })}
+                className={`relative flex flex-col gap-1 rounded-lg border p-4 text-left transition-colors ${
+                  formData.aiVoiceEngine === "openai"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-border/80 hover:bg-muted/30"
+                }`}
+              >
+                {formData.aiVoiceEngine === "openai" && (
+                  <span className="absolute top-3 right-3 h-2 w-2 rounded-full bg-primary" />
+                )}
+                <span className="font-semibold text-sm text-foreground">OpenAI TTS</span>
+                <span className="text-xs text-muted-foreground">Fast, no extra API key required.</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, aiVoiceEngine: "elevenlabs" })}
+                className={`relative flex flex-col gap-1 rounded-lg border p-4 text-left transition-colors ${
+                  formData.aiVoiceEngine === "elevenlabs"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-border/80 hover:bg-muted/30"
+                }`}
+              >
+                {formData.aiVoiceEngine === "elevenlabs" && (
+                  <span className="absolute top-3 right-3 h-2 w-2 rounded-full bg-primary" />
+                )}
+                <span className="font-semibold text-sm text-foreground">ElevenLabs</span>
+                <span className="text-xs text-muted-foreground">Real human-sounding voices. Import voices in your ElevenLabs account.</span>
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Engine used for inbound AI call answering. Can be overridden per phone number.
+            </p>
+          </div>
+
           {/* Voice + Language row */}
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label className="text-green-400">Voice</Label>
-              <Select value={formData.voice} onValueChange={(v) => setFormData({...formData, voice: v})}>
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Select voice">
-                    {formData.voice && (() => {
-                      const v = VOICES.find(v => v.id === formData.voice);
-                      return v ? (
-                        <div className="flex items-center gap-2">
-                          <Mic2 className="h-4 w-4 text-muted-foreground" />
-                          <span>{v.name}</span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${v.gender === "Female" ? "bg-pink-500/20 text-pink-400" : "bg-blue-500/20 text-blue-400"}`}>{v.gender}</span>
-                        </div>
-                      ) : null;
-                    })()}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {["Female", "Male"].map(gender => (
-                    <div key={gender}>
-                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{gender}</div>
-                      {VOICES.filter(v => v.gender === gender).map(v => (
-                        <SelectItem key={v.id} value={v.id} className="pr-2">
+              {formData.aiVoiceEngine === "elevenlabs" ? (
+                <>
+                  <Select value={formData.elevenLabsVoiceId || ""} onValueChange={(v) => setFormData({...formData, elevenLabsVoiceId: v})}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Select an ElevenLabs voice" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {elevenLabsVoices?.voices?.map(v => (
+                        <SelectItem key={v.voiceId} value={v.voiceId} className="pr-2">
                           <div className="flex items-center gap-2 w-full">
                             <Mic2 className="h-4 w-4 text-muted-foreground shrink-0" />
                             <span className="font-medium">{v.name}</span>
-                            <span className="text-muted-foreground text-xs">— {v.desc}</span>
+                            {v.accent && <span className="text-muted-foreground text-xs">— {v.accent}</span>}
                             <button
                               type="button"
                               onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                              onClick={(e) => playVoicePreview(e, v.id)}
+                              onClick={(e) => playVoicePreview(e, v.voiceId, "elevenlabs")}
                               className={`ml-auto shrink-0 flex items-center justify-center h-6 w-6 rounded transition-colors ${
-                                previewingVoice === v.id
+                                previewingVoice === `elevenlabs:${v.voiceId}`
                                   ? "bg-green-500/20 text-green-400 hover:bg-red-500/20 hover:text-red-400"
-                                  : loadingVoice === v.id
+                                  : loadingVoice === `elevenlabs:${v.voiceId}`
                                   ? "text-muted-foreground"
                                   : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
                               }`}
                             >
-                              {loadingVoice === v.id ? (
+                              {loadingVoice === `elevenlabs:${v.voiceId}` ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : previewingVoice === v.id ? (
+                              ) : previewingVoice === `elevenlabs:${v.voiceId}` ? (
                                 <Square className="h-3 w-3 fill-current" />
                               ) : (
                                 <Play className="h-3.5 w-3.5 fill-current" />
@@ -280,11 +317,71 @@ export default function Settings() {
                           </div>
                         </SelectItem>
                       ))}
-                    </div>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">OpenAI TTS voice used for synthesis.</p>
+                    </SelectContent>
+                  </Select>
+                  {!elevenLabsVoices?.voices?.length ? (
+                    <p className="text-xs text-amber-500">No ElevenLabs voices found. Import voices in your ElevenLabs account, or check the API key.</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Human voice used for synthesis. Same voice library used for campaign calls.</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Select value={formData.voice} onValueChange={(v) => setFormData({...formData, voice: v})}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Select voice">
+                        {formData.voice && (() => {
+                          const v = VOICES.find(v => v.id === formData.voice);
+                          return v ? (
+                            <div className="flex items-center gap-2">
+                              <Mic2 className="h-4 w-4 text-muted-foreground" />
+                              <span>{v.name}</span>
+                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${v.gender === "Female" ? "bg-pink-500/20 text-pink-400" : "bg-blue-500/20 text-blue-400"}`}>{v.gender}</span>
+                            </div>
+                          ) : null;
+                        })()}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["Female", "Male"].map(gender => (
+                        <div key={gender}>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{gender}</div>
+                          {VOICES.filter(v => v.gender === gender).map(v => (
+                            <SelectItem key={v.id} value={v.id} className="pr-2">
+                              <div className="flex items-center gap-2 w-full">
+                                <Mic2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                                <span className="font-medium">{v.name}</span>
+                                <span className="text-muted-foreground text-xs">— {v.desc}</span>
+                                <button
+                                  type="button"
+                                  onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                  onClick={(e) => playVoicePreview(e, v.id)}
+                                  className={`ml-auto shrink-0 flex items-center justify-center h-6 w-6 rounded transition-colors ${
+                                    previewingVoice === v.id
+                                      ? "bg-green-500/20 text-green-400 hover:bg-red-500/20 hover:text-red-400"
+                                      : loadingVoice === v.id
+                                      ? "text-muted-foreground"
+                                      : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                                  }`}
+                                >
+                                  {loadingVoice === v.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : previewingVoice === v.id ? (
+                                    <Square className="h-3 w-3 fill-current" />
+                                  ) : (
+                                    <Play className="h-3.5 w-3.5 fill-current" />
+                                  )}
+                                </button>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </div>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">OpenAI TTS voice used for synthesis.</p>
+                </>
+              )}
             </div>
 
             <div className="space-y-2">

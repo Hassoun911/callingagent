@@ -5,6 +5,7 @@
  * Call Center API
  * OpenAPI spec version: 0.1.0
  */
+import type { PhoneNumberUpdateAiVoiceEngine } from './phoneNumberUpdateAiVoiceEngine';
 import type { PhoneNumberUpdateAnswerMode } from './phoneNumberUpdateAnswerMode';
 import type { PhoneNumberUpdateCallerExperience } from './phoneNumberUpdateCallerExperience';
 import type { PhoneNumberUpdateCallScreenFallback } from './phoneNumberUpdateCallScreenFallback';
@@ -40,6 +41,10 @@ export interface PhoneNumberUpdate {
   aiSystemPrompt?: string | null;
   /** @nullable */
   aiVoice?: string | null;
+  /** @nullable */
+  aiVoiceEngine?: PhoneNumberUpdateAiVoiceEngine;
+  /** @nullable */
+  aiElevenLabsVoiceId?: string | null;
   /** @nullable */
   aiLanguage?: string | null;
   /** @nullable */

@@ -7,6 +7,7 @@ import {
   getGetPhoneNumberQueryKey,
   useTestCall,
   useGetPhoneNumberTwilioStatus,
+  useListElevenLabsVoices,
 } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck, MessageSquare, Keyboard, Mic, Mail, Globe, Plus, ChevronRight, Play, Pause, Users } from "lucide-react";
+import { ArrowLeft, Save, Trash2, PhoneCall, PhoneForwarded, Bot, Voicemail, Ban, CheckCircle2, AlertCircle, Loader2, ShieldCheck, MessageSquare, Keyboard, Mic, Mail, Globe, Plus, ChevronRight, Play, Pause, Users, Square } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -53,6 +54,52 @@ export default function NumberDetail() {
 
   const { data: number, isLoading } = useGetPhoneNumber(numId);
   const { data: twilioStatus, isLoading: twilioLoading, isError: twilioError } = useGetPhoneNumberTwilioStatus(numId);
+  const { data: elevenLabsVoices } = useListElevenLabsVoices();
+  const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
+  const [loadingVoice, setLoadingVoice] = useState<string | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const playAiVoicePreview = async (e: React.MouseEvent, engine: "openai" | "elevenlabs", voiceId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const key = `${engine}:${voiceId}`;
+
+    if (previewingVoice === key) {
+      previewAudioRef.current?.pause();
+      setPreviewingVoice(null);
+      return;
+    }
+
+    previewAudioRef.current?.pause();
+    setPreviewingVoice(null);
+    setLoadingVoice(key);
+
+    try {
+      const url = engine === "elevenlabs"
+        ? `/api/ai-voice/preview?engine=elevenlabs&voiceId=${encodeURIComponent(voiceId)}`
+        : `/api/ai-voice/preview?voice=${voiceId}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Preview failed");
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const audio = new Audio(objectUrl);
+      previewAudioRef.current = audio;
+      audio.onended = () => {
+        setPreviewingVoice(null);
+        URL.revokeObjectURL(objectUrl);
+      };
+      audio.onerror = () => {
+        setPreviewingVoice(null);
+        URL.revokeObjectURL(objectUrl);
+      };
+      setLoadingVoice(null);
+      setPreviewingVoice(key);
+      audio.play();
+    } catch {
+      setLoadingVoice(null);
+      setPreviewingVoice(null);
+    }
+  };
   const updateMutation = useUpdatePhoneNumber();
   const releaseMutation = useReleasePhoneNumber({
     mutation: {
@@ -137,6 +184,8 @@ export default function NumberDetail() {
         holdMessage: number.holdMessage ?? "",
         aiSystemPrompt: number.aiSystemPrompt || "",
         aiVoice: number.aiVoice || "",
+        aiVoiceEngine: (number as any).aiVoiceEngine || "",
+        aiElevenLabsVoiceId: (number as any).aiElevenLabsVoiceId || "",
         aiLanguage: number.aiLanguage || "",
         aiGreeting: number.aiGreeting || "",
         aiSpeakingStyle: number.aiSpeakingStyle || "",
@@ -465,32 +514,114 @@ export default function NumberDetail() {
                       <span className="ml-auto text-xs text-muted-foreground">Leave blank to use global defaults</span>
                     </div>
 
+                    {/* Voice Engine */}
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1.5 text-muted-foreground text-xs uppercase tracking-wide">Voice Engine</Label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({...formData, aiVoiceEngine: ""})}
+                          className={`rounded-md border px-3 py-2 text-xs font-medium text-left transition-colors ${
+                            !formData.aiVoiceEngine
+                              ? "border-primary bg-primary/5 text-foreground"
+                              : "border-border text-muted-foreground hover:border-border/80 hover:bg-muted/30"
+                          }`}
+                        >
+                          Global default
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({...formData, aiVoiceEngine: "openai"})}
+                          className={`rounded-md border px-3 py-2 text-xs font-medium text-left transition-colors ${
+                            formData.aiVoiceEngine === "openai"
+                              ? "border-primary bg-primary/5 text-foreground"
+                              : "border-border text-muted-foreground hover:border-border/80 hover:bg-muted/30"
+                          }`}
+                        >
+                          OpenAI TTS
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({...formData, aiVoiceEngine: "elevenlabs"})}
+                          className={`rounded-md border px-3 py-2 text-xs font-medium text-left transition-colors ${
+                            formData.aiVoiceEngine === "elevenlabs"
+                              ? "border-primary bg-primary/5 text-foreground"
+                              : "border-border text-muted-foreground hover:border-border/80 hover:bg-muted/30"
+                          }`}
+                        >
+                          ElevenLabs
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Voice + Language row */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1.5 text-muted-foreground text-xs uppercase tracking-wide"><Mic className="h-3 w-3" />Voice</Label>
-                        <Select value={formData.aiVoice || "__default__"} onValueChange={v => setFormData({...formData, aiVoice: v === "__default__" ? "" : v})}>
-                          <SelectTrigger className="bg-background">
-                            <SelectValue placeholder="Global default" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__default__"><span className="text-muted-foreground">Global default</span></SelectItem>
-                            {VOICES.filter(v => v.gender === "Female").map(v => (
-                              <SelectItem key={v.id} value={v.id}>
-                                <span className="font-medium">{v.name}</span>
-                                <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0 border-pink-500/30 text-pink-400">F</Badge>
-                                <span className="text-muted-foreground text-xs ml-2">{v.desc}</span>
-                              </SelectItem>
-                            ))}
-                            {VOICES.filter(v => v.gender === "Male").map(v => (
-                              <SelectItem key={v.id} value={v.id}>
-                                <span className="font-medium">{v.name}</span>
-                                <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0 border-blue-500/30 text-blue-400">M</Badge>
-                                <span className="text-muted-foreground text-xs ml-2">{v.desc}</span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {formData.aiVoiceEngine === "elevenlabs" ? (
+                          <Select value={formData.aiElevenLabsVoiceId || "__default__"} onValueChange={v => setFormData({...formData, aiElevenLabsVoiceId: v === "__default__" ? "" : v})}>
+                            <SelectTrigger className="bg-background">
+                              <SelectValue placeholder="Global default" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__default__"><span className="text-muted-foreground">Global default</span></SelectItem>
+                              {elevenLabsVoices?.voices?.map(v => (
+                                <SelectItem key={v.voiceId} value={v.voiceId} className="pr-2">
+                                  <div className="flex items-center gap-2 w-full">
+                                    <span className="font-medium">{v.name}</span>
+                                    {v.accent && <span className="text-muted-foreground text-xs">— {v.accent}</span>}
+                                    <button
+                                      type="button"
+                                      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                      onClick={(e) => playAiVoicePreview(e, "elevenlabs", v.voiceId)}
+                                      className={`ml-auto shrink-0 flex items-center justify-center h-6 w-6 rounded transition-colors ${
+                                        previewingVoice === `elevenlabs:${v.voiceId}`
+                                          ? "bg-green-500/20 text-green-400 hover:bg-red-500/20 hover:text-red-400"
+                                          : loadingVoice === `elevenlabs:${v.voiceId}`
+                                          ? "text-muted-foreground"
+                                          : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                                      }`}
+                                    >
+                                      {loadingVoice === `elevenlabs:${v.voiceId}` ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : previewingVoice === `elevenlabs:${v.voiceId}` ? (
+                                        <Square className="h-3 w-3 fill-current" />
+                                      ) : (
+                                        <Play className="h-3.5 w-3.5 fill-current" />
+                                      )}
+                                    </button>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Select value={formData.aiVoice || "__default__"} onValueChange={v => setFormData({...formData, aiVoice: v === "__default__" ? "" : v})}>
+                            <SelectTrigger className="bg-background">
+                              <SelectValue placeholder="Global default" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__default__"><span className="text-muted-foreground">Global default</span></SelectItem>
+                              {VOICES.filter(v => v.gender === "Female").map(v => (
+                                <SelectItem key={v.id} value={v.id}>
+                                  <span className="font-medium">{v.name}</span>
+                                  <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0 border-pink-500/30 text-pink-400">F</Badge>
+                                  <span className="text-muted-foreground text-xs ml-2">{v.desc}</span>
+                                </SelectItem>
+                              ))}
+                              {VOICES.filter(v => v.gender === "Male").map(v => (
+                                <SelectItem key={v.id} value={v.id}>
+                                  <span className="font-medium">{v.name}</span>
+                                  <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0 border-blue-500/30 text-blue-400">M</Badge>
+                                  <span className="text-muted-foreground text-xs ml-2">{v.desc}</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {formData.aiVoiceEngine === "elevenlabs" && !elevenLabsVoices?.voices?.length && (
+                          <p className="text-xs text-amber-500">No ElevenLabs voices found. Import voices in your ElevenLabs account, or check the API key.</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">

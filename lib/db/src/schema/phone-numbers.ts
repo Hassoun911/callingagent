@@ -20,6 +20,8 @@ export const phoneNumbersTable = pgTable("phone_numbers", {
   holdMessage: text("hold_message"),
   aiSystemPrompt: text("ai_system_prompt"),
   aiVoice: text("ai_voice"),
+  aiVoiceEngine: text("ai_voice_engine"),
+  aiElevenLabsVoiceId: text("ai_eleven_labs_voice_id"),
   aiLanguage: text("ai_language"),
   aiGreeting: text("ai_greeting"),
   aiSpeakingStyle: text("ai_speaking_style"),

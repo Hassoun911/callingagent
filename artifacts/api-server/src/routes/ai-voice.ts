@@ -5,8 +5,9 @@ import {
   GetAiVoiceConfigResponse,
   UpdateAiVoiceConfigBody,
   UpdateAiVoiceConfigResponse,
+  ListElevenLabsVoicesResponse,
 } from "@workspace/api-zod";
-import { warmTtsCache } from "./twilio-webhooks";
+import { warmTtsCache, synthesizeElevenLabs } from "./twilio-webhooks";
 import { openai } from "@workspace/integrations-openai-ai-server/audio";
 
 const router: IRouter = Router();
@@ -36,7 +37,28 @@ const VOICE_SAMPLES: Record<VoiceId, string> = {
   onyx:    "Good day. I'm Onyx. I'm here to assist. Please go ahead.",
 };
 
+const ELEVENLABS_PREVIEW_TEXT = "Hello, thank you for calling. I'm here to help — how can I assist you today?";
+
 router.get("/ai-voice/preview", async (req, res): Promise<void> => {
+  const engine = (req.query.engine as string) || "openai";
+
+  if (engine === "elevenlabs") {
+    const voiceId = req.query.voiceId as string;
+    if (!voiceId) {
+      res.status(400).json({ error: "voiceId is required for elevenlabs preview" });
+      return;
+    }
+    try {
+      const buf = await synthesizeElevenLabs(ELEVENLABS_PREVIEW_TEXT, voiceId);
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Content-Length", buf.length);
+      res.send(buf);
+    } catch (err: any) {
+      res.status(502).json({ error: err?.message ?? "ElevenLabs preview failed" });
+    }
+    return;
+  }
+
   const voice = req.query.voice as string;
   if (!VALID_VOICES.includes(voice as VoiceId)) {
     res.status(400).json({ error: "Invalid voice" });
@@ -55,6 +77,34 @@ router.get("/ai-voice/preview", async (req, res): Promise<void> => {
   res.setHeader("Content-Type", "audio/mpeg");
   res.setHeader("Content-Length", buf.length);
   res.send(buf);
+});
+
+router.get("/ai-voice/elevenlabs-voices", async (_req, res): Promise<void> => {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) {
+    res.status(503).json({ error: "ELEVENLABS_API_KEY not configured" });
+    return;
+  }
+  try {
+    const resp = await fetch("https://api.elevenlabs.io/v1/voices", {
+      headers: { "xi-api-key": apiKey },
+    });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      res.status(502).json({ error: `ElevenLabs API error ${resp.status}: ${errText}` });
+      return;
+    }
+    const data: any = await resp.json();
+    const voices = (data.voices ?? []).map((v: any) => ({
+      voiceId: v.voice_id,
+      name: v.name,
+      previewUrl: v.preview_url ?? null,
+      category: v.category ?? null,
+    }));
+    res.json(ListElevenLabsVoicesResponse.parse({ voices }));
+  } catch (err: any) {
+    res.status(502).json({ error: err?.message ?? "Failed to fetch ElevenLabs voices" });
+  }
 });
 
 router.get("/ai-voice/config", async (_req, res): Promise<void> => {
@@ -83,6 +133,7 @@ router.patch("/ai-voice/config", async (req, res): Promise<void> => {
   if (body.voiceStyle != null) updateData.voiceStyle = body.voiceStyle;
   if (body.campaignVoiceEngine != null) updateData.campaignVoiceEngine = body.campaignVoiceEngine;
   if (body.elevenLabsVoiceId != null) updateData.elevenLabsVoiceId = body.elevenLabsVoiceId;
+  if (body.aiVoiceEngine != null) updateData.aiVoiceEngine = body.aiVoiceEngine;
 
   const [updated] = await db.update(aiVoiceConfigTable)
     .set(updateData)
