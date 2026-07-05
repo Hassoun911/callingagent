@@ -312,7 +312,7 @@ export default function Settings() {
                       <SelectTrigger className="bg-background h-8 text-xs mb-1.5">
                         <SelectValue placeholder="Filter by language" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="max-h-[240px]" style={{ maxHeight: 240 }}>
                         <SelectItem value="all">All languages</SelectItem>
                         {elevenLabsLanguageOptions.map(code => (
                           <SelectItem key={code} value={code}>{languageLabel(code)}</SelectItem>
@@ -334,7 +334,7 @@ export default function Settings() {
                           : v.language;
                         const otherCount = (v.languages?.length ?? (v.language ? 1 : 0)) - (displayLang ? 1 : 0);
                         return (
-                        <SelectItem key={v.voiceId} value={v.voiceId} className="pr-2">
+                        <SelectItem key={v.voiceId} value={v.voiceId} className="pr-2" onSelect={(e) => e.preventDefault()}>
                           <div className="flex items-center gap-2 w-full">
                             <Mic2 className="h-4 w-4 text-muted-foreground shrink-0" />
                             <span className="font-medium">{v.name}</span>
@@ -401,7 +401,7 @@ export default function Settings() {
                         <div key={gender}>
                           <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{gender}</div>
                           {VOICES.filter(v => v.gender === gender).map(v => (
-                            <SelectItem key={v.id} value={v.id} className="pr-2">
+                            <SelectItem key={v.id} value={v.id} className="pr-2" onSelect={(e) => e.preventDefault()}>
                               <div className="flex items-center gap-2 w-full">
                                 <Mic2 className="h-4 w-4 text-muted-foreground shrink-0" />
                                 <span className="font-medium">{v.name}</span>

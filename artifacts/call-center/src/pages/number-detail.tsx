@@ -589,7 +589,7 @@ export default function NumberDetail() {
                                 <SelectTrigger className="bg-background h-8 text-xs mb-1.5">
                                   <SelectValue placeholder="Filter by language" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="max-h-[240px]" style={{ maxHeight: 240 }}>
                                   <SelectItem value="all">All languages</SelectItem>
                                   {elevenLabsLanguageOptions.map(code => (
                                     <SelectItem key={code} value={code}>{languageLabel(code)}</SelectItem>
@@ -612,7 +612,7 @@ export default function NumberDetail() {
                                   : v.language;
                                 const otherCount = (v.languages?.length ?? (v.language ? 1 : 0)) - (displayLang ? 1 : 0);
                                 return (
-                                <SelectItem key={v.voiceId} value={v.voiceId} className="pr-2">
+                                <SelectItem key={v.voiceId} value={v.voiceId} className="pr-2" onSelect={(e) => e.preventDefault()}>
                                   <div className="flex items-center gap-2 w-full">
                                     <span className="font-medium">{v.name}</span>
                                     {displayLang && (
