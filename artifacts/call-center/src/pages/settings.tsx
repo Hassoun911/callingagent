@@ -94,6 +94,7 @@ export default function Settings() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
   const [loadingVoice, setLoadingVoice] = useState<string | null>(null);
+  const [voiceLangFilter, setVoiceLangFilter] = useState("all");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const playVoicePreview = async (e: React.MouseEvent, voiceId: string, engine: "openai" | "elevenlabs" = "openai") => {
@@ -182,6 +183,16 @@ export default function Settings() {
     : null);
   const previewCompanyName = linkedCompany?.name ?? firstNumber?.callerIdName ?? null;
   const previewPhoneNumber = firstNumber?.number ?? null;
+
+  const elevenLabsLanguageOptions = Array.from(
+    new Set(
+      (elevenLabsVoices?.voices ?? []).flatMap(v => [v.language, ...(v.languages ?? [])].filter(Boolean) as string[])
+    )
+  ).sort((a, b) => languageLabel(a).localeCompare(languageLabel(b)));
+
+  const filteredElevenLabsVoices = (elevenLabsVoices?.voices ?? []).filter(v =>
+    voiceLangFilter === "all" || v.language === voiceLangFilter || v.languages?.includes(voiceLangFilter)
+  );
 
   const resolvedPrompt = resolvePromptTemplate(formData.systemPrompt ?? "", {
     companyName: previewCompanyName,
@@ -296,24 +307,45 @@ export default function Settings() {
               <Label className="text-green-400">Voice</Label>
               {formData.aiVoiceEngine === "elevenlabs" ? (
                 <>
+                  {elevenLabsLanguageOptions.length > 1 && (
+                    <Select value={voiceLangFilter} onValueChange={setVoiceLangFilter}>
+                      <SelectTrigger className="bg-background h-8 text-xs mb-1.5">
+                        <SelectValue placeholder="Filter by language" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All languages</SelectItem>
+                        {elevenLabsLanguageOptions.map(code => (
+                          <SelectItem key={code} value={code}>{languageLabel(code)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <Select value={formData.elevenLabsVoiceId || ""} onValueChange={(v) => setFormData({...formData, elevenLabsVoiceId: v})}>
                     <SelectTrigger className="bg-background">
                       <SelectValue placeholder="Select an ElevenLabs voice" />
                     </SelectTrigger>
                     <SelectContent>
-                      {elevenLabsVoices?.voices?.map(v => (
+                      {filteredElevenLabsVoices.length === 0 && (
+                        <div className="px-2 py-3 text-xs text-muted-foreground text-center">No voices for this language</div>
+                      )}
+                      {filteredElevenLabsVoices.map(v => {
+                        const displayLang = voiceLangFilter !== "all" && v.languages?.includes(voiceLangFilter)
+                          ? voiceLangFilter
+                          : v.language;
+                        const otherCount = (v.languages?.length ?? (v.language ? 1 : 0)) - (displayLang ? 1 : 0);
+                        return (
                         <SelectItem key={v.voiceId} value={v.voiceId} className="pr-2">
                           <div className="flex items-center gap-2 w-full">
                             <Mic2 className="h-4 w-4 text-muted-foreground shrink-0" />
                             <span className="font-medium">{v.name}</span>
-                            {v.language && (
+                            {displayLang && (
                               <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-primary/15 text-primary uppercase tracking-wide">
-                                {languageLabel(v.language)}
+                                {languageLabel(displayLang)}
                               </span>
                             )}
                             {v.accent && <span className="text-muted-foreground text-xs">— {v.accent}</span>}
-                            {!!v.languages?.length && v.languages.length > 1 && (
-                              <span className="text-muted-foreground text-xs">+{v.languages.length - 1} more</span>
+                            {otherCount > 0 && (
+                              <span className="text-muted-foreground text-xs">+{otherCount} more</span>
                             )}
                             <button
                               type="button"
@@ -337,7 +369,8 @@ export default function Settings() {
                             </button>
                           </div>
                         </SelectItem>
-                      ))}
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                   {!elevenLabsVoices?.voices?.length ? (
