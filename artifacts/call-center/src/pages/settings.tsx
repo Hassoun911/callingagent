@@ -373,6 +373,28 @@ export default function Settings() {
                       })}
                     </SelectContent>
                   </Select>
+                  {formData.elevenLabsVoiceId && (
+                    <button
+                      type="button"
+                      onClick={(e) => playVoicePreview(e, formData.elevenLabsVoiceId, "elevenlabs")}
+                      className={`flex items-center gap-2 px-3 h-8 rounded text-xs font-medium transition-colors border ${
+                        previewingVoice === `elevenlabs:${formData.elevenLabsVoiceId}`
+                          ? "border-green-500/40 bg-green-500/10 text-green-400 hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-400"
+                          : loadingVoice === `elevenlabs:${formData.elevenLabsVoiceId}`
+                          ? "border-border bg-muted/20 text-muted-foreground cursor-wait"
+                          : "border-border bg-muted/20 text-muted-foreground hover:bg-primary/10 hover:border-primary/30 hover:text-primary"
+                      }`}
+                    >
+                      {loadingVoice === `elevenlabs:${formData.elevenLabsVoiceId}` ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : previewingVoice === `elevenlabs:${formData.elevenLabsVoiceId}` ? (
+                        <Square className="h-3 w-3 fill-current" />
+                      ) : (
+                        <Play className="h-3 w-3 fill-current" />
+                      )}
+                      {previewingVoice === `elevenlabs:${formData.elevenLabsVoiceId}` ? "Stop preview" : loadingVoice === `elevenlabs:${formData.elevenLabsVoiceId}` ? "Loading…" : "Test selected voice"}
+                    </button>
+                  )}
                   {!elevenLabsVoices?.voices?.length ? (
                     <p className="text-xs text-amber-500">No ElevenLabs voices found. Import voices in your ElevenLabs account, or check the API key.</p>
                   ) : (

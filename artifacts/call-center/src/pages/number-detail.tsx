@@ -650,6 +650,28 @@ export default function NumberDetail() {
                               })}
                             </SelectContent>
                           </Select>
+                          {(formData.aiElevenLabsVoiceId && formData.aiElevenLabsVoiceId !== "__default__") && (
+                            <button
+                              type="button"
+                              onClick={(e) => playAiVoicePreview(e, "elevenlabs", formData.aiElevenLabsVoiceId!)}
+                              className={`flex items-center gap-2 px-3 h-8 rounded text-xs font-medium transition-colors border ${
+                                previewingVoice === `elevenlabs:${formData.aiElevenLabsVoiceId}`
+                                  ? "border-green-500/40 bg-green-500/10 text-green-400 hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-400"
+                                  : loadingVoice === `elevenlabs:${formData.aiElevenLabsVoiceId}`
+                                  ? "border-border bg-muted/20 text-muted-foreground cursor-wait"
+                                  : "border-border bg-muted/20 text-muted-foreground hover:bg-primary/10 hover:border-primary/30 hover:text-primary"
+                              }`}
+                            >
+                              {loadingVoice === `elevenlabs:${formData.aiElevenLabsVoiceId}` ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : previewingVoice === `elevenlabs:${formData.aiElevenLabsVoiceId}` ? (
+                                <Square className="h-3 w-3 fill-current" />
+                              ) : (
+                                <Play className="h-3 w-3 fill-current" />
+                              )}
+                              {previewingVoice === `elevenlabs:${formData.aiElevenLabsVoiceId}` ? "Stop preview" : loadingVoice === `elevenlabs:${formData.aiElevenLabsVoiceId}` ? "Loading…" : "Test selected voice"}
+                            </button>
+                          )}
                           </>
                         ) : (
                           <Select value={formData.aiVoice || "__default__"} onValueChange={v => setFormData({...formData, aiVoice: v === "__default__" ? "" : v})}>
