@@ -37,7 +37,38 @@ const VOICE_SAMPLES: Record<VoiceId, string> = {
   onyx:    "Good day. I'm Onyx. I'm here to assist. Please go ahead.",
 };
 
-const ELEVENLABS_PREVIEW_TEXT = "Hello, thank you for calling. I'm here to help — how can I assist you today?";
+const PREVIEW_TEXT_BY_LANG: Record<string, string> = {
+  en:  "Hello, thank you for calling. I'm here to help — how can I assist you today?",
+  ar:  "مرحباً، شكراً لاتصالك. أنا هنا للمساعدة — كيف يمكنني مساعدتك اليوم؟",
+  fr:  "Bonjour, merci de votre appel. Je suis là pour vous aider — comment puis-je vous assister aujourd'hui?",
+  de:  "Hallo, vielen Dank für Ihren Anruf. Ich bin hier um zu helfen — wie kann ich Ihnen heute behilflich sein?",
+  es:  "Hola, gracias por llamar. Estoy aquí para ayudar — ¿en qué puedo asistirle hoy?",
+  it:  "Ciao, grazie per aver chiamato. Sono qui per aiutarti — come posso assisterti oggi?",
+  pt:  "Olá, obrigado por ligar. Estou aqui para ajudar — como posso lhe ajudar hoje?",
+  nl:  "Hallo, bedankt voor uw oproep. Ik ben hier om te helpen — hoe kan ik u vandaag helpen?",
+  zh:  "您好，感谢您的来电。我在这里为您提供帮助 — 今天我能为您做什么？",
+  ja:  "こんにちは、お電話ありがとうございます。お手伝いするためにここにいます — 本日はどのようにお手伝いできますか？",
+  hi:  "नमस्ते, कॉल करने के लिए धन्यवाद। मैं यहाँ मदद के लिए हूँ — आज मैं आपकी कैसे सहायता कर सकता हूँ?",
+  ru:  "Здравствуйте, спасибо за звонок. Я здесь, чтобы помочь — как я могу помочь вам сегодня?",
+  sv:  "Hej, tack för ditt samtal. Jag är här för att hjälpa — hur kan jag hjälpa dig idag?",
+  no:  "Hei, takk for at du ringte. Jeg er her for å hjelpe — hvordan kan jeg hjelpe deg i dag?",
+  pl:  "Cześć, dziękuję za telefon. Jestem tutaj, żeby pomóc — jak mogę ci dziś pomóc?",
+  cs:  "Dobrý den, děkujeme za váš hovor. Jsem tu, abych pomohl — jak vám dnes mohu pomoci?",
+  sk:  "Dobrý deň, ďakujeme za váš hovor. Som tu, aby som pomohol — ako vám môžem dnes pomôcť?",
+  ro:  "Bună ziua, vă mulțumim că ați sunat. Sunt aici să ajut — cu ce vă pot ajuta astăzi?",
+  hr:  "Bok, hvala što ste pozvali. Ovdje sam da pomognem — kako vam mogu pomoći danas?",
+  uk:  "Привіт, дякуємо за дзвінок. Я тут, щоб допомогти — як я можу допомогти вам сьогодні?",
+  tr:  "Merhaba, aradığınız için teşekkürler. Yardımcı olmak için buradayım — bugün size nasıl yardımcı olabilirim?",
+  vi:  "Xin chào, cảm ơn bạn đã gọi. Tôi ở đây để giúp đỡ — tôi có thể giúp gì cho bạn hôm nay?",
+  ms:  "Helo, terima kasih kerana menghubungi. Saya di sini untuk membantu — bagaimana saya boleh membantu anda hari ini?",
+  fil: "Kumusta, salamat sa pagtawag. Nandito ako para tumulong — paano kita matutulungan ngayon?",
+};
+
+function getPreviewText(lang?: string): string {
+  if (!lang) return PREVIEW_TEXT_BY_LANG.en;
+  const code = lang.toLowerCase().split("-")[0];
+  return PREVIEW_TEXT_BY_LANG[code] ?? PREVIEW_TEXT_BY_LANG.en;
+}
 
 router.get("/ai-voice/preview", async (req, res): Promise<void> => {
   const engine = (req.query.engine as string) || "openai";
@@ -48,8 +79,9 @@ router.get("/ai-voice/preview", async (req, res): Promise<void> => {
       res.status(400).json({ error: "voiceId is required for elevenlabs preview" });
       return;
     }
+    const previewText = getPreviewText(req.query.lang as string | undefined);
     try {
-      const buf = await synthesizeElevenLabs(ELEVENLABS_PREVIEW_TEXT, voiceId);
+      const buf = await synthesizeElevenLabs(previewText, voiceId);
       res.setHeader("Content-Type", "audio/mpeg");
       res.setHeader("Content-Length", buf.length);
       res.send(buf);

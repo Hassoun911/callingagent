@@ -97,7 +97,7 @@ export default function Settings() {
   const [voiceLangFilter, setVoiceLangFilter] = useState("all");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const playVoicePreview = async (e: React.MouseEvent, voiceId: string, engine: "openai" | "elevenlabs" = "openai") => {
+  const playVoicePreview = async (e: React.MouseEvent, voiceId: string, engine: "openai" | "elevenlabs" = "openai", lang?: string) => {
     e.preventDefault();
     e.stopPropagation();
     const key = engine === "elevenlabs" ? `elevenlabs:${voiceId}` : voiceId;
@@ -114,7 +114,7 @@ export default function Settings() {
 
     try {
       const url = engine === "elevenlabs"
-        ? `/api/ai-voice/preview?engine=elevenlabs&voiceId=${encodeURIComponent(voiceId)}`
+        ? `/api/ai-voice/preview?engine=elevenlabs&voiceId=${encodeURIComponent(voiceId)}${lang ? `&lang=${encodeURIComponent(lang)}` : ""}`
         : `/api/ai-voice/preview?voice=${voiceId}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Preview failed");
@@ -350,7 +350,7 @@ export default function Settings() {
                             <button
                               type="button"
                               onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                              onClick={(e) => playVoicePreview(e, v.voiceId, "elevenlabs")}
+                              onClick={(e) => playVoicePreview(e, v.voiceId, "elevenlabs", displayLang || v.language || undefined)}
                               className={`ml-auto shrink-0 flex items-center justify-center h-6 w-6 rounded transition-colors ${
                                 previewingVoice === `elevenlabs:${v.voiceId}`
                                   ? "bg-green-500/20 text-green-400 hover:bg-red-500/20 hover:text-red-400"
@@ -376,7 +376,7 @@ export default function Settings() {
                   {formData.elevenLabsVoiceId && (
                     <button
                       type="button"
-                      onClick={(e) => playVoicePreview(e, formData.elevenLabsVoiceId, "elevenlabs")}
+                      onClick={(e) => playVoicePreview(e, formData.elevenLabsVoiceId, "elevenlabs", elevenLabsVoices?.voices?.find((v: any) => v.voiceId === formData.elevenLabsVoiceId)?.language || undefined)}
                       className={`flex items-center gap-2 px-3 h-8 rounded text-xs font-medium transition-colors border ${
                         previewingVoice === `elevenlabs:${formData.elevenLabsVoiceId}`
                           ? "border-green-500/40 bg-green-500/10 text-green-400 hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-400"
