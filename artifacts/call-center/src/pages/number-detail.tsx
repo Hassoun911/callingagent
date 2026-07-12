@@ -589,7 +589,7 @@ export default function NumberDetail() {
                                 <SelectTrigger className="bg-background h-8 text-xs mb-1.5">
                                   <SelectValue placeholder="Filter by language" />
                                 </SelectTrigger>
-                                <SelectContent className="max-h-[240px]" style={{ maxHeight: 240 }}>
+                                <SelectContent className="max-h-[480px]" style={{ maxHeight: 480 }}>
                                   <SelectItem value="all">All languages</SelectItem>
                                   {elevenLabsLanguageOptions.map(code => (
                                     <SelectItem key={code} value={code}>{languageLabel(code)}</SelectItem>
