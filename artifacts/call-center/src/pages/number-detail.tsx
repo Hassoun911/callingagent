@@ -653,7 +653,7 @@ export default function NumberDetail() {
                           {(formData.aiElevenLabsVoiceId && formData.aiElevenLabsVoiceId !== "__default__") && (
                             <button
                               type="button"
-                              onClick={(e) => playAiVoicePreview(e, "elevenlabs", formData.aiElevenLabsVoiceId!, elevenLabsVoices?.voices?.find((v: any) => v.voiceId === formData.aiElevenLabsVoiceId)?.language || undefined)}
+                              onClick={(e) => playAiVoicePreview(e, "elevenlabs", formData.aiElevenLabsVoiceId!, voiceLangFilter !== "all" ? voiceLangFilter : (elevenLabsVoices?.voices?.find((v: any) => v.voiceId === formData.aiElevenLabsVoiceId)?.language || undefined))}
                               className={`flex items-center gap-2 px-3 h-8 rounded text-xs font-medium transition-colors border ${
                                 previewingVoice === `elevenlabs:${formData.aiElevenLabsVoiceId}`
                                   ? "border-green-500/40 bg-green-500/10 text-green-400 hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-400"

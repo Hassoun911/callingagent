@@ -376,7 +376,7 @@ export default function Settings() {
                   {formData.elevenLabsVoiceId && (
                     <button
                       type="button"
-                      onClick={(e) => playVoicePreview(e, formData.elevenLabsVoiceId, "elevenlabs", elevenLabsVoices?.voices?.find((v: any) => v.voiceId === formData.elevenLabsVoiceId)?.language || undefined)}
+                      onClick={(e) => playVoicePreview(e, formData.elevenLabsVoiceId, "elevenlabs", voiceLangFilter !== "all" ? voiceLangFilter : (elevenLabsVoices?.voices?.find((v: any) => v.voiceId === formData.elevenLabsVoiceId)?.language || undefined))}
                       className={`flex items-center gap-2 px-3 h-8 rounded text-xs font-medium transition-colors border ${
                         previewingVoice === `elevenlabs:${formData.elevenLabsVoiceId}`
                           ? "border-green-500/40 bg-green-500/10 text-green-400 hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-400"
