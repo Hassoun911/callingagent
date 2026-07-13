@@ -16,6 +16,8 @@ export const appointmentsTable = pgTable("appointments", {
   startTime: timestamp("start_time", { withTimezone: true }).notNull(),
   endTime: timestamp("end_time", { withTimezone: true }),
   status: text("status").notNull().default("scheduled"),
+  // Tracks which reminders have been sent — e.g. ["24h", "1h"]
+  remindersSent: text("reminders_sent").array().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

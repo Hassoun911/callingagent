@@ -1,12 +1,12 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable, contactsTable, smsMessagesTable, extensionsTable, appointmentsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
 import twilio from "twilio";
 import { randomUUID } from "crypto";
 import nodemailer from "nodemailer";
-import { sendBookingNotifications } from "../lib/notifications";
+import { sendBookingNotifications, sendRescheduleNotifications, sendCancellationNotifications } from "../lib/notifications";
 
 // ─── Email notifications ─────────────────────────────────────────────────────
 
@@ -880,28 +880,88 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   try {
     const openai = getChatOpenAI();
 
-    const bookingTool: OpenAI.Chat.ChatCompletionTool = {
-      type: "function",
-      function: {
-        name: "book_appointment",
-        description: "Book an appointment for the caller. Call this when the caller wants to schedule a meeting, appointment, or callback. Extract all available details from the conversation.",
-        parameters: {
-          type: "object",
-          required: ["customerName", "customerPhone", "startTime", "title"],
-          properties: {
-            customerName: { type: "string", description: "Full name of the caller" },
-            customerPhone: { type: "string", description: "Phone number of the caller" },
-            customerEmail: { type: "string", description: "Email address if provided" },
-            title: { type: "string", description: "Type or purpose of the appointment (e.g. 'Consultation', 'Follow-up', 'Sales Meeting')" },
-            startTime: { type: "string", description: "ISO 8601 datetime for the appointment start (e.g. 2025-07-14T10:00:00Z)" },
-            endTime: { type: "string", description: "ISO 8601 datetime for the appointment end (optional)" },
-            notes: { type: "string", description: "Any additional notes or details about the appointment" },
+    // Helper: get company notification context
+    async function getCompanyNotifContext() {
+      if (!conv.companyId) return { companyName: conv.companyName ?? "the business", companyAdminEmail: null as string | null, companyAdminWhatsapp: null as string | null };
+      const [co] = await db.select().from(companiesTable).where(eq(companiesTable.id, conv.companyId));
+      return {
+        companyName: co?.name ?? conv.companyName ?? "the business",
+        companyAdminEmail: co?.adminNotificationEmail ?? co?.email ?? null,
+        companyAdminWhatsapp: co?.adminWhatsapp ?? null,
+      };
+    }
+
+    const callerPhone = conv.fromNumber ?? "unknown";
+
+    const aiTools: OpenAI.Chat.ChatCompletionTool[] = [
+      {
+        type: "function",
+        function: {
+          name: "book_appointment",
+          description: "Book a new appointment for the caller. Use when the caller wants to schedule a meeting, consultation, service visit, or callback.",
+          parameters: {
+            type: "object",
+            required: ["customerName", "customerPhone", "startTime", "title"],
+            properties: {
+              customerName: { type: "string", description: "Full name of the caller" },
+              customerPhone: { type: "string", description: "Phone number — use the caller's number if not explicitly given" },
+              customerEmail: { type: "string", description: "Email address if the caller provides it" },
+              title: { type: "string", description: "Type or purpose (e.g. 'Consultation', 'Tire Service', 'Follow-up')" },
+              startTime: { type: "string", description: "ISO 8601 datetime (e.g. 2025-07-14T10:00:00Z)" },
+              endTime: { type: "string", description: "ISO 8601 end datetime (optional)" },
+              notes: { type: "string", description: "Any additional details or requests" },
+            },
           },
         },
       },
-    };
+      {
+        type: "function",
+        function: {
+          name: "find_appointments",
+          description: "Look up existing appointments for the caller. Use before rescheduling or cancelling to find what appointments exist.",
+          parameters: {
+            type: "object",
+            required: [],
+            properties: {
+              customerPhone: { type: "string", description: "Phone number to search by — defaults to the caller's number" },
+            },
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "reschedule_appointment",
+          description: "Reschedule an existing appointment to a new date/time. Use find_appointments first to get the appointment ID.",
+          parameters: {
+            type: "object",
+            required: ["appointmentId", "newStartTime"],
+            properties: {
+              appointmentId: { type: "number", description: "ID of the appointment to reschedule" },
+              newStartTime: { type: "string", description: "New ISO 8601 start datetime" },
+              newEndTime: { type: "string", description: "New ISO 8601 end datetime (optional)" },
+              notes: { type: "string", description: "Updated notes (optional)" },
+            },
+          },
+        },
+      },
+      {
+        type: "function",
+        function: {
+          name: "cancel_appointment",
+          description: "Cancel an existing appointment. Use find_appointments first to get the appointment ID.",
+          parameters: {
+            type: "object",
+            required: ["appointmentId"],
+            properties: {
+              appointmentId: { type: "number", description: "ID of the appointment to cancel" },
+            },
+          },
+        },
+      },
+    ];
 
-    const systemContent = conv.systemPrompt + "\n\nIMPORTANT: You are on a live phone call. Keep responses concise — 1-2 sentences when possible. Always finish your sentences completely. Never use markdown, bullet points, or lists — only natural spoken language. NUMBERS AND DATES ARE SACRED: reproduce every number, salary, date, and figure character-for-character exactly as written in your instructions — never round, shorten, approximate, paraphrase, or invent any numeric or date value under any circumstances.\n\nYou have the ability to book appointments. If the caller wants to schedule something, collect their name, preferred date and time, and purpose, then use the book_appointment function. After booking, confirm it verbally to the caller.";
+    const systemContent = conv.systemPrompt + "\n\nIMPORTANT: You are on a live phone call. Keep responses concise — 1-2 sentences when possible. Always finish your sentences completely. Never use markdown, bullet points, or lists — only natural spoken language. NUMBERS AND DATES ARE SACRED: reproduce every number, salary, date, and figure character-for-character exactly as written in your instructions — never round, shorten, approximate, paraphrase, or invent any numeric or date value under any circumstances.\n\nYou can book, reschedule, and cancel appointments. When a caller wants to book: collect their name, preferred date/time, and purpose, then call book_appointment. When they want to reschedule or cancel: first call find_appointments to see their existing appointments, then call reschedule_appointment or cancel_appointment. Always confirm the action verbally after completing it.";
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -910,24 +970,27 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
         ...conv.messages,
       ],
       max_tokens: conv.maxTokens,
-      tools: [bookingTool],
+      tools: aiTools,
       tool_choice: "auto",
     });
 
     const choice = completion.choices[0];
     let aiText = choice?.message?.content ?? "";
 
-    // Handle function call — book_appointment
+    // Handle tool calls
     if (choice?.message?.tool_calls?.length) {
       const toolCall = choice.message.tool_calls[0];
-      if (toolCall.function.name === "book_appointment") {
-        try {
-          const args = JSON.parse(toolCall.function.arguments);
+      const toolName = toolCall.function.name;
+
+      try {
+        const args = JSON.parse(toolCall.function.arguments);
+
+        if (toolName === "book_appointment") {
           const [appointment] = await db.insert(appointmentsTable).values({
             companyId: conv.companyId,
             phoneNumberId: conv.phoneNumberId,
             customerName: args.customerName,
-            customerPhone: args.customerPhone ?? conv.fromNumber ?? "unknown",
+            customerPhone: args.customerPhone ?? callerPhone,
             customerEmail: args.customerEmail ?? null,
             title: args.title ?? "Appointment",
             notes: args.notes ?? null,
@@ -936,12 +999,10 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
             status: "scheduled",
           }).returning();
 
-          // Fire notifications async
           if (appointment) {
-            const companyForNotif = conv.companyId
-              ? await db.select().from(companiesTable).where(eq(companiesTable.id, conv.companyId)).then(r => r[0] ?? null)
-              : null;
+            const ctx = await getCompanyNotifContext();
             sendBookingNotifications({
+              ...ctx,
               customerName: appointment.customerName,
               customerPhone: appointment.customerPhone,
               customerEmail: appointment.customerEmail,
@@ -949,11 +1010,8 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
               notes: appointment.notes,
               startTime: appointment.startTime,
               endTime: appointment.endTime,
-              companyName: conv.companyName ?? "the business",
-              companyAdminEmail: companyForNotif?.adminNotificationEmail ?? companyForNotif?.email ?? null,
-              companyAdminWhatsapp: companyForNotif?.adminWhatsapp ?? null,
               twilioFromNumber: conv.fromNumber,
-            }).catch(err => logger.warn({ err: err?.message }, "Booking notification failed after AI booking"));
+            }).catch(err => logger.warn({ err: err?.message }, "Booking notification failed"));
           }
 
           const dateStr = new Date(args.startTime).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -961,10 +1019,113 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
           aiText = isArabic
             ? `تم حجز موعدك بنجاح في ${dateStr} الساعة ${timeStr}. سنرسل لك تأكيدًا. هل هناك أي شيء آخر يمكنني مساعدتك به؟`
             : `Your appointment has been booked for ${dateStr} at ${timeStr}. You'll receive a confirmation by SMS${args.customerEmail ? " and email" : ""}. Is there anything else I can help you with?`;
-        } catch (bookErr: any) {
-          logger.error({ err: bookErr?.message }, "Failed to save appointment from AI call");
-          aiText = isArabic ? "حدث خطأ أثناء حجز الموعد. يرجى الاتصال بنا مباشرة." : "I encountered an issue booking your appointment. Please contact us directly to schedule.";
+
+        } else if (toolName === "find_appointments") {
+          const searchPhone = args.customerPhone ?? callerPhone;
+          const found = await db.select().from(appointmentsTable)
+            .where(and(
+              eq(appointmentsTable.customerPhone, searchPhone),
+              ...(conv.companyId ? [eq(appointmentsTable.companyId, conv.companyId)] : []),
+            ))
+            .orderBy(desc(appointmentsTable.startTime))
+            .limit(5);
+
+          const upcoming = found.filter(a => a.startTime > new Date() && a.status !== "cancelled");
+
+          if (upcoming.length === 0) {
+            aiText = isArabic
+              ? "لم أجد أي مواعيد قادمة مرتبطة برقمك. هل تريد حجز موعد جديد؟"
+              : "I don't see any upcoming appointments for your number. Would you like to book a new one?";
+          } else {
+            // Return appointment data as tool result and let AI respond naturally
+            // Push as assistant tool_call + tool result so the AI can form its own reply
+            const apptList = upcoming.map(a => {
+              const d = a.startTime.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+              const t = a.startTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+              return `ID ${a.id}: ${a.title} on ${d} at ${t} (${a.status})`;
+            }).join("; ");
+            // Feed the result back to AI for a natural response
+            const followUp = await openai.chat.completions.create({
+              model: "gpt-4o-mini",
+              messages: [
+                { role: "system", content: systemContent },
+                ...conv.messages,
+                { role: "assistant", content: null, tool_calls: choice.message.tool_calls } as any,
+                { role: "tool", tool_call_id: toolCall.id, content: JSON.stringify({ appointments: upcoming.map(a => ({ id: a.id, title: a.title, startTime: a.startTime.toISOString(), status: a.status })) }) } as any,
+              ],
+              max_tokens: conv.maxTokens,
+              tools: aiTools,
+              tool_choice: "auto",
+            });
+            aiText = followUp.choices[0]?.message?.content ?? `I found your appointment: ${apptList}. Would you like to reschedule or cancel it?`;
+          }
+
+        } else if (toolName === "reschedule_appointment") {
+          const apptId = Number(args.appointmentId);
+          const [existing] = await db.select().from(appointmentsTable).where(eq(appointmentsTable.id, apptId));
+          if (!existing) {
+            aiText = isArabic ? "لم أجد هذا الموعد." : "I couldn't find that appointment. Please try again.";
+          } else {
+            const oldStartTime = existing.startTime;
+            const newStart = new Date(args.newStartTime);
+            const [updated] = await db.update(appointmentsTable).set({
+              startTime: newStart,
+              endTime: args.newEndTime ? new Date(args.newEndTime) : existing.endTime,
+              notes: args.notes ?? existing.notes,
+              status: "scheduled",
+              remindersSent: [], // Reset reminders for new time
+            }).where(eq(appointmentsTable.id, apptId)).returning();
+
+            const ctx = await getCompanyNotifContext();
+            sendRescheduleNotifications({
+              ...ctx,
+              customerName: updated.customerName,
+              customerPhone: updated.customerPhone,
+              customerEmail: updated.customerEmail,
+              title: updated.title,
+              notes: updated.notes,
+              startTime: updated.startTime,
+              endTime: updated.endTime,
+              twilioFromNumber: conv.fromNumber,
+              oldStartTime,
+            }).catch(err => logger.warn({ err: err?.message }, "Reschedule notification failed"));
+
+            const dateStr = newStart.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+            const timeStr = newStart.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+            aiText = isArabic
+              ? `تم إعادة جدولة موعدك إلى ${dateStr} الساعة ${timeStr}. ستتلقى تأكيدًا قريبًا.`
+              : `Done — your appointment has been rescheduled to ${dateStr} at ${timeStr}. You'll receive an updated confirmation. Is there anything else I can help you with?`;
+          }
+
+        } else if (toolName === "cancel_appointment") {
+          const apptId = Number(args.appointmentId);
+          const [existing] = await db.select().from(appointmentsTable).where(eq(appointmentsTable.id, apptId));
+          if (!existing) {
+            aiText = isArabic ? "لم أجد هذا الموعد." : "I couldn't find that appointment. Please try again.";
+          } else {
+            await db.update(appointmentsTable).set({ status: "cancelled" }).where(eq(appointmentsTable.id, apptId));
+
+            const ctx = await getCompanyNotifContext();
+            sendCancellationNotifications({
+              ...ctx,
+              customerName: existing.customerName,
+              customerPhone: existing.customerPhone,
+              customerEmail: existing.customerEmail,
+              title: existing.title,
+              notes: existing.notes,
+              startTime: existing.startTime,
+              endTime: existing.endTime,
+              twilioFromNumber: conv.fromNumber,
+            }).catch(err => logger.warn({ err: err?.message }, "Cancellation notification failed"));
+
+            aiText = isArabic
+              ? `تم إلغاء موعدك بنجاح. إذا أردت الحجز مجددًا في المستقبل، لا تتردد في الاتصال.`
+              : `Your appointment has been cancelled. You'll receive a cancellation confirmation. If you'd like to rebook in the future, don't hesitate to call us.`;
+          }
         }
+      } catch (toolErr: any) {
+        logger.error({ err: toolErr?.message, tool: toolName }, "AI tool call failed");
+        aiText = isArabic ? "حدث خطأ. يرجى المحاولة مرة أخرى أو الاتصال بنا مباشرة." : "I ran into an issue with that. Please try again or contact us directly.";
       }
     }
 
