@@ -53,7 +53,7 @@ router.post("/platform-users", async (req: Request, res: Response): Promise<void
   const scopedCompanyId = getCompanyScope(req);
   const { username, email, password, role, companyId } = parsed.data;
   const effectiveCompanyId = scopedCompanyId !== null ? scopedCompanyId : (companyId ?? null);
-  if (scopedCompanyId !== null && role === "super_admin") {
+  if (scopedCompanyId !== null && (role as string) === "super_admin") {
     res.status(403).json({ error: "Cannot create super_admin accounts" });
     return;
   }
@@ -79,7 +79,7 @@ router.patch("/platform-users/:id", async (req: Request, res: Response): Promise
       res.status(403).json({ error: "Access denied" });
       return;
     }
-    if (parsed.data.role === "super_admin") {
+    if ((parsed.data.role as string) === "super_admin") {
       res.status(403).json({ error: "Cannot assign super_admin role" });
       return;
     }

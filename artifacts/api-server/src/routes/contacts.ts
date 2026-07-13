@@ -126,7 +126,8 @@ router.post("/contacts", async (req, res): Promise<void> => {
     return;
   }
 
-  const [contact] = await db.insert(contactsTable).values(parsed.data).returning();
+  const { accessType, ...restData } = parsed.data;
+  const [contact] = await db.insert(contactsTable).values({ ...restData, accessType: accessType ?? undefined }).returning();
   res.status(201).json(GetContactResponse.parse({
     ...contact,
     companyName: null,
