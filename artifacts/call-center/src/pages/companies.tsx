@@ -141,7 +141,7 @@ export default function Companies() {
       const res = await fetch(`${BASE}/api/phone-numbers/import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber: num }),
+        body: JSON.stringify({ number: num }),
       });
       const body = await res.json();
       if (!res.ok) {
