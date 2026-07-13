@@ -252,12 +252,30 @@ export default function Companies() {
                   ) : '--'}
                 </TableCell>
                 <TableCell>
-                  {company.phone ? (
-                    <div className="flex items-center gap-1.5 text-sm font-mono text-muted-foreground">
-                      <Phone className="h-3 w-3" />
-                      {company.phone}
-                    </div>
-                  ) : '--'}
+                  {(() => {
+                    if (company.phone) {
+                      return (
+                        <div className="flex items-center gap-1.5 text-sm font-mono text-muted-foreground">
+                          <Phone className="h-3 w-3" />
+                          {company.phone}
+                        </div>
+                      );
+                    }
+                    const linked = allNumbers?.filter(n => n.companyId === company.id) ?? [];
+                    if (linked.length > 0) {
+                      return (
+                        <div className="space-y-0.5">
+                          {linked.map(n => (
+                            <div key={n.id} className="flex items-center gap-1.5 text-sm font-mono text-muted-foreground">
+                              <Phone className="h-3 w-3 flex-shrink-0" />
+                              {n.number}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return <span className="text-muted-foreground/40">--</span>;
+                  })()}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
