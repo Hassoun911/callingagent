@@ -13,9 +13,11 @@ import {
   Target,
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
 import { useWatches } from "@/hooks/use-watches";
 import { useListCompanies, useListPhoneNumbers } from "@workspace/api-client-react";
+import { useAuthContext } from "@/App";
 
 function NotificationBell() {
   const { data: watches } = useWatches();
@@ -109,6 +111,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   function NavContent({ onNav }: { onNav?: () => void }) {
     const onCompanyDetail = !!location.match(/^\/companies\/\d+/);
+    const { logout } = useAuthContext();
 
     return (
       <>
@@ -255,10 +258,17 @@ export function Layout({ children }: { children: ReactNode }) {
             <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs flex-shrink-0">
               A
             </div>
-            <div className="text-xs min-w-0">
+            <div className="text-xs min-w-0 flex-1">
               <div className="font-medium text-foreground">Admin User</div>
               <div className="text-muted-foreground">System Operator</div>
             </div>
+            <button
+              onClick={logout}
+              title="Sign out"
+              className="h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       </>
