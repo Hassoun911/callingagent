@@ -4,7 +4,9 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   useGetCompany, useUpdateCompany, getListCompaniesQueryKey, useListPhoneNumbers,
   useGetPhoneNumber, useUpdatePhoneNumber, getGetPhoneNumberQueryKey,
+  useGetAiVoiceConfig,
 } from "@workspace/api-client-react";
+import { GlobalAiSettingsDialog, GLOBAL_AI_LANGUAGES } from "@/components/GlobalAiSettingsDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -90,6 +92,8 @@ function NumberConfigPanel({ numberId, companyName }: { numberId: number; compan
   const { data: number, isLoading } = useGetPhoneNumber(numberId);
   const updateMutation = useUpdatePhoneNumber();
   const initRef = useRef(false);
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const { data: globalAiConfig } = useGetAiVoiceConfig();
 
   const [form, setForm] = useState<any>({});
 
@@ -224,8 +228,51 @@ function NumberConfigPanel({ numberId, companyName }: { numberId: number; compan
 
       {mode === "ai_voice" && (
         <div className="space-y-4">
+          {/* Global AI Defaults summary */}
+          {globalAiConfig && (
+            <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Global AI Defaults</span>
+                <button
+                  type="button"
+                  onClick={() => setAiSettingsOpen(true)}
+                  className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  Configure
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                <span className="text-xs text-muted-foreground">
+                  <span className="text-foreground/60 font-mono text-[10px] uppercase tracking-wide mr-1">Engine</span>
+                  <span className="text-foreground">{(globalAiConfig as any).aiVoiceEngine === "elevenlabs" ? "ElevenLabs" : "OpenAI TTS"}</span>
+                </span>
+                {globalAiConfig.voice && (
+                  <span className="text-xs text-muted-foreground">
+                    <span className="text-foreground/60 font-mono text-[10px] uppercase tracking-wide mr-1">Voice</span>
+                    <span className="text-foreground capitalize">{globalAiConfig.voice}</span>
+                  </span>
+                )}
+                {globalAiConfig.language && (
+                  <span className="text-xs text-foreground">
+                    {GLOBAL_AI_LANGUAGES.find(l => l.id === globalAiConfig.language)?.label ?? globalAiConfig.language}
+                  </span>
+                )}
+                {globalAiConfig.greeting && (
+                  <span className="text-xs text-muted-foreground truncate max-w-[220px]">
+                    <span className="text-foreground/60 font-mono text-[10px] uppercase tracking-wide mr-1">Greeting</span>
+                    <span className="text-foreground">{globalAiConfig.greeting}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          <GlobalAiSettingsDialog open={aiSettingsOpen} onOpenChange={setAiSettingsOpen} />
+
+          {/* Per-number overrides */}
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">AI Greeting</Label>
+            <Label className="text-xs text-muted-foreground">AI Greeting <span className="opacity-50">(leave blank to use global default)</span></Label>
             <Input
               className="h-8 text-xs bg-background border-border"
               value={form.aiGreeting}
@@ -234,7 +281,7 @@ function NumberConfigPanel({ numberId, companyName }: { numberId: number; compan
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">AI System Prompt</Label>
+            <Label className="text-xs text-muted-foreground">AI System Prompt <span className="opacity-50">(leave blank to use global default)</span></Label>
             <Textarea
               className="text-xs bg-background border-border resize-none"
               rows={4}
