@@ -431,6 +431,8 @@ export const ListCompaniesResponseItem = zod.object({
   "email": zod.string().nullish(),
   "website": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "adminNotificationEmail": zod.string().nullish(),
+  "adminWhatsapp": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListCompaniesResponse = zod.array(ListCompaniesResponseItem)
@@ -443,7 +445,9 @@ export const CreateCompanyBody = zod.object({
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),
   "website": zod.string().nullish(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "adminNotificationEmail": zod.string().nullish(),
+  "adminWhatsapp": zod.string().nullish()
 })
 
 
@@ -460,6 +464,8 @@ export const GetCompanyResponse = zod.object({
   "email": zod.string().nullish(),
   "website": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "adminNotificationEmail": zod.string().nullish(),
+  "adminWhatsapp": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -475,7 +481,9 @@ export const UpdateCompanyBody = zod.object({
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),
   "website": zod.string().nullish(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "adminNotificationEmail": zod.string().nullish(),
+  "adminWhatsapp": zod.string().nullish()
 })
 
 export const UpdateCompanyResponse = zod.object({
@@ -487,6 +495,8 @@ export const UpdateCompanyResponse = zod.object({
   "email": zod.string().nullish(),
   "website": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "adminNotificationEmail": zod.string().nullish(),
+  "adminWhatsapp": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -494,6 +504,138 @@ export const UpdateCompanyResponse = zod.object({
 export const DeleteCompanyParams = zod.object({
   "id": zod.coerce.number()
 })
+
+
+/**
+ * @summary List all appointments
+ */
+export const ListAppointmentsQueryParams = zod.object({
+  "companyId": zod.coerce.number().optional()
+})
+
+export const ListAppointmentsResponseItem = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number().nullish(),
+  "phoneNumberId": zod.number().nullish(),
+  "contactId": zod.number().nullish(),
+  "callLogId": zod.number().nullish(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerEmail": zod.string().nullish(),
+  "title": zod.string(),
+  "notes": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string().nullish(),
+  "status": zod.enum(['scheduled', 'confirmed', 'cancelled', 'no_show']),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+export const ListAppointmentsResponse = zod.array(ListAppointmentsResponseItem)
+
+
+/**
+ * @summary Create an appointment
+ */
+export const CreateAppointmentBody = zod.object({
+  "companyId": zod.number().nullish(),
+  "phoneNumberId": zod.number().nullish(),
+  "contactId": zod.number().nullish(),
+  "callLogId": zod.number().nullish(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerEmail": zod.string().nullish(),
+  "title": zod.string().optional(),
+  "notes": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string().nullish(),
+  "status": zod.enum(['scheduled', 'confirmed', 'cancelled', 'no_show']).optional()
+})
+
+
+export const GetAppointmentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetAppointmentResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number().nullish(),
+  "phoneNumberId": zod.number().nullish(),
+  "contactId": zod.number().nullish(),
+  "callLogId": zod.number().nullish(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerEmail": zod.string().nullish(),
+  "title": zod.string(),
+  "notes": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string().nullish(),
+  "status": zod.enum(['scheduled', 'confirmed', 'cancelled', 'no_show']),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+export const UpdateAppointmentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateAppointmentBody = zod.object({
+  "customerName": zod.string().nullish(),
+  "customerPhone": zod.string().nullish(),
+  "customerEmail": zod.string().nullish(),
+  "title": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "startTime": zod.string().nullish(),
+  "endTime": zod.string().nullish(),
+  "status": zod.string().nullish()
+})
+
+export const UpdateAppointmentResponse = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number().nullish(),
+  "phoneNumberId": zod.number().nullish(),
+  "contactId": zod.number().nullish(),
+  "callLogId": zod.number().nullish(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerEmail": zod.string().nullish(),
+  "title": zod.string(),
+  "notes": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string().nullish(),
+  "status": zod.enum(['scheduled', 'confirmed', 'cancelled', 'no_show']),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+export const DeleteAppointmentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const ListCompanyAppointmentsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListCompanyAppointmentsResponseItem = zod.object({
+  "id": zod.number(),
+  "companyId": zod.number().nullish(),
+  "phoneNumberId": zod.number().nullish(),
+  "contactId": zod.number().nullish(),
+  "callLogId": zod.number().nullish(),
+  "customerName": zod.string(),
+  "customerPhone": zod.string(),
+  "customerEmail": zod.string().nullish(),
+  "title": zod.string(),
+  "notes": zod.string().nullish(),
+  "startTime": zod.string(),
+  "endTime": zod.string().nullish(),
+  "status": zod.enum(['scheduled', 'confirmed', 'cancelled', 'no_show']),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+export const ListCompanyAppointmentsResponse = zod.array(ListCompanyAppointmentsResponseItem)
 
 
 /**

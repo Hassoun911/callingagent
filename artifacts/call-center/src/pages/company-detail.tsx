@@ -26,7 +26,7 @@ import {
   ArrowLeft, Building2, Phone, Globe, Mail, Edit, Plus, Trash2,
   ChevronRight, Hash, PhoneForwarded, Bot, Voicemail, Ban, Target,
   Settings2, Save, Loader2, Users, Shield, ChevronDown, Copy, Check,
-  Eye, EyeOff,
+  Eye, EyeOff, CalendarDays,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -333,7 +333,7 @@ export default function CompanyDetail() {
   const [extsLoading, setExtsLoading] = useState(true);
 
   const [editingCompany, setEditingCompany] = useState(false);
-  const [companyForm, setCompanyForm] = useState({ name: "", industry: "", phone: "", email: "", website: "", notes: "" });
+  const [companyForm, setCompanyForm] = useState({ name: "", industry: "", phone: "", email: "", website: "", notes: "", adminNotificationEmail: "", adminWhatsapp: "" });
 
   const [extDialog, setExtDialog] = useState(false);
   const [editingExt, setEditingExt] = useState<Extension | null>(null);
@@ -373,6 +373,8 @@ export default function CompanyDetail() {
         email: (company as any).email ?? "",
         website: company.website ?? "",
         notes: (company as any).notes ?? "",
+        adminNotificationEmail: (company as any).adminNotificationEmail ?? "",
+        adminWhatsapp: (company as any).adminWhatsapp ?? "",
       });
     }
   }, [company, companyLoading]);
@@ -930,6 +932,11 @@ export default function CompanyDetail() {
             </div>
             <div><Label>Website</Label><Input className="mt-1 bg-background" value={companyForm.website} onChange={e => setCompanyForm(f => ({ ...f, website: e.target.value }))} /></div>
             <div><Label>Notes</Label><Textarea className="mt-1 bg-background resize-none min-h-[70px]" value={companyForm.notes} onChange={e => setCompanyForm(f => ({ ...f, notes: e.target.value }))} /></div>
+            <div className="border-t border-border pt-3 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">AI Booking Notifications</p>
+              <div><Label className="text-xs">Admin Notification Email</Label><Input className="mt-1 bg-background text-xs" placeholder="admin@company.com" value={companyForm.adminNotificationEmail} onChange={e => setCompanyForm(f => ({ ...f, adminNotificationEmail: e.target.value }))} /></div>
+              <div><Label className="text-xs">Admin WhatsApp Number</Label><Input className="mt-1 bg-background text-xs font-mono" placeholder="+1 555 000 0000" value={companyForm.adminWhatsapp} onChange={e => setCompanyForm(f => ({ ...f, adminWhatsapp: e.target.value }))} /></div>
+            </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setEditingCompany(false)}>Cancel</Button>

@@ -20,6 +20,7 @@ import Messages from "@/pages/messages";
 import Campaigns from "@/pages/campaigns";
 import CampaignDetail from "@/pages/campaign-detail";
 import NotFound from "@/pages/not-found";
+import Bookings from "@/pages/bookings";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -176,6 +177,7 @@ function AdminRouter() {
         <Route path="/messages" component={Messages} />
         <Route path="/campaigns" component={Campaigns} />
         <Route path="/campaigns/:id" component={CampaignDetail} />
+        <Route path="/bookings" component={Bookings} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

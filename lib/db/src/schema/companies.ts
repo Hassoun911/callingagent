@@ -11,6 +11,8 @@ export const companiesTable = pgTable("companies", {
   email: text("email"),
   website: text("website"),
   notes: text("notes"),
+  adminNotificationEmail: text("admin_notification_email"),
+  adminWhatsapp: text("admin_whatsapp"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

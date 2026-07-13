@@ -21,4 +21,8 @@ export interface CompanyUpdate {
   website?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  adminNotificationEmail?: string | null;
+  /** @nullable */
+  adminWhatsapp?: string | null;
 }

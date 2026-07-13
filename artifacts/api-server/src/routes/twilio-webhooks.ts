@@ -1,11 +1,12 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable, contactsTable, smsMessagesTable, extensionsTable } from "@workspace/db";
+import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable, contactsTable, smsMessagesTable, extensionsTable, appointmentsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
 import twilio from "twilio";
 import { randomUUID } from "crypto";
 import nodemailer from "nodemailer";
+import { sendBookingNotifications } from "../lib/notifications";
 
 // ─── Email notifications ─────────────────────────────────────────────────────
 
@@ -298,6 +299,10 @@ interface ConversationState {
   baseUrl: string;
   speechTimeout: number;
   maxTokens: number;
+  companyId: number | null;
+  phoneNumberId: number | null;
+  fromNumber: string | null;
+  companyName: string | null;
 }
 const conversations = new Map<string, ConversationState>();
 
@@ -706,6 +711,10 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       baseUrl,
       speechTimeout,
       maxTokens,
+      companyId: phoneNumber?.companyId ?? null,
+      phoneNumberId: phoneNumber?.id ?? null,
+      fromNumber: phoneNumber?.number ?? null,
+      companyName: companyName ?? null,
     });
 
     // Generate greeting + retry audio in parallel, and start recording (non-blocking)
@@ -871,19 +880,93 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
   try {
     const openai = getChatOpenAI();
 
+    const bookingTool: OpenAI.Chat.ChatCompletionTool = {
+      type: "function",
+      function: {
+        name: "book_appointment",
+        description: "Book an appointment for the caller. Call this when the caller wants to schedule a meeting, appointment, or callback. Extract all available details from the conversation.",
+        parameters: {
+          type: "object",
+          required: ["customerName", "customerPhone", "startTime", "title"],
+          properties: {
+            customerName: { type: "string", description: "Full name of the caller" },
+            customerPhone: { type: "string", description: "Phone number of the caller" },
+            customerEmail: { type: "string", description: "Email address if provided" },
+            title: { type: "string", description: "Type or purpose of the appointment (e.g. 'Consultation', 'Follow-up', 'Sales Meeting')" },
+            startTime: { type: "string", description: "ISO 8601 datetime for the appointment start (e.g. 2025-07-14T10:00:00Z)" },
+            endTime: { type: "string", description: "ISO 8601 datetime for the appointment end (optional)" },
+            notes: { type: "string", description: "Any additional notes or details about the appointment" },
+          },
+        },
+      },
+    };
+
+    const systemContent = conv.systemPrompt + "\n\nIMPORTANT: You are on a live phone call. Keep responses concise — 1-2 sentences when possible. Always finish your sentences completely. Never use markdown, bullet points, or lists — only natural spoken language. NUMBERS AND DATES ARE SACRED: reproduce every number, salary, date, and figure character-for-character exactly as written in your instructions — never round, shorten, approximate, paraphrase, or invent any numeric or date value under any circumstances.\n\nYou have the ability to book appointments. If the caller wants to schedule something, collect their name, preferred date and time, and purpose, then use the book_appointment function. After booking, confirm it verbally to the caller.";
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        {
-          role: "system",
-          content: conv.systemPrompt + "\n\nIMPORTANT: You are on a live phone call. Keep responses concise — 1-2 sentences when possible. Always finish your sentences completely. Never use markdown, bullet points, or lists — only natural spoken language. NUMBERS AND DATES ARE SACRED: reproduce every number, salary, date, and figure character-for-character exactly as written in your instructions — never round, shorten, approximate, paraphrase, or invent any numeric or date value under any circumstances.",
-        },
+        { role: "system", content: systemContent },
         ...conv.messages,
       ],
       max_tokens: conv.maxTokens,
+      tools: [bookingTool],
+      tool_choice: "auto",
     });
 
-    let aiText = completion.choices[0]?.message?.content ?? "";
+    const choice = completion.choices[0];
+    let aiText = choice?.message?.content ?? "";
+
+    // Handle function call — book_appointment
+    if (choice?.message?.tool_calls?.length) {
+      const toolCall = choice.message.tool_calls[0];
+      if (toolCall.function.name === "book_appointment") {
+        try {
+          const args = JSON.parse(toolCall.function.arguments);
+          const [appointment] = await db.insert(appointmentsTable).values({
+            companyId: conv.companyId,
+            phoneNumberId: conv.phoneNumberId,
+            customerName: args.customerName,
+            customerPhone: args.customerPhone ?? conv.fromNumber ?? "unknown",
+            customerEmail: args.customerEmail ?? null,
+            title: args.title ?? "Appointment",
+            notes: args.notes ?? null,
+            startTime: new Date(args.startTime),
+            endTime: args.endTime ? new Date(args.endTime) : null,
+            status: "scheduled",
+          }).returning();
+
+          // Fire notifications async
+          if (appointment) {
+            const companyForNotif = conv.companyId
+              ? await db.select().from(companiesTable).where(eq(companiesTable.id, conv.companyId)).then(r => r[0] ?? null)
+              : null;
+            sendBookingNotifications({
+              customerName: appointment.customerName,
+              customerPhone: appointment.customerPhone,
+              customerEmail: appointment.customerEmail,
+              title: appointment.title,
+              notes: appointment.notes,
+              startTime: appointment.startTime,
+              endTime: appointment.endTime,
+              companyName: conv.companyName ?? "the business",
+              companyAdminEmail: companyForNotif?.adminNotificationEmail ?? companyForNotif?.email ?? null,
+              companyAdminWhatsapp: companyForNotif?.adminWhatsapp ?? null,
+              twilioFromNumber: conv.fromNumber,
+            }).catch(err => logger.warn({ err: err?.message }, "Booking notification failed after AI booking"));
+          }
+
+          const dateStr = new Date(args.startTime).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+          const timeStr = new Date(args.startTime).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+          aiText = isArabic
+            ? `تم حجز موعدك بنجاح في ${dateStr} الساعة ${timeStr}. سنرسل لك تأكيدًا. هل هناك أي شيء آخر يمكنني مساعدتك به؟`
+            : `Your appointment has been booked for ${dateStr} at ${timeStr}. You'll receive a confirmation by SMS${args.customerEmail ? " and email" : ""}. Is there anything else I can help you with?`;
+        } catch (bookErr: any) {
+          logger.error({ err: bookErr?.message }, "Failed to save appointment from AI call");
+          aiText = isArabic ? "حدث خطأ أثناء حجز الموعد. يرجى الاتصال بنا مباشرة." : "I encountered an issue booking your appointment. Please contact us directly to schedule.";
+        }
+      }
+    }
 
     if (!aiText) aiText = isArabic ? "عذرًا، لم أتمكن من المعالجة. هل يمكنك المحاولة مرة أخرى؟" : "I'm sorry, I couldn't process that. Can you try again?";
     conv.messages.push({ role: "assistant", content: aiText });

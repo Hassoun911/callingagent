@@ -573,6 +573,10 @@ export interface Company {
   website?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  adminNotificationEmail?: string | null;
+  /** @nullable */
+  adminWhatsapp?: string | null;
   createdAt: string;
 }
 
@@ -590,6 +594,10 @@ export interface CompanyInput {
   website?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  adminNotificationEmail?: string | null;
+  /** @nullable */
+  adminWhatsapp?: string | null;
 }
 
 export interface CompanyUpdate {
@@ -607,6 +615,96 @@ export interface CompanyUpdate {
   website?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  adminNotificationEmail?: string | null;
+  /** @nullable */
+  adminWhatsapp?: string | null;
+}
+
+export type AppointmentStatus = typeof AppointmentStatus[keyof typeof AppointmentStatus];
+
+
+export const AppointmentStatus = {
+  scheduled: 'scheduled',
+  confirmed: 'confirmed',
+  cancelled: 'cancelled',
+  no_show: 'no_show',
+} as const;
+
+export interface Appointment {
+  id: number;
+  /** @nullable */
+  companyId?: number | null;
+  /** @nullable */
+  phoneNumberId?: number | null;
+  /** @nullable */
+  contactId?: number | null;
+  /** @nullable */
+  callLogId?: number | null;
+  customerName: string;
+  customerPhone: string;
+  /** @nullable */
+  customerEmail?: string | null;
+  title: string;
+  /** @nullable */
+  notes?: string | null;
+  startTime: string;
+  /** @nullable */
+  endTime?: string | null;
+  status: AppointmentStatus;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type AppointmentInputStatus = typeof AppointmentInputStatus[keyof typeof AppointmentInputStatus];
+
+
+export const AppointmentInputStatus = {
+  scheduled: 'scheduled',
+  confirmed: 'confirmed',
+  cancelled: 'cancelled',
+  no_show: 'no_show',
+} as const;
+
+export interface AppointmentInput {
+  /** @nullable */
+  companyId?: number | null;
+  /** @nullable */
+  phoneNumberId?: number | null;
+  /** @nullable */
+  contactId?: number | null;
+  /** @nullable */
+  callLogId?: number | null;
+  customerName: string;
+  customerPhone: string;
+  /** @nullable */
+  customerEmail?: string | null;
+  title?: string;
+  /** @nullable */
+  notes?: string | null;
+  startTime: string;
+  /** @nullable */
+  endTime?: string | null;
+  status?: AppointmentInputStatus;
+}
+
+export interface AppointmentUpdate {
+  /** @nullable */
+  customerName?: string | null;
+  /** @nullable */
+  customerPhone?: string | null;
+  /** @nullable */
+  customerEmail?: string | null;
+  /** @nullable */
+  title?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  startTime?: string | null;
+  /** @nullable */
+  endTime?: string | null;
+  /** @nullable */
+  status?: string | null;
 }
 
 export type RecentCallItemDirection = typeof RecentCallItemDirection[keyof typeof RecentCallItemDirection];
@@ -1167,6 +1265,10 @@ companyId?: number;
 
 export type DeletePlatformUser200 = {
   ok: boolean;
+};
+
+export type ListAppointmentsParams = {
+companyId?: number;
 };
 
 export type ListCallLogsParams = {

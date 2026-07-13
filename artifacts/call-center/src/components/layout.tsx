@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   LogOut,
+  CalendarDays,
 } from "lucide-react";
 import { useWatches } from "@/hooks/use-watches";
 import { useListCompanies, useListPhoneNumbers } from "@workspace/api-client-react";
@@ -194,6 +195,18 @@ export function Layout({ children }: { children: ReactNode }) {
                 Messages
               </Link>
               <Link
+                href={`/bookings?companyId=${contextCompany.id}`}
+                onClick={onNav}
+                className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${
+                  isActive(`/bookings?companyId=${contextCompany.id}`)
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                <CalendarDays className="h-3 w-3 flex-shrink-0" />
+                Bookings
+              </Link>
+              <Link
                 href={`/settings?companyId=${contextCompany.id}`}
                 onClick={onNav}
                 className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${
@@ -242,6 +255,14 @@ export function Layout({ children }: { children: ReactNode }) {
                 );
               })}
             </div>
+          )}
+
+          {/* ── BOOKINGS (top-level, when no company context) ── */}
+          {!contextCompany && (
+            <Link href="/bookings" onClick={onNav} className={navCls("/bookings")}>
+              <CalendarDays className="h-4 w-4 flex-shrink-0" />
+              Bookings
+            </Link>
           )}
 
           {/* ── SYSTEM ── */}

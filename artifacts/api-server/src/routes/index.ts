@@ -14,6 +14,7 @@ import smsRouter from "./sms";
 import campaignsRouter from "./campaigns";
 import extensionsRouter from "./extensions";
 import platformUsersRouter from "./platform-users";
+import appointmentsRouter from "./appointments";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(watchesRouter);
 router.use(smsRouter);
 router.use(campaignsRouter);
 router.use(extensionsRouter);
+router.use(appointmentsRouter);
 
 export default router;

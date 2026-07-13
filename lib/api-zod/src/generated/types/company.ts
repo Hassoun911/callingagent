@@ -21,5 +21,9 @@ export interface Company {
   website?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  adminNotificationEmail?: string | null;
+  /** @nullable */
+  adminWhatsapp?: string | null;
   createdAt: string;
 }

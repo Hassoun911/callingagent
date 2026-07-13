@@ -8,3 +8,4 @@ export * from "./sms-messages";
 export * from "./campaigns";
 export * from "./auth";
 export * from "./extensions";
+export * from "./appointments";

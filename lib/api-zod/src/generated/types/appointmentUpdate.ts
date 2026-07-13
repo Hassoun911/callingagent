@@ -6,22 +6,21 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface CompanyInput {
-  name: string;
+export interface AppointmentUpdate {
   /** @nullable */
-  ownerName?: string | null;
+  customerName?: string | null;
   /** @nullable */
-  industry?: string | null;
+  customerPhone?: string | null;
   /** @nullable */
-  phone?: string | null;
+  customerEmail?: string | null;
   /** @nullable */
-  email?: string | null;
-  /** @nullable */
-  website?: string | null;
+  title?: string | null;
   /** @nullable */
   notes?: string | null;
   /** @nullable */
-  adminNotificationEmail?: string | null;
+  startTime?: string | null;
   /** @nullable */
-  adminWhatsapp?: string | null;
+  endTime?: string | null;
+  /** @nullable */
+  status?: string | null;
 }

@@ -25,6 +25,8 @@ tags:
     description: SMS messages
   - name: campaigns
     description: Outbound cold calling campaigns
+  - name: appointments
+    description: Appointment booking management
   - name: Auth
     description: Browser and mobile authentication endpoints.
 
@@ -483,6 +485,115 @@ paths:
       responses:
         "204":
           description: Deleted
+
+  /appointments:
+    get:
+      operationId: listAppointments
+      tags: [appointments]
+      summary: List all appointments
+      parameters:
+        - name: companyId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Appointment"
+    post:
+      operationId: createAppointment
+      tags: [appointments]
+      summary: Create an appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+
+  /appointments/{id}:
+    get:
+      operationId: getAppointment
+      tags: [appointments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+    patch:
+      operationId: updateAppointment
+      tags: [appointments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Appointment"
+    delete:
+      operationId: deleteAppointment
+      tags: [appointments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /companies/{id}/appointments:
+    get:
+      operationId: listCompanyAppointments
+      tags: [appointments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Company appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Appointment"
 
   /call-logs:
     get:
@@ -1639,6 +1750,10 @@ components:
           type: ["string", "null"]
         notes:
           type: ["string", "null"]
+        adminNotificationEmail:
+          type: ["string", "null"]
+        adminWhatsapp:
+          type: ["string", "null"]
         createdAt:
           type: string
 
@@ -1660,6 +1775,10 @@ components:
           type: ["string", "null"]
         notes:
           type: ["string", "null"]
+        adminNotificationEmail:
+          type: ["string", "null"]
+        adminWhatsapp:
+          type: ["string", "null"]
 
     CompanyUpdate:
       type: object
@@ -1677,6 +1796,96 @@ components:
         website:
           type: ["string", "null"]
         notes:
+          type: ["string", "null"]
+        adminNotificationEmail:
+          type: ["string", "null"]
+        adminWhatsapp:
+          type: ["string", "null"]
+
+    Appointment:
+      type: object
+      required: [id, customerName, customerPhone, title, startTime, status, createdAt]
+      properties:
+        id:
+          type: integer
+        companyId:
+          type: ["integer", "null"]
+        phoneNumberId:
+          type: ["integer", "null"]
+        contactId:
+          type: ["integer", "null"]
+        callLogId:
+          type: ["integer", "null"]
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        customerEmail:
+          type: ["string", "null"]
+        title:
+          type: string
+        notes:
+          type: ["string", "null"]
+        startTime:
+          type: string
+        endTime:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [scheduled, confirmed, cancelled, no_show]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    AppointmentInput:
+      type: object
+      required: [customerName, customerPhone, startTime]
+      properties:
+        companyId:
+          type: ["integer", "null"]
+        phoneNumberId:
+          type: ["integer", "null"]
+        contactId:
+          type: ["integer", "null"]
+        callLogId:
+          type: ["integer", "null"]
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        customerEmail:
+          type: ["string", "null"]
+        title:
+          type: string
+        notes:
+          type: ["string", "null"]
+        startTime:
+          type: string
+        endTime:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [scheduled, confirmed, cancelled, no_show]
+
+    AppointmentUpdate:
+      type: object
+      properties:
+        customerName:
+          type: ["string", "null"]
+        customerPhone:
+          type: ["string", "null"]
+        customerEmail:
+          type: ["string", "null"]
+        title:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        startTime:
+          type: ["string", "null"]
+        endTime:
+          type: ["string", "null"]
+        status:
           type: ["string", "null"]
 
     RecentCallItem:
