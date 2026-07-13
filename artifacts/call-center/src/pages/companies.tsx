@@ -145,7 +145,11 @@ export default function Companies() {
       });
       const body = await res.json();
       if (!res.ok) {
-        toast({ title: body.error || "Import failed", variant: "destructive" });
+        const message =
+          res.status === 409
+            ? "This number is already provisioned in Vanguard.OPS."
+            : body.error || "Import failed";
+        toast({ title: message, variant: "destructive" });
         return;
       }
       await queryClient.refetchQueries({ queryKey: ["listPhoneNumbers"] });

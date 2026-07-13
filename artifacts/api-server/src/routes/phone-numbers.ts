@@ -161,6 +161,14 @@ router.post("/phone-numbers/import", async (req, res): Promise<void> => {
   const twilioNum = incomingNumbers[0];
   const baseUrl = getBaseUrl(req);
 
+  // Check if already imported before touching Twilio webhooks
+  const existing = await db.select().from(phoneNumbersTable)
+    .where(eq(phoneNumbersTable.number, number));
+  if (existing.length > 0) {
+    res.status(409).json({ error: `${number} is already provisioned in Vanguard.OPS.` });
+    return;
+  }
+
   // Update webhook URLs on the Twilio number to point at our system
   try {
     await client.incomingPhoneNumbers(twilioNum.sid).update({
@@ -174,14 +182,6 @@ router.post("/phone-numbers/import", async (req, res): Promise<void> => {
   } catch (err: any) {
     req.log.error({ err }, "Failed to update Twilio webhooks on imported number");
     res.status(500).json({ error: "Found number but failed to configure webhooks: " + (err.message ?? "unknown") });
-    return;
-  }
-
-  // Check if already imported
-  const existing = await db.select().from(phoneNumbersTable)
-    .where(eq(phoneNumbersTable.number, number));
-  if (existing.length > 0) {
-    res.status(409).json({ error: `${number} is already in your Vanguard.OPS account.` });
     return;
   }
 

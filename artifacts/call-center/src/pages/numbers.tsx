@@ -51,7 +51,13 @@ export default function Numbers() {
         body: JSON.stringify({ number: num, friendlyName: importFriendlyName.trim() || undefined }),
       });
       const json = await r.json();
-      if (!r.ok) { toast({ title: json.error ?? "Import failed", variant: "destructive" }); return; }
+      if (!r.ok) {
+        const message = r.status === 409
+          ? "This number is already provisioned in Vanguard.OPS."
+          : json.error ?? "Import failed";
+        toast({ title: message, variant: "destructive" });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: getListPhoneNumbersQueryKey() });
       setSearchOpen(false);
       setImportNumber("");
