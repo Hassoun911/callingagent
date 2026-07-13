@@ -148,11 +148,11 @@ export default function Companies() {
         toast({ title: body.error || "Import failed", variant: "destructive" });
         return;
       }
-      await queryClient.invalidateQueries({ queryKey: ["listPhoneNumbers"] });
+      await queryClient.refetchQueries({ queryKey: ["listPhoneNumbers"] });
       setSelectedPhoneNumberId(String(body.id));
       setShowInlineImport(false);
       setInlineImportNumber("");
-      toast({ title: `Imported ${body.number}` });
+      toast({ title: `Imported ${body.number} — now selected below` });
     } catch {
       toast({ title: "Import failed", variant: "destructive" });
     } finally {
