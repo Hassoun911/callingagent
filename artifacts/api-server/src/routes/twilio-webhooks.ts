@@ -600,6 +600,16 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
 </Response>`;
     }
 
+  } else if (answerMode === "forward" && !forwardTo) {
+    // Forward mode configured but no destination set — fall back to voicemail
+    const greeting = phoneNumber?.voicemailGreeting ?? "Thank you for calling. Please leave a message after the tone and we'll get back to you.";
+    const audioId = await generateTts(greeting);
+    twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  ${playOrSay(audioId, greeting, baseUrl)}
+  <Record maxLength="120" action="${baseUrl}/api/twilio/recording" transcribe="true" transcribeCallback="${baseUrl}/api/twilio/transcription" />
+</Response>`;
+
   } else if (answerMode === "forward" && forwardTo) {
     const forwardCallerId = phoneNumber?.forwardCallerId ?? "caller";
     // When "line" is selected, explicitly set callerId to the Twilio number.
