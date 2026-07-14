@@ -293,18 +293,16 @@ export default function NumberDetail() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
 
-          {/* ── Routing Mode ── tabs only */}
-          <Card className="border-border">
+          {/* ── Routing ── unified card */}
+          <Card className={`border-border ${formData.answerMode === 'reject' ? 'border-red-500/20 bg-red-500/5' : ''}`}>
             <CardHeader className="pb-4">
               <CardTitle className="text-green-400">Routing Mode</CardTitle>
               <CardDescription>Determine how incoming calls are handled.</CardDescription>
-            </CardHeader>
-            <CardContent>
               <ToggleGroup
                 type="single"
                 value={formData.answerMode}
                 onValueChange={(val) => val && setFormData({ ...formData, answerMode: val })}
-                className="justify-start bg-secondary/50 p-1 rounded-lg border border-border"
+                className="justify-start bg-secondary/50 p-1 rounded-lg border border-border mt-2"
               >
                 <ToggleGroupItem value="forward" className="data-[state=on]:bg-background data-[state=on]:shadow-sm px-6 py-2 h-auto gap-2">
                   <PhoneForwarded className="h-4 w-4" />
@@ -323,11 +321,10 @@ export default function NumberDetail() {
                   <div className="font-medium text-sm">Reject</div>
                 </ToggleGroupItem>
               </ToggleGroup>
-            </CardContent>
-          </Card>
+            </CardHeader>
 
-          {/* ── Forward Settings ── */}
-          {formData.answerMode === 'forward' && (() => {
+            {/* ── Forward Settings ── */}
+            {formData.answerMode === 'forward' && (() => {
             const radioBase = "flex items-start gap-3 w-full p-3 rounded-md border text-left transition-colors cursor-pointer";
             const radioOn  = "border-primary bg-primary/10 text-foreground";
             const radioOff = "border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground";
@@ -343,15 +340,7 @@ export default function NumberDetail() {
               holdMessage: msg !== undefined ? msg : (exp === "ringing" ? "" : exp === "connecting" ? PRESET_HOLD : formData.holdMessage),
             });
             return (
-              <Card className="border-border animate-in fade-in slide-in-from-top-2 duration-300">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-green-400 flex items-center gap-2">
-                    <PhoneForwarded className="h-4 w-4" />
-                    Forward Settings
-                  </CardTitle>
-                  <CardDescription>Configure how calls are forwarded to your destination.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-0">
+              <CardContent className="space-y-0 border-t border-border animate-in fade-in duration-200">
 
                   {/* Destination + Ring Count */}
                   <div className="grid grid-cols-2 gap-6 pb-6">
@@ -538,25 +527,12 @@ export default function NumberDetail() {
                   </div>
 
                 </CardContent>
-              </Card>
             );
           })()}
 
           {/* ── AI Voice Settings ── */}
           {formData.answerMode === 'ai_voice' && (
-            <Card className="border-border animate-in fade-in slide-in-from-top-2 duration-300">
-              <CardHeader className="pb-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-green-400 flex items-center gap-2">
-                      <Bot className="h-4 w-4" />
-                      AI Voice Settings
-                    </CardTitle>
-                    <CardDescription className="mt-1">Per-number overrides — leave blank to use global defaults.</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-5">
+            <CardContent className="space-y-5 border-t border-border animate-in fade-in duration-200">
 
                 {/* Global Defaults summary */}
                 {globalAiConfig && (
@@ -752,48 +728,32 @@ export default function NumberDetail() {
                 </div>
 
               </CardContent>
-            </Card>
           )}
 
           {/* ── Voicemail Settings ── */}
           {formData.answerMode === 'voicemail' && (
-            <Card className="border-border animate-in fade-in slide-in-from-top-2 duration-300">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-green-400 flex items-center gap-2">
-                  <Voicemail className="h-4 w-4" />
-                  Voicemail Settings
-                </CardTitle>
-                <CardDescription>Configure the greeting callers hear before leaving a message.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Label className="text-green-400">Greeting Text</Label>
-                  <Textarea
-                    placeholder="Please leave a message after the beep."
-                    value={formData.voicemailGreeting}
-                    onChange={(e) => setFormData({...formData, voicemailGreeting: e.target.value})}
-                    className="bg-background"
-                  />
-                  <p className="text-xs text-muted-foreground">Text-to-speech will read this before recording starts.</p>
-                </div>
-              </CardContent>
-            </Card>
+            <CardContent className="border-t border-border animate-in fade-in duration-200">
+              <div className="space-y-2">
+                <Label className="text-green-400">Greeting Text</Label>
+                <Textarea
+                  placeholder="Please leave a message after the beep."
+                  value={formData.voicemailGreeting}
+                  onChange={(e) => setFormData({...formData, voicemailGreeting: e.target.value})}
+                  className="bg-background"
+                />
+                <p className="text-xs text-muted-foreground">Text-to-speech will read this before recording starts.</p>
+              </div>
+            </CardContent>
           )}
 
           {/* ── Reject ── */}
           {formData.answerMode === 'reject' && (
-            <Card className="border-red-500/20 bg-red-500/5 animate-in fade-in slide-in-from-top-2 duration-300">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-red-400 flex items-center gap-2">
-                  <Ban className="h-4 w-4" />
-                  Reject All Calls
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-red-400/80">All incoming calls to this number will be rejected immediately without answering.</p>
-              </CardContent>
-            </Card>
+            <CardContent className="border-t border-red-500/20 animate-in fade-in duration-200">
+              <p className="text-sm text-red-400/80">All incoming calls to this number will be rejected immediately without answering.</p>
+            </CardContent>
           )}
+
+          </Card>
 
         </div>
 
