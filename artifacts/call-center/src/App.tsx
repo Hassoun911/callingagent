@@ -129,15 +129,18 @@ function LoginScreen({ onSuccess, portalCompanyId }: { onSuccess: () => void; po
     <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
       <div className="w-full max-w-sm px-8">
         <div className="mb-10 text-center">
-          <p className="text-xs font-bold tracking-[3px] uppercase text-emerald-500 mb-2">
-            {isPortal ? "Company Portal" : "Operations Platform"}
-          </p>
-          <h1 className="text-3xl font-bold text-slate-50 tracking-tight">
-            {isPortal ? (companyName ?? "Company Portal") : "CallingAgent"}
-          </h1>
-          <p className="mt-2 text-sm text-slate-500">
-            {isPortal ? "Sign in to access your company portal" : "Call Center Management"}
-          </p>
+          {isPortal ? (
+            <>
+              <p className="text-xs font-bold tracking-[3px] uppercase text-emerald-500 mb-2">Company Portal</p>
+              <h1 className="text-3xl font-bold text-slate-50 tracking-tight">{companyName ?? "Company Portal"}</h1>
+              <p className="mt-2 text-sm text-slate-500">Sign in to access your company portal</p>
+            </>
+          ) : (
+            <>
+              <img src="/logo.png" alt="CallingAgent" className="h-14 w-auto mx-auto mb-4 object-contain" />
+              <p className="text-sm text-slate-500">Call Center Management</p>
+            </>
+          )}
         </div>
         <form onSubmit={handleSubmit} className="border border-slate-800 rounded-lg bg-slate-900/60 p-8 space-y-4">
           <div>

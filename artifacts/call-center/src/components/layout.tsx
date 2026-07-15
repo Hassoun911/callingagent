@@ -117,13 +117,8 @@ export function Layout({ children }: { children: ReactNode }) {
 
     return (
       <>
-        <div className="h-16 flex items-center px-6 border-b border-border flex-shrink-0">
-          <div className="flex items-center gap-2 text-primary">
-            <PhoneCall className="h-6 w-6" />
-            <span className="font-bold text-lg text-foreground tracking-tight">
-              CALLING<span className="text-primary">AGENT</span>
-            </span>
-          </div>
+        <div className="h-16 flex items-center px-4 border-b border-border flex-shrink-0">
+          <img src="/logo.png" alt="CallingAgent" className="h-8 w-auto object-contain" />
         </div>
 
         <div className="flex-1 py-4 px-3 overflow-y-auto space-y-0.5">
