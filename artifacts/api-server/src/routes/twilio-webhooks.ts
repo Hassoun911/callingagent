@@ -727,9 +727,11 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       companyName: companyName ?? null,
     });
 
-    // Generate greeting + retry audio in parallel, and start recording (non-blocking)
+    // Generate greeting + retry audio in parallel BEFORE responding
+    // (startCallRecording is deferred until after res.send — calling the Twilio
+    // recordings API before TwiML is returned causes Twilio to fire "no-answer"
+    // and terminate the call prematurely on the first cold-start when TTS is slow)
     const retryFallback = language === "ar-SA" ? "لم أفهم. هل يمكنك الإعادة؟" : "I didn't catch that. Could you please repeat?";
-    startCallRecording(CallSid, `${baseUrl}/api/twilio/recording`);
     const [greetingAudioId, retryAudioId] = await Promise.all([
       generateTts(greetingText, ttsVoice, voiceStyle, engineOpts),
       generateTts(retryFallback, ttsVoice, voiceStyle, engineOpts),
@@ -757,6 +759,14 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
 
   res.set("Content-Type", "text/xml");
   res.send(twiml);
+
+  // Start recording AFTER TwiML is sent — calling the Twilio recordings API
+  // before the response is returned terminates the call prematurely on cold starts.
+  if (answerMode === "ai_voice") {
+    setImmediate(() => {
+      startCallRecording(CallSid, `${baseUrl}/api/twilio/recording`);
+    });
+  }
 
   } catch (err: any) {
     req.log.error({ err: err?.message, stack: err?.stack }, "Unhandled error in /twilio/voice — returning safe TwiML");
