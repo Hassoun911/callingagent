@@ -1564,6 +1564,18 @@ async function sendSmsNotificationIfConfigured(callSid: string): Promise<void> {
     const adminPhone = aiConfig?.adminNotifyPhone?.trim();
     if (!adminPhone) return;
 
+    // Resolve business name from the phone number's company
+    let businessName = "Us";
+    if (log.toNumber) {
+      const [pn] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, log.toNumber));
+      if (pn?.companyId) {
+        const [co] = await db.select().from(companiesTable).where(eq(companiesTable.id, pn.companyId));
+        if (co?.name) businessName = co.name;
+      } else if (pn?.friendlyName) {
+        businessName = pn.friendlyName;
+      }
+    }
+
     const client = getTwilioClient();
 
     const callerDisplay = log.contactName ?? log.callerIdName ?? log.callerName ?? log.fromNumber ?? "Unknown";
@@ -1601,11 +1613,11 @@ async function sendSmsNotificationIfConfigured(callSid: string): Promise<void> {
     if (callerNumber && callerNumber !== "Anonymous" && (isEmergency || isAppointment)) {
       let callerMsg: string;
       if (isEmergency) {
-        callerMsg = `Thank you for calling All Tire Mobile Shop. We received your request for roadside assistance`;
+        callerMsg = `Thank you for calling ${businessName}. We received your request for roadside assistance`;
         if (log.callerLocation) callerMsg += ` at ${log.callerLocation}`;
         callerMsg += `. A technician will be in touch shortly. For urgent help call us back anytime.`;
       } else {
-        callerMsg = `Thank you for booking with All Tire Mobile Shop!`;
+        callerMsg = `Thank you for booking with ${businessName}!`;
         if (log.callSummary) callerMsg += ` ${log.callSummary}`;
         callerMsg += ` If you need to change your appointment please call us back.`;
       }
