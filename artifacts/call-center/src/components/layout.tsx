@@ -196,6 +196,18 @@ export function Layout({ children }: { children: ReactNode }) {
                 Messages
               </Link>
               <Link
+                href={`/leads?companyId=${contextCompany.id}`}
+                onClick={onNav}
+                className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${
+                  isActive(`/leads?companyId=${contextCompany.id}`)
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                <TrendingUp className="h-3 w-3 flex-shrink-0" />
+                Leads
+              </Link>
+              <Link
                 href={`/bookings?companyId=${contextCompany.id}`}
                 onClick={onNav}
                 className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${

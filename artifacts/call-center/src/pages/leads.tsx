@@ -406,6 +406,27 @@ export default function Leads() {
   // Normalize to E.164 digits-only key for reliable matching
   const normPhone = (n: string) => n.replace(/\D/g, "");
 
+  // Read company filter from URL
+  const urlCompanyId = useMemo(() => {
+    const p = new URLSearchParams(window.location.search).get("companyId");
+    return p ? parseInt(p, 10) : undefined;
+  }, []);
+
+  const filterCompanyName = useMemo(
+    () => urlCompanyId && companies ? (companies.find(c => c.id === urlCompanyId)?.name ?? null) : null,
+    [urlCompanyId, companies]
+  );
+
+  // Set of normalized phone numbers belonging to the filtered company
+  const companyNumbers = useMemo(() => {
+    if (!urlCompanyId || !phoneNumbers) return null;
+    return new Set(
+      phoneNumbers
+        .filter(pn => pn.companyId === urlCompanyId)
+        .map(pn => normPhone(pn.number))
+    );
+  }, [urlCompanyId, phoneNumbers]);
+
   // Build normalized-toNumber → company name lookup
   const companyByToNumber = useMemo(() => {
     const map: Record<string, string> = {};
@@ -420,13 +441,20 @@ export default function Leads() {
     return map;
   }, [phoneNumbers, companies]);
 
-  const needsHelp = calls?.filter(
-    (c) => c.callType === "Emergency" || c.priority === "High"
-  ) ?? [];
+  // Apply company filter if active
+  const filteredCalls = useMemo(() => {
+    if (!calls) return [];
+    if (!companyNumbers) return calls;
+    return calls.filter(c => c.toNumber && companyNumbers.has(normPhone(c.toNumber)));
+  }, [calls, companyNumbers]);
 
-  const appointments = calls?.filter(
+  const needsHelp = filteredCalls.filter(
+    (c) => c.callType === "Emergency" || c.priority === "High"
+  );
+
+  const appointments = filteredCalls.filter(
     (c) => c.callType === "Appointment"
-  ) ?? [];
+  );
 
   const tabs: { id: TabId; label: string; count: number }[] = [
     { id: "needs-help",   label: "Needs Help",  count: needsHelp.length },
@@ -442,6 +470,12 @@ export default function Leads() {
         <p className="text-muted-foreground mt-1">
           Inbound calls classified as high-priority or appointment requests by the AI.
         </p>
+        {filterCompanyName && (
+          <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
+            <Building2 className="h-3 w-3" />
+            Filtered: {filterCompanyName}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
