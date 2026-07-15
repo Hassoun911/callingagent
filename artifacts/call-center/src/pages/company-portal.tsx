@@ -154,8 +154,26 @@ function AdminNotifyWidget({ role }: { role: string }) {
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
+  function normalizePhone(raw: string): string | null {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const isWhatsApp = trimmed.toLowerCase().startsWith("whatsapp:");
+    const numPart = isWhatsApp ? trimmed.slice("whatsapp:".length).trim() : trimmed;
+    const digits = numPart.replace(/\D/g, "");
+    let e164 = numPart;
+    if (digits.length === 10) {
+      e164 = `+1${digits}`;
+    } else if (digits.length === 11 && digits.startsWith("1")) {
+      e164 = `+${digits}`;
+    } else if (!numPart.startsWith("+")) {
+      e164 = `+${digits}`;
+    }
+    return isWhatsApp ? `whatsapp:${e164}` : e164;
+  }
+
   function save() {
-    update.mutate({ data: { adminNotifyPhone: value.trim() || null } });
+    const normalized = normalizePhone(value);
+    update.mutate({ data: { adminNotifyPhone: normalized } });
     setEditing(false);
   }
 
@@ -188,7 +206,7 @@ function AdminNotifyWidget({ role }: { role: string }) {
               ref={inputRef}
               value={value}
               onChange={e => setValue(e.target.value)}
-              placeholder="+1... or whatsapp:+1..."
+              placeholder="2265551234 or whatsapp:2265551234"
               className="flex-1 bg-background border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-primary font-mono"
               onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
             />
