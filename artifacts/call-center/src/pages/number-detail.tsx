@@ -186,6 +186,7 @@ export default function NumberDetail() {
   }
 
   const [formData, setFormData] = useState<any>({});
+  const [testCallTo, setTestCallTo] = useState("");
   const initRef = useRef(false);
 
   useEffect(() => {
@@ -243,17 +244,22 @@ export default function NumberDetail() {
   };
 
   const handleTestCall = () => {
-    if (!formData.forwardTo && formData.answerMode === 'forward') {
+    const isForward = formData.answerMode === 'forward';
+    if (isForward && !formData.forwardTo) {
       toast({ title: "Missing number", description: "Please specify a forward-to number to test.", variant: "destructive" });
       return;
     }
-    const targetNumber = formData.answerMode === 'forward' ? formData.forwardTo : "+1234567890"; // Mock target for non-forward modes
+    if (!isForward && !testCallTo) {
+      toast({ title: "Missing number", description: "Enter a phone number to call for the test.", variant: "destructive" });
+      return;
+    }
+    const targetNumber = isForward ? formData.forwardTo : testCallTo;
     testCallMutation.mutate({
       id: numId,
       data: { toNumber: targetNumber }
     }, {
       onSuccess: () => {
-        toast({ title: "Test call initiated", description: "Ringing destination number..." });
+        toast({ title: "Test call initiated", description: "Calling your phone — answer to hear the AI greeting." });
       }
     });
   };
@@ -278,10 +284,18 @@ export default function NumberDetail() {
             <p className="text-muted-foreground mt-1">Configure line behavior and routing.</p>
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          {formData.answerMode && formData.answerMode !== 'forward' && (
+            <Input
+              value={testCallTo}
+              onChange={e => setTestCallTo(e.target.value)}
+              placeholder="Your phone +1..."
+              className="h-9 w-44 text-sm bg-background"
+            />
+          )}
           <Button variant="outline" onClick={handleTestCall} disabled={testCallMutation.isPending} className="gap-2">
             <PhoneCall className="h-4 w-4" />
-            Test Routing
+            {testCallMutation.isPending ? "Calling..." : "Test Routing"}
           </Button>
           <Button onClick={handleSave} disabled={updateMutation.isPending} className="gap-2">
             <Save className="h-4 w-4" />
