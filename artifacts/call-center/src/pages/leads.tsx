@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useListCallLogs } from "@workspace/api-client-react";
+import { useState, useMemo } from "react";
+import { useListCallLogs, useListPhoneNumbers, useListCompanies } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import {
   PhoneIncoming, Phone, Mail, MapPin, Tag, AlertCircle,
-  User, CalendarDays, FileText, Play, Download, Loader2,
+  User, CalendarDays, FileText, Play, Download, Loader2, Building2,
 } from "lucide-react";
 import { useRef, useEffect, useCallback } from "react";
 
@@ -147,7 +147,7 @@ function CallTypeBadge({ type }: { type: string | null | undefined }) {
   );
 }
 
-function LeadDetail({ call, open, onClose }: { call: any; open: boolean; onClose: () => void }) {
+function LeadDetail({ call, companyName, open, onClose }: { call: any; companyName?: string; open: boolean; onClose: () => void }) {
   if (!call) return null;
   const hasRecording = !!(call.recordingSid || call.recordingUrl);
   const hasSummary = call.callSummary || call.actionRequired;
@@ -171,6 +171,15 @@ function LeadDetail({ call, open, onClose }: { call: any; open: boolean; onClose
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-3">
+          {companyName && (
+            <div className="col-span-2 flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+              <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Company</p>
+                <p className="text-sm font-medium text-primary">{companyName}</p>
+              </div>
+            </div>
+          )}
           {call.fromNumber && call.fromNumber !== "Anonymous" && (
             <div className="flex items-center gap-2 p-3 bg-background border border-border rounded-lg">
               <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -304,7 +313,7 @@ function formatDuration(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function LeadCard({ call, onClick }: { call: any; onClick: () => void }) {
+function LeadCard({ call, companyName, onClick }: { call: any; companyName?: string; onClick: () => void }) {
   const displayName =
     [call.callerName, call.contactName, call.callerIdName].find(n => n && n !== "null" && n !== "undefined") ?? null;
   const hasRecording = !!(call.recordingSid || call.recordingUrl);
@@ -327,6 +336,12 @@ function LeadCard({ call, onClick }: { call: any; onClick: () => void }) {
               </>
             ) : (
               <p className="font-mono text-sm font-medium">{formatPhone(call.fromNumber)}</p>
+            )}
+            {companyName && (
+              <p className="text-xs text-primary/80 flex items-center gap-1 mt-0.5 font-medium">
+                <Building2 className="h-3 w-3 shrink-0" />
+                {companyName}
+              </p>
             )}
             {call.callerEmail && (
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -385,6 +400,22 @@ export default function Leads() {
   const [selectedCall, setSelectedCall] = useState<any>(null);
 
   const { data: calls, isLoading } = useListCallLogs({ limit: 200 });
+  const { data: phoneNumbers } = useListPhoneNumbers();
+  const { data: companies } = useListCompanies();
+
+  // Build toNumber → company name lookup
+  const companyByToNumber = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (!phoneNumbers || !companies) return map;
+    const companyMap = new Map(companies.map(c => [c.id, c.name]));
+    for (const pn of phoneNumbers) {
+      if (pn.companyId && pn.number) {
+        const name = companyMap.get(pn.companyId);
+        if (name) map[pn.number] = name;
+      }
+    }
+    return map;
+  }, [phoneNumbers, companies]);
 
   const needsHelp = calls?.filter(
     (c) => c.callType === "Emergency" || c.priority === "High"
@@ -476,6 +507,7 @@ export default function Leads() {
             <LeadCard
               key={call.id}
               call={call}
+              companyName={call.toNumber ? companyByToNumber[call.toNumber] : undefined}
               onClick={() => setSelectedCall(call)}
             />
           ))}
@@ -484,6 +516,7 @@ export default function Leads() {
 
       <LeadDetail
         call={selectedCall}
+        companyName={selectedCall?.toNumber ? companyByToNumber[selectedCall.toNumber] : undefined}
         open={!!selectedCall}
         onClose={() => setSelectedCall(null)}
       />
