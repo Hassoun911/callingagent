@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, createContext, useContext } from "react";
+import { useState, useEffect, useCallback, createContext, useContext, useRef } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -82,6 +82,47 @@ function useAuth() {
   return { user, isLoading, isAuthenticated: !!user, logout, refetch: checkAuth };
 }
 
+function AnimatedLogo() {
+  return (
+    <>
+      <style>{`
+        @keyframes ca-icon-pop {
+          0%   { transform: scale(0.4) rotate(-15deg); opacity: 0; }
+          65%  { transform: scale(1.1)  rotate(4deg);  opacity: 1; }
+          100% { transform: scale(1)    rotate(0deg);  opacity: 1; }
+        }
+        @keyframes ca-text-slide {
+          0%   { transform: translateX(-100%); opacity: 0; }
+          25%  { opacity: 1; }
+          100% { transform: translateX(0);     opacity: 1; }
+        }
+        .ca-icon { animation: ca-icon-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both; }
+        .ca-clip  { overflow: hidden; }
+        .ca-text  { animation: ca-text-slide 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both; white-space: nowrap; }
+      `}</style>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        {/* Phone icon — the "C" */}
+        <div className="ca-icon" style={{ width: 56, height: 56, flexShrink: 0 }}>
+          <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%" }}>
+            {/* Signal arcs */}
+            <path d="M35 10 C40 12 44 17 45 23" stroke="#12aae8" strokeWidth="3" strokeLinecap="round"/>
+            <path d="M32 15 C35 16.5 38 19.5 39 23" stroke="#12aae8" strokeWidth="2.5" strokeLinecap="round"/>
+            {/* Handset body */}
+            <path d="M22 12c-1 0-2.2.4-2.8 1.2l-3 4c-.8 1.3-.5 2.8.1 4 2.4 4.6 6.5 8.7 11.1 11.1 1.2.6 2.7.9 4 .1l4-3c.8-.6 1.2-1.8 1.2-2.8v-.5c0-.4-.2-.8-.5-1l-4.8-3.2c-.5-.3-1.1-.3-1.5.1l-1.8 1.8c-.3.3-.8.4-1.2.2-1.8-1-3.8-3-4.8-4.8-.2-.4-.1-.9.2-1.2l1.8-1.8c.4-.4.4-1 .1-1.5L23.5 12.5c-.2-.3-.6-.5-1-.5H22z" fill="#12aae8"/>
+          </svg>
+        </div>
+        {/* ALLINGAGENT slides out from inside the icon */}
+        <div className="ca-clip">
+          <div className="ca-text" style={{ display: "flex", alignItems: "baseline", gap: 0 }}>
+            <span style={{ color: "#fff", fontWeight: 900, fontSize: "2.4rem", letterSpacing: "-0.02em", lineHeight: 1, fontFamily: "system-ui, -apple-system, sans-serif" }}>ALLING</span>
+            <span style={{ color: "#12aae8", fontWeight: 900, fontSize: "2.4rem", letterSpacing: "-0.02em", lineHeight: 1, fontFamily: "system-ui, -apple-system, sans-serif" }}>AGENT</span>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function LoginScreen({ onSuccess, portalCompanyId }: { onSuccess: () => void; portalCompanyId?: number }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -137,7 +178,9 @@ function LoginScreen({ onSuccess, portalCompanyId }: { onSuccess: () => void; po
             </>
           ) : (
             <>
-              <img src="/logo.png" alt="CallingAgent" className="w-72 h-auto mx-auto mb-4 object-contain" />
+              <div className="flex justify-center mb-4">
+                <AnimatedLogo />
+              </div>
               <p className="text-sm text-slate-500">Call Center Management</p>
             </>
           )}
