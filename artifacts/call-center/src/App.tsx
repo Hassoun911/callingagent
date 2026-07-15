@@ -86,39 +86,23 @@ function AnimatedLogo() {
   return (
     <>
       <style>{`
-        @keyframes ca-icon-pop {
-          0%   { transform: scale(0.4) rotate(-15deg); opacity: 0; }
-          65%  { transform: scale(1.1)  rotate(4deg);  opacity: 1; }
-          100% { transform: scale(1)    rotate(0deg);  opacity: 1; }
+        @keyframes ca-reveal {
+          0%   { clip-path: inset(0 calc(100% - 62px) 0 0); }
+          100% { clip-path: inset(0 0% 0 0); }
         }
-        @keyframes ca-text-slide {
-          0%   { transform: translateX(-100%); opacity: 0; }
-          25%  { opacity: 1; }
-          100% { transform: translateX(0);     opacity: 1; }
+        @keyframes ca-fade-in {
+          0%   { opacity: 0; transform: scale(0.92); }
+          100% { opacity: 1; transform: scale(1); }
         }
-        .ca-icon { animation: ca-icon-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both; }
-        .ca-clip  { overflow: hidden; }
-        .ca-text  { animation: ca-text-slide 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both; white-space: nowrap; }
+        .ca-logo {
+          display: block;
+          width: 300px;
+          height: auto;
+          animation: ca-fade-in 0.25s ease-out 0s both,
+                     ca-reveal 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+        }
       `}</style>
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        {/* Phone icon — the "C" */}
-        <div className="ca-icon" style={{ width: 72, height: 72, flexShrink: 0 }}>
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%" }}>
-            {/* Signal arcs */}
-            <path d="M19.5 3.5 C21.8 5.8 23 9 23 12.5" stroke="#12aae8" strokeWidth="1.8" strokeLinecap="round"/>
-            <path d="M16.5 6 C18 8 18.8 10.1 18.8 12.5" stroke="#12aae8" strokeWidth="1.5" strokeLinecap="round"/>
-            {/* Phone handset — lucide Phone path, fills 24×24 */}
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 5 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.9 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="#12aae8"/>
-          </svg>
-        </div>
-        {/* ALLINGAGENT slides out from inside the icon */}
-        <div className="ca-clip">
-          <div className="ca-text" style={{ display: "flex", alignItems: "baseline", gap: 0 }}>
-            <span style={{ color: "#fff", fontWeight: 900, fontSize: "2.4rem", letterSpacing: "-0.02em", lineHeight: 1, fontFamily: "system-ui, -apple-system, sans-serif" }}>ALLING</span>
-            <span style={{ color: "#12aae8", fontWeight: 900, fontSize: "2.4rem", letterSpacing: "-0.02em", lineHeight: 1, fontFamily: "system-ui, -apple-system, sans-serif" }}>AGENT</span>
-          </div>
-        </div>
-      </div>
+      <img src="/logo.png" alt="CallingAgent" className="ca-logo" />
     </>
   );
 }
