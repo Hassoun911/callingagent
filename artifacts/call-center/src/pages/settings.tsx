@@ -151,6 +151,7 @@ export default function Settings() {
     campaignVoiceEngine: "google",
     elevenLabsVoiceId: "",
     aiVoiceEngine: "openai",
+    adminNotifyPhone: "",
   });
   const initRef = useRef(false);
 
@@ -168,6 +169,7 @@ export default function Settings() {
         campaignVoiceEngine: (config as any).campaignVoiceEngine ?? "google",
         elevenLabsVoiceId: (config as any).elevenLabsVoiceId ?? "",
         aiVoiceEngine: (config as any).aiVoiceEngine ?? "openai",
+        adminNotifyPhone: config.adminNotifyPhone ?? "",
       });
       initRef.current = true;
     }
@@ -721,6 +723,32 @@ export default function Settings() {
             </div>
           )}
 
+        </CardContent>
+      </Card>
+
+      <Card className="border-border">
+        <CardHeader>
+          <div className="flex items-center gap-2 text-primary mb-2">
+            <Bot className="h-5 w-5" />
+            <CardTitle>Post-Call Notifications</CardTitle>
+          </div>
+          <CardDescription>Receive an SMS or WhatsApp message after every completed AI-answered call.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-green-400">Admin Notify Phone</Label>
+            <Input
+              value={formData.adminNotifyPhone ?? ""}
+              onChange={e => setFormData({ ...formData, adminNotifyPhone: e.target.value || null })}
+              className="bg-background font-mono max-w-xs"
+              placeholder="+12125551234"
+            />
+            <p className="text-xs text-muted-foreground">
+              Phone number to receive a summary SMS after every call. Use E.164 format (e.g. <span className="font-mono text-foreground">+12125551234</span>).
+              Prefix with <span className="font-mono text-foreground">whatsapp:</span> to receive on WhatsApp instead (e.g. <span className="font-mono text-foreground">whatsapp:+12125551234</span>).
+              Leave blank to disable.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

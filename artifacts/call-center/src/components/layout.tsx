@@ -15,6 +15,7 @@ import {
   X,
   LogOut,
   CalendarDays,
+  TrendingUp,
 } from "lucide-react";
 import { useWatches } from "@/hooks/use-watches";
 import { useListCompanies, useListPhoneNumbers } from "@workspace/api-client-react";
@@ -255,6 +256,14 @@ export function Layout({ children }: { children: ReactNode }) {
                 );
               })}
             </div>
+          )}
+
+          {/* ── LEADS (top-level only) ── */}
+          {!contextCompany && (
+            <Link href="/leads" onClick={onNav} className={navCls("/leads")}>
+              <TrendingUp className="h-4 w-4 flex-shrink-0" />
+              Leads
+            </Link>
           )}
 
           {/* ── BOOKINGS (top-level, when no company context) ── */}

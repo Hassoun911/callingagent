@@ -158,6 +158,21 @@ function PriorityBadge({ priority }: { priority: string | null | undefined }) {
   );
 }
 
+function CallTypeBadge({ type }: { type: string | null | undefined }) {
+  if (!type) return <span className="text-muted-foreground text-xs">--</span>;
+  const styles: Record<string, string> = {
+    "Emergency":        "bg-red-500/15 text-red-400 border-red-500/30",
+    "Appointment":      "bg-blue-500/15 text-blue-400 border-blue-500/30",
+    "Pricing Inquiry":  "bg-amber-500/15 text-amber-400 border-amber-500/30",
+    "General Inquiry":  "bg-secondary/60 text-muted-foreground border-border/50",
+  };
+  return (
+    <Badge variant="outline" className={`text-xs font-medium ${styles[type] ?? "bg-secondary/60 text-muted-foreground border-border/50"}`}>
+      {type}
+    </Badge>
+  );
+}
+
 function NoteIconButton({ callId, note, onOpen }: {
   callId: number;
   note: string | null;
@@ -662,8 +677,8 @@ export default function Calls() {
                     return <span className="text-muted-foreground text-xs">Anonymous</span>;
                   })()}
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
-                  {call.callType ?? "--"}
+                <TableCell>
+                  <CallTypeBadge type={call.callType} />
                 </TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">
                   {call.duration ? formatDuration(call.duration) : "--:--"}

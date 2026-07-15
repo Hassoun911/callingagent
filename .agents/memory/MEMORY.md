@@ -1,1 +1,2 @@
 - [Multi-tenant Architecture](multi-tenant-arch.md) — company CRM is fully operational but scoped; only phone provisioning is super_admin-only
+- [Orval Codegen Fix](orval-codegen-fix.md) — @scalar/json-magic readFiles() fails under jiti; fix is to pre-parse YAML in config and pass as object

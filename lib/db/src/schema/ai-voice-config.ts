@@ -15,6 +15,7 @@ export const aiVoiceConfigTable = pgTable("ai_voice_config", {
   campaignVoiceEngine: text("campaign_voice_engine").notNull().default("google"),
   elevenLabsVoiceId: text("eleven_labs_voice_id"),
   aiVoiceEngine: text("ai_voice_engine").notNull().default("openai"),
+  adminNotifyPhone: text("admin_notify_phone"),
   openaiCreditBalance: doublePrecision("openai_credit_balance"),
   openaiCreditUpdatedAt: timestamp("openai_credit_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

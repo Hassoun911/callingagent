@@ -1999,6 +1999,8 @@ components:
           type: ["string", "null"]
         priority:
           type: ["string", "null"]
+        callerLocation:
+          type: ["string", "null"]
         notes:
           type: ["string", "null"]
         createdAt:
@@ -2052,6 +2054,9 @@ components:
           type: string
           enum: [openai, elevenlabs]
           description: Global default TTS engine used for inbound AI voice answering
+        adminNotifyPhone:
+          type: ["string", "null"]
+          description: "Phone number to receive SMS/WhatsApp notifications after every call. Prefix with whatsapp: for WhatsApp."
 
     AiVoiceConfigUpdate:
       type: object
@@ -2082,6 +2087,8 @@ components:
         aiVoiceEngine:
           type: ["string", "null"]
           enum: [openai, elevenlabs, null]
+        adminNotifyPhone:
+          type: ["string", "null"]
 
     ElevenLabsVoice:
       type: object

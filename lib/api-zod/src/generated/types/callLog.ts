@@ -46,6 +46,8 @@ export interface CallLog {
   /** @nullable */
   priority?: string | null;
   /** @nullable */
+  callerLocation?: string | null;
+  /** @nullable */
   notes?: string | null;
   createdAt: string;
 }

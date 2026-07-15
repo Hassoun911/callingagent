@@ -33,4 +33,6 @@ export interface AiVoiceConfigUpdate {
   elevenLabsVoiceId?: string | null;
   /** @nullable */
   aiVoiceEngine?: AiVoiceConfigUpdateAiVoiceEngine;
+  /** @nullable */
+  adminNotifyPhone?: string | null;
 }

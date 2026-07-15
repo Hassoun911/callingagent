@@ -817,6 +817,8 @@ export interface CallLog {
   /** @nullable */
   priority?: string | null;
   /** @nullable */
+  callerLocation?: string | null;
+  /** @nullable */
   notes?: string | null;
   createdAt: string;
 }
@@ -894,6 +896,11 @@ export interface AiVoiceConfig {
   elevenLabsVoiceId?: string | null;
   /** Global default TTS engine used for inbound AI voice answering */
   aiVoiceEngine?: AiVoiceConfigAiVoiceEngine;
+  /**
+     * Phone number to receive SMS/WhatsApp notifications after every call. Prefix with whatsapp: for WhatsApp.
+     * @nullable
+     */
+  adminNotifyPhone?: string | null;
 }
 
 /**
@@ -973,6 +980,8 @@ export interface AiVoiceConfigUpdate {
   elevenLabsVoiceId?: string | null;
   /** @nullable */
   aiVoiceEngine?: AiVoiceConfigUpdateAiVoiceEngine;
+  /** @nullable */
+  adminNotifyPhone?: string | null;
 }
 
 export interface ElevenLabsVoice {

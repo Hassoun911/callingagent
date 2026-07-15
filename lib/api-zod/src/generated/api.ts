@@ -673,6 +673,7 @@ export const ListCallLogsResponseItem = zod.object({
   "callSummary": zod.string().nullish(),
   "actionRequired": zod.string().nullish(),
   "priority": zod.string().nullish(),
+  "callerLocation": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "createdAt": zod.string()
 })
@@ -705,6 +706,7 @@ export const GetCallLogResponse = zod.object({
   "callSummary": zod.string().nullish(),
   "actionRequired": zod.string().nullish(),
   "priority": zod.string().nullish(),
+  "callerLocation": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "createdAt": zod.string()
 })
@@ -743,6 +745,7 @@ export const UpdateCallLogNotesResponse = zod.object({
   "callSummary": zod.string().nullish(),
   "actionRequired": zod.string().nullish(),
   "priority": zod.string().nullish(),
+  "callerLocation": zod.string().nullish(),
   "notes": zod.string().nullish(),
   "createdAt": zod.string()
 })
@@ -776,7 +779,8 @@ export const GetAiVoiceConfigResponse = zod.object({
   "voiceStyle": zod.string().optional().describe('Speaking style instructions passed to the TTS model for a more human sound'),
   "campaignVoiceEngine": zod.enum(['google', 'elevenlabs']).optional().describe('TTS engine used for outbound campaign calls'),
   "elevenLabsVoiceId": zod.string().nullish().describe('ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs'),
-  "aiVoiceEngine": zod.enum(['openai', 'elevenlabs']).optional().describe('Global default TTS engine used for inbound AI voice answering')
+  "aiVoiceEngine": zod.enum(['openai', 'elevenlabs']).optional().describe('Global default TTS engine used for inbound AI voice answering'),
+  "adminNotifyPhone": zod.string().nullish().describe('Phone number to receive SMS\/WhatsApp notifications after every call. Prefix with whatsapp: for WhatsApp.')
 })
 
 
@@ -791,7 +795,8 @@ export const UpdateAiVoiceConfigBody = zod.object({
   "voiceStyle": zod.string().nullish(),
   "campaignVoiceEngine": zod.union([zod.literal('google'),zod.literal('elevenlabs'),zod.literal(null)]).nullish(),
   "elevenLabsVoiceId": zod.string().nullish(),
-  "aiVoiceEngine": zod.union([zod.literal('openai'),zod.literal('elevenlabs'),zod.literal(null)]).nullish()
+  "aiVoiceEngine": zod.union([zod.literal('openai'),zod.literal('elevenlabs'),zod.literal(null)]).nullish(),
+  "adminNotifyPhone": zod.string().nullish()
 })
 
 export const UpdateAiVoiceConfigResponse = zod.object({
@@ -806,7 +811,8 @@ export const UpdateAiVoiceConfigResponse = zod.object({
   "voiceStyle": zod.string().optional().describe('Speaking style instructions passed to the TTS model for a more human sound'),
   "campaignVoiceEngine": zod.enum(['google', 'elevenlabs']).optional().describe('TTS engine used for outbound campaign calls'),
   "elevenLabsVoiceId": zod.string().nullish().describe('ElevenLabs voice ID used when campaignVoiceEngine is elevenlabs'),
-  "aiVoiceEngine": zod.enum(['openai', 'elevenlabs']).optional().describe('Global default TTS engine used for inbound AI voice answering')
+  "aiVoiceEngine": zod.enum(['openai', 'elevenlabs']).optional().describe('Global default TTS engine used for inbound AI voice answering'),
+  "adminNotifyPhone": zod.string().nullish().describe('Phone number to receive SMS\/WhatsApp notifications after every call. Prefix with whatsapp: for WhatsApp.')
 })
 
 

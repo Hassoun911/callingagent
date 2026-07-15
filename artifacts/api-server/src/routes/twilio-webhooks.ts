@@ -1500,9 +1500,10 @@ async function extractCallSummary(conv: ConversationState): Promise<{
   callSummary: string | null;
   actionRequired: string | null;
   priority: string | null;
+  callerLocation: string | null;
 }> {
   if (conv.messages.length === 0) {
-    return { callerName: null, callerEmail: null, callType: null, callSummary: null, actionRequired: null, priority: null };
+    return { callerName: null, callerEmail: null, callType: null, callSummary: null, actionRequired: null, priority: null, callerLocation: null };
   }
   try {
     const openai = getChatOpenAI();
@@ -1513,11 +1514,25 @@ async function extractCallSummary(conv: ConversationState): Promise<{
         {
           role: "system",
           content: `Extract call data from this transcript as JSON only. Use null for missing info.
-Return exactly: {"callerName": "...", "callerEmail": "...", "callType": "General Inquiry|Customer Support|New Customer|Appointment Request|Billing|Sales|Emergency|Other", "callSummary": "2-3 sentences", "actionRequired": "...", "priority": "Low|Medium|High"}`,
+
+callType rules (pick exactly one):
+- "Emergency" — caller is stranded, broken down, or needs urgent roadside/tire help RIGHT NOW
+- "Appointment" — caller booked or requested a service appointment
+- "Pricing Inquiry" — caller only asked about pricing, quotes, or costs with no booking or emergency
+- "General Inquiry" — anything else (questions, info requests, callbacks, etc.)
+
+priority rules:
+- Emergency → always "High"
+- Appointment → always "Medium"
+- Pricing Inquiry or General Inquiry → "Low"
+
+callerLocation: for Emergency calls, extract any location the caller mentioned (street, intersection, city, landmark). null otherwise.
+
+Return exactly: {"callerName": "...", "callerEmail": "...", "callType": "Emergency|Appointment|Pricing Inquiry|General Inquiry", "callSummary": "2-3 sentences", "actionRequired": "...", "priority": "Low|Medium|High", "callerLocation": "..."}`,
         },
         { role: "user", content: `Transcript:\n\n${transcript}` },
       ],
-      max_tokens: 300,
+      max_tokens: 400,
       response_format: { type: "json_object" },
     });
     const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
@@ -1528,10 +1543,78 @@ Return exactly: {"callerName": "...", "callerEmail": "...", "callType": "General
       callSummary: parsed.callSummary ?? null,
       actionRequired: parsed.actionRequired ?? null,
       priority: parsed.priority ?? null,
+      callerLocation: parsed.callerLocation ?? null,
     };
   } catch (err) {
     logger.error({ err }, "Failed to extract call summary");
-    return { callerName: null, callerEmail: null, callType: null, callSummary: null, actionRequired: null, priority: null };
+    return { callerName: null, callerEmail: null, callType: null, callSummary: null, actionRequired: null, priority: null, callerLocation: null };
+  }
+}
+
+// ─── Post-call SMS / WhatsApp admin notification ──────────────────────────────
+async function sendSmsNotificationIfConfigured(callSid: string): Promise<void> {
+  try {
+    const [log] = await db
+      .select()
+      .from(callLogsTable)
+      .where(eq(callLogsTable.twilioCallSid, callSid));
+    if (!log) return;
+
+    const [aiConfig] = await db.select().from(aiVoiceConfigTable);
+    const adminPhone = aiConfig?.adminNotifyPhone?.trim();
+    if (!adminPhone) return;
+
+    const client = getTwilioClient();
+
+    const callerDisplay = log.contactName ?? log.callerIdName ?? log.callerName ?? log.fromNumber ?? "Unknown";
+    const durationDisplay = log.duration && log.duration > 0
+      ? `${Math.floor(log.duration / 60)}m ${log.duration % 60}s`
+      : "N/A";
+
+    const isEmergency = log.callType === "Emergency" || log.priority === "High";
+    const isAppointment = log.callType === "Appointment";
+
+    // ── Admin notification ────────────────────────────────────────────────
+    let adminMsg = isEmergency
+      ? `URGENT — Emergency call from ${callerDisplay} (${durationDisplay})`
+      : isAppointment
+        ? `Appointment booked — call from ${callerDisplay} (${durationDisplay})`
+        : `New call from ${callerDisplay} (${durationDisplay})`;
+
+    if (log.callType) adminMsg += `\nType: ${log.callType}`;
+    if (log.callerLocation) adminMsg += `\nLocation: ${log.callerLocation}`;
+    if (log.callSummary) adminMsg += `\nSummary: ${log.callSummary}`;
+    if (log.actionRequired) adminMsg += `\nAction: ${log.actionRequired}`;
+
+    // Determine from-number: use the "to" number on the call log (our Twilio line)
+    let fromNumber = log.toNumber ?? "";
+    // WhatsApp requires the whatsapp: prefix; make sure the from-number is also prefixed
+    const isWhatsApp = adminPhone.toLowerCase().startsWith("whatsapp:");
+    const adminTo = isWhatsApp ? adminPhone : adminPhone;
+    const adminFrom = isWhatsApp ? `whatsapp:${fromNumber}` : fromNumber;
+
+    await client.messages.create({ body: adminMsg, from: adminFrom, to: adminTo });
+    logger.info({ callSid, adminPhone, isWhatsApp }, "Admin SMS/WhatsApp notification sent");
+
+    // ── Caller confirmation (only for Emergency and Appointment) ──────────
+    const callerNumber = log.fromNumber;
+    if (callerNumber && callerNumber !== "Anonymous" && (isEmergency || isAppointment)) {
+      let callerMsg: string;
+      if (isEmergency) {
+        callerMsg = `Thank you for calling All Tire Mobile Shop. We received your request for roadside assistance`;
+        if (log.callerLocation) callerMsg += ` at ${log.callerLocation}`;
+        callerMsg += `. A technician will be in touch shortly. For urgent help call us back anytime.`;
+      } else {
+        callerMsg = `Thank you for booking with All Tire Mobile Shop!`;
+        if (log.callSummary) callerMsg += ` ${log.callSummary}`;
+        callerMsg += ` If you need to change your appointment please call us back.`;
+      }
+      const callerTo = isWhatsApp ? `whatsapp:${callerNumber}` : callerNumber;
+      await client.messages.create({ body: callerMsg, from: adminFrom, to: callerTo });
+      logger.info({ callSid, callerNumber }, "Caller confirmation SMS sent");
+    }
+  } catch (err: any) {
+    logger.warn({ err: err?.message, callSid }, "SMS notification failed — non-fatal");
   }
 }
 
@@ -1568,6 +1651,11 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
     await db.update(callLogsTable)
       .set(updateData)
       .where(eq(callLogsTable.twilioCallSid, CallSid));
+
+    // Fire SMS/WhatsApp notification immediately after DB write (no need to wait for recording)
+    if (isTerminal) {
+      setImmediate(() => { sendSmsNotificationIfConfigured(CallSid).catch(() => {}); });
+    }
 
     if (isTerminal) {
       if (!RecordingUrl) {
