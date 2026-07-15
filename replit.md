@@ -1,4 +1,4 @@
-# Vanguard.OPS — Call Center Platform
+# CallingAgent — Call Center Platform
 
 A full-featured call center management platform with Twilio phone number provisioning, AI voice answering, voicemail, call forwarding, CRM (contacts + companies), call logs with recordings, and a live dashboard.
 

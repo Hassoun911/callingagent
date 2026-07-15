@@ -147,7 +147,7 @@ export default function Companies() {
       if (!res.ok) {
         const message =
           res.status === 409
-            ? "This number is already provisioned in Vanguard.OPS."
+            ? "This number is already provisioned in CallingAgent."
             : body.error || "Import failed";
         toast({ title: message, variant: "destructive" });
         return;

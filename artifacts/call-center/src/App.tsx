@@ -133,7 +133,7 @@ function LoginScreen({ onSuccess, portalCompanyId }: { onSuccess: () => void; po
             {isPortal ? "Company Portal" : "Operations Platform"}
           </p>
           <h1 className="text-3xl font-bold text-slate-50 tracking-tight">
-            {isPortal ? (companyName ?? "Company Portal") : "Vanguard.OPS"}
+            {isPortal ? (companyName ?? "Company Portal") : "CallingAgent"}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
             {isPortal ? "Sign in to access your company portal" : "Call Center Management"}
@@ -175,7 +175,7 @@ function LoginScreen({ onSuccess, portalCompanyId }: { onSuccess: () => void; po
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
-        <p className="mt-6 text-center text-xs text-slate-600">Vanguard.OPS &copy; {new Date().getFullYear()}</p>
+        <p className="mt-6 text-center text-xs text-slate-600">CallingAgent &copy; {new Date().getFullYear()}</p>
       </div>
     </div>
   );

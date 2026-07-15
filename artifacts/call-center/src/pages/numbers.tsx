@@ -53,7 +53,7 @@ export default function Numbers() {
       const json = await r.json();
       if (!r.ok) {
         const message = r.status === 409
-          ? "This number is already provisioned in Vanguard.OPS."
+          ? "This number is already provisioned in CallingAgent."
           : json.error ?? "Import failed";
         toast({ title: message, variant: "destructive" });
         return;
@@ -62,7 +62,7 @@ export default function Numbers() {
       setSearchOpen(false);
       setImportNumber("");
       setImportFriendlyName("");
-      toast({ title: "Number imported", description: `${num} is now active in Vanguard.OPS` });
+      toast({ title: "Number imported", description: `${num} is now active in CallingAgent` });
     } catch (err: any) {
       toast({ title: err.message ?? "Import failed", variant: "destructive" });
     } finally {
@@ -225,7 +225,7 @@ export default function Numbers() {
                     <p className="font-medium text-foreground">What happens on import:</p>
                     <ul className="space-y-0.5 list-disc list-inside">
                       <li>Number is verified against your Twilio account</li>
-                      <li>Voice, status, and SMS webhooks are updated to point at Vanguard.OPS</li>
+                      <li>Voice, status, and SMS webhooks are updated to point at CallingAgent</li>
                       <li>Number appears in your active lines list, ready to configure</li>
                     </ul>
                   </div>

@@ -128,7 +128,7 @@ async function sendCallNotificationIfConfigured(callSid: string, overrideRecordi
         <table width="100%" cellpadding="0" cellspacing="0">
           <tr>
             <td>
-              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#22c55e">Vanguard.OPS</p>
+              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#22c55e">CallingAgent</p>
               <h1 style="margin:4px 0 0;font-size:20px;font-weight:700;color:#f8fafc;letter-spacing:-.3px">Incoming Call</h1>
               <p style="margin:4px 0 0;font-size:13px;color:#94a3b8">${phoneNumber?.friendlyName ?? log.toNumber ?? "Your Line"}</p>
             </td>
@@ -203,7 +203,7 @@ async function sendCallNotificationIfConfigured(callSid: string, overrideRecordi
 
         <!-- Footer -->
         <div style="margin-top:28px;padding-top:20px;border-top:1px solid #f1f5f9;display:flex;align-items:center">
-          <p style="margin:0;font-size:11px;color:#94a3b8">Sent by <strong style="color:#64748b">Vanguard.OPS</strong></p>
+          <p style="margin:0;font-size:11px;color:#94a3b8">Sent by <strong style="color:#64748b">CallingAgent</strong></p>
         </div>
 
       </td></tr>
@@ -1621,7 +1621,7 @@ async function sendSmsNotificationIfConfigured(callSid: string): Promise<void> {
         if (log.callSummary) callerMsg += ` ${log.callSummary}`;
         callerMsg += ` If you need to change your appointment please call us back.`;
       }
-      callerMsg += `\n\n---\nPowered by Vanguard.OPS — AI-powered call management for businesses. vanguard-ops.replit.app`;
+      callerMsg += `\n\n---\nPowered by CallingAgent — AI-powered call management for businesses. callingagent.ai`;
       const callerTo = isWhatsApp ? `whatsapp:${callerNumber}` : callerNumber;
       await client.messages.create({ body: callerMsg, from: adminFrom, to: callerTo });
       logger.info({ callSid, callerNumber }, "Caller confirmation SMS sent");
@@ -1861,7 +1861,7 @@ router.post("/twilio/sms", async (req, res): Promise<void> => {
         <table width="100%" cellpadding="0" cellspacing="0">
           <tr>
             <td>
-              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#22c55e">Vanguard.OPS</p>
+              <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#22c55e">CallingAgent</p>
               <h1 style="margin:4px 0 0;font-size:20px;font-weight:700;color:#f8fafc;letter-spacing:-.3px">New SMS Message</h1>
               ${lineName ? `<p style="margin:4px 0 0;font-size:13px;color:#94a3b8">${lineName}</p>` : ""}
             </td>
@@ -1899,7 +1899,7 @@ router.post("/twilio/sms", async (req, res): Promise<void> => {
         ${mediaAttachments}
 
         <div style="margin-top:28px;padding-top:20px;border-top:1px solid #f1f5f9">
-          <p style="margin:0;font-size:11px;color:#94a3b8">Sent by <strong style="color:#64748b">Vanguard.OPS</strong>${lineName ? ` &nbsp;&middot;&nbsp; ${lineName} (${To ?? ""})` : ""}</p>
+          <p style="margin:0;font-size:11px;color:#94a3b8">Sent by <strong style="color:#64748b">CallingAgent</strong>${lineName ? ` &nbsp;&middot;&nbsp; ${lineName} (${To ?? ""})` : ""}</p>
         </div>
       </td></tr>
 

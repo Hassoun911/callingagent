@@ -213,7 +213,7 @@ async function sendHotLeadEmail(contact: any, campaign: any, summary: any, recor
   <tr><td align="center">
     <table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px">
       <tr><td style="background:#0f172a;border-radius:10px 10px 0 0;padding:24px 32px">
-        <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#22c55e">Vanguard.OPS — Hot Lead</p>
+        <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#22c55e">CallingAgent — Hot Lead</p>
         <h1 style="margin:4px 0 0;font-size:22px;font-weight:700;color:#f8fafc">Seller Interested in Listing</h1>
         <p style="margin:4px 0 0;font-size:13px;color:#94a3b8">Campaign: ${escapeXml(campaign.name)}</p>
       </td></tr>
@@ -240,7 +240,7 @@ async function sendHotLeadEmail(contact: any, campaign: any, summary: any, recor
         </table>
         ${summary.callSummary ? `<div style="background:#f8f9fa;border-left:3px solid #22c55e;border-radius:0 6px 6px 0;padding:14px 18px;margin:0 0 20px"><p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#22c55e">AI Call Summary</p><p style="margin:0;font-size:14px;line-height:1.6;color:#1a1a1a">${escapeXml(summary.callSummary)}</p>${summary.additionalNotes ? `<p style="margin:10px 0 0;font-size:13px;color:#374151"><strong>Notes:</strong> ${escapeXml(summary.additionalNotes)}</p>` : ""}</div>` : ""}
         ${recordingLink ? `<div style="margin:0 0 20px;text-align:center"><a href="${recordingLink}" style="display:inline-block;padding:12px 32px;background:#22c55e;color:#fff;font-family:sans-serif;font-size:14px;font-weight:700;text-decoration:none;border-radius:6px">&#9654;&nbsp; Listen to Recording</a></div>` : ""}
-        <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9"><p style="margin:0;font-size:11px;color:#94a3b8">Sent by <strong style="color:#64748b">Vanguard.OPS</strong> — Outbound Campaign</p></div>
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9"><p style="margin:0;font-size:11px;color:#94a3b8">Sent by <strong style="color:#64748b">CallingAgent</strong> — Outbound Campaign</p></div>
       </td></tr>
     </table>
   </td></tr>
@@ -320,8 +320,8 @@ router.post("/campaigns/test-email", async (req, res): Promise<void> => {
     await transport.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER || "",
       to,
-      subject: "Vanguard.OPS — Email Test",
-      html: `<p style="font-family:sans-serif">This is a test email from <strong>Vanguard.OPS</strong>. If you received this, hot lead notifications are working correctly.</p>`,
+      subject: "CallingAgent — Email Test",
+      html: `<p style="font-family:sans-serif">This is a test email from <strong>CallingAgent</strong>. If you received this, hot lead notifications are working correctly.</p>`,
     });
     logger.info({ to }, "Test email sent");
     res.json({ ok: true, sentTo: to });

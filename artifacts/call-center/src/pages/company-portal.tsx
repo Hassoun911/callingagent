@@ -48,7 +48,7 @@ function PortalSidebar({ company, onNav }: { company: { name: string } | null; o
         <div className="flex items-center gap-2 text-primary">
           <PhoneCall className="h-5 w-5" />
           <div>
-            <span className="font-bold text-sm text-foreground tracking-tight">VANGUARD<span className="text-primary">.OPS</span></span>
+            <span className="font-bold text-sm text-foreground tracking-tight">CALLING<span className="text-primary">AGENT</span></span>
             {company && <p className="text-[10px] text-muted-foreground leading-none mt-0.5 truncate max-w-[140px]">{company.name}</p>}
           </div>
         </div>

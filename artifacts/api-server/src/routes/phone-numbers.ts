@@ -127,7 +127,7 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
   }
 });
 
-// Import an existing Twilio number into Vanguard.OPS
+// Import an existing Twilio number into CallingAgent
 router.post("/phone-numbers/import", async (req, res): Promise<void> => {
   const { number, friendlyName } = req.body ?? {};
   if (!number || typeof number !== "string") {
@@ -165,7 +165,7 @@ router.post("/phone-numbers/import", async (req, res): Promise<void> => {
   const existing = await db.select().from(phoneNumbersTable)
     .where(eq(phoneNumbersTable.number, number));
   if (existing.length > 0) {
-    res.status(409).json({ error: `${number} is already provisioned in Vanguard.OPS.` });
+    res.status(409).json({ error: `${number} is already provisioned in CallingAgent.` });
     return;
   }
 

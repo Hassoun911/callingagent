@@ -121,7 +121,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-2 text-primary">
             <PhoneCall className="h-6 w-6" />
             <span className="font-bold text-lg text-foreground tracking-tight">
-              VANGUARD<span className="text-primary">.OPS</span>
+              CALLING<span className="text-primary">AGENT</span>
             </span>
           </div>
         </div>
