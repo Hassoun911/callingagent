@@ -78,7 +78,7 @@ function AudioPlayer({ src, large = false }: { src: string; large?: boolean }) {
   const seek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const audio = audioRef.current;
     const track = trackRef.current;
-    if (!audio || !track || !duration) return;
+    if (!audio || !track || !duration || !isFinite(duration)) return;
     const rect = track.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     audio.currentTime = ratio * duration;
