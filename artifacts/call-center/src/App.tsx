@@ -81,22 +81,33 @@ function useAuth() {
   return { user, isLoading, isAuthenticated: !!user, logout, refetch: checkAuth };
 }
 
-function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
+function LoginScreen({ onSuccess, portalCompanyId }: { onSuccess: () => void; portalCompanyId?: number }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [companyName, setCompanyName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!portalCompanyId) return;
+    fetch(`/api/companies/${portalCompanyId}/public-info`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d?.name && setCompanyName(d.name))
+      .catch(() => {});
+  }, [portalCompanyId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
+      const body: Record<string, unknown> = { username, password };
+      if (portalCompanyId) body.companyId = portalCompanyId;
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -111,13 +122,21 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
     }
   }
 
+  const isPortal = !!portalCompanyId;
+
   return (
     <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
       <div className="w-full max-w-sm px-8">
         <div className="mb-10 text-center">
-          <p className="text-xs font-bold tracking-[3px] uppercase text-emerald-500 mb-2">Operations Platform</p>
-          <h1 className="text-3xl font-bold text-slate-50 tracking-tight">Vanguard.OPS</h1>
-          <p className="mt-2 text-sm text-slate-500">Call Center Management</p>
+          <p className="text-xs font-bold tracking-[3px] uppercase text-emerald-500 mb-2">
+            {isPortal ? "Company Portal" : "Operations Platform"}
+          </p>
+          <h1 className="text-3xl font-bold text-slate-50 tracking-tight">
+            {isPortal ? (companyName ?? "Company Portal") : "Vanguard.OPS"}
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            {isPortal ? "Sign in to access your company portal" : "Call Center Management"}
+          </p>
         </div>
         <form onSubmit={handleSubmit} className="border border-slate-800 rounded-lg bg-slate-900/60 p-8 space-y-4">
           <div>
@@ -209,7 +228,10 @@ function AuthGate({ children }: { children?: React.ReactNode }) {
   }
 
   if (!isAuthenticated || !user) {
-    return <LoginScreen onSuccess={refetch} />;
+    const params = new URLSearchParams(window.location.search);
+    const companyParam = params.get("company");
+    const portalCompanyId = companyParam ? parseInt(companyParam, 10) : undefined;
+    return <LoginScreen onSuccess={refetch} portalCompanyId={portalCompanyId || undefined} />;
   }
 
   const isSuperAdmin = !user.role || user.role === "super_admin";

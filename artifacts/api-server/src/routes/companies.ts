@@ -15,6 +15,15 @@ import {
 
 const router: IRouter = Router();
 
+router.get("/companies/:id/public-info", async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const [company] = await db.select({ id: companiesTable.id, name: companiesTable.name })
+    .from(companiesTable).where(eq(companiesTable.id, id));
+  if (!company) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(company);
+});
+
 router.get("/companies", async (req, res): Promise<void> => {
   const companyId = getCompanyScope(req);
   let companies = await db.select().from(companiesTable).orderBy(desc(companiesTable.createdAt));

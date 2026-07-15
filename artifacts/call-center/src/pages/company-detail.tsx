@@ -551,11 +551,11 @@ export default function CompanyDetail() {
           <div className="flex items-center gap-2 min-w-0">
             <Shield className="h-3.5 w-3.5 flex-shrink-0" />
             <span>Share this login link with company admins:</span>
-            <span className="font-mono text-blue-300 truncate">{window.location.origin}/</span>
+            <span className="font-mono text-blue-300 truncate">{window.location.origin}/?company={companyId}</span>
           </div>
           <button
             onClick={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/`).then(() => {
+              navigator.clipboard.writeText(`${window.location.origin}/?company=${companyId}`).then(() => {
                 setCopiedUrl(true);
                 setTimeout(() => setCopiedUrl(false), 2000);
               });

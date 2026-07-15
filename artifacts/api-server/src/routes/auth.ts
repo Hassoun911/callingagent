@@ -43,7 +43,7 @@ router.get("/auth/user", (req: Request, res: Response) => {
 });
 
 router.post("/login", async (req: Request, res: Response): Promise<void> => {
-  const { username, password } = req.body ?? {};
+  const { username, password, companyId: requiredCompanyId } = req.body ?? {};
 
   if (typeof username !== "string" || typeof password !== "string") {
     res.status(400).json({ error: "Username and password required." });
@@ -67,6 +67,14 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
       await new Promise(r => setTimeout(r, 500));
       res.status(401).json({ error: "Invalid username or password." });
       return;
+    }
+    if (requiredCompanyId !== undefined && requiredCompanyId !== null) {
+      const required = parseInt(String(requiredCompanyId), 10);
+      if (!isNaN(required) && platformUser.companyId !== required) {
+        await new Promise(r => setTimeout(r, 500));
+        res.status(403).json({ error: "This account does not belong to this company's portal." });
+        return;
+      }
     }
     const sessionData: SessionData = {
       user: {
