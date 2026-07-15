@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable, contactsTable, smsMessagesTable, extensionsTable, appointmentsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
@@ -499,7 +499,11 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : `${req.protocol}://${req.get("host")}`;
 
-  const [phoneNumber] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, To));
+  // Twilio sends E.164 without spaces (e.g. "+12262865860") but the DB may store
+  // formatted numbers with spaces (e.g. "+1 226 286 5860"). Strip spaces on both sides.
+  const toNormalized = To.replace(/\s/g, "");
+  const [phoneNumber] = await db.select().from(phoneNumbersTable)
+    .where(sql`REPLACE(${phoneNumbersTable.number}, ' ', '') = ${toNormalized}`);
 
   // Use Twilio's free CallerName field (broadcast by many carriers).
   // If not available, attempt an async Lookup after responding so we don't block TwiML.
