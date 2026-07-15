@@ -1156,10 +1156,22 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
     if (!aiText) aiText = isArabic ? "عذرًا، لم أتمكن من المعالجة. هل يمكنك المحاولة مرة أخرى؟" : "I'm sorry, I couldn't process that. Can you try again?";
     conv.messages.push({ role: "assistant", content: aiText });
 
+    // Dynamically update Gather language based on what language the AI is now
+    // speaking in. Once the AI replies in Arabic, flip conv.language so Twilio
+    // uses Arabic STT for the next turn — critical for mid-call language switches.
+    const hasArabic = /[\u0600-\u06FF]/.test(aiText);
+    if (hasArabic && !conv.language.startsWith("ar-")) {
+      conv.language = "ar-SA";
+    } else if (!hasArabic && conv.language.startsWith("ar-")) {
+      conv.language = "en-US";
+    }
+    const currentLanguage = conv.language;
+    const currentIsArabic = currentLanguage.startsWith("ar-");
+
     const audioId = await generateTts(aiText, voice, voiceStyle, engineOpts);
 
     // Check if AI naturally wants to end
-    const endPhrases = isArabic
+    const endPhrases = currentIsArabic
       ? ["مع السلامة", "وداعا", "شكرا لاتصالك", "يوم سعيد"]
       : ["goodbye", "have a great day", "take care", "thank you for calling", "bye", "take care now"];
     const wantsToEnd = endPhrases.some(p => aiText.toLowerCase().includes(p.toLowerCase())) && conv.messages.length > 12;
@@ -1178,7 +1190,7 @@ router.post("/twilio/ai-gather", async (req, res): Promise<void> => {
     res.set("Content-Type", "text/xml");
     res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  ${gatherBlock(audioId, aiText, baseUrl, language, conv.speechTimeout)}
+  ${gatherBlock(audioId, aiText, baseUrl, currentLanguage, conv.speechTimeout)}
   <Hangup/>
 </Response>`);
   } catch (innerErr: any) {
