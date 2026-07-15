@@ -102,13 +102,13 @@ function AnimatedLogo() {
       `}</style>
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
         {/* Phone icon — the "C" */}
-        <div className="ca-icon" style={{ width: 56, height: 56, flexShrink: 0 }}>
-          <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%" }}>
+        <div className="ca-icon" style={{ width: 72, height: 72, flexShrink: 0 }}>
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%" }}>
             {/* Signal arcs */}
-            <path d="M35 10 C40 12 44 17 45 23" stroke="#12aae8" strokeWidth="3" strokeLinecap="round"/>
-            <path d="M32 15 C35 16.5 38 19.5 39 23" stroke="#12aae8" strokeWidth="2.5" strokeLinecap="round"/>
-            {/* Handset body */}
-            <path d="M22 12c-1 0-2.2.4-2.8 1.2l-3 4c-.8 1.3-.5 2.8.1 4 2.4 4.6 6.5 8.7 11.1 11.1 1.2.6 2.7.9 4 .1l4-3c.8-.6 1.2-1.8 1.2-2.8v-.5c0-.4-.2-.8-.5-1l-4.8-3.2c-.5-.3-1.1-.3-1.5.1l-1.8 1.8c-.3.3-.8.4-1.2.2-1.8-1-3.8-3-4.8-4.8-.2-.4-.1-.9.2-1.2l1.8-1.8c.4-.4.4-1 .1-1.5L23.5 12.5c-.2-.3-.6-.5-1-.5H22z" fill="#12aae8"/>
+            <path d="M19.5 3.5 C21.8 5.8 23 9 23 12.5" stroke="#12aae8" strokeWidth="1.8" strokeLinecap="round"/>
+            <path d="M16.5 6 C18 8 18.8 10.1 18.8 12.5" stroke="#12aae8" strokeWidth="1.5" strokeLinecap="round"/>
+            {/* Phone handset — lucide Phone path, fills 24×24 */}
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 5 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.9 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="#12aae8"/>
           </svg>
         </div>
         {/* ALLINGAGENT slides out from inside the icon */}
