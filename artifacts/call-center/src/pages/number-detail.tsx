@@ -612,7 +612,7 @@ export default function NumberDetail() {
                         )}
                         <Select value={formData.aiElevenLabsVoiceId || "__default__"} onValueChange={v => setFormData({...formData, aiElevenLabsVoiceId: v === "__default__" ? "" : v})}>
                           <SelectTrigger className="bg-background"><SelectValue placeholder="Global default" /></SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="max-h-[280px]">
                             <SelectItem value="__default__"><span className="text-muted-foreground">Global default</span></SelectItem>
                             {filteredElevenLabsVoices.length === 0 && (
                               <div className="px-2 py-3 text-xs text-muted-foreground text-center">No voices for this language</div>
