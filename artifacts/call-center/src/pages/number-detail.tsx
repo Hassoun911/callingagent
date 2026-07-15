@@ -215,7 +215,7 @@ export default function NumberDetail() {
         holdMessage: number.holdMessage ?? "",
         aiSystemPrompt: number.aiSystemPrompt || "",
         aiVoice: number.aiVoice || "",
-        aiVoiceEngine: (number as any).aiVoiceEngine || "",
+        aiVoiceEngine: (number as any).aiVoiceEngine || null,
         aiElevenLabsVoiceId: (number as any).aiElevenLabsVoiceId || "",
         aiLanguage: number.aiLanguage || "",
         aiGreeting: number.aiGreeting || "",
@@ -300,7 +300,7 @@ export default function NumberDetail() {
               <CardDescription>Determine how incoming calls are handled.</CardDescription>
               <ToggleGroup
                 type="single"
-                value={formData.answerMode}
+                value={formData.answerMode ?? "forward"}
                 onValueChange={(val) => val && setFormData({ ...formData, answerMode: val })}
                 className="justify-start bg-secondary/50 p-1 rounded-lg border border-border mt-2"
               >

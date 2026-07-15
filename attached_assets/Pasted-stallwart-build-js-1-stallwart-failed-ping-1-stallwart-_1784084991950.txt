@@ -1,0 +1,124 @@
+stallwart.build.js:1 stallwart: failed ping 1
+stallwart.build.js:1 stallwart: failed ping 1
+stallwart.build.js:1 stallwart: failed ping 2
+stallwart.build.js:1 stallwart: failed ping 3
+stallwart.build.js:1 stallwart: failed ping 4
+0z7700xnabpit.js:21 [tldraw] You have multiple versions of tldraw libraries installed. This can lead to bugs and unexpected behavior.
+
+The latest version you have installed is v5.2.4. The following libraries are on the latest version:
+
+The following libraries are not on the latest version, or have multiple versions installed:
+  • ❌ @tldraw/utils (v5.0.1, v5.2.4)
+  • ❌ @tldraw/state (v5.0.1)
+  • ❌ @tldraw/state-react (v5.0.1)
+  • ❌ @tldraw/store (v5.0.1)
+  • ❌ @tldraw/validate (v5.0.1, v5.2.4)
+  • ❌ @tldraw/tlschema (v5.0.1)
+  • ❌ @tldraw/editor (v5.0.1)
+  • ❌ tldraw (v5.0.1)
+  • ❌ @tldraw/sync-core (v5.0.1)
+  • ❌ @tldraw/sync (v5.0.1)
+stallwart.build.js:1 stallwart: failed ping 1
+stallwart.build.js:1 stallwart: failed ping 2
+stallwart.build.js:1 stallwart: failed ping 3
+0z7700xnabpit.js:21 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+   ///////////////////////////
+      /////////////////////
+      
+0z7700xnabpit.js:21 Download the Apollo DevTools for a better development experience: https://chrome.google.com/webstore/detail/apollo-client-developer-t/jdkknkkbebbapilgoeccciglkfbmbnfm
+0z7700xnabpit.js:21 [LaunchDarkly] LaunchDarkly client initialized
+Virtual-Call-Hub:1 Access to image at 'https://7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev:5904//asset_-2058470036.png' from origin 'https://replit.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev:5904//asset_-2058470036.png:1  Failed to load resource: net::ERR_FAILED
+0i8wy8tbht2ow.js:2 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'ambient-light-sensor'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'battery'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'execution-while-not-rendered'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'execution-while-out-of-viewport'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'layout-animations'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'legacy-image-formats'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'navigation-override'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'oversized-images'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'publickey-credentials'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'speaker-selection'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'unoptimized-images'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'unsized-media'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'pointer-lock'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Allow attribute will take precedence over 'allowfullscreen'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Allow attribute will take precedence over 'allowpaymentrequest'.
+C @ 0i8wy8tbht2ow.js:2
+0on3.14yorzg5.js:26 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev') does not match the recipient window's origin ('https://replit.com').
+S @ 0on3.14yorzg5.js:26
+0on3.14yorzg5.js:26 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev') does not match the recipient window's origin ('https://replit.com').
+S @ 0on3.14yorzg5.js:26
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0i8wy8tbht2ow.js:2 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+C @ 0i8wy8tbht2ow.js:2
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'ambient-light-sensor'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'battery'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'execution-while-not-rendered'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'layout-animations'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'legacy-image-formats'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'navigation-override'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'oversized-images'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'publickey-credentials'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'speaker-selection'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'unoptimized-images'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'unsized-media'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Allow attribute will take precedence over 'allowfullscreen'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+0on3.14yorzg5.js:26 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev') does not match the recipient window's origin ('https://replit.com').
+S @ 0on3.14yorzg5.js:26
+0on3.14yorzg5.js:26 Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('https://7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev') does not match the recipient window's origin ('https://replit.com').
+S @ 0on3.14yorzg5.js:26
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/api/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+injected.js:37 A component is changing an uncontrolled input to be controlled. This is likely caused by the value changing from undefined to a defined value, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://react.dev/link/controlled-components
+(anonymous) @ injected.js:37
+injected.js:37 ToggleGroup is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component.
+(anonymous) @ injected.js:37
+injected.js:37 [vite] server connection lost. Polling for restart...
+injected.js:37 A component is changing an uncontrolled input to be controlled. This is likely caused by the value changing from undefined to a defined value, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://react.dev/link/controlled-components
+(anonymous) @ injected.js:37
+injected.js:37 ToggleGroup is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component.
+(anonymous) @ injected.js:37
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/api/phone-numbers/2:1  Failed to load resource: the server responded with a status of 400 (Bad Request)
