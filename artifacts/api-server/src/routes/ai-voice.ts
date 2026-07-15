@@ -180,6 +180,7 @@ router.patch("/ai-voice/config", async (req, res): Promise<void> => {
   if (body.campaignVoiceEngine != null) updateData.campaignVoiceEngine = body.campaignVoiceEngine;
   if (body.elevenLabsVoiceId != null) updateData.elevenLabsVoiceId = body.elevenLabsVoiceId;
   if (body.aiVoiceEngine != null) updateData.aiVoiceEngine = body.aiVoiceEngine;
+  if ("adminNotifyPhone" in body) updateData.adminNotifyPhone = body.adminNotifyPhone ?? null;
 
   const [updated] = await db.update(aiVoiceConfigTable)
     .set(updateData)
