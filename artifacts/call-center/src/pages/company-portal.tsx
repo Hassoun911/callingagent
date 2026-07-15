@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Switch, Route, Link, useLocation } from "wouter";
 import {
   LayoutDashboard, Phone, Target, PhoneIncoming, Users, LogOut,
-  PhoneCall, Menu, Building2, Settings,
+  PhoneCall, Menu, Building2, Settings, CalendarDays, Bell, Check,
+  ChevronRight, Clock,
 } from "lucide-react";
-import { useListPhoneNumbers, useListCampaigns, useGetCompany } from "@workspace/api-client-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useListPhoneNumbers, useListCampaigns, useGetCompany,
+  useGetAiVoiceConfig, useUpdateAiVoiceConfig, getGetAiVoiceConfigQueryKey,
+} from "@workspace/api-client-react";
 import type { AuthUser } from "@/App";
 import { useAuthContext } from "@/App";
 import NumberDetail from "@/pages/number-detail";
@@ -12,6 +17,7 @@ import CampaignDetail from "@/pages/campaign-detail";
 import Calls from "@/pages/calls";
 import Contacts from "@/pages/contacts";
 import Campaigns from "@/pages/campaigns";
+import Bookings from "@/pages/bookings";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -72,6 +78,10 @@ function PortalSidebar({ company, onNav }: { company: { name: string } | null; o
           <Users className="h-4 w-4 flex-shrink-0" />
           Contacts
         </Link>
+        <Link href="/portal/bookings" onClick={onNav} className={navCls("/portal/bookings")}>
+          <CalendarDays className="h-4 w-4 flex-shrink-0" />
+          Bookings
+        </Link>
         {user?.role === "company_admin" && (
           <>
             <SectionLabel label="Admin" />
@@ -102,11 +112,132 @@ function PortalSidebar({ company, onNav }: { company: { name: string } | null; o
   );
 }
 
-function PortalDashboard({ companyId }: { companyId: number }) {
+interface Appointment {
+  id: number;
+  companyId: number | null;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string | null;
+  title: string;
+  notes: string | null;
+  startTime: string;
+  endTime: string | null;
+  status: "scheduled" | "confirmed" | "cancelled" | "no_show";
+}
+
+const APPT_STATUS_COLORS: Record<string, string> = {
+  scheduled: "bg-blue-500/10 text-blue-400",
+  confirmed: "bg-emerald-500/10 text-emerald-400",
+  cancelled: "bg-red-500/10 text-red-400",
+  no_show: "bg-yellow-500/10 text-yellow-400",
+};
+
+function AdminNotifyWidget({ role }: { role: string }) {
+  const qc = useQueryClient();
+  const { data: config } = useGetAiVoiceConfig();
+  const update = useUpdateAiVoiceConfig({
+    mutation: {
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getGetAiVoiceConfigQueryKey() }); },
+    },
+  });
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  if (role !== "company_admin") return null;
+
+  const current = config?.adminNotifyPhone ?? null;
+
+  function startEdit() {
+    setValue(current ?? "");
+    setEditing(true);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }
+
+  function save() {
+    update.mutate({ data: { adminNotifyPhone: value.trim() || null } });
+    setEditing(false);
+  }
+
+  if (!current && !editing) {
+    return (
+      <div className="flex items-start gap-3 bg-amber-500/5 border border-amber-500/20 rounded-lg px-4 py-3">
+        <Bell className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-amber-300">Post-call notifications not configured</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Set an admin phone number to receive SMS or WhatsApp alerts after each call.</p>
+        </div>
+        <button
+          onClick={startEdit}
+          className="text-xs bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 px-3 py-1.5 rounded font-medium transition-colors flex-shrink-0"
+        >
+          Set up
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 bg-card border border-border rounded-lg px-4 py-3">
+      <Bell className="h-4 w-4 text-primary flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Notification Phone</p>
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <input
+              ref={inputRef}
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              placeholder="+1... or whatsapp:+1..."
+              className="flex-1 bg-background border border-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-primary font-mono"
+              onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+            />
+            <button onClick={save} className="p-1.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+              <Check className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm font-mono text-foreground">{current}</p>
+        )}
+      </div>
+      {!editing && (
+        <button onClick={startEdit} className="text-xs text-muted-foreground hover:text-foreground underline">Edit</button>
+      )}
+    </div>
+  );
+}
+
+function PortalDashboard({ companyId, role }: { companyId: number; role: string }) {
   const { data: numbers } = useListPhoneNumbers();
   const { data: campaigns } = useListCampaigns();
+  const { data: appointments } = useQuery<Appointment[]>({
+    queryKey: ["appointments", companyId],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/companies/${companyId}/appointments`, { credentials: "include" });
+      if (!r.ok) return [];
+      return r.json();
+    },
+  });
+
   const myNumbers = numbers?.filter(n => n.companyId === companyId) ?? [];
   const myCampaigns = campaigns?.filter(c => myNumbers.some(n => n.id === c.fromPhoneNumberId)) ?? [];
+
+  const now = new Date();
+  const upcoming = (appointments ?? []).filter(a =>
+    (a.status === "scheduled" || a.status === "confirmed") && new Date(a.startTime) >= now
+  ).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+  const todayAppts = (appointments ?? []).filter(a => {
+    const d = new Date(a.startTime);
+    return d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate();
+  });
+
+  function fmtTime(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  }
 
   return (
     <div className="p-8 space-y-6">
@@ -114,12 +245,15 @@ function PortalDashboard({ companyId }: { companyId: number }) {
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-1">Overview of your company operations</p>
       </div>
+
+      <AdminNotifyWidget role={role} />
+
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
           { label: "Phone Numbers", value: myNumbers.length, icon: Phone },
           { label: "Active Campaigns", value: myCampaigns.filter(c => c.status === "active").length, icon: Target },
-          { label: "Total Campaigns", value: myCampaigns.length, icon: Target },
-          { label: "Numbers Active", value: myNumbers.filter(n => n.answerMode !== "reject").length, icon: Phone },
+          { label: "Today's Bookings", value: todayAppts.length, icon: CalendarDays },
+          { label: "Upcoming", value: upcoming.length, icon: Clock },
         ].map(({ label, value, icon: Icon }) => (
           <div key={label} className="bg-card border border-border rounded-lg p-5">
             <div className="flex items-center justify-between mb-3">
@@ -132,9 +266,45 @@ function PortalDashboard({ companyId }: { companyId: number }) {
       </div>
 
       <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Upcoming Bookings</h2>
+          <Link href="/portal/bookings" className="text-xs text-primary hover:text-primary/80 flex items-center gap-1">
+            View all <ChevronRight className="h-3 w-3" />
+          </Link>
+        </div>
+        {upcoming.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-sm border border-dashed border-border rounded-lg">
+            No upcoming bookings. AI voice will schedule them automatically.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {upcoming.slice(0, 5).map(a => (
+              <div key={a.id} className="flex items-center justify-between bg-card border border-border rounded-lg px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <CalendarDays className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{a.customerName}</p>
+                    <p className="text-xs text-muted-foreground">{a.title} &middot; {a.customerPhone}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground font-mono">{fmtTime(a.startTime)}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded capitalize font-medium ${APPT_STATUS_COLORS[a.status] ?? "bg-muted text-muted-foreground"}`}>
+                    {a.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Your Phone Numbers</h2>
         {myNumbers.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground text-sm border border-dashed border-border rounded-lg">
+          <div className="text-center py-8 text-muted-foreground text-sm border border-dashed border-border rounded-lg">
             No phone numbers assigned to your company yet.
           </div>
         ) : (
@@ -147,7 +317,7 @@ function PortalDashboard({ companyId }: { companyId: number }) {
                   {n.friendlyName && <span className="text-xs text-muted-foreground">{n.friendlyName}</span>}
                 </div>
                 <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded capitalize">
-                  {n.answerMode?.replace("_", " ")}
+                  {n.answerMode?.replace(/_/g, " ")}
                 </span>
               </div>
             ))}
@@ -399,17 +569,18 @@ export default function CompanyPortal({ user }: { user: AuthUser }) {
 
         <div className="flex-1 overflow-y-auto">
           <Switch>
-            <Route path="/portal" component={() => <PortalDashboard companyId={companyId} />} />
+            <Route path="/portal" component={() => <PortalDashboard companyId={companyId} role={user.role ?? ""} />} />
             <Route path="/portal/numbers/:id" component={NumberDetail} />
             <Route path="/portal/numbers" component={() => <PortalNumbers companyId={companyId} />} />
             <Route path="/portal/campaigns/:id" component={CampaignDetail} />
             <Route path="/portal/campaigns" component={Campaigns} />
             <Route path="/portal/calls" component={Calls} />
             <Route path="/portal/contacts" component={Contacts} />
+            <Route path="/portal/bookings" component={() => <Bookings />} />
             {user.role === "company_admin" && (
               <Route path="/portal/users" component={() => <PortalUsers companyId={companyId} />} />
             )}
-            <Route component={() => <PortalDashboard companyId={companyId} />} />
+            <Route component={() => <PortalDashboard companyId={companyId} role={user.role ?? ""} />} />
           </Switch>
         </div>
       </div>
