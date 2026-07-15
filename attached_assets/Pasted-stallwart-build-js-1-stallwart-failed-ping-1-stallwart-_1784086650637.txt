@@ -1,0 +1,748 @@
+stallwart.build.js:1 stallwart: failed ping 1
+stallwart.build.js:1 stallwart: failed ping 1
+stallwart.build.js:1 stallwart: failed ping 2
+stallwart.build.js:1 stallwart: failed ping 3
+stallwart.build.js:1 stallwart: failed ping 4
+0z7700xnabpit.js:21 [tldraw] You have multiple versions of tldraw libraries installed. This can lead to bugs and unexpected behavior.
+
+The latest version you have installed is v5.2.4. The following libraries are on the latest version:
+
+The following libraries are not on the latest version, or have multiple versions installed:
+  • ❌ @tldraw/utils (v5.0.1, v5.2.4)
+  • ❌ @tldraw/state (v5.0.1)
+  • ❌ @tldraw/state-react (v5.0.1)
+  • ❌ @tldraw/store (v5.0.1)
+  • ❌ @tldraw/validate (v5.0.1, v5.2.4)
+  • ❌ @tldraw/tlschema (v5.0.1)
+  • ❌ @tldraw/editor (v5.0.1)
+  • ❌ tldraw (v5.0.1)
+  • ❌ @tldraw/sync-core (v5.0.1)
+  • ❌ @tldraw/sync (v5.0.1)
+stallwart.build.js:1 stallwart: failed ping 1
+stallwart.build.js:1 stallwart: failed ping 2
+stallwart.build.js:1 stallwart: failed ping 3
+0z7700xnabpit.js:21 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+   ///////////////////////////
+      /////////////////////
+      
+0z7700xnabpit.js:21 Download the Apollo DevTools for a better development experience: https://chrome.google.com/webstore/detail/apollo-client-developer-t/jdkknkkbebbapilgoeccciglkfbmbnfm
+0z7700xnabpit.js:21 [LaunchDarkly] LaunchDarkly client initialized
+Virtual-Call-Hub:1 Access to image at 'https://7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev:5904//asset_-2058470036.png' from origin 'https://replit.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev:5904//asset_-2058470036.png:1  Failed to load resource: net::ERR_FAILED
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'ambient-light-sensor'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'battery'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'execution-while-not-rendered'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'execution-while-out-of-viewport'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'layout-animations'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'legacy-image-formats'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'navigation-override'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'oversized-images'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'publickey-credentials'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'speaker-selection'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'unoptimized-images'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'unsized-media'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Unrecognized feature: 'pointer-lock'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Allow attribute will take precedence over 'allowfullscreen'.
+C @ 0i8wy8tbht2ow.js:2
+0i8wy8tbht2ow.js:2 Allow attribute will take precedence over 'allowpaymentrequest'.
+C @ 0i8wy8tbht2ow.js:2
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('<URL>').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('<URL>').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('<URL>').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('<URL>').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('<URL>').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('<URL>').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('<URL>').
+Failed to execute 'postMessage' on 'DOMWindow': The target origin provided ('<URL>') does not match the recipient window's origin ('<URL>').
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'ambient-light-sensor'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'ambient-light-sensor'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'battery'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'battery'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'execution-while-not-rendered'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'execution-while-not-rendered'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'layout-animations'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'layout-animations'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'legacy-image-formats'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'legacy-image-formats'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'navigation-override'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'navigation-override'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'oversized-images'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'oversized-images'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'publickey-credentials'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'publickey-credentials'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'speaker-selection'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'speaker-selection'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'unoptimized-images'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'unoptimized-images'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'unsized-media'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Unrecognized feature: 'unsized-media'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Allow attribute will take precedence over 'allowfullscreen'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Allow attribute will take precedence over 'allowfullscreen'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+workspace_iframe.html?initialPath=%2Fcompanies%2F4&id=artifacts%2Fcall-center:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/api/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/api/login:1  Failed to load resource: the server responded with a status of 401 (Unauthorized)
+injected.js:37 A component is changing an uncontrolled input to be controlled. This is likely caused by the value changing from undefined to a defined value, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://react.dev/link/controlled-components
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/static/devtools/injected.js:37
+injected.js:37 ToggleGroup is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component.
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/static/devtools/injected.js:37
+injected.js:37 [vite] server connection lost. Polling for restart...
+injected.js:37 A component is changing an uncontrolled input to be controlled. This is likely caused by the value changing from undefined to a defined value, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://react.dev/link/controlled-components
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/static/devtools/injected.js:37
+injected.js:37 ToggleGroup is changing from uncontrolled to controlled. Components should not switch from controlled to uncontrolled (or vice versa). Decide between using a controlled or uncontrolled value for the lifetime of the component.
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/static/devtools/injected.js:37
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/api/phone-numbers/2:1  Failed to load resource: the server responded with a status of 400 (Bad Request)
+2:1  Failed to load resource: the server responded with a status of 400 (Bad Request)
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+(anonymous) @ 0_fzdwdm3tpr-.js:68
+injected.js:37 A component is changing an uncontrolled input to be controlled. This is likely caused by the value changing from undefined to a defined value, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://react.dev/link/controlled-components
+(anonymous) @ VM522 injected.js:37
+updateProperties @ VM531 react-dom_client.js:12979
+commitUpdate @ VM531 react-dom_client.js:13956
+runWithFiberInDEV @ VM531 react-dom_client.js:1485
+commitHostUpdate @ VM531 react-dom_client.js:8730
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9513
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9502
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9502
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9502
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9502
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9502
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9502
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9655
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9502
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9502
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9502
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9655
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9655
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9655
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9655
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9655
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9374
+recursivelyTraverseMutationEffects @ VM531 react-dom_client.js:9365
+commitMutationEffectsOnFiber @ VM531 react-dom_client.js:9551
+flushMutationEffects @ VM531 react-dom_client.js:11098
+commitRoot @ VM531 react-dom_client.js:11079
+commitRootWhenReady @ VM531 react-dom_client.js:10512
+performWorkOnRoot @ VM531 react-dom_client.js:10457
+performSyncWorkOnRoot @ VM531 react-dom_client.js:11635
+flushSyncWorkAcrossRoots_impl @ VM531 react-dom_client.js:11536
+processRootScheduleInMicrotask @ VM531 react-dom_client.js:11558
+(anonymous) @ VM531 react-dom_client.js:11649
+<input>
+exports.jsxDEV @ VM530 react_jsx-dev-runtime.js:250
+_c @ VM578 input.tsx:7
+react-stack-bottom-frame @ VM531 react-dom_client.js:17424
+renderWithHooks @ VM531 react-dom_client.js:4206
+updateForwardRef @ VM531 react-dom_client.js:6461
+beginWork @ VM531 react-dom_client.js:7864
+runWithFiberInDEV @ VM531 react-dom_client.js:1485
+performUnitOfWork @ VM531 react-dom_client.js:10868
+workLoopSync @ VM531 react-dom_client.js:10728
+renderRootSync @ VM531 react-dom_client.js:10711
+performWorkOnRoot @ VM531 react-dom_client.js:10330
+performSyncWorkOnRoot @ VM531 react-dom_client.js:11635
+flushSyncWorkAcrossRoots_impl @ VM531 react-dom_client.js:11536
+processRootScheduleInMicrotask @ VM531 react-dom_client.js:11558
+(anonymous) @ VM531 react-dom_client.js:11649
+<Input>
+exports.jsxDEV @ VM530 react_jsx-dev-runtime.js:250
+NumberDetail @ VM563 number-detail.tsx:1844
+react-stack-bottom-frame @ VM531 react-dom_client.js:17424
+renderWithHooks @ VM531 react-dom_client.js:4206
+updateFunctionComponent @ VM531 react-dom_client.js:6619
+beginWork @ VM531 react-dom_client.js:7654
+runWithFiberInDEV @ VM531 react-dom_client.js:1485
+performUnitOfWork @ VM531 react-dom_client.js:10868
+workLoopSync @ VM531 react-dom_client.js:10728
+renderRootSync @ VM531 react-dom_client.js:10711
+performWorkOnRoot @ VM531 react-dom_client.js:10330
+performSyncWorkOnRoot @ VM531 react-dom_client.js:11635
+flushSyncWorkAcrossRoots_impl @ VM531 react-dom_client.js:11536
+processRootScheduleInMicrotask @ VM531 react-dom_client.js:11558
+(anonymous) @ VM531 react-dom_client.js:11649
+<NumberDetail>
+exports.createElement @ VM532 chunk-KC53NVYV.js:773
+h_route @ VM540 wouter.js:277
+Route @ VM540 wouter.js:312
+react-stack-bottom-frame @ VM531 react-dom_client.js:17424
+renderWithHooks @ VM531 react-dom_client.js:4206
+updateFunctionComponent @ VM531 react-dom_client.js:6619
+beginWork @ VM531 react-dom_client.js:7654
+runWithFiberInDEV @ VM531 react-dom_client.js:1485
+performUnitOfWork @ VM531 react-dom_client.js:10868
+workLoopSync @ VM531 react-dom_client.js:10728
+renderRootSync @ VM531 react-dom_client.js:10711
+performWorkOnRoot @ VM531 react-dom_client.js:10330
+performSyncWorkOnRoot @ VM531 react-dom_client.js:11635
+flushSyncWorkAcrossRoots_impl @ VM531 react-dom_client.js:11536
+processRootScheduleInMicrotask @ VM531 react-dom_client.js:11558
+(anonymous) @ VM531 react-dom_client.js:11649
+<Route>
+exports.jsxDEV @ VM530 react_jsx-dev-runtime.js:250
+CompanyPortal @ VM544 company-portal.tsx:957
+react-stack-bottom-frame @ VM531 react-dom_client.js:17424
+renderWithHooks @ VM531 react-dom_client.js:4206
+updateFunctionComponent @ VM531 react-dom_client.js:6619
+beginWork @ VM531 react-dom_client.js:7654
+runWithFiberInDEV @ VM531 react-dom_client.js:1485
+performUnitOfWork @ VM531 react-dom_client.js:10868
+workLoopSync @ VM531 react-dom_client.js:10728
+renderRootSync @ VM531 react-dom_client.js:10711
+performWorkOnRoot @ VM531 react-dom_client.js:10330
+performSyncWorkOnRoot @ VM531 react-dom_client.js:11635
+flushSyncWorkAcrossRoots_impl @ VM531 react-dom_client.js:11536
+processRootScheduleInMicrotask @ VM531 react-dom_client.js:11558
+(anonymous) @ VM531 react-dom_client.js:11649
+<CompanyPortal>
+exports.jsxDEV @ VM530 react_jsx-dev-runtime.js:250
+component @ VM537 App.tsx:345
+react-stack-bottom-frame @ VM531 react-dom_client.js:17424
+renderWithHooks @ VM531 react-dom_client.js:4206
+updateFunctionComponent @ VM531 react-dom_client.js:6619
+beginWork @ VM531 react-dom_client.js:7654
+runWithFiberInDEV @ VM531 react-dom_client.js:1485
+performUnitOfWork @ VM531 react-dom_client.js:10868
+workLoopSync @ VM531 react-dom_client.js:10728
+renderRootSync @ VM531 react-dom_client.js:10711
+performWorkOnRoot @ VM531 react-dom_client.js:10330
+performSyncWorkOnRoot @ VM531 react-dom_client.js:11635
+flushSyncWorkAcrossRoots_impl @ VM531 react-dom_client.js:11536
+processRootScheduleInMicrotask @ VM531 react-dom_client.js:11558
+(anonymous) @ VM531 react-dom_client.js:11649
+<component>
+exports.createElement @ VM532 chunk-KC53NVYV.js:773
+h_route @ VM540 wouter.js:277
+Route @ VM540 wouter.js:312
+react-stack-bottom-frame @ VM531 react-dom_client.js:17424
+renderWithHooks @ VM531 react-dom_client.js:4206
+updateFunctionComponent @ VM531 react-dom_client.js:6619
+beginWork @ VM531 react-dom_client.js:7654
+runWithFiberInDEV @ VM531 react-dom_client.js:1485
+performUnitOfWork @ VM531 react-dom_client.js:10868
+workLoopSync @ VM531 react-dom_client.js:10728
+renderRootSync @ VM531 react-dom_client.js:10711
+performWorkOnRoot @ VM531 react-dom_client.js:10330
+performSyncWorkOnRoot @ VM531 react-dom_client.js:11635
+flushSyncWorkAcrossRoots_impl @ VM531 react-dom_client.js:11536
+processRootScheduleInMicrotask @ VM531 react-dom_client.js:11558
+(anonymous) @ VM531 react-dom_client.js:11649
+<Route>
+exports.jsxDEV @ VM530 react_jsx-dev-runtime.js:250
+PortalRedirect @ VM537 App.tsx:345
+react-stack-bottom-frame @ VM531 react-dom_client.js:17424
+renderWithHooks @ VM531 react-dom_client.js:4206
+updateFunctionComponent @ VM531 react-dom_client.js:6619
+beginWork @ VM531 react-dom_client.js:7654
+runWithFiberInDEV @ VM531 react-dom_client.js:1485
+performUnitOfWork @ VM531 react-dom_client.js:10868
+workLoopSync @ VM531 react-dom_client.js:10728
+renderRootSync @ VM531 react-dom_client.js:10711
+performWorkOnRoot @ VM531 react-dom_client.js:10330
+performWorkOnRootViaSchedulerTask @ VM531 react-dom_client.js:11623
+performWorkUntilDeadline @ VM531 react-dom_client.js:36
+<PortalRedirect>
+exports.jsxDEV @ VM530 react_jsx-dev-runtime.js:250
+AuthGate @ VM537 App.tsx:389
+react-stack-bottom-frame @ VM531 react-dom_client.js:17424
+renderWithHooks @ VM531 react-dom_client.js:4206
+updateFunctionComponent @ VM531 react-dom_client.js:6619
+beginWork @ VM531 react-dom_client.js:7654
+runWithFiberInDEV @ VM531 react-dom_client.js:1485
+performUnitOfWork @ VM531 react-dom_client.js:10868
+workLoopSync @ VM531 react-dom_client.js:10728
+renderRootSync @ VM531 react-dom_client.js:10711
+performWorkOnRoot @ VM531 react-dom_client.js:10330
+performWorkOnRootViaSchedulerTask @ VM531 react-dom_client.js:11623
+performWorkUntilDeadline @ VM531 react-dom_client.js:36
+<AuthGate>
+exports.jsxDEV @ VM530 react_jsx-dev-runtime.js:250
+App @ VM537 App.tsx:405
+react-stack-bottom-frame @ VM531 react-dom_client.js:17424
+renderWithHooks @ VM531 react-dom_client.js:4206
+updateFunctionComponent @ VM531 react-dom_client.js:6619
+beginWork @ VM531 react-dom_client.js:7654
+runWithFiberInDEV @ VM531 react-dom_client.js:1485
+performUnitOfWork @ VM531 react-dom_client.js:10868
+workLoopSync @ VM531 react-dom_client.js:10728
+renderRootSync @ VM531 react-dom_client.js:10711
+performWorkOnRoot @ VM531 react-dom_client.js:10330
+performWorkOnRootViaSchedulerTask @ VM531 react-dom_client.js:11623
+performWorkUntilDeadline @ VM531 react-dom_client.js:36
+<App>
+exports.jsxDEV @ VM530 react_jsx-dev-runtime.js:250
+(anonymous) @ VM528 main.tsx:6
+injected.js:37 [vite] server connection lost. Polling for restart...
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+(anonymous) @ 0_fzdwdm3tpr-.js:68
+injected.js:37 A component is changing an uncontrolled input to be controlled. This is likely caused by the value changing from undefined to a defined value, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://react.dev/link/controlled-components
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/static/devtools/injected.js:37
+updateProperties @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:12979
+commitUpdate @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:13956
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+commitHostUpdate @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:8730
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9513
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9502
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9502
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9502
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9502
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9502
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9502
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9655
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9502
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9502
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9502
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9655
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9655
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9655
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9655
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9655
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9374
+recursivelyTraverseMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9365
+commitMutationEffectsOnFiber @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:9551
+flushMutationEffects @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11098
+commitRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11079
+commitRootWhenReady @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10512
+performWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10457
+performSyncWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11635
+flushSyncWorkAcrossRoots_impl @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11536
+processRootScheduleInMicrotask @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11558
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11649
+<input>
+exports.jsxDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=1a3ad88e:250
+_c @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/src/components/ui/input.tsx:7
+react-stack-bottom-frame @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:17424
+renderWithHooks @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:4206
+updateForwardRef @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:6461
+beginWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:7864
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+performUnitOfWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10868
+workLoopSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10728
+renderRootSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10711
+performWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10330
+performSyncWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11635
+flushSyncWorkAcrossRoots_impl @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11536
+processRootScheduleInMicrotask @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11558
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11649
+<Input>
+exports.jsxDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=1a3ad88e:250
+NumberDetail @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/src/pages/number-detail.tsx?t=1784085334624:1844
+react-stack-bottom-frame @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:17424
+renderWithHooks @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:4206
+updateFunctionComponent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:6619
+beginWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:7654
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+performUnitOfWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10868
+workLoopSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10728
+renderRootSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10711
+performWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10330
+performSyncWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11635
+flushSyncWorkAcrossRoots_impl @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11536
+processRootScheduleInMicrotask @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11558
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11649
+<NumberDetail>
+exports.createElement @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/chunk-KC53NVYV.js?v=1a3ad88e:773
+h_route @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/wouter.js?v=1a3ad88e:277
+Route @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/wouter.js?v=1a3ad88e:312
+react-stack-bottom-frame @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:17424
+renderWithHooks @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:4206
+updateFunctionComponent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:6619
+beginWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:7654
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+performUnitOfWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10868
+workLoopSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10728
+renderRootSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10711
+performWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10330
+performSyncWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11635
+flushSyncWorkAcrossRoots_impl @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11536
+processRootScheduleInMicrotask @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11558
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11649
+<Route>
+exports.jsxDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=1a3ad88e:250
+CompanyPortal @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/src/pages/company-portal.tsx?t=1784085126080:957
+react-stack-bottom-frame @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:17424
+renderWithHooks @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:4206
+updateFunctionComponent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:6619
+beginWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:7654
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+performUnitOfWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10868
+workLoopSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10728
+renderRootSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10711
+performWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10330
+performSyncWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11635
+flushSyncWorkAcrossRoots_impl @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11536
+processRootScheduleInMicrotask @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11558
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11649
+<CompanyPortal>
+exports.jsxDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=1a3ad88e:250
+component @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/src/App.tsx?t=1784085126080:345
+react-stack-bottom-frame @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:17424
+renderWithHooks @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:4206
+updateFunctionComponent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:6619
+beginWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:7654
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+performUnitOfWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10868
+workLoopSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10728
+renderRootSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10711
+performWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10330
+performSyncWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11635
+flushSyncWorkAcrossRoots_impl @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11536
+processRootScheduleInMicrotask @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11558
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11649
+<component>
+exports.createElement @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/chunk-KC53NVYV.js?v=1a3ad88e:773
+h_route @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/wouter.js?v=1a3ad88e:277
+Route @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/wouter.js?v=1a3ad88e:312
+react-stack-bottom-frame @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:17424
+renderWithHooks @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:4206
+updateFunctionComponent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:6619
+beginWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:7654
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+performUnitOfWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10868
+workLoopSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10728
+renderRootSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10711
+performWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10330
+performSyncWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11635
+flushSyncWorkAcrossRoots_impl @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11536
+processRootScheduleInMicrotask @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11558
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11649
+<Route>
+exports.jsxDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=1a3ad88e:250
+PortalRedirect @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/src/App.tsx?t=1784085126080:345
+react-stack-bottom-frame @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:17424
+renderWithHooks @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:4206
+updateFunctionComponent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:6619
+beginWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:7654
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+performUnitOfWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10868
+workLoopSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10728
+renderRootSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10711
+performWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10330
+performWorkOnRootViaSchedulerTask @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11623
+performWorkUntilDeadline @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:36
+<PortalRedirect>
+exports.jsxDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=1a3ad88e:250
+AuthGate @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/src/App.tsx?t=1784085126080:389
+react-stack-bottom-frame @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:17424
+renderWithHooks @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:4206
+updateFunctionComponent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:6619
+beginWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:7654
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+performUnitOfWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10868
+workLoopSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10728
+renderRootSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10711
+performWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10330
+performWorkOnRootViaSchedulerTask @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11623
+performWorkUntilDeadline @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:36
+<AuthGate>
+exports.jsxDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=1a3ad88e:250
+App @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/src/App.tsx?t=1784085126080:405
+react-stack-bottom-frame @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:17424
+renderWithHooks @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:4206
+updateFunctionComponent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:6619
+beginWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:7654
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+performUnitOfWork @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10868
+workLoopSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10728
+renderRootSync @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10711
+performWorkOnRoot @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:10330
+performWorkOnRootViaSchedulerTask @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11623
+performWorkUntilDeadline @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:36
+<App>
+exports.jsxDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=1a3ad88e:250
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/src/main.tsx?t=1784085126080:6
+injected.js:214  POST https://7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/api/phone-numbers/2/test-call 500 (Internal Server Error)
+apply @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/static/devtools/injected.js:214
+customFetch @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/@fs/home/runner/workspace/lib/api-client-react/src/custom-fetch.ts:227
+testCall @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/@fs/home/runner/workspace/lib/api-client-react/src/generated/api.ts:239
+mutationFn @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/@fs/home/runner/workspace/lib/api-client-react/src/generated/api.ts:256
+fn @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:2052
+run @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:844
+start @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:886
+execute @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:2093
+await in execute
+mutate @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:2429
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:3653
+handleTestCall @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/src/pages/number-detail.tsx?t=1784085334624:244
+executeDispatch @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11736
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+processDispatchQueue @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11772
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:12182
+batchedUpdates$1 @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:2628
+dispatchEventForPluginEventSystem @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11877
+dispatchEvent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:14792
+dispatchDiscreteEvent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:14773
+injected.js:214  POST https://7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/api/phone-numbers/2/test-call 500 (Internal Server Error)
+apply @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/static/devtools/injected.js:214
+customFetch @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/@fs/home/runner/workspace/lib/api-client-react/src/custom-fetch.ts:227
+testCall @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/@fs/home/runner/workspace/lib/api-client-react/src/generated/api.ts:239
+mutationFn @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/@fs/home/runner/workspace/lib/api-client-react/src/generated/api.ts:256
+fn @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:2052
+run @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:844
+start @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:886
+execute @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:2093
+await in execute
+mutate @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:2429
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:3653
+handleTestCall @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/src/pages/number-detail.tsx?t=1784085334624:244
+executeDispatch @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11736
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+processDispatchQueue @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11772
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:12182
+batchedUpdates$1 @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:2628
+dispatchEventForPluginEventSystem @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11877
+dispatchEvent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:14792
+dispatchDiscreteEvent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:14773
+injected.js:214  POST https://7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/api/phone-numbers/2/test-call 500 (Internal Server Error)
+apply @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/static/devtools/injected.js:214
+customFetch @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/@fs/home/runner/workspace/lib/api-client-react/src/custom-fetch.ts:227
+testCall @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/@fs/home/runner/workspace/lib/api-client-react/src/generated/api.ts:239
+mutationFn @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/@fs/home/runner/workspace/lib/api-client-react/src/generated/api.ts:256
+fn @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:2052
+run @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:844
+start @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:886
+execute @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:2093
+await in execute
+mutate @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:2429
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/@tanstack_react-query.js?v=1a3ad88e:3653
+handleTestCall @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/src/pages/number-detail.tsx?t=1784085334624:244
+executeDispatch @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11736
+runWithFiberInDEV @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:1485
+processDispatchQueue @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11772
+(anonymous) @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:12182
+batchedUpdates$1 @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:2628
+dispatchEventForPluginEventSystem @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:11877
+dispatchEvent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:14792
+dispatchDiscreteEvent @ 7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/node_modules/.vite/deps/react-dom_client.js?v=1a3ad88e:14773
+stallwart.build.js:1 stallwart: failed ping 1
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+(anonymous) @ 0_fzdwdm3tpr-.js:68
+stallwart.build.js:1 stallwart: failed ping 1
+stallwart.build.js:1 stallwart: failed ping 1
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+(anonymous) @ 0_fzdwdm3tpr-.js:68
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+(anonymous) @ 0_fzdwdm3tpr-.js:68
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+(anonymous) @ 0_fzdwdm3tpr-.js:68
+0z7700xnabpit.js:21 Haven't heard from the server in a while, resetting connection...
+(anonymous) @ 0z7700xnabpit.js:21
+(anonymous) @ 0_fzdwdm3tpr-.js:68
+0z7700xnabpit.js:21  POST https://replit.com/graphql net::ERR_CONNECTION_CLOSED
+(anonymous) @ 0z7700xnabpit.js:21
+(anonymous) @ 0ab1xyk..9g58.js:2
+e @ 0oni7~e3xqwhf.js:2
+r.subscribe @ 0oni7~e3xqwhf.js:2
+r.consumeQueue @ 0ab1xyk..9g58.js:2
+(anonymous) @ 0ab1xyk..9g58.js:2
+setTimeout
+r.scheduleQueueConsumption @ 0ab1xyk..9g58.js:2
+(anonymous) @ 0ab1xyk..9g58.js:2
+e @ 0oni7~e3xqwhf.js:2
+r.subscribe @ 0oni7~e3xqwhf.js:2
+(anonymous) @ 0ab1xyk..9g58.js:2
+Promise.then
+(anonymous) @ 0ab1xyk..9g58.js:2
+e @ 0oni7~e3xqwhf.js:2
+r.subscribe @ 0oni7~e3xqwhf.js:2
+(anonymous) @ 0ab1xyk..9g58.js:2
+e @ 0oni7~e3xqwhf.js:2
+r.subscribe @ 0oni7~e3xqwhf.js:2
+(anonymous) @ 0ab1xyk..9g58.js:2
+e @ 0oni7~e3xqwhf.js:2
+r.subscribe @ 0oni7~e3xqwhf.js:2
+r.try @ 0ab1xyk..9g58.js:2
+r.start @ 0ab1xyk..9g58.js:2
+e.request @ 0ab1xyk..9g58.js:2
+(anonymous) @ 16.rnv599nis_.js:2
+(anonymous) @ 16.rnv599nis_.js:2
+(anonymous) @ 0ab1xyk..9g58.js:2
+Promise.then
+(anonymous) @ 0ab1xyk..9g58.js:2
+e @ 0oni7~e3xqwhf.js:2
+r.subscribe @ 0oni7~e3xqwhf.js:2
+(anonymous) @ 0ab1xyk..9g58.js:2
+Promise.then
+(anonymous) @ 0ab1xyk..9g58.js:2
+e @ 0oni7~e3xqwhf.js:2
+r.subscribe @ 0oni7~e3xqwhf.js:2
+complete @ 16.rnv599nis_.js:2
+i.start @ 16.rnv599nis_.js:2
+i @ 16.rnv599nis_.js:2
+e.getObservableFromLink @ 16.rnv599nis_.js:2
+e.getResultsFromLink @ 16.rnv599nis_.js:2
+b @ 16.rnv599nis_.js:2
+e.fetchQueryByPolicy @ 16.rnv599nis_.js:2
+g @ 16.rnv599nis_.js:2
+e.fetchConcastWithInfo @ 16.rnv599nis_.js:2
+t.fetch @ 16.rnv599nis_.js:2
+t.reobserveAsConcast @ 16.rnv599nis_.js:2
+e.executeQuery @ 0c8e1fsynm600.js:14
+(anonymous) @ 0c8e1fsynm600.js:14
+(anonymous) @ 01hj~nzwj30.e.js:589
+enabled @ 01hj~nzwj30.e.js:589
+(anonymous) @ 09ewkxznrimxq.js:14
+trigger @ 15q1pody02rkz.js:2
+(anonymous) @ 15q1pody02rkz.js:2
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Unrecognized feature: 'ambient-light-sensor'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Unrecognized feature: 'battery'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Unrecognized feature: 'execution-while-not-rendered'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Unrecognized feature: 'layout-animations'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Unrecognized feature: 'legacy-image-formats'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Unrecognized feature: 'navigation-override'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Unrecognized feature: 'oversized-images'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Unrecognized feature: 'publickey-credentials'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Unrecognized feature: 'speaker-selection'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Unrecognized feature: 'unoptimized-images'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Unrecognized feature: 'unsized-media'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Allow attribute will take precedence over 'allowfullscreen'.
+7ca5c311-75d0-4d3e-a3ed-9b642ae72c70-00-7ngfqg5akwh.spock.replit.dev/__replco/workspace_iframe.html?initialPath=%2Fportal%2Fnumbers%2F2&id=artifacts%2Fcall-center:32 Allow attribute will take precedence over 'allowpaymentrequest'.
