@@ -403,7 +403,10 @@ export default function Leads() {
   const { data: phoneNumbers } = useListPhoneNumbers();
   const { data: companies } = useListCompanies();
 
-  // Build toNumber → company name lookup
+  // Normalize to E.164 digits-only key for reliable matching
+  const normPhone = (n: string) => n.replace(/\D/g, "");
+
+  // Build normalized-toNumber → company name lookup
   const companyByToNumber = useMemo(() => {
     const map: Record<string, string> = {};
     if (!phoneNumbers || !companies) return map;
@@ -411,7 +414,7 @@ export default function Leads() {
     for (const pn of phoneNumbers) {
       if (pn.companyId && pn.number) {
         const name = companyMap.get(pn.companyId);
-        if (name) map[pn.number] = name;
+        if (name) map[normPhone(pn.number)] = name;
       }
     }
     return map;
@@ -507,7 +510,7 @@ export default function Leads() {
             <LeadCard
               key={call.id}
               call={call}
-              companyName={call.toNumber ? companyByToNumber[call.toNumber] : undefined}
+              companyName={call.toNumber ? companyByToNumber[normPhone(call.toNumber)] : undefined}
               onClick={() => setSelectedCall(call)}
             />
           ))}
@@ -516,7 +519,7 @@ export default function Leads() {
 
       <LeadDetail
         call={selectedCall}
-        companyName={selectedCall?.toNumber ? companyByToNumber[selectedCall.toNumber] : undefined}
+        companyName={selectedCall?.toNumber ? companyByToNumber[normPhone(selectedCall.toNumber)] : undefined}
         open={!!selectedCall}
         onClose={() => setSelectedCall(null)}
       />
