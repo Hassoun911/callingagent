@@ -137,7 +137,7 @@ function LoginScreen({ onSuccess, portalCompanyId }: { onSuccess: () => void; po
             </>
           ) : (
             <>
-              <img src="/logo.png" alt="CallingAgent" className="h-14 w-auto mx-auto mb-4 object-contain" />
+              <img src="/logo.png" alt="CallingAgent" className="w-72 h-auto mx-auto mb-4 object-contain" />
               <p className="text-sm text-slate-500">Call Center Management</p>
             </>
           )}

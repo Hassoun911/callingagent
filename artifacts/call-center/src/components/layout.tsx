@@ -118,7 +118,7 @@ export function Layout({ children }: { children: ReactNode }) {
     return (
       <>
         <div className="h-16 flex items-center px-4 border-b border-border flex-shrink-0">
-          <img src="/logo.png" alt="CallingAgent" className="h-8 w-auto object-contain" />
+          <img src="/logo.png" alt="CallingAgent" className="w-full h-auto object-contain" />
         </div>
 
         <div className="flex-1 py-4 px-3 overflow-y-auto space-y-0.5">
