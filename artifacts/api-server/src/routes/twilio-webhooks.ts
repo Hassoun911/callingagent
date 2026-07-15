@@ -1621,7 +1621,7 @@ async function sendSmsNotificationIfConfigured(callSid: string): Promise<void> {
         if (log.callSummary) callerMsg += ` ${log.callSummary}`;
         callerMsg += ` If you need to change your appointment please call us back.`;
       }
-      callerMsg += `\n\n---\nPowered by CallingAgent — AI-powered call management for businesses. callingagent.ai`;
+      callerMsg += `\n\n---\nPowered by CallingAgent — AI-powered call management for businesses. callingagent.ca`;
       const callerTo = isWhatsApp ? `whatsapp:${callerNumber}` : callerNumber;
       await client.messages.create({ body: callerMsg, from: adminFrom, to: callerTo });
       logger.info({ callSid, callerNumber }, "Caller confirmation SMS sent");
