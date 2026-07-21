@@ -11,6 +11,7 @@ import {
   type SessionData,
 } from "../lib/auth";
 import { verifyPassword } from "../lib/password";
+import { getPermissionsForRole } from "../lib/permissions";
 
 const router: IRouter = Router();
 
@@ -39,7 +40,11 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 router.get("/auth/user", (req: Request, res: Response) => {
-  res.json({ user: req.isAuthenticated() ? req.user : null });
+  const user = req.isAuthenticated() ? req.user : null;
+  res.json({
+    user,
+    permissions: user ? getPermissionsForRole(user.role) : [],
+  });
 });
 
 router.post("/login", async (req: Request, res: Response): Promise<void> => {
@@ -90,7 +95,12 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
     };
     const sid = await createSession(sessionData);
     setSessionCookie(res, sid);
-    res.json({ ok: true, role: platformUser.role, companyId: platformUser.companyId ?? null });
+    res.json({
+      ok: true,
+      role: platformUser.role,
+      companyId: platformUser.companyId ?? null,
+      permissions: getPermissionsForRole(platformUser.role),
+    });
     return;
   }
 
@@ -128,7 +138,12 @@ router.post("/login", async (req: Request, res: Response): Promise<void> => {
 
   const sid = await createSession(sessionData);
   setSessionCookie(res, sid);
-  res.json({ ok: true, role: "super_admin", companyId: null });
+  res.json({
+    ok: true,
+    role: "super_admin",
+    companyId: null,
+    permissions: getPermissionsForRole("super_admin"),
+  });
 });
 
 router.post("/logout", async (req: Request, res: Response): Promise<void> => {
