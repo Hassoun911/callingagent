@@ -21,7 +21,7 @@ import Campaigns from "@/pages/campaigns";
 import CampaignDetail from "@/pages/campaign-detail";
 import NotFound from "@/pages/not-found";
 import Bookings from "@/pages/bookings";
-import BookingSetup from "@/pages/booking-setup";
+import BookingSetupEntry from "@/pages/booking-setup-entry";
 import BookingAiImport from "@/pages/booking-ai-import";
 import Leads from "@/pages/leads";
 
@@ -242,7 +242,7 @@ function AdminRouter() {
         <Route path="/campaigns" component={Campaigns} />
         <Route path="/campaigns/:id" component={CampaignDetail} />
         <Route path="/bookings/import" component={BookingAiImport} />
-        <Route path="/bookings/setup" component={BookingSetup} />
+        <Route path="/bookings/setup" component={BookingSetupEntry} />
         <Route path="/bookings" component={Bookings} />
         <Route path="/leads" component={Leads} />
         <Route component={NotFound} />
