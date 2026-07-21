@@ -58,11 +58,13 @@ async function sendCallNotificationIfConfigured(callSid: string, overrideRecordi
 
     // Build a proxied recording URL through our own endpoint so the email
     // recipient can click and play instantly — no Twilio credentials required.
-    const publicDomain = process.env.REPLIT_DOMAINS
-      ? `https://${process.env.REPLIT_DOMAINS.split(",")[0].trim()}`
-      : process.env.REPLIT_DEV_DOMAIN
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : null;
+    const publicDomain = process.env.APP_URL
+      ? process.env.APP_URL.replace(/\/$/, "")
+      : process.env.REPLIT_DOMAINS
+        ? `https://${process.env.REPLIT_DOMAINS.split(",")[0].trim()}`
+        : process.env.REPLIT_DEV_DOMAIN
+          ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+          : null;
     const hasRecording = !!(overrideRecordingUrl ?? log.recordingUrl ?? log.recordingSid);
     const recordingUrl = hasRecording && publicDomain
       ? `${publicDomain}/api/call-logs/${log.id}/recording`
@@ -495,9 +497,11 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
   req.log.info({ To, From, CallSid }, "Incoming Twilio voice webhook");
   try {
 
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : `${req.protocol}://${req.get("host")}`;
+  const baseUrl = process.env.APP_URL
+    ? process.env.APP_URL.replace(/\/$/, "")
+    : process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : `${req.protocol}://${req.get("host")}`;
 
   // Twilio sends E.164 without spaces (e.g. "+12262865860") but the DB may store
   // formatted numbers with spaces (e.g. "+1 226 286 5860"). Strip spaces on both sides.
@@ -790,9 +794,11 @@ router.post("/twilio/ivr-gather", async (req, res): Promise<void> => {
   const phoneNumberId = parseInt(req.query.phoneNumberId as string, 10);
   res.set("Content-Type", "text/xml");
   try {
-    const baseUrl = process.env.REPLIT_DEV_DOMAIN
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : `${req.protocol}://${req.get("host")}`;
+    const baseUrl = process.env.APP_URL
+      ? process.env.APP_URL.replace(/\/$/, "")
+      : process.env.REPLIT_DEV_DOMAIN
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : `${req.protocol}://${req.get("host")}`;
 
     if (!phoneNumberId || isNaN(phoneNumberId)) {
       res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
@@ -1228,9 +1234,11 @@ router.post("/twilio/name-recorded", async (req, res): Promise<void> => {
   req.log.info({ CallSid, phoneNumberId, hasRecording: !!RecordingUrl }, "Caller name recorded");
   try {
 
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : `${req.protocol}://${req.get("host")}`;
+  const baseUrl = process.env.APP_URL
+    ? process.env.APP_URL.replace(/\/$/, "")
+    : process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : `${req.protocol}://${req.get("host")}`;
 
   let phoneNumber = null;
   if (phoneNumberId) {
@@ -1276,9 +1284,11 @@ router.post("/twilio/name-recorded", async (req, res): Promise<void> => {
 router.post("/twilio/name-screen", (req, res): void => {
   const { recordingUrl, fallback } = req.query as Record<string, string>;
   const parentCallSid: string = req.body.ParentCallSid ?? "";
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : `${req.protocol}://${req.get("host")}`;
+  const baseUrl = process.env.APP_URL
+    ? process.env.APP_URL.replace(/\/$/, "")
+    : process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : `${req.protocol}://${req.get("host")}`;
 
   const decodedRecUrl = recordingUrl ? decodeURIComponent(recordingUrl) : "";
   const fallbackLabel = fallback === "ai_voice" ? "AI agent" : "voicemail";
@@ -1307,9 +1317,11 @@ router.post("/twilio/screen", async (req, res): Promise<void> => {
   const { phoneNumberId, fallback, callerFrom } = req.query as Record<string, string>;
   const parentCallSid: string = req.body.ParentCallSid ?? "";
   const From = callerFrom ? decodeURIComponent(callerFrom) : null;
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : `${req.protocol}://${req.get("host")}`;
+  const baseUrl = process.env.APP_URL
+    ? process.env.APP_URL.replace(/\/$/, "")
+    : process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : `${req.protocol}://${req.get("host")}`;
 
   const fallbackLabel = fallback === "ai_voice" ? "AI agent" : "voicemail";
   req.log.info({ phoneNumberId, fallback, callerFrom: From }, "Call screen whisper");
@@ -1400,9 +1412,11 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
     return;
   }
 
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : `${req.protocol}://${req.get("host")}`;
+  const baseUrl = process.env.APP_URL
+    ? process.env.APP_URL.replace(/\/$/, "")
+    : process.env.REPLIT_DEV_DOMAIN
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : `${req.protocol}://${req.get("host")}`;
 
   let phoneNumber = null;
   if (phoneNumberId) {
