@@ -23,9 +23,27 @@ function getTwilioClient() {
 
 type AllowedNumbers = { ids: number[]; numbers: string[] } | null;
 
+function getCompanyIdFromReferer(req: any): number | null {
+  const referer = req.get?.("referer") || req.headers?.referer;
+  if (!referer || typeof referer !== "string") return null;
+  try {
+    const value = new URL(referer).searchParams.get("companyId");
+    if (!value) return null;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function getRequestedCompanyId(req: any, explicitCompanyId?: number | null): number | null {
+  if (explicitCompanyId != null) return explicitCompanyId;
+  return getCompanyIdFromReferer(req);
+}
+
 async function getAllowedNumbers(req: any, requestedCompanyId?: number | null): Promise<AllowedNumbers> {
   const scopedCompanyId = getCompanyScope(req);
-  const effectiveCompanyId = scopedCompanyId ?? requestedCompanyId ?? null;
+  const effectiveCompanyId = scopedCompanyId ?? getRequestedCompanyId(req, requestedCompanyId) ?? null;
   if (effectiveCompanyId === null) return null;
 
   const rows = await db
