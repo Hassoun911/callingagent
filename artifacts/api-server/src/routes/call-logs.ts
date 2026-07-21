@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, and } from "drizzle-orm";
 import { db, callLogsTable, phoneNumbersTable } from "@workspace/db";
 import { getCompanyScope } from "../lib/scope";
 import {
@@ -21,6 +21,24 @@ function getTwilioClient() {
   return twilio(accountSid, authToken);
 }
 
+async function getAllowedNumberIds(req: any, requestedCompanyId?: number | null): Promise<number[] | null> {
+  const scopedCompanyId = getCompanyScope(req);
+  const effectiveCompanyId = scopedCompanyId ?? requestedCompanyId ?? null;
+  if (effectiveCompanyId === null) return null;
+
+  const rows = await db
+    .select({ id: phoneNumbersTable.id })
+    .from(phoneNumbersTable)
+    .where(eq(phoneNumbersTable.companyId, effectiveCompanyId));
+  return rows.map((row) => row.id);
+}
+
+async function canAccessLog(req: any, phoneNumberId: number | null): Promise<boolean> {
+  const allowedNumberIds = await getAllowedNumberIds(req);
+  if (allowedNumberIds === null) return true;
+  return phoneNumberId !== null && allowedNumberIds.includes(phoneNumberId);
+}
+
 router.get("/call-logs", async (req, res): Promise<void> => {
   const query = ListCallLogsQueryParams.safeParse(req.query);
   if (!query.success) {
@@ -29,29 +47,28 @@ router.get("/call-logs", async (req, res): Promise<void> => {
   }
 
   const { phoneNumberId, direction, status, limit = 50, companyId: filterCompanyId } = query.data;
+  const allowedNumberIds = await getAllowedNumberIds(req, filterCompanyId);
 
-  // Determine which phone number IDs this user is allowed to see
-  const scopedCompanyId = getCompanyScope(req);
-  // Super-admin can optionally filter by a specific company via query param
-  const effectiveCompanyId = scopedCompanyId ?? filterCompanyId ?? null;
-
-  let allowedNumberIds: number[] | null = null;
-  if (effectiveCompanyId !== null) {
-    const myNumbers = await db
-      .select({ id: phoneNumbersTable.id })
-      .from(phoneNumbersTable)
-      .where(eq(phoneNumbersTable.companyId, effectiveCompanyId));
-    allowedNumberIds = myNumbers.map(n => n.id);
+  if (allowedNumberIds !== null && allowedNumberIds.length === 0) {
+    res.json([]);
+    return;
   }
 
-  let logs = await db.select().from(callLogsTable).orderBy(desc(callLogsTable.createdAt)).limit(limit);
-
-  if (allowedNumberIds !== null) {
-    logs = logs.filter(l => l.phoneNumberId !== null && allowedNumberIds!.includes(l.phoneNumberId));
+  const conditions = [];
+  if (allowedNumberIds !== null) conditions.push(inArray(callLogsTable.phoneNumberId, allowedNumberIds));
+  if (phoneNumberId) {
+    if (allowedNumberIds !== null && !allowedNumberIds.includes(phoneNumberId)) {
+      res.status(403).json({ error: "Access denied" });
+      return;
+    }
+    conditions.push(eq(callLogsTable.phoneNumberId, phoneNumberId));
   }
-  if (phoneNumberId) logs = logs.filter(l => l.phoneNumberId === phoneNumberId);
-  if (direction) logs = logs.filter(l => l.direction === direction);
-  if (status) logs = logs.filter(l => l.status === status);
+  if (direction) conditions.push(eq(callLogsTable.direction, direction));
+  if (status) conditions.push(eq(callLogsTable.status, status));
+
+  const logs = conditions.length
+    ? await db.select().from(callLogsTable).where(and(...conditions)).orderBy(desc(callLogsTable.createdAt)).limit(limit)
+    : await db.select().from(callLogsTable).orderBy(desc(callLogsTable.createdAt)).limit(limit);
 
   res.json(ListCallLogsResponse.parse(logs.map(l => ({
     ...l,
@@ -71,6 +88,10 @@ router.get("/call-logs/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Call log not found" });
     return;
   }
+  if (!(await canAccessLog(req, log.phoneNumberId))) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
 
   res.json(GetCallLogResponse.parse({ ...log, createdAt: log.createdAt.toISOString() }));
 });
@@ -85,6 +106,10 @@ router.get("/call-logs/:id/recording", async (req, res): Promise<void> => {
   const [log] = await db.select().from(callLogsTable).where(eq(callLogsTable.id, params.data.id));
   if (!log) {
     res.status(404).json({ error: "Call log not found" });
+    return;
+  }
+  if (!(await canAccessLog(req, log.phoneNumberId))) {
+    res.status(403).json({ error: "Access denied" });
     return;
   }
 
@@ -137,18 +162,29 @@ router.get("/call-logs/:id/recording", async (req, res): Promise<void> => {
 router.patch("/call-logs/:id/notes", async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const [existing] = await db.select().from(callLogsTable).where(eq(callLogsTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await canAccessLog(req, existing.phoneNumberId))) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
   const { notes } = req.body as { notes: string | null };
   const [updated] = await db
     .update(callLogsTable)
     .set({ notes: notes ?? null, updatedAt: new Date() })
     .where(eq(callLogsTable.id, id))
     .returning();
-  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
   res.json({ ...updated, createdAt: updated.createdAt.toISOString() });
 });
 
 router.delete("/call-logs", async (req, res): Promise<void> => {
-  await db.delete(callLogsTable);
+  const allowedNumberIds = await getAllowedNumberIds(req);
+  if (allowedNumberIds === null) {
+    await db.delete(callLogsTable);
+  } else if (allowedNumberIds.length > 0) {
+    await db.delete(callLogsTable).where(inArray(callLogsTable.phoneNumberId, allowedNumberIds));
+  }
   res.json({ deleted: true });
 });
 
@@ -158,11 +194,18 @@ router.delete("/call-logs/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Invalid id" });
     return;
   }
-  const [deleted] = await db.delete(callLogsTable).where(eq(callLogsTable.id, id)).returning();
-  if (!deleted) {
+
+  const [existing] = await db.select().from(callLogsTable).where(eq(callLogsTable.id, id));
+  if (!existing) {
     res.status(404).json({ error: "Not found" });
     return;
   }
+  if (!(await canAccessLog(req, existing.phoneNumberId))) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  await db.delete(callLogsTable).where(eq(callLogsTable.id, id));
   res.json({ deleted: true });
 });
 
