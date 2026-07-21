@@ -16,6 +16,7 @@ const ROUTE_RULES: RouteRule[] = [
   { prefix: "/contacts", read: "contacts.view", write: "contacts.manage" },
   { prefix: "/sms", read: "messages.view", write: "messages.reply" },
   { prefix: "/appointments", read: "bookings.view", write: "bookings.manage" },
+  { prefix: "/booking", read: "bookings.view", write: "bookings.manage" },
   { prefix: "/companies", read: "companies.view", write: "companies.manage" },
   { prefix: "/costs", read: "billing.view" },
   { prefix: "/dashboard", read: "reports.view" },
@@ -25,37 +26,15 @@ const ROUTE_RULES: RouteRule[] = [
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
-/**
- * Central permission gate for authenticated application routes.
- * Public authentication, health, and Twilio webhook routes are intentionally
- * excluded because they are handled by their own security controls.
- */
 export function routeAccessControl(req: Request, res: Response, next: NextFunction): void {
   const rule = ROUTE_RULES.find(({ prefix }) => req.path === prefix || req.path.startsWith(`${prefix}/`));
-  if (!rule) {
-    next();
-    return;
-  }
-
-  if (!req.isAuthenticated?.() || !req.user) {
-    res.status(401).json({ error: "Authentication required" });
-    return;
-  }
-
+  if (!rule) { next(); return; }
+  if (!req.isAuthenticated?.() || !req.user) { res.status(401).json({ error: "Authentication required" }); return; }
   let permission = SAFE_METHODS.has(req.method) ? rule.read : (rule.write ?? rule.read);
-
-  // Listening to recordings is more sensitive than viewing call metadata.
-  if (rule.prefix === "/call-logs" && req.path.includes("/recording")) {
-    permission = "calls.listen";
-  }
-
+  if (rule.prefix === "/call-logs" && req.path.includes("/recording")) permission = "calls.listen";
   if (!hasPermission(req.user.role, permission)) {
-    res.status(403).json({
-      error: "You do not have permission to perform this action",
-      requiredPermission: permission,
-    });
+    res.status(403).json({ error: "You do not have permission to perform this action", requiredPermission: permission });
     return;
   }
-
   next();
 }
