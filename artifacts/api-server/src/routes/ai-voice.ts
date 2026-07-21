@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, aiVoiceConfigTable } from "@workspace/db";
+import { db, aiVoiceConfigTable, companiesTable } from "@workspace/db";
 import {
   GetAiVoiceConfigResponse,
   UpdateAiVoiceConfigBody,
@@ -53,8 +53,8 @@ const PREVIEW_TEXT_BY_LANG: Record<string, string> = {
   sv:  "Hej, tack för ditt samtal. Jag är här för att hjälpa — hur kan jag hjälpa dig idag?",
   no:  "Hei, takk for at du ringte. Jeg er her for å hjelpe — hvordan kan jeg hjelpe deg i dag?",
   pl:  "Cześć, dziękuję za telefon. Jestem tutaj, żeby pomóc — jak mogę ci dziś pomóc?",
-  cs:  "Dobrý den, děkujeme za váš hovor. Jsem tu, abych pomohl — jak vám dnes mohu pomoci?",
-  sk:  "Dobrý deň, ďakujeme za váš hovor. Som tu, aby som pomohol — ako vám môžem dnes pomôcť?",
+  cs:  "Dobrý den, děkujeme za váš hovor. Jsem tu, abych pomohl — jak vám mohu pomoci?",
+  sk:  "Dobrý deň, ďakujeme za váš hovor. Som tu, aby som pomohol — ako vám môžem pomôcť?",
   ro:  "Bună ziua, vă mulțumim că ați sunat. Sunt aici să ajut — cu ce vă pot ajuta astăzi?",
   hr:  "Bok, hvala što ste pozvali. Ovdje sam da pomognem — kako vam mogu pomoći danas?",
   uk:  "Привіт, дякуємо за дзвінок. Я тут, щоб допомогти — як я можу допомогти вам сьогодні?",
@@ -188,9 +188,104 @@ router.patch("/ai-voice/config", async (req, res): Promise<void> => {
     .returning();
 
   res.json(UpdateAiVoiceConfigResponse.parse(updated));
-
-  // Re-warm TTS cache in the background with the new greeting/voice so the next call is instant
   warmTtsCache().catch(() => {});
+});
+
+router.post("/ai-voice/extract-booking-setup", async (req, res): Promise<void> => {
+  try {
+    const requestedCompanyId = Number(req.body?.companyId);
+    const companyId = req.user?.role === "super_admin" ? requestedCompanyId : Number(req.user?.companyId);
+    if (!companyId) {
+      res.status(400).json({ error: "companyId is required" });
+      return;
+    }
+    if (req.user?.role !== "super_admin" && Number(req.user?.companyId) !== companyId) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId));
+    if (!company) {
+      res.status(404).json({ error: "Company not found" });
+      return;
+    }
+
+    const config = await ensureConfig();
+    const promptText = String(req.body?.systemPrompt ?? config.systemPrompt ?? "").trim();
+    if (!promptText) {
+      res.status(400).json({ error: "The AI system prompt is empty" });
+      return;
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `Extract a proposed booking configuration from a business receptionist prompt. Return JSON only with this shape:
+{
+  "resources": [{"name":"string","resourceType":"staff|technician|barber|chair|room|table|vehicle|agent|other","description":"string","allowRandomAssignment":true}],
+  "services": [{"name":"string","description":"string","durationMinutes":30,"bufferBeforeMinutes":0,"bufferAfterMinutes":0}],
+  "availability": [{"resourceName":"string","dayOfWeek":0,"startTime":"09:00","endTime":"17:00"}],
+  "settings": {"enabled":true,"timezone":"America/Toronto","slotIntervalMinutes":30,"minimumNoticeMinutes":60,"maximumAdvanceDays":90,"allowResourceSelection":true,"allowRandomAssignment":true,"requireApproval":false},
+  "warnings": ["string"]
+}
+Rules: infer only what is supported by the prompt. Do not invent named staff. If no named staff/resources exist, create one generic resource appropriate to the business, such as Mobile Technician, Barber, Realtor, Treatment Room, Table, or Service Vehicle. Convert stated regular business hours into availability for the generic resource. Emergency 24/7 service may use 00:00 to 23:59 and minimumNoticeMinutes 0. Use realistic service durations only when the prompt does not specify them, and mention those estimates in warnings. Do not include prices as services unless they are actual bookable services.`
+        },
+        {
+          role: "user",
+          content: `Company: ${company.name}\n\nAI receptionist instructions:\n${promptText}`
+        }
+      ]
+    });
+
+    const raw = completion.choices[0]?.message?.content || "{}";
+    const parsed = JSON.parse(raw);
+    const resources = Array.isArray(parsed.resources) ? parsed.resources.slice(0, 50).map((r: any) => ({
+      name: String(r.name || "").trim(),
+      resourceType: String(r.resourceType || "staff").trim(),
+      description: String(r.description || "").trim(),
+      allowRandomAssignment: r.allowRandomAssignment !== false,
+    })).filter((r: any) => r.name) : [];
+    const services = Array.isArray(parsed.services) ? parsed.services.slice(0, 100).map((s: any) => ({
+      name: String(s.name || "").trim(),
+      description: String(s.description || "").trim(),
+      durationMinutes: Math.max(5, Math.min(480, Number(s.durationMinutes) || 30)),
+      bufferBeforeMinutes: Math.max(0, Math.min(120, Number(s.bufferBeforeMinutes) || 0)),
+      bufferAfterMinutes: Math.max(0, Math.min(120, Number(s.bufferAfterMinutes) || 0)),
+    })).filter((s: any) => s.name) : [];
+    const availability = Array.isArray(parsed.availability) ? parsed.availability.slice(0, 350).map((a: any) => ({
+      resourceName: String(a.resourceName || "").trim(),
+      dayOfWeek: Math.max(0, Math.min(6, Number(a.dayOfWeek) || 0)),
+      startTime: /^\d{2}:\d{2}$/.test(String(a.startTime)) ? String(a.startTime) : "09:00",
+      endTime: /^\d{2}:\d{2}$/.test(String(a.endTime)) ? String(a.endTime) : "17:00",
+    })).filter((a: any) => a.resourceName && a.endTime > a.startTime) : [];
+    const settings = {
+      enabled: parsed.settings?.enabled !== false,
+      timezone: String(parsed.settings?.timezone || "America/Toronto"),
+      slotIntervalMinutes: Math.max(5, Math.min(240, Number(parsed.settings?.slotIntervalMinutes) || 30)),
+      minimumNoticeMinutes: Math.max(0, Number(parsed.settings?.minimumNoticeMinutes) || 0),
+      maximumAdvanceDays: Math.max(1, Math.min(730, Number(parsed.settings?.maximumAdvanceDays) || 90)),
+      allowResourceSelection: parsed.settings?.allowResourceSelection !== false,
+      allowRandomAssignment: parsed.settings?.allowRandomAssignment !== false,
+      requireApproval: parsed.settings?.requireApproval === true,
+    };
+
+    res.json({
+      companyId,
+      companyName: company.name,
+      source: "ai_system_prompt",
+      resources,
+      services,
+      availability,
+      settings,
+      warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map(String).slice(0, 20) : [],
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "Could not analyze AI settings" });
+  }
 });
 
 export default router;
