@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, inArray, and } from "drizzle-orm";
+import { eq, desc, inArray, and, or } from "drizzle-orm";
 import { db, callLogsTable, phoneNumbersTable } from "@workspace/db";
 import { getCompanyScope } from "../lib/scope";
 import {
@@ -21,22 +21,42 @@ function getTwilioClient() {
   return twilio(accountSid, authToken);
 }
 
-async function getAllowedNumberIds(req: any, requestedCompanyId?: number | null): Promise<number[] | null> {
+type AllowedNumbers = { ids: number[]; numbers: string[] } | null;
+
+async function getAllowedNumbers(req: any, requestedCompanyId?: number | null): Promise<AllowedNumbers> {
   const scopedCompanyId = getCompanyScope(req);
   const effectiveCompanyId = scopedCompanyId ?? requestedCompanyId ?? null;
   if (effectiveCompanyId === null) return null;
 
   const rows = await db
-    .select({ id: phoneNumbersTable.id })
+    .select({ id: phoneNumbersTable.id, number: phoneNumbersTable.number })
     .from(phoneNumbersTable)
     .where(eq(phoneNumbersTable.companyId, effectiveCompanyId));
-  return rows.map((row) => row.id);
+
+  return {
+    ids: rows.map((row) => row.id),
+    numbers: rows.map((row) => row.number).filter((number): number is string => Boolean(number)),
+  };
 }
 
-async function canAccessLog(req: any, phoneNumberId: number | null): Promise<boolean> {
-  const allowedNumberIds = await getAllowedNumberIds(req);
-  if (allowedNumberIds === null) return true;
-  return phoneNumberId !== null && allowedNumberIds.includes(phoneNumberId);
+function companyLogCondition(allowed: Exclude<AllowedNumbers, null>) {
+  const matches = [];
+  if (allowed.ids.length > 0) matches.push(inArray(callLogsTable.phoneNumberId, allowed.ids));
+  if (allowed.numbers.length > 0) {
+    matches.push(inArray(callLogsTable.toNumber, allowed.numbers));
+    matches.push(inArray(callLogsTable.fromNumber, allowed.numbers));
+  }
+  return matches.length > 0 ? or(...matches) : undefined;
+}
+
+async function canAccessLog(req: any, log: typeof callLogsTable.$inferSelect): Promise<boolean> {
+  const allowed = await getAllowedNumbers(req);
+  if (allowed === null) return true;
+  return (
+    (log.phoneNumberId !== null && allowed.ids.includes(log.phoneNumberId)) ||
+    allowed.numbers.includes(log.toNumber) ||
+    allowed.numbers.includes(log.fromNumber)
+  );
 }
 
 router.get("/call-logs", async (req, res): Promise<void> => {
@@ -47,17 +67,20 @@ router.get("/call-logs", async (req, res): Promise<void> => {
   }
 
   const { phoneNumberId, direction, status, limit = 50, companyId: filterCompanyId } = query.data;
-  const allowedNumberIds = await getAllowedNumberIds(req, filterCompanyId);
+  const allowed = await getAllowedNumbers(req, filterCompanyId);
 
-  if (allowedNumberIds !== null && allowedNumberIds.length === 0) {
+  if (allowed !== null && allowed.ids.length === 0 && allowed.numbers.length === 0) {
     res.json([]);
     return;
   }
 
   const conditions = [];
-  if (allowedNumberIds !== null) conditions.push(inArray(callLogsTable.phoneNumberId, allowedNumberIds));
+  if (allowed !== null) {
+    const scopedCondition = companyLogCondition(allowed);
+    if (scopedCondition) conditions.push(scopedCondition);
+  }
   if (phoneNumberId) {
-    if (allowedNumberIds !== null && !allowedNumberIds.includes(phoneNumberId)) {
+    if (allowed !== null && !allowed.ids.includes(phoneNumberId)) {
       res.status(403).json({ error: "Access denied" });
       return;
     }
@@ -88,7 +111,7 @@ router.get("/call-logs/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Call log not found" });
     return;
   }
-  if (!(await canAccessLog(req, log.phoneNumberId))) {
+  if (!(await canAccessLog(req, log))) {
     res.status(403).json({ error: "Access denied" });
     return;
   }
@@ -108,7 +131,7 @@ router.get("/call-logs/:id/recording", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Call log not found" });
     return;
   }
-  if (!(await canAccessLog(req, log.phoneNumberId))) {
+  if (!(await canAccessLog(req, log))) {
     res.status(403).json({ error: "Access denied" });
     return;
   }
@@ -164,7 +187,7 @@ router.patch("/call-logs/:id/notes", async (req, res): Promise<void> => {
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const [existing] = await db.select().from(callLogsTable).where(eq(callLogsTable.id, id));
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (!(await canAccessLog(req, existing.phoneNumberId))) {
+  if (!(await canAccessLog(req, existing))) {
     res.status(403).json({ error: "Access denied" });
     return;
   }
@@ -179,11 +202,12 @@ router.patch("/call-logs/:id/notes", async (req, res): Promise<void> => {
 });
 
 router.delete("/call-logs", async (req, res): Promise<void> => {
-  const allowedNumberIds = await getAllowedNumberIds(req);
-  if (allowedNumberIds === null) {
+  const allowed = await getAllowedNumbers(req);
+  if (allowed === null) {
     await db.delete(callLogsTable);
-  } else if (allowedNumberIds.length > 0) {
-    await db.delete(callLogsTable).where(inArray(callLogsTable.phoneNumberId, allowedNumberIds));
+  } else {
+    const scopedCondition = companyLogCondition(allowed);
+    if (scopedCondition) await db.delete(callLogsTable).where(scopedCondition);
   }
   res.json({ deleted: true });
 });
@@ -200,7 +224,7 @@ router.delete("/call-logs/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  if (!(await canAccessLog(req, existing.phoneNumberId))) {
+  if (!(await canAccessLog(req, existing))) {
     res.status(403).json({ error: "Access denied" });
     return;
   }
