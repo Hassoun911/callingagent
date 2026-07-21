@@ -43,7 +43,6 @@ export function Layout({ children }: { children: ReactNode }) {
   const { data: companies } = useListCompanies();
   const { data: allNumbers } = useListPhoneNumbers();
 
-  // Derive active company from current route or ?companyId= query param
   const activeCompanyId = (() => {
     const cm = location.match(/^\/companies\/(\d+)/);
     if (cm) return parseInt(cm[1]);
@@ -58,7 +57,6 @@ export function Layout({ children }: { children: ReactNode }) {
   })();
   const contextCompany = activeCompanyId ? companies?.find(c => c.id === activeCompanyId) : null;
 
-  // Active number: from /numbers/:id URL or ?numberId= param
   const activeNumberId = (() => {
     const nm = location.match(/^\/numbers\/(\d+)/);
     if (nm) return parseInt(nm[1]);
@@ -86,7 +84,6 @@ export function Layout({ children }: { children: ReactNode }) {
       }
       return true;
     }
-    // When there's a ?companyId= param active, don't highlight the generic top-level links
     if (
       (href === "/campaigns" || href === "/numbers" || href === "/calls" || href === "/settings") &&
       window.location.search.includes("companyId=")
@@ -122,24 +119,18 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
 
         <div className="flex-1 py-4 px-3 overflow-y-auto space-y-0.5">
-
-          {/* ── OVERVIEW ── */}
           <SectionLabel label="Overview" />
           <Link href="/" onClick={onNav} className={navCls("/")}>
             <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
             Dashboard
           </Link>
 
-          {/* ── OPERATIONS ── */}
           <SectionLabel label="Operations" />
-
-          {/* Companies — always flat at top level */}
           <Link href="/companies" onClick={onNav} className={navCls("/companies")}>
             <Building2 className="h-4 w-4 flex-shrink-0" />
             Companies
           </Link>
 
-          {/* Company context tree: only shown when inside a specific company */}
           {contextCompany && (
             <div className="ml-3 space-y-0.5 border-l border-border/50 pl-3">
               <Link
@@ -215,6 +206,18 @@ export function Layout({ children }: { children: ReactNode }) {
                 Bookings
               </Link>
               <Link
+                href={`/bookings/setup?companyId=${contextCompany.id}`}
+                onClick={onNav}
+                className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${
+                  isActive(`/bookings/setup?companyId=${contextCompany.id}`)
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+              >
+                <Settings className="h-3 w-3 flex-shrink-0" />
+                Booking Setup
+              </Link>
+              <Link
                 href={`/settings?companyId=${contextCompany.id}`}
                 onClick={onNav}
                 className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition-colors ${
@@ -265,7 +268,6 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           )}
 
-          {/* ── LEADS (top-level only) ── */}
           {!contextCompany && (
             <Link href="/leads" onClick={onNav} className={navCls("/leads")}>
               <TrendingUp className="h-4 w-4 flex-shrink-0" />
@@ -273,7 +275,6 @@ export function Layout({ children }: { children: ReactNode }) {
             </Link>
           )}
 
-          {/* ── BOOKINGS (top-level, when no company context) ── */}
           {!contextCompany && (
             <Link href="/bookings" onClick={onNav} className={navCls("/bookings")}>
               <CalendarDays className="h-4 w-4 flex-shrink-0" />
@@ -281,13 +282,11 @@ export function Layout({ children }: { children: ReactNode }) {
             </Link>
           )}
 
-          {/* ── SYSTEM ── */}
           <SectionLabel label="System" />
           <Link href="/billing" onClick={onNav} className={navCls("/billing")}>
             <CreditCard className="h-4 w-4 flex-shrink-0" />
             Billing
           </Link>
-
         </div>
 
         <div className="p-4 border-t border-border flex-shrink-0">
@@ -314,12 +313,10 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Desktop sidebar */}
       <aside className="hidden md:flex w-64 flex-shrink-0 border-r border-border bg-card flex-col">
         <NavContent />
       </aside>
 
-      {/* Mobile sidebar overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div
@@ -340,7 +337,6 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col h-full overflow-hidden relative min-w-0">
         <div className="h-16 flex-shrink-0 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center px-4 md:px-6 justify-between z-10">
           <div className="flex items-center gap-3">
