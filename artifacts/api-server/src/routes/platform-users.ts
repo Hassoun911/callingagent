@@ -1,7 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, platformUsersTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { getCompanyScope, isCompanyScoped } from "../lib/scope";
+import { getCompanyScope } from "../lib/scope";
+import { requireAuthenticated, requirePermission } from "../lib/permissions";
 import {
   ListPlatformUsersQueryParams,
   CreatePlatformUserBody,
@@ -12,6 +13,7 @@ import {
 import { hashPassword } from "../lib/password";
 
 const router: IRouter = Router();
+const COMPANY_ASSIGNABLE_ROLES = new Set(["company_user", "company_read_only"]);
 
 function serializeUser(u: typeof platformUsersTable.$inferSelect) {
   return {
@@ -25,10 +27,9 @@ function serializeUser(u: typeof platformUsersTable.$inferSelect) {
   };
 }
 
-router.get("/platform-users", async (req: Request, res: Response): Promise<void> => {
+router.get("/platform-users", requireAuthenticated, async (req: Request, res: Response): Promise<void> => {
   const query = ListPlatformUsersQueryParams.safeParse(req.query);
 
-  // Company-scoped users can only see their own company's users
   const scopedCompanyId = getCompanyScope(req);
   const conditions = [];
   if (scopedCompanyId !== null) {
@@ -42,21 +43,28 @@ router.get("/platform-users", async (req: Request, res: Response): Promise<void>
   res.json(users.map(serializeUser));
 });
 
-router.post("/platform-users", async (req: Request, res: Response): Promise<void> => {
+router.post("/platform-users", requirePermission("users.manage"), async (req: Request, res: Response): Promise<void> => {
   const parsed = CreatePlatformUserBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
     return;
   }
 
-  // Company-scoped users can only create users within their own company
   const scopedCompanyId = getCompanyScope(req);
   const { username, email, password, role, companyId } = parsed.data;
-  const effectiveCompanyId = scopedCompanyId !== null ? scopedCompanyId : (companyId ?? null);
-  if (scopedCompanyId !== null && (role as string) === "super_admin") {
-    res.status(403).json({ error: "Cannot create super_admin accounts" });
+  const requestedRole = String(role);
+
+  if (scopedCompanyId !== null && !COMPANY_ASSIGNABLE_ROLES.has(requestedRole)) {
+    res.status(403).json({ error: "Company admins may only create company_user or company_read_only accounts" });
     return;
   }
+
+  const effectiveCompanyId = scopedCompanyId !== null ? scopedCompanyId : (companyId ?? null);
+  if (requestedRole !== "super_admin" && effectiveCompanyId === null) {
+    res.status(400).json({ error: "A company must be selected for company accounts" });
+    return;
+  }
+
   const passwordHash = await hashPassword(password);
   const [user] = await db
     .insert(platformUsersTable)
@@ -65,22 +73,23 @@ router.post("/platform-users", async (req: Request, res: Response): Promise<void
   res.status(201).json(serializeUser(user));
 });
 
-router.patch("/platform-users/:id", async (req: Request, res: Response): Promise<void> => {
+router.patch("/platform-users/:id", requirePermission("users.manage"), async (req: Request, res: Response): Promise<void> => {
   const params = UpdatePlatformUserParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const parsed = UpdatePlatformUserBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: "Invalid input" }); return; }
 
-  // Company-scoped users can only modify users in their own company
   const scopedCompanyId = getCompanyScope(req);
+  const [existing] = await db.select().from(platformUsersTable).where(eq(platformUsersTable.id, params.data.id));
+  if (!existing) { res.status(404).json({ error: "User not found" }); return; }
+
   if (scopedCompanyId !== null) {
-    const [existing] = await db.select().from(platformUsersTable).where(eq(platformUsersTable.id, params.data.id));
-    if (!existing || existing.companyId !== scopedCompanyId) {
+    if (existing.companyId !== scopedCompanyId) {
       res.status(403).json({ error: "Access denied" });
       return;
     }
-    if ((parsed.data.role as string) === "super_admin") {
-      res.status(403).json({ error: "Cannot assign super_admin role" });
+    if (parsed.data.role !== undefined && !COMPANY_ASSIGNABLE_ROLES.has(String(parsed.data.role))) {
+      res.status(403).json({ error: "Company admins may only assign company_user or company_read_only roles" });
       return;
     }
   }
@@ -98,22 +107,25 @@ router.patch("/platform-users/:id", async (req: Request, res: Response): Promise
     .set(updates)
     .where(eq(platformUsersTable.id, params.data.id))
     .returning();
-  if (!updated) { res.status(404).json({ error: "User not found" }); return; }
   res.json(serializeUser(updated));
 });
 
-router.delete("/platform-users/:id", async (req: Request, res: Response): Promise<void> => {
+router.delete("/platform-users/:id", requirePermission("users.manage"), async (req: Request, res: Response): Promise<void> => {
   const params = DeletePlatformUserParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: "Invalid id" }); return; }
 
-  // Company-scoped users can only delete users in their own company
   const scopedCompanyId = getCompanyScope(req);
-  if (scopedCompanyId !== null) {
-    const [existing] = await db.select().from(platformUsersTable).where(eq(platformUsersTable.id, params.data.id));
-    if (!existing || existing.companyId !== scopedCompanyId) {
-      res.status(403).json({ error: "Access denied" });
-      return;
-    }
+  const [existing] = await db.select().from(platformUsersTable).where(eq(platformUsersTable.id, params.data.id));
+  if (!existing) { res.status(404).json({ error: "User not found" }); return; }
+
+  if (scopedCompanyId !== null && existing.companyId !== scopedCompanyId) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  if (existing.id.toString() === req.user?.id) {
+    res.status(400).json({ error: "You cannot delete your own account" });
+    return;
   }
 
   await db.delete(platformUsersTable).where(eq(platformUsersTable.id, params.data.id));
