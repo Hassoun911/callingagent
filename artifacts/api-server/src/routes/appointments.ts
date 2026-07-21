@@ -7,6 +7,7 @@ import {
   phoneNumbersTable,
   bookingResourcesTable,
   bookingServicesTable,
+  bookingResourceServicesTable,
   bookingAvailabilityTable,
   bookingTimeOffTable,
   bookingSettingsTable,
@@ -142,6 +143,29 @@ router.post("/booking/resources", async (req, res): Promise<void> => {
   const [row] = await db.insert(bookingResourcesTable).values({ companyId, name: String(req.body.name).trim(), resourceType: req.body.resourceType ?? "staff", description: req.body.description ?? null, allowRandomAssignment: req.body.allowRandomAssignment !== false }).returning();
   res.status(201).json(row);
 });
+router.patch("/booking/resources/:id", async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  const [existing] = await db.select().from(bookingResourcesTable).where(eq(bookingResourcesTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Resource not found" }); return; }
+  if (!canAccessCompany(req, existing.companyId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const update: Record<string, any> = { updatedAt: new Date() };
+  if (req.body?.name != null) update.name = String(req.body.name).trim();
+  if (req.body?.resourceType != null) update.resourceType = String(req.body.resourceType).trim();
+  if (req.body?.description !== undefined) update.description = req.body.description || null;
+  if (req.body?.allowRandomAssignment !== undefined) update.allowRandomAssignment = !!req.body.allowRandomAssignment;
+  if (req.body?.active !== undefined) update.active = !!req.body.active;
+  const [row] = await db.update(bookingResourcesTable).set(update).where(eq(bookingResourcesTable.id, id)).returning();
+  res.json(row);
+});
+router.delete("/booking/resources/:id", async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  const [existing] = await db.select().from(bookingResourcesTable).where(eq(bookingResourcesTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Resource not found" }); return; }
+  if (!canAccessCompany(req, existing.companyId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  await db.update(bookingResourcesTable).set({ active: false, updatedAt: new Date() }).where(eq(bookingResourcesTable.id, id));
+  res.status(204).end();
+});
+
 router.get("/booking/services", async (req, res): Promise<void> => {
   const companyId = effectiveCompanyId(req, req.query.companyId);
   if (!companyId) { res.status(400).json({ error: "companyId is required" }); return; }
@@ -153,6 +177,48 @@ router.post("/booking/services", async (req, res): Promise<void> => {
   const [row] = await db.insert(bookingServicesTable).values({ companyId, name: String(req.body.name).trim(), description: req.body.description ?? null, durationMinutes: Number(req.body.durationMinutes ?? 30), bufferBeforeMinutes: Number(req.body.bufferBeforeMinutes ?? 0), bufferAfterMinutes: Number(req.body.bufferAfterMinutes ?? 0) }).returning();
   res.status(201).json(row);
 });
+router.patch("/booking/services/:id", async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  const [existing] = await db.select().from(bookingServicesTable).where(eq(bookingServicesTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Service not found" }); return; }
+  if (!canAccessCompany(req, existing.companyId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const update: Record<string, any> = { updatedAt: new Date() };
+  if (req.body?.name != null) update.name = String(req.body.name).trim();
+  if (req.body?.description !== undefined) update.description = req.body.description || null;
+  if (req.body?.durationMinutes != null) update.durationMinutes = Number(req.body.durationMinutes);
+  if (req.body?.bufferBeforeMinutes != null) update.bufferBeforeMinutes = Number(req.body.bufferBeforeMinutes);
+  if (req.body?.bufferAfterMinutes != null) update.bufferAfterMinutes = Number(req.body.bufferAfterMinutes);
+  if (req.body?.active !== undefined) update.active = !!req.body.active;
+  const [row] = await db.update(bookingServicesTable).set(update).where(eq(bookingServicesTable.id, id)).returning();
+  res.json(row);
+});
+router.delete("/booking/services/:id", async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  const [existing] = await db.select().from(bookingServicesTable).where(eq(bookingServicesTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Service not found" }); return; }
+  if (!canAccessCompany(req, existing.companyId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  await db.update(bookingServicesTable).set({ active: false, updatedAt: new Date() }).where(eq(bookingServicesTable.id, id));
+  res.status(204).end();
+});
+
+router.get("/booking/resource-services", async (req, res): Promise<void> => {
+  const companyId = effectiveCompanyId(req, req.query.companyId);
+  if (!companyId) { res.status(400).json({ error: "companyId is required" }); return; }
+  res.json(await db.select().from(bookingResourceServicesTable).where(eq(bookingResourceServicesTable.companyId, companyId)));
+});
+router.put("/booking/resource-services/:resourceId", async (req, res): Promise<void> => {
+  const resourceId = Number(req.params.resourceId);
+  const [resource] = await db.select().from(bookingResourcesTable).where(eq(bookingResourcesTable.id, resourceId));
+  if (!resource) { res.status(404).json({ error: "Resource not found" }); return; }
+  if (!canAccessCompany(req, resource.companyId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const serviceIds = Array.isArray(req.body?.serviceIds) ? req.body.serviceIds.map(Number).filter(Number.isFinite) : [];
+  await db.delete(bookingResourceServicesTable).where(eq(bookingResourceServicesTable.resourceId, resourceId));
+  if (serviceIds.length) {
+    await db.insert(bookingResourceServicesTable).values(serviceIds.map((serviceId: number) => ({ companyId: resource.companyId, resourceId, serviceId })));
+  }
+  res.json(await db.select().from(bookingResourceServicesTable).where(eq(bookingResourceServicesTable.resourceId, resourceId)));
+});
+
 router.get("/booking/settings", async (req, res): Promise<void> => {
   const companyId = effectiveCompanyId(req, req.query.companyId);
   if (!companyId) { res.status(400).json({ error: "companyId is required" }); return; }
@@ -166,17 +232,56 @@ router.put("/booking/settings", async (req, res): Promise<void> => {
   const [row] = await db.insert(bookingSettingsTable).values(values).onConflictDoUpdate({ target: bookingSettingsTable.companyId, set: values }).returning();
   res.json(row);
 });
+
+router.get("/booking/availability", async (req, res): Promise<void> => {
+  const companyId = effectiveCompanyId(req, req.query.companyId);
+  if (!companyId) { res.status(400).json({ error: "companyId is required" }); return; }
+  const resourceId = req.query.resourceId ? Number(req.query.resourceId) : null;
+  const rows = resourceId
+    ? await db.select().from(bookingAvailabilityTable).where(and(eq(bookingAvailabilityTable.companyId, companyId), eq(bookingAvailabilityTable.resourceId, resourceId)))
+    : await db.select().from(bookingAvailabilityTable).where(eq(bookingAvailabilityTable.companyId, companyId));
+  res.json(rows);
+});
 router.post("/booking/availability", async (req, res): Promise<void> => {
   const companyId = effectiveCompanyId(req, req.body?.companyId);
   if (!companyId || !req.body?.resourceId) { res.status(400).json({ error: "companyId and resourceId are required" }); return; }
+  const [resource] = await db.select().from(bookingResourcesTable).where(and(eq(bookingResourcesTable.id, Number(req.body.resourceId)), eq(bookingResourcesTable.companyId, companyId)));
+  if (!resource) { res.status(400).json({ error: "Resource does not belong to this company" }); return; }
   const [row] = await db.insert(bookingAvailabilityTable).values({ companyId, resourceId: Number(req.body.resourceId), dayOfWeek: Number(req.body.dayOfWeek), startTime: req.body.startTime, endTime: req.body.endTime }).returning();
   res.status(201).json(row);
+});
+router.delete("/booking/availability/:id", async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  const [existing] = await db.select().from(bookingAvailabilityTable).where(eq(bookingAvailabilityTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Working hours not found" }); return; }
+  if (!canAccessCompany(req, existing.companyId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  await db.delete(bookingAvailabilityTable).where(eq(bookingAvailabilityTable.id, id));
+  res.status(204).end();
+});
+
+router.get("/booking/time-off", async (req, res): Promise<void> => {
+  const companyId = effectiveCompanyId(req, req.query.companyId);
+  if (!companyId) { res.status(400).json({ error: "companyId is required" }); return; }
+  const rows = await db.select().from(bookingTimeOffTable).where(eq(bookingTimeOffTable.companyId, companyId)).orderBy(desc(bookingTimeOffTable.startTime));
+  res.json(rows.map(row => ({ ...row, startTime: row.startTime.toISOString(), endTime: row.endTime.toISOString() })));
 });
 router.post("/booking/time-off", async (req, res): Promise<void> => {
   const companyId = effectiveCompanyId(req, req.body?.companyId);
   if (!companyId || !req.body?.resourceId) { res.status(400).json({ error: "companyId and resourceId are required" }); return; }
-  const [row] = await db.insert(bookingTimeOffTable).values({ companyId, resourceId: Number(req.body.resourceId), startTime: new Date(req.body.startTime), endTime: new Date(req.body.endTime), reason: req.body.reason ?? null }).returning();
-  res.status(201).json(row);
+  const startTime = new Date(req.body.startTime), endTime = new Date(req.body.endTime);
+  if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime()) || endTime <= startTime) { res.status(400).json({ error: "Valid start and end times are required" }); return; }
+  const [resource] = await db.select().from(bookingResourcesTable).where(and(eq(bookingResourcesTable.id, Number(req.body.resourceId)), eq(bookingResourcesTable.companyId, companyId)));
+  if (!resource) { res.status(400).json({ error: "Resource does not belong to this company" }); return; }
+  const [row] = await db.insert(bookingTimeOffTable).values({ companyId, resourceId: Number(req.body.resourceId), startTime, endTime, reason: req.body.reason ?? null }).returning();
+  res.status(201).json({ ...row, startTime: row.startTime.toISOString(), endTime: row.endTime.toISOString() });
+});
+router.delete("/booking/time-off/:id", async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  const [existing] = await db.select().from(bookingTimeOffTable).where(eq(bookingTimeOffTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Time off not found" }); return; }
+  if (!canAccessCompany(req, existing.companyId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  await db.delete(bookingTimeOffTable).where(eq(bookingTimeOffTable.id, id));
+  res.status(204).end();
 });
 
 export async function sendBookingNotificationsForAppointment(appointment: typeof appointmentsTable.$inferSelect): Promise<void> {
