@@ -14,6 +14,7 @@ import Calls from "@/pages/calls";
 import Contacts from "@/pages/contacts";
 import Companies from "@/pages/companies";
 import CompanyDetail from "@/pages/company-detail";
+import CompanySetupOverview from "@/pages/company-setup-overview";
 import Settings from "@/pages/settings";
 import Billing from "@/pages/billing";
 import Messages from "@/pages/messages";
@@ -175,47 +176,19 @@ function LoginScreen({ onSuccess, portalCompanyId }: { onSuccess: () => void; po
         <form onSubmit={handleSubmit} className="border border-slate-800 rounded-lg bg-slate-900/60 p-8 space-y-4">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Username</label>
-            <input
-              type="text"
-              autoComplete="username"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-600 transition-colors"
-              placeholder="Enter username"
-              required
-            />
+            <input type="text" autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-600 transition-colors" placeholder="Enter username" required />
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Password</label>
             <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 pr-10 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-600 transition-colors"
-                placeholder="Enter password"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(current => !current)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-200 transition-colors"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                title={showPassword ? "Hide password" : "Show password"}
-              >
+              <input type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 pr-10 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-600 transition-colors" placeholder="Enter password" required />
+              <button type="button" onClick={() => setShowPassword(current => !current)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-200 transition-colors" aria-label={showPassword ? "Hide password" : "Show password"} title={showPassword ? "Hide password" : "Show password"}>
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>
-          {error && (
-            <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{error}</p>
-          )}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold py-2.5 rounded-md transition-colors text-sm mt-2"
-          >
+          {error && <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{error}</p>}
+          <button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold py-2.5 rounded-md transition-colors text-sm mt-2">
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
@@ -236,6 +209,7 @@ function AdminRouter() {
         <Route path="/contacts" component={Contacts} />
         <Route path="/companies/:id" component={CompanyDetail} />
         <Route path="/companies" component={Companies} />
+        <Route path="/company-setup" component={CompanySetupOverview} />
         <Route path="/settings" component={Settings} />
         <Route path="/billing" component={Billing} />
         <Route path="/messages" component={Messages} />
@@ -253,9 +227,7 @@ function AdminRouter() {
 
 function PortalRedirect({ user }: { user: AuthUser }) {
   const [, navigate] = useLocation();
-  useEffect(() => {
-    navigate("/portal");
-  }, [navigate]);
+  useEffect(() => { navigate("/portal"); }, [navigate]);
   return (
     <Switch>
       <Route path="/portal" component={() => <CompanyPortal user={user} />} />
@@ -268,11 +240,7 @@ function AuthGate({ children }: { children?: React.ReactNode }) {
   const { isLoading, isAuthenticated, user, logout, refetch } = useAuth();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
-        <div className="text-slate-600 text-sm tracking-widest uppercase">Loading...</div>
-      </div>
-    );
+    return <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center"><div className="text-slate-600 text-sm tracking-widest uppercase">Loading...</div></div>;
   }
 
   if (!isAuthenticated || !user) {
@@ -286,10 +254,7 @@ function AuthGate({ children }: { children?: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, logout, refetch }}>
-      {isSuperAdmin
-        ? children
-        : <PortalRedirect user={user} />
-      }
+      {isSuperAdmin ? children : <PortalRedirect user={user} />}
     </AuthContext.Provider>
   );
 }
@@ -299,9 +264,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AuthGate>
-            <AdminRouter />
-          </AuthGate>
+          <AuthGate><AdminRouter /></AuthGate>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
