@@ -6,7 +6,6 @@ import {
   PhoneCall,
   Users,
   Building2,
-  Settings,
   Bell,
   CreditCard,
   MessageSquare,
@@ -203,17 +202,6 @@ export function Layout({ children }: { children: ReactNode }) {
                 );
               })}
             </div>
-          )}
-
-          {!contextCompany && (
-            <>
-              <Link href="/leads" onClick={onNav} className={navCls("/leads")}>
-                <TrendingUp className="h-4 w-4 flex-shrink-0" /> Leads
-              </Link>
-              <Link href="/bookings" onClick={onNav} className={navCls("/bookings")}>
-                <CalendarDays className="h-4 w-4 flex-shrink-0" /> Appointments
-              </Link>
-            </>
           )}
 
           <SectionLabel label="System" />
