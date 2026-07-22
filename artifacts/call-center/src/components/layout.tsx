@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Bot,
   CalendarCog,
+  ClipboardCheck,
   PhoneCall as PhoneSetup,
 } from "lucide-react";
 import { useWatches } from "@/hooks/use-watches";
@@ -166,6 +167,9 @@ export function Layout({ children }: { children: ReactNode }) {
               </Link>
 
               <CompanyGroupLabel label="Setup & Control" />
+              <Link href={`/company-setup?companyId=${contextCompany.id}`} onClick={onNav} className={companyNavCls(`/company-setup?companyId=${contextCompany.id}`)}>
+                <ClipboardCheck className="h-3 w-3 flex-shrink-0" /> Setup Overview
+              </Link>
               <Link href={`/settings?companyId=${contextCompany.id}`} onClick={onNav} className={companyNavCls(`/settings?companyId=${contextCompany.id}`)}>
                 <Bot className="h-3 w-3 flex-shrink-0" /> AI Agent Setup
               </Link>
