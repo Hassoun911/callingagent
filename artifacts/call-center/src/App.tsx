@@ -5,6 +5,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
+import { ContextualGuide } from "@/components/contextual-guide";
 import CompanyPortal from "@/pages/company-portal";
 
 import Dashboard from "@/pages/dashboard";
@@ -166,9 +167,7 @@ function LoginScreen({ onSuccess, portalCompanyId }: { onSuccess: () => void; po
             </>
           ) : (
             <>
-              <div className="flex justify-center mb-4">
-                <AnimatedLogo />
-              </div>
+              <div className="flex justify-center mb-4"><AnimatedLogo /></div>
               <p className="text-sm text-slate-500">Call Center Management</p>
             </>
           )}
@@ -221,6 +220,7 @@ function AdminRouter() {
         <Route path="/leads" component={Leads} />
         <Route component={NotFound} />
       </Switch>
+      <ContextualGuide />
     </Layout>
   );
 }
