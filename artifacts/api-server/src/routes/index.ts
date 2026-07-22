@@ -5,6 +5,7 @@ import phoneNumbersRouter from "./phone-numbers";
 import contactsRouter from "./contacts";
 import companiesRouter from "./companies";
 import callLogsRouter from "./call-logs";
+import bookingAiExtractRouter from "./booking-ai-extract";
 import aiVoiceRouter from "./ai-voice";
 import dashboardRouter from "./dashboard";
 import costsRouter from "./costs";
@@ -31,6 +32,8 @@ router.use(phoneNumbersRouter);
 router.use(contactsRouter);
 router.use(companiesRouter);
 router.use(callLogsRouter);
+// Mount the corrected extraction handler before the legacy AI voice router.
+router.use(bookingAiExtractRouter);
 router.use(aiVoiceRouter);
 router.use(dashboardRouter);
 router.use(costsRouter);
