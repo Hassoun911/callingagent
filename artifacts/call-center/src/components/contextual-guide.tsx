@@ -233,6 +233,21 @@ export function ContextualGuide() {
     );
   }
 
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className={`fixed z-40 flex h-12 min-w-12 items-center justify-center gap-2 rounded-full border border-primary/30 bg-card px-3 text-primary shadow-xl transition-all hover:border-primary/60 hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 ${keepClearOfComposer ? "sm:top-20 sm:bottom-auto" : "sm:bottom-5"} sm:right-5 sm:h-11 sm:min-w-0 sm:px-4`}
+        aria-label={`Open CallingAgent Guide: ${guide.title}`}
+        title={guide.title}
+      >
+        <Bot className="h-5 w-5 flex-shrink-0" />
+        <span className="hidden text-xs font-semibold sm:inline">Guide</span>
+        <ChevronUp className="hidden h-3.5 w-3.5 sm:block" />
+      </button>
+    );
+  }
+
   return (
     <aside
       className={`fixed z-40 overflow-hidden border border-primary/30 bg-card shadow-2xl left-0 right-0 bottom-0 rounded-t-2xl max-h-[82dvh] sm:left-auto sm:w-[360px] sm:max-w-[calc(100vw-2rem)] sm:rounded-xl sm:max-h-[calc(100vh-6rem)] ${desktopPosition}`}
@@ -245,11 +260,11 @@ export function ContextualGuide() {
           <div className="text-sm font-semibold truncate">{guide.title}</div>
         </div>
         <button
-          onClick={() => setOpen(current => !current)}
+          onClick={() => setOpen(false)}
           className="h-10 w-10 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-primary"
-          aria-label={open ? "Collapse guide" : "Expand guide"}
+          aria-label="Collapse guide"
         >
-          {open ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          <ChevronDown className="h-4 w-4" />
         </button>
         <button
           onClick={() => setHidden(true)}
@@ -261,23 +276,21 @@ export function ContextualGuide() {
         </button>
       </div>
 
-      {open && (
-        <div className="overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3 sm:max-h-[60vh]">
-          <p className="text-sm text-muted-foreground leading-relaxed">{guide.intro}</p>
-          <ol className="space-y-2.5">
-            {guide.steps.map((step, index) => (
-              <li key={index} className="flex items-start gap-2 text-sm sm:text-xs leading-relaxed">
-                <span className="h-6 w-6 sm:h-5 sm:w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 text-[11px] sm:text-[10px] font-bold">{index + 1}</span>
-                <span className="pt-0.5 text-foreground/90">{step}</span>
-              </li>
-            ))}
-          </ol>
-          <div className="flex items-start gap-2 rounded-md border border-border bg-background/40 p-3 text-xs text-muted-foreground">
-            <Lightbulb className="h-4 w-4 text-amber-300 flex-shrink-0" />
-            <span>The guide changes automatically based on the page and selected company.</span>
-          </div>
+      <div className="overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3 sm:max-h-[60vh]">
+        <p className="text-sm text-muted-foreground leading-relaxed">{guide.intro}</p>
+        <ol className="space-y-2.5">
+          {guide.steps.map((step, index) => (
+            <li key={index} className="flex items-start gap-2 text-sm sm:text-xs leading-relaxed">
+              <span className="h-6 w-6 sm:h-5 sm:w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 text-[11px] sm:text-[10px] font-bold">{index + 1}</span>
+              <span className="pt-0.5 text-foreground/90">{step}</span>
+            </li>
+          ))}
+        </ol>
+        <div className="flex items-start gap-2 rounded-md border border-border bg-background/40 p-3 text-xs text-muted-foreground">
+          <Lightbulb className="h-4 w-4 text-amber-300 flex-shrink-0" />
+          <span>The guide changes automatically based on the page and selected company.</span>
         </div>
-      )}
+      </div>
     </aside>
   );
 }
