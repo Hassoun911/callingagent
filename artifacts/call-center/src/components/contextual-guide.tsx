@@ -193,6 +193,7 @@ export function ContextualGuide() {
   }, [location]);
 
   const guide = guideFor(location, companyId);
+  const isLongSetupPage = location === "/settings" || location === "/bookings/setup" || location === "/bookings/import";
 
   useEffect(() => {
     const updateViewport = () => setIsMobile(window.innerWidth < 640);
@@ -210,8 +211,8 @@ export function ContextualGuide() {
   }, [hidden]);
 
   useEffect(() => {
-    if (isMobile) setOpen(false);
-  }, [location, isMobile]);
+    if (isMobile || isLongSetupPage) setOpen(false);
+  }, [location, isMobile, isLongSetupPage]);
 
   if (hidden) {
     return (
