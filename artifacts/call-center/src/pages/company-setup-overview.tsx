@@ -35,7 +35,7 @@ interface SetupItem {
 }
 
 async function getJson(url: string) {
-  const response = await fetch(url, { credentials: "include" });
+  const response = await fetch(url, { credentials: "include", cache: "no-store" });
   const data = await response.json().catch(() => null);
   if (!response.ok) throw new Error(data?.error || `Request failed (${response.status})`);
   return data;
@@ -58,7 +58,7 @@ export default function CompanySetupOverview() {
       const results = await Promise.allSettled([
         getJson(`/api/companies/${companyId}`),
         getJson(`/api/phone-numbers`),
-        getJson(`/api/ai-voice/config?companyId=${companyId}`),
+        getJson(`/api/ai-voice/config?companyId=${companyId}&_=${Date.now()}`),
         getJson(`/api/booking/resources?companyId=${companyId}`),
         getJson(`/api/booking/services?companyId=${companyId}`),
         getJson(`/api/booking/availability?companyId=${companyId}`),
@@ -81,7 +81,7 @@ export default function CompanySetupOverview() {
       const companyInfoComplete = !!companyData?.name && !!(companyData?.industry || companyData?.phone || companyData?.email || companyData?.website);
       const hasPhone = numbers.length > 0;
       const hasAiPrompt = !!String(aiConfig?.systemPrompt || "").trim();
-      const hasGreeting = !!String(aiConfig?.initialGreeting || "").trim();
+      const hasGreeting = !!String(aiConfig?.greeting ?? aiConfig?.initialGreeting ?? "").trim();
       const bookingEnabled = bookingSettings?.enabled !== false;
       const hasResources = resources.some(row => row.active !== false);
       const hasServices = services.some(row => row.active !== false);
