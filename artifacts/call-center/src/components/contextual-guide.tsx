@@ -195,6 +195,7 @@ export function ContextualGuide() {
   const guide = guideFor(location, companyId);
   const isLongSetupPage = location === "/settings" || location === "/bookings/setup" || location === "/bookings/import";
   const keepClearOfComposer = location === "/messages";
+  const keepClearOfAppointmentActions = location === "/bookings";
 
   useEffect(() => {
     const updateViewport = () => setIsMobile(window.innerWidth < 640);
@@ -212,18 +213,22 @@ export function ContextualGuide() {
   }, [hidden]);
 
   useEffect(() => {
-    if (isMobile || isLongSetupPage || keepClearOfComposer) setOpen(false);
-  }, [location, isMobile, isLongSetupPage, keepClearOfComposer]);
+    if (isMobile || isLongSetupPage || keepClearOfComposer || keepClearOfAppointmentActions) setOpen(false);
+  }, [location, isMobile, isLongSetupPage, keepClearOfComposer, keepClearOfAppointmentActions]);
 
   const desktopPosition = keepClearOfComposer
     ? "sm:top-20 sm:bottom-auto sm:right-5"
     : "sm:right-5 sm:bottom-5";
 
+  const compactMobilePosition = keepClearOfAppointmentActions
+    ? "top-24 bottom-auto right-3"
+    : "bottom-[max(1rem,env(safe-area-inset-bottom))] right-4";
+
   if (hidden) {
     return (
       <button
         onClick={() => { setHidden(false); setOpen(true); }}
-        className={`fixed z-40 flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-xl hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 ${keepClearOfComposer ? "sm:top-20 sm:bottom-auto" : "sm:bottom-5"} sm:right-5`}
+        className={`fixed z-40 flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-xl hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background ${compactMobilePosition} ${keepClearOfComposer ? "sm:top-20 sm:bottom-auto" : "sm:bottom-5"} sm:right-5`}
         aria-label="Open CallingAgent Guide"
       >
         <Bot className="h-4 w-4" />
@@ -237,7 +242,7 @@ export function ContextualGuide() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className={`fixed z-40 flex h-12 min-w-12 items-center justify-center gap-2 rounded-full border border-primary/30 bg-card px-3 text-primary shadow-xl transition-all hover:border-primary/60 hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 ${keepClearOfComposer ? "sm:top-20 sm:bottom-auto" : "sm:bottom-5"} sm:right-5 sm:h-11 sm:min-w-0 sm:px-4`}
+        className={`fixed z-40 flex h-12 min-w-12 items-center justify-center gap-2 rounded-full border border-primary/30 bg-card px-3 text-primary shadow-xl transition-all hover:border-primary/60 hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary ${compactMobilePosition} ${keepClearOfComposer ? "sm:top-20 sm:bottom-auto" : "sm:bottom-5"} sm:right-5 sm:h-11 sm:min-w-0 sm:px-4`}
         aria-label={`Open CallingAgent Guide: ${guide.title}`}
         title={guide.title}
       >
