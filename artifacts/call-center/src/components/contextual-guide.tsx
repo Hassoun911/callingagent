@@ -194,6 +194,7 @@ export function ContextualGuide() {
 
   const guide = guideFor(location, companyId);
   const isLongSetupPage = location === "/settings" || location === "/bookings/setup" || location === "/bookings/import";
+  const keepClearOfComposer = location === "/messages";
 
   useEffect(() => {
     const updateViewport = () => setIsMobile(window.innerWidth < 640);
@@ -211,14 +212,18 @@ export function ContextualGuide() {
   }, [hidden]);
 
   useEffect(() => {
-    if (isMobile || isLongSetupPage) setOpen(false);
-  }, [location, isMobile, isLongSetupPage]);
+    if (isMobile || isLongSetupPage || keepClearOfComposer) setOpen(false);
+  }, [location, isMobile, isLongSetupPage, keepClearOfComposer]);
+
+  const desktopPosition = keepClearOfComposer
+    ? "sm:top-20 sm:bottom-auto sm:right-5"
+    : "sm:right-5 sm:bottom-5";
 
   if (hidden) {
     return (
       <button
         onClick={() => { setHidden(false); setOpen(true); }}
-        className="fixed z-40 flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-xl hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 sm:bottom-5 sm:right-5"
+        className={`fixed z-40 flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-xl hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 ${keepClearOfComposer ? "sm:top-20 sm:bottom-auto" : "sm:bottom-5"} sm:right-5`}
         aria-label="Open CallingAgent Guide"
       >
         <Bot className="h-4 w-4" />
@@ -230,7 +235,7 @@ export function ContextualGuide() {
 
   return (
     <aside
-      className="fixed z-40 overflow-hidden border border-primary/30 bg-card shadow-2xl left-0 right-0 bottom-0 rounded-t-2xl max-h-[82dvh] sm:left-auto sm:right-5 sm:bottom-5 sm:w-[360px] sm:max-w-[calc(100vw-2rem)] sm:rounded-xl sm:max-h-[calc(100vh-2.5rem)]"
+      className={`fixed z-40 overflow-hidden border border-primary/30 bg-card shadow-2xl left-0 right-0 bottom-0 rounded-t-2xl max-h-[82dvh] sm:left-auto sm:w-[360px] sm:max-w-[calc(100vw-2rem)] sm:rounded-xl sm:max-h-[calc(100vh-6rem)] ${desktopPosition}`}
       aria-label="CallingAgent contextual guide"
     >
       <div className="flex items-center gap-2.5 border-b border-primary/20 bg-primary/10 px-3 py-3 sm:gap-3 sm:px-4">
