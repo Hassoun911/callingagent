@@ -177,6 +177,20 @@
   }
 }
 
+@media (max-width: 1023px) {
+  /* Appointment calendar and selected-day details must stack and remain visible. */
+  .grid.min-h-\[570px\] {
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .grid.min-h-\[570px\] > section {
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+}
+
 @media (max-width: 639px) {
   /* Legacy two-column forms become readable single-column mobile forms. */
   .grid.grid-cols-2 {
