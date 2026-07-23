@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListSmsMessages,
   useListPhoneNumbers,
+  useListCompanies,
   useSendSms,
   getListSmsMessagesQueryKey,
 } from "@workspace/api-client-react";
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Search, Send, ChevronLeft, Image, Phone } from "lucide-react";
+import { Building2, ChevronLeft, ChevronRight, Image, MessageSquare, Phone, Search, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 function formatPhone(raw: string | null | undefined): string {
@@ -29,17 +30,23 @@ function formatPhone(raw: string | null | undefined): string {
 const ET = "America/New_York";
 
 function formatTime(iso: string): string {
-  const d = new Date(iso);
+  const date = new Date(iso);
   const now = new Date();
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
-  if (diffDays === 0) return d.toLocaleTimeString("en-US", { timeZone: ET, hour: "2-digit", minute: "2-digit" });
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / 86400000);
+  if (diffDays === 0) return date.toLocaleTimeString("en-US", { timeZone: ET, hour: "numeric", minute: "2-digit" });
   if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return d.toLocaleDateString("en-US", { timeZone: ET, weekday: "short" });
-  return d.toLocaleDateString("en-US", { timeZone: ET, month: "short", day: "numeric" });
+  if (diffDays < 7) return date.toLocaleDateString("en-US", { timeZone: ET, weekday: "short" });
+  return date.toLocaleDateString("en-US", { timeZone: ET, month: "short", day: "numeric" });
 }
 
 function formatFull(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { timeZone: ET, hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleString("en-US", {
+    timeZone: ET,
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 interface Conversation {
@@ -51,22 +58,21 @@ interface Conversation {
   unread: number;
 }
 
-// Derive unique conversations from flat message list
 function buildConversations(messages: any[]): Conversation[] {
   const map = new Map<string, Conversation>();
-  // messages come newest-first; iterate in reverse so last write = newest
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    const lineNum: string = m.lineNumber ?? m.to ?? m.from ?? "";
-    const contactNum: string = m.direction === "inbound" ? m.from : m.to;
-    const key = `${lineNum}::${contactNum}`;
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
+    const lineNumber: string = message.lineNumber ?? message.to ?? message.from ?? "";
+    const contactNumber: string = message.direction === "inbound" ? message.from : message.to;
+    if (!lineNumber || !contactNumber) continue;
+    const key = `${lineNumber}::${contactNumber}`;
     map.set(key, {
-      contactNumber: contactNum,
-      lineNumber: lineNum,
-      lineName: m.lineName ?? null,
-      lastBody: m.body,
-      lastAt: m.createdAt,
-      unread: 0,
+      contactNumber,
+      lineNumber,
+      lineName: message.lineName ?? null,
+      lastBody: message.body ?? "",
+      lastAt: message.createdAt,
+      unread: Number(message.unread ?? 0),
     });
   }
   return Array.from(map.values()).sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime());
@@ -74,139 +80,159 @@ function buildConversations(messages: any[]): Conversation[] {
 
 export default function Messages() {
   const { toast } = useToast();
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterNumberId, setFilterNumberId] = useState<string>("all");
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [replyText, setReplyText] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
+  const replyRef = useRef<HTMLInputElement>(null);
 
-  const scopedCompanyId = (() => {
-    const v = new URLSearchParams(window.location.search).get("companyId");
-    return v ? parseInt(v, 10) : null;
-  })();
+  const scopedCompanyId = useMemo(() => {
+    const value = new URLSearchParams(window.location.search).get("companyId");
+    return value ? Number(value) : null;
+  }, []);
 
-  const { data: allNumbers } = useListPhoneNumbers();
+  const { data: companies = [] } = useListCompanies();
+  const scopedCompany = scopedCompanyId ? companies.find(company => company.id === scopedCompanyId) : null;
+  const { data: allNumbers = [] } = useListPhoneNumbers();
   const numbers = scopedCompanyId !== null
-    ? allNumbers?.filter(n => (n as any).companyId === scopedCompanyId)
+    ? allNumbers.filter(number => Number((number as any).companyId) === scopedCompanyId)
     : allNumbers;
-  const { data: allMessages, isLoading } = useListSmsMessages({ limit: 500 });
+  const { data: allMessages = [], isLoading } = useListSmsMessages({ limit: 500 });
   const { mutateAsync: sendSms, isPending: sending } = useSendSms();
 
-  // Thread messages for selected conversation (chronological order)
-  const threadMessages = selected
-    ? (allMessages ?? [])
-        .filter(m => {
-          const lineNum = m.lineNumber ?? m.to ?? m.from ?? "";
-          const contact = m.direction === "inbound" ? m.from : m.to;
-          return lineNum === selected.lineNumber && contact === selected.contactNumber;
+  const companyLineNumbers = useMemo(() => new Set(numbers.map(number => number.number)), [numbers]);
+  const noCompanyLines = scopedCompanyId !== null && numbers.length === 0;
+
+  const conversations = useMemo(() => buildConversations(allMessages).filter(conversation => {
+    if (scopedCompanyId !== null && !companyLineNumbers.has(conversation.lineNumber)) return false;
+    const query = search.trim().toLowerCase();
+    const matchesSearch = !query ||
+      formatPhone(conversation.contactNumber).toLowerCase().includes(query) ||
+      conversation.contactNumber.toLowerCase().includes(query) ||
+      conversation.lastBody.toLowerCase().includes(query) ||
+      String(conversation.lineName ?? "").toLowerCase().includes(query);
+    const selectedNumber = numbers.find(number => String(number.id) === filterNumberId)?.number;
+    const matchesNumber = filterNumberId === "all" || selectedNumber === conversation.lineNumber;
+    return matchesSearch && matchesNumber;
+  }), [allMessages, companyLineNumbers, filterNumberId, numbers, scopedCompanyId, search]);
+
+  const threadMessages = useMemo(() => selected
+    ? allMessages
+        .filter(message => {
+          const lineNumber = message.lineNumber ?? message.to ?? message.from ?? "";
+          const contact = message.direction === "inbound" ? message.from : message.to;
+          return lineNumber === selected.lineNumber && contact === selected.contactNumber;
         })
         .slice()
         .reverse()
-    : [];
+    : [], [allMessages, selected]);
 
-  // Scroll to bottom when thread opens or new messages arrive
   useEffect(() => {
-    if (threadRef.current) {
-      threadRef.current.scrollTop = threadRef.current.scrollHeight;
-    }
+    if (!selected && conversations.length === 1 && window.innerWidth >= 768) setSelected(conversations[0]);
+  }, [conversations, selected]);
+
+  useEffect(() => {
+    if (!selected) return;
+    requestAnimationFrame(() => {
+      if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
+    });
   }, [threadMessages.length, selected]);
 
-  const companyLineNumbers = new Set(numbers?.map(n => n.number) ?? []);
-
-  const conversations = buildConversations(allMessages ?? []).filter(c => {
-    if (scopedCompanyId !== null && !companyLineNumbers.has(c.lineNumber)) return false;
-    const matchSearch = !search ||
-      formatPhone(c.contactNumber).includes(search) ||
-      c.contactNumber.includes(search) ||
-      c.lastBody.toLowerCase().includes(search.toLowerCase());
-    const matchNumber = filterNumberId === "all" || numbers?.find(n => String(n.id) === filterNumberId)?.number === c.lineNumber;
-    return matchSearch && matchNumber;
-  });
+  useEffect(() => {
+    if (selected && window.innerWidth >= 768) replyRef.current?.focus();
+  }, [selected]);
 
   const handleSend = useCallback(async () => {
-    if (!selected || !replyText.trim()) return;
+    const body = replyText.trim();
+    if (!selected || !body) return;
     try {
-      await sendSms({ data: { from: selected.lineNumber, to: selected.contactNumber, body: replyText.trim() } });
+      await sendSms({ data: { from: selected.lineNumber, to: selected.contactNumber, body } });
       setReplyText("");
-      qc.invalidateQueries({ queryKey: getListSmsMessagesQueryKey() });
-    } catch (err: any) {
-      toast({ title: "Send failed", description: err.message, variant: "destructive" });
+      await queryClient.invalidateQueries({ queryKey: getListSmsMessagesQueryKey() });
+      requestAnimationFrame(() => replyRef.current?.focus());
+    } catch (error: any) {
+      toast({ title: "Message not sent", description: error?.message || "Please try again.", variant: "destructive" });
     }
-  }, [selected, replyText, sendSms, qc, toast]);
+  }, [queryClient, replyText, selected, sendSms, toast]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      handleSend();
+    }
   };
 
   return (
-    <div className="flex flex-col h-full gap-4">
-      <div className="flex items-center justify-between flex-shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Messages</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">SMS conversations on your lines</p>
+    <div className="flex min-h-0 flex-col gap-4 pb-24 sm:pb-6 md:h-[calc(100dvh-7.5rem)]">
+      <header className="flex flex-shrink-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          {scopedCompany && (
+            <div className="mb-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">{scopedCompany.name}</span>
+              <span className="text-muted-foreground/40">/</span>
+              <span className="font-medium text-foreground">Messages</span>
+            </div>
+          )}
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Messages</h1>
+          <p className="mt-1 text-sm text-muted-foreground">SMS conversations on {scopedCompany ? `${scopedCompany.name}'s lines` : "all connected lines"}.</p>
         </div>
         {!selected && conversations.length > 0 && (
-          <div className="text-sm text-muted-foreground font-mono">{conversations.length} conversation{conversations.length !== 1 ? "s" : ""}</div>
+          <div className="font-mono text-xs text-muted-foreground sm:text-sm">{conversations.length} conversation{conversations.length === 1 ? "" : "s"}</div>
         )}
-      </div>
+      </header>
 
-      <div className="flex gap-4 flex-1 min-h-0">
-        {/* ── Conversations list ── */}
-        <Card className={`border-border flex flex-col flex-shrink-0 ${selected ? "w-72 hidden md:flex" : "flex-1"}`}>
-          <div className="p-3 border-b border-border space-y-2 flex-shrink-0">
+      {noCompanyLines && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-300">
+          <div className="font-semibold">No phone line is connected to {scopedCompany?.name}.</div>
+          <div className="mt-1 text-xs text-amber-300/75">Connect a phone line before this company can send or receive SMS messages.</div>
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1 gap-4">
+        <Card className={`${selected ? "hidden md:flex md:w-[320px] lg:w-[360px]" : "flex w-full"} min-h-[480px] flex-col overflow-hidden border-border md:min-h-0 md:flex-shrink-0`}>
+          <div className="flex-shrink-0 space-y-2 border-b border-border p-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-8 text-sm" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder="Search conversations..." value={search} onChange={event => setSearch(event.target.value)} className="min-h-11 bg-background pl-9 text-sm md:min-h-10" />
             </div>
             <Select value={filterNumberId} onValueChange={setFilterNumberId}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue placeholder="All numbers" />
-              </SelectTrigger>
+              <SelectTrigger className="min-h-11 bg-background text-xs md:min-h-10"><SelectValue placeholder="All phone lines" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All numbers</SelectItem>
-                {numbers?.map(n => (
-                  <SelectItem key={n.id} value={String(n.id)}>{n.friendlyName || n.number}</SelectItem>
-                ))}
+                <SelectItem value="all">All phone lines</SelectItem>
+                {numbers.map(number => <SelectItem key={number.id} value={String(number.id)}>{number.friendlyName || formatPhone(number.number)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <CardContent className="p-0 flex-1 overflow-y-auto">
+
+          <CardContent className="min-h-0 flex-1 overflow-y-auto p-0">
             {isLoading ? (
-              <div className="divide-y divide-border">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="flex gap-3 p-4">
-                    <Skeleton className="h-9 w-9 rounded-full flex-shrink-0" />
-                    <div className="flex-1 space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-48" /></div>
-                  </div>
-                ))}
-              </div>
+              <div className="divide-y divide-border">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="flex gap-3 p-4"><Skeleton className="h-10 w-10 flex-shrink-0 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-full" /></div></div>)}</div>
             ) : conversations.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+              <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground">
                 <MessageSquare className="h-10 w-10 opacity-30" />
-                <p className="text-sm">No conversations yet</p>
-                <p className="text-xs opacity-60">Text your number to start</p>
+                <p className="text-sm font-medium">No conversations found</p>
+                <p className="text-xs opacity-70">{search ? "Try a different search." : noCompanyLines ? "Connect a phone line first." : "Incoming and outgoing SMS conversations will appear here."}</p>
               </div>
             ) : (
               <div className="divide-y divide-border">
-                {conversations.map(c => {
-                  const isActive = selected?.contactNumber === c.contactNumber && selected?.lineNumber === c.lineNumber;
+                {conversations.map(conversation => {
+                  const active = selected?.contactNumber === conversation.contactNumber && selected?.lineNumber === conversation.lineNumber;
                   return (
-                    <button
-                      key={`${c.lineNumber}::${c.contactNumber}`}
-                      onClick={() => setSelected(c)}
-                      className={`w-full text-left flex gap-3 px-4 py-3.5 hover:bg-secondary/20 transition-colors ${isActive ? "bg-primary/10 border-l-2 border-primary" : ""}`}
-                    >
-                      <div className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center flex-shrink-0 text-muted-foreground">
-                        <Phone className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className="text-sm font-medium text-foreground truncate">{formatPhone(c.contactNumber)}</span>
-                          <span className="text-[11px] text-muted-foreground font-mono flex-shrink-0">{formatTime(c.lastAt)}</span>
+                    <button key={`${conversation.lineNumber}::${conversation.contactNumber}`} onClick={() => setSelected(conversation)} className={`flex min-h-[76px] w-full gap-3 px-4 py-3.5 text-left transition-colors hover:bg-secondary/20 active:bg-secondary/30 ${active ? "border-l-2 border-primary bg-primary/10" : ""}`}>
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground"><Phone className="h-4 w-4" /></div>
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex items-start justify-between gap-2">
+                          <span className="truncate text-sm font-semibold text-foreground">{formatPhone(conversation.contactNumber)}</span>
+                          <span className="flex-shrink-0 font-mono text-[10px] text-muted-foreground sm:text-[11px]">{formatTime(conversation.lastAt)}</span>
                         </div>
-                        <p className="text-xs text-muted-foreground truncate">{c.lastBody}</p>
-                        {c.lineName && <p className="text-[10px] text-muted-foreground/60 mt-0.5">via {c.lineName}</p>}
+                        <p className="truncate text-xs text-muted-foreground">{conversation.lastBody || "Media message"}</p>
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                          <p className="truncate text-[10px] text-muted-foreground/60">via {conversation.lineName || formatPhone(conversation.lineNumber)}</p>
+                          <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40 md:hidden" />
+                        </div>
                       </div>
                     </button>
                   );
@@ -216,82 +242,37 @@ export default function Messages() {
           </CardContent>
         </Card>
 
-        {/* ── Thread view ── */}
         {selected ? (
-          <Card className="border-border flex-1 flex flex-col min-h-0">
-            {/* Thread header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-border flex-shrink-0">
-              <Button variant="ghost" size="icon" className="h-7 w-7 md:hidden" onClick={() => setSelected(null)}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-muted-foreground flex-shrink-0">
-                <Phone className="h-3.5 w-3.5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">{formatPhone(selected.contactNumber)}</p>
-                <p className="text-xs text-muted-foreground">{selected.lineName ? `${selected.lineName} · ` : ""}{formatPhone(selected.lineNumber)}</p>
-              </div>
-              <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">SMS</Badge>
+          <Card className="flex min-h-[520px] min-w-0 flex-1 flex-col overflow-hidden border-border md:min-h-0">
+            <div className="flex min-h-16 flex-shrink-0 items-center gap-3 border-b border-border px-3 py-3 sm:px-4">
+              <Button variant="ghost" size="icon" className="h-11 w-11 flex-shrink-0 md:hidden" onClick={() => setSelected(null)} aria-label="Back to conversations"><ChevronLeft className="h-5 w-5" /></Button>
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground"><Phone className="h-4 w-4" /></div>
+              <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-foreground">{formatPhone(selected.contactNumber)}</p><p className="truncate text-xs text-muted-foreground">{selected.lineName ? `${selected.lineName} · ` : ""}{formatPhone(selected.lineNumber)}</p></div>
+              <Badge variant="outline" className="flex-shrink-0 border-primary/30 text-[10px] text-primary">SMS</Badge>
             </div>
 
-            {/* Messages */}
-            <div ref={threadRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-              {threadMessages.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No messages in this thread</div>
-              ) : threadMessages.map(m => {
-                const isOutbound = m.direction === "outbound";
+            <div ref={threadRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-background/30 px-3 py-4 sm:px-5">
+              {threadMessages.length === 0 ? <div className="flex h-full items-center justify-center text-sm text-muted-foreground">No messages in this conversation</div> : threadMessages.map(message => {
+                const outbound = message.direction === "outbound";
                 return (
-                  <div key={m.id} className={`flex flex-col gap-1 ${isOutbound ? "items-end" : "items-start"}`}>
-                    <div className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-                      isOutbound
-                        ? "bg-primary text-primary-foreground rounded-br-sm"
-                        : "bg-secondary text-foreground rounded-bl-sm"
-                    }`}>
-                      {m.body}
-                      {(m.mediaUrls?.length ?? 0) > 0 && (
-                        <div className="mt-2 flex flex-col gap-1">
-                          {m.mediaUrls!.map((url: string, i: number) => (
-                            <a key={i} href={url} target="_blank" rel="noreferrer"
-                              className={`flex items-center gap-1 text-xs underline underline-offset-2 ${isOutbound ? "text-primary-foreground/80" : "text-primary"}`}>
-                              <Image className="h-3 w-3" />Media {i + 1}
-                            </a>
-                          ))}
-                        </div>
-                      )}
+                  <div key={message.id} className={`flex flex-col gap-1 ${outbound ? "items-end" : "items-start"}`}>
+                    <div className={`max-w-[88%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed sm:max-w-[75%] ${outbound ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-secondary text-foreground"}`}>
+                      {message.body}
+                      {(message.mediaUrls?.length ?? 0) > 0 && <div className="mt-2 flex flex-col gap-1">{message.mediaUrls!.map((url: string, index: number) => <a key={index} href={url} target="_blank" rel="noreferrer" className={`flex min-h-8 items-center gap-1 text-xs underline underline-offset-2 ${outbound ? "text-primary-foreground/80" : "text-primary"}`}><Image className="h-3 w-3" />Open media {index + 1}</a>)}</div>}
                     </div>
-                    <span className="text-[10px] text-muted-foreground px-1">{formatFull(m.createdAt)}</span>
+                    <span className="px-1 text-[10px] text-muted-foreground">{formatFull(message.createdAt)}</span>
                   </div>
                 );
               })}
             </div>
 
-            {/* Reply box */}
-            <div className="border-t border-border px-4 py-3 flex gap-2 flex-shrink-0">
-              <Input
-                placeholder={`Reply to ${formatPhone(selected.contactNumber)}…`}
-                value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="text-sm flex-1"
-                disabled={sending}
-              />
-              <Button
-                onClick={handleSend}
-                disabled={!replyText.trim() || sending}
-                size="icon"
-                className="flex-shrink-0"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+            <div className="flex flex-shrink-0 gap-2 border-t border-border bg-card px-3 py-3 pb-[max(.75rem,env(safe-area-inset-bottom))] sm:px-4">
+              <Input ref={replyRef} placeholder={`Reply to ${formatPhone(selected.contactNumber)}…`} value={replyText} onChange={event => setReplyText(event.target.value)} onKeyDown={handleKeyDown} className="min-h-11 min-w-0 flex-1 bg-background text-base sm:text-sm" disabled={sending || noCompanyLines} />
+              <Button onClick={handleSend} disabled={!replyText.trim() || sending || noCompanyLines} size="icon" className="h-11 w-11 flex-shrink-0" aria-label="Send message"><Send className="h-4 w-4" /></Button>
             </div>
           </Card>
         ) : (
-          <Card className="border-border flex-1 hidden md:flex items-center justify-center text-muted-foreground">
-            <div className="flex flex-col items-center gap-3">
-              <MessageSquare className="h-10 w-10 opacity-30" />
-              <p className="text-sm">Select a conversation</p>
-            </div>
-          </Card>
+          <Card className="hidden min-w-0 flex-1 items-center justify-center border-border text-muted-foreground md:flex"><div className="flex flex-col items-center gap-3 text-center"><MessageSquare className="h-10 w-10 opacity-30" /><p className="text-sm font-medium">Select a conversation</p><p className="text-xs opacity-70">Choose a customer from the inbox to view and reply.</p></div></Card>
         )}
       </div>
     </div>
