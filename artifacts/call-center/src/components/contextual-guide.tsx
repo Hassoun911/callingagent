@@ -221,7 +221,7 @@ export function ContextualGuide() {
     : "sm:right-5 sm:bottom-5";
 
   const compactMobilePosition = keepClearOfAppointmentActions
-    ? "top-24 bottom-auto right-3"
+    ? "top-2 bottom-auto right-16"
     : "bottom-[max(1rem,env(safe-area-inset-bottom))] right-4";
 
   if (hidden) {
