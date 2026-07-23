@@ -1,0 +1,62 @@
+/* Final layout polish for long setup forms and company-management pages. */
+
+@media (min-width: 1024px) {
+  /* Use the available workspace instead of leaving a large empty column. */
+  main .max-w-4xl {
+    width: 100%;
+    max-width: 72rem;
+  }
+
+  main .max-w-3xl {
+    width: 100%;
+    max-width: 68rem;
+  }
+
+  /* Keep the page title and primary save action available on long AI setup pages. */
+  main .max-w-4xl > .flex.items-center.justify-between:first-child {
+    position: sticky;
+    top: -1.5rem;
+    z-index: 20;
+    margin-left: -0.75rem;
+    margin-right: -0.75rem;
+    padding: 1.25rem 0.75rem 0.9rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.8);
+    background: hsl(var(--background) / 0.96);
+    backdrop-filter: blur(12px);
+  }
+}
+
+@media (max-width: 767px) {
+  /* Company detail headers and action groups must wrap instead of squeezing. */
+  main .max-w-3xl > .flex.items-center.gap-3:first-child {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  main .max-w-3xl > .flex.items-center.gap-3:first-child > .min-w-0 {
+    flex: 1 1 calc(100% - 3rem);
+  }
+
+  main .max-w-3xl > .flex.items-center.gap-3:first-child > button:last-child,
+  main .max-w-3xl > .flex.items-center.gap-3:first-child > div:last-child {
+    margin-left: 2.75rem;
+  }
+
+  /* Dialogs and company-management controls stay inside the phone viewport. */
+  [role="dialog"] {
+    max-width: calc(100vw - 1rem) !important;
+    max-height: 92dvh;
+    overflow-y: auto;
+  }
+
+  main .max-w-3xl .flex.items-center.justify-between,
+  main .max-w-3xl .flex.items-start.justify-between {
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  main .max-w-3xl .flex.items-center.justify-between > button,
+  main .max-w-3xl .flex.items-start.justify-between > button {
+    min-height: 44px;
+  }
+}
