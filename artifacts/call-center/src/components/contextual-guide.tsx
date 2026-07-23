@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { Bot, ChevronDown, ChevronUp, Lightbulb, X } from "lucide-react";
 
@@ -171,50 +171,97 @@ function guideFor(location: string, companyId: number | null): GuideContent {
   };
 }
 
+function readStoredBoolean(key: string, fallback: boolean) {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value === null ? fallback : value === "true";
+  } catch {
+    return fallback;
+  }
+}
+
 export function ContextualGuide() {
   const [location] = useLocation();
-  const [open, setOpen] = useState(true);
-  const [hidden, setHidden] = useState(false);
+  const [open, setOpen] = useState(() => readStoredBoolean("callingagent-guide-open", true));
+  const [hidden, setHidden] = useState(() => readStoredBoolean("callingagent-guide-hidden", false));
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 640);
+
   const companyId = useMemo(() => {
     const queryId = Number(new URLSearchParams(window.location.search).get("companyId") || 0);
     const companyMatch = location.match(/^\/companies\/(\d+)/);
     return queryId || (companyMatch ? Number(companyMatch[1]) : null);
   }, [location]);
+
   const guide = guideFor(location, companyId);
+
+  useEffect(() => {
+    const updateViewport = () => setIsMobile(window.innerWidth < 640);
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, []);
+
+  useEffect(() => {
+    try { window.localStorage.setItem("callingagent-guide-open", String(open)); } catch {}
+  }, [open]);
+
+  useEffect(() => {
+    try { window.localStorage.setItem("callingagent-guide-hidden", String(hidden)); } catch {}
+  }, [hidden]);
+
+  useEffect(() => {
+    if (isMobile) setOpen(false);
+  }, [location, isMobile]);
 
   if (hidden) {
     return (
       <button
         onClick={() => { setHidden(false); setOpen(true); }}
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-xl hover:opacity-90"
+        className="fixed z-40 flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-xl hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 sm:bottom-5 sm:right-5"
+        aria-label="Open CallingAgent Guide"
       >
-        <Bot className="h-4 w-4" /> What should I do?
+        <Bot className="h-4 w-4" />
+        <span className="hidden min-[380px]:inline">What should I do?</span>
+        <span className="min-[380px]:hidden">Help</span>
       </button>
     );
   }
 
   return (
-    <aside className="fixed bottom-5 right-5 z-40 w-[360px] max-w-[calc(100vw-2rem)] rounded-xl border border-primary/30 bg-card shadow-2xl overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3 bg-primary/10 border-b border-primary/20">
+    <aside
+      className="fixed z-40 overflow-hidden border border-primary/30 bg-card shadow-2xl left-0 right-0 bottom-0 rounded-t-2xl max-h-[82dvh] sm:left-auto sm:right-5 sm:bottom-5 sm:w-[360px] sm:max-w-[calc(100vw-2rem)] sm:rounded-xl sm:max-h-[calc(100vh-2.5rem)]"
+      aria-label="CallingAgent contextual guide"
+    >
+      <div className="flex items-center gap-2.5 border-b border-primary/20 bg-primary/10 px-3 py-3 sm:gap-3 sm:px-4">
         <div className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0"><Bot className="h-4 w-4" /></div>
         <div className="min-w-0 flex-1">
-          <div className="text-xs font-bold uppercase tracking-wider text-primary">CallingAgent Guide</div>
+          <div className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-primary">CallingAgent Guide</div>
           <div className="text-sm font-semibold truncate">{guide.title}</div>
         </div>
-        <button onClick={() => setOpen(current => !current)} className="h-8 w-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary">
+        <button
+          onClick={() => setOpen(current => !current)}
+          className="h-10 w-10 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-primary"
+          aria-label={open ? "Collapse guide" : "Expand guide"}
+        >
           {open ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
         </button>
-        <button onClick={() => setHidden(true)} className="h-8 w-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary" title="Hide guide">
+        <button
+          onClick={() => setHidden(true)}
+          className="h-10 w-10 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-primary"
+          title="Hide guide"
+          aria-label="Hide guide"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
+
       {open && (
-        <div className="p-4 space-y-3">
+        <div className="overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3 sm:max-h-[60vh]">
           <p className="text-sm text-muted-foreground leading-relaxed">{guide.intro}</p>
-          <ol className="space-y-2">
+          <ol className="space-y-2.5">
             {guide.steps.map((step, index) => (
-              <li key={index} className="flex items-start gap-2 text-xs leading-relaxed">
-                <span className="h-5 w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 text-[10px] font-bold">{index + 1}</span>
+              <li key={index} className="flex items-start gap-2 text-sm sm:text-xs leading-relaxed">
+                <span className="h-6 w-6 sm:h-5 sm:w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 text-[11px] sm:text-[10px] font-bold">{index + 1}</span>
                 <span className="pt-0.5 text-foreground/90">{step}</span>
               </li>
             ))}
