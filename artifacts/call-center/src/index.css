@@ -73,7 +73,6 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  /* Cockpit dark theme by default */
   --background: 222 47% 7%;
   --foreground: 210 40% 98%;
 
@@ -147,14 +146,107 @@
 }
 
 .dark {
-  /* Using same values since default is dark */
 }
 
 @layer base {
   * {
     @apply border-border;
   }
+
+  html {
+    min-width: 320px;
+    overflow-x: hidden;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    min-width: 320px;
+    overflow-x: hidden;
+  }
+
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  textarea {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 639px) {
+  /* Legacy two-column forms become readable single-column mobile forms. */
+  .grid.grid-cols-2 {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .grid.grid-cols-2 > .col-span-2 {
+    grid-column: auto !important;
+  }
+
+  /* Fixed-width selectors and action controls should fill the phone screen. */
+  .w-64,
+  .w-72,
+  .w-80,
+  .max-w-4xl {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Prevent headings and long company names from creating horizontal scroll. */
+  h1.text-3xl {
+    font-size: 1.5rem !important;
+    line-height: 2rem !important;
+    overflow-wrap: anywhere;
+  }
+
+  h2,
+  h3,
+  p,
+  label,
+  button,
+  [role="option"] {
+    overflow-wrap: anywhere;
+  }
+
+  /* Mobile-friendly card and form spacing across older setup pages. */
+  [data-slot="card-header"] {
+    padding: 1rem !important;
+  }
+
+  [data-slot="card-content"] {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  input,
+  textarea,
+  button,
+  [role="combobox"] {
+    min-height: 44px;
+  }
+
+  textarea {
+    min-height: 120px;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  input,
+  select {
+    font-size: 16px !important;
+  }
+
+  /* Keep dropdown content and long voice names inside the viewport. */
+  [role="listbox"] {
+    max-width: calc(100vw - 1rem) !important;
+  }
+
+  [role="option"] > div {
+    min-width: 0;
+    max-width: 100%;
   }
 }
