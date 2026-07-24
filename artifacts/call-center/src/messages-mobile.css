@@ -1,0 +1,52 @@
+/* Mobile SMS conversations behave like a focused messaging screen. */
+@media (max-width: 767px) {
+  main:has(button[aria-label="Back to conversations"]) {
+    overflow: hidden;
+  }
+
+  main:has(button[aria-label="Back to conversations"]) > div {
+    padding: 0 !important;
+  }
+
+  main:has(button[aria-label="Back to conversations"]) header,
+  main:has(button[aria-label="Back to conversations"]) > div > div.rounded-xl.border-amber-500\/20 {
+    display: none !important;
+  }
+
+  main:has(button[aria-label="Back to conversations"]) .flex.min-h-0.flex-1.gap-4 {
+    position: fixed;
+    inset: 4rem 0 0;
+    z-index: 30;
+    display: block;
+    background: hsl(var(--background));
+  }
+
+  main:has(button[aria-label="Back to conversations"]) .flex.min-h-0.flex-1.gap-4 > [data-slot="card"]:has(button[aria-label="Back to conversations"]),
+  main:has(button[aria-label="Back to conversations"]) .flex.min-h-0.flex-1.gap-4 > div:has(button[aria-label="Back to conversations"]) {
+    width: 100% !important;
+    height: calc(100dvh - 4rem) !important;
+    min-height: 0 !important;
+    max-height: calc(100dvh - 4rem) !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  main:has(button[aria-label="Back to conversations"]) button[aria-label="Back to conversations"] {
+    width: 2.75rem !important;
+    min-width: 2.75rem !important;
+    height: 2.75rem !important;
+    min-height: 2.75rem !important;
+  }
+
+  main:has(button[aria-label="Back to conversations"]) input[placeholder^="Reply to"] {
+    scroll-margin-bottom: 6rem;
+  }
+
+  main:has(button[aria-label="Back to conversations"]) .border-t.border-border.bg-card {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+  }
+}
