@@ -120,7 +120,7 @@ select,
     overflow-wrap: anywhere;
   }
 
-  /* Keep the floating AI helper compact and out of the bottom action zone. */
+  /* Keep the round AI helper compact and out of the bottom action zone. */
   button.fixed.rounded-full {
     right: 0.65rem !important;
     top: 5rem !important;
@@ -130,6 +130,22 @@ select,
     height: 2.75rem !important;
     min-height: 2.75rem !important;
     z-index: 35 !important;
+  }
+
+  /* Contextual text actions must stay in document flow on phones.
+     This prevents Auto-fill from AI Settings from covering Add Resource and save controls. */
+  a.fixed:not(.rounded-full),
+  button.fixed:not(.rounded-full) {
+    position: static !important;
+    inset: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 3rem !important;
+    margin: 0.75rem 0 0 !important;
+    white-space: normal !important;
+    text-align: center;
+    justify-content: center;
   }
 
   main > div:last-child > div {
