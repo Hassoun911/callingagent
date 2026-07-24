@@ -9,7 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -197,11 +197,11 @@ function AudioPlayer({ src }: { src: string }) {
 }
 
 function DetailItem({ icon: Icon, label, value, mono = false }: { icon: React.ElementType; label: string; value: string; mono?: boolean }) {
-  return <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background p-3"><Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" /><div className="min-w-0"><p className="text-xs text-muted-foreground">{label}</p><p className={`break-words text-sm font-medium ${mono ? "font-mono" : ""}`}>{value}</p></div></div>;
+  return <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-background p-2.5 sm:p-3"><Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" /><div className="min-w-0"><p className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs sm:normal-case sm:tracking-normal">{label}</p><p className={`break-words text-sm font-medium ${mono ? "font-mono" : ""}`}>{value}</p></div></div>;
 }
 
 function InfoBox({ label, text, highlighted = false }: { label: string; text: string; highlighted?: boolean }) {
-  return <div className={`space-y-1 rounded-lg border p-3 ${highlighted ? "border-primary/20 bg-primary/5" : "border-border bg-background"}`}><p className={`text-xs font-medium uppercase tracking-wide ${highlighted ? "text-primary" : "text-muted-foreground"}`}>{label}</p><p className="break-words text-sm leading-relaxed">{text}</p></div>;
+  return <div className={`space-y-1 rounded-lg border p-3 ${highlighted ? "border-primary/20 bg-primary/5" : "border-border bg-background"}`}><p className={`text-[10px] font-medium uppercase tracking-wide sm:text-xs ${highlighted ? "text-primary" : "text-muted-foreground"}`}>{label}</p><p className="break-words text-sm leading-relaxed">{text}</p></div>;
 }
 
 function CallDetail({ call, open, onClose, onNotesUpdate, onDelete }: { call: any; open: boolean; onClose: () => void; onNotesUpdate: (id: number, notes: string | null) => void; onDelete: (id: number) => void }) {
@@ -237,21 +237,47 @@ function CallDetail({ call, open, onClose, onNotesUpdate, onDelete }: { call: an
 
   return (
     <Dialog open={open} onOpenChange={value => !value && onClose()}>
-      <DialogContent className="max-h-[92dvh] w-[calc(100vw-1rem)] overflow-y-auto border-border bg-card p-4 sm:max-w-2xl sm:p-6">
-        <DialogHeader><DialogTitle className="flex flex-wrap items-center gap-2 pr-8"><span className="min-w-0 break-words font-medium">{name || formatPhone(call.fromNumber)}</span>{name && <span className="font-mono text-xs text-muted-foreground sm:text-sm">{formatPhone(call.fromNumber)}</span>}<PriorityBadge priority={call.priority} /></DialogTitle></DialogHeader>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {call.fromNumber && call.fromNumber !== "Anonymous" && <DetailItem icon={Phone} label="Phone" value={formatPhone(call.fromNumber)} mono />}
-          {call.callerName && <DetailItem icon={User} label="Name" value={call.callerName} />}
-          {call.callerEmail && <DetailItem icon={Mail} label="Email" value={call.callerEmail} />}
-          {call.callType && <DetailItem icon={Tag} label="Call Type" value={call.callType} />}
-          {call.priority && <DetailItem icon={AlertCircle} label="Priority" value={call.priority} />}
+      <DialogContent className="!left-0 !top-0 !h-[100dvh] !max-h-none !w-screen !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-0 bg-card p-0 sm:!left-1/2 sm:!top-1/2 sm:!h-auto sm:!max-h-[92dvh] sm:!w-[calc(100vw-2rem)] sm:!max-w-2xl sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:rounded-lg sm:border">
+        <div className="flex h-full min-h-0 flex-col sm:max-h-[92dvh]">
+          <div className="flex-shrink-0 border-b border-border bg-card px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:py-4">
+            <DialogHeader>
+              <DialogTitle className="pr-10">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="min-w-0 break-words text-lg font-semibold sm:text-xl">{name || formatPhone(call.fromNumber)}</span>
+                  {name && <span className="font-mono text-xs text-muted-foreground sm:text-sm">{formatPhone(call.fromNumber)}</span>}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <DirectionBadge direction={call.direction} />
+                  <StatusBadge status={call.status} />
+                  <CallTypeBadge type={call.callType} />
+                  <PriorityBadge priority={call.priority} />
+                </div>
+                <p className="mt-2 text-xs font-normal text-muted-foreground">{formatDate(call.createdAt)} · {formatDuration(call.duration)}</p>
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-8 sm:px-6 sm:py-5">
+            <div className="space-y-4">
+              {(name || call.callerEmail) && (
+                <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+                  {name && call.fromNumber && call.fromNumber !== "Anonymous" && <DetailItem icon={Phone} label="Phone" value={formatPhone(call.fromNumber)} mono />}
+                  {call.callerEmail && <DetailItem icon={Mail} label="Email" value={call.callerEmail} />}
+                </div>
+              )}
+              {hasRecording && <div className="space-y-2"><p className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">Recording</p><AudioPlayer src={`/api/call-logs/${call.id}/recording`} /></div>}
+              {call.callSummary && <InfoBox label="Summary" text={call.callSummary} />}
+              {call.actionRequired && <InfoBox label="Action Required" text={call.actionRequired} highlighted />}
+              {call.transcription && <><Separator /><div className="space-y-2"><p className="text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs">Transcript</p><div className="whitespace-pre-wrap break-words rounded-lg border border-border bg-background p-3 font-mono text-xs leading-relaxed sm:max-h-[280px] sm:overflow-y-auto">{call.transcription}</div></div></>}
+              <div className="space-y-2"><div className="flex items-center justify-between"><p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground sm:text-xs"><FileText className="h-3 w-3" />Notes</p>{saved && <span className="flex items-center gap-1 text-xs text-emerald-400"><Check className="h-3 w-3" />Saved</span>}</div><textarea value={notes} onChange={event => changeNotes(event.target.value)} onBlur={() => persist(notes)} rows={3} placeholder="Add notes about this call..." className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring sm:rows-4" /></div>
+            </div>
+          </div>
+
+          <div className="flex flex-shrink-0 items-center justify-between gap-3 border-t border-border bg-card px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:pb-4">
+            <DialogClose asChild><Button variant="outline" className="min-h-11 flex-1 sm:min-h-9 sm:flex-none">Close</Button></DialogClose>
+            <Button variant="outline" onClick={() => { onClose(); onDelete(call.id); }} className="min-h-11 flex-1 gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 sm:min-h-9 sm:flex-none"><Trash2 className="h-4 w-4" />Delete</Button>
+          </div>
         </div>
-        {hasRecording && <div className="space-y-2"><p className="text-xs uppercase tracking-wide text-muted-foreground">Recording</p><AudioPlayer src={`/api/call-logs/${call.id}/recording`} /></div>}
-        {call.callSummary && <InfoBox label="Summary" text={call.callSummary} />}
-        {call.actionRequired && <InfoBox label="Action Required" text={call.actionRequired} highlighted />}
-        {call.transcription && <><Separator /><div className="space-y-2"><p className="text-xs uppercase tracking-wide text-muted-foreground">Transcript</p><div className="max-h-[280px] overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-background p-3 font-mono text-xs leading-relaxed">{call.transcription}</div></div></>}
-        <div className="space-y-2"><div className="flex items-center justify-between"><p className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground"><FileText className="h-3 w-3" />Notes</p>{saved && <span className="flex items-center gap-1 text-xs text-emerald-400"><Check className="h-3 w-3" />Saved</span>}</div><textarea value={notes} onChange={event => changeNotes(event.target.value)} onBlur={() => persist(notes)} rows={4} placeholder="Add notes about this call..." className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" /></div>
-        <div className="flex justify-end border-t border-border pt-4"><Button variant="outline" size="sm" onClick={() => { onClose(); onDelete(call.id); }} className="gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-4 w-4" />Delete call log</Button></div>
       </DialogContent>
     </Dialog>
   );
