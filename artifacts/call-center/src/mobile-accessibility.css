@@ -92,31 +92,53 @@ select,
     overflow-wrap: anywhere;
   }
 
-  /* The companies desktop table becomes a focused two-column mobile list. */
+  /* Keep company management usable on phones: name, industry and actions remain visible. */
   table.min-w-\[560px\] {
     min-width: 100% !important;
     table-layout: fixed;
   }
 
-  table.min-w-\[560px\] th:nth-child(n + 3),
-  table.min-w-\[560px\] td:nth-child(n + 3) {
+  table.min-w-\[560px\] th:nth-child(3),
+  table.min-w-\[560px\] td:nth-child(3),
+  table.min-w-\[560px\] th:nth-child(4),
+  table.min-w-\[560px\] td:nth-child(4) {
     display: none;
   }
 
   table.min-w-\[560px\] th:first-child,
   table.min-w-\[560px\] td:first-child {
-    width: 62%;
+    width: 52%;
   }
 
   table.min-w-\[560px\] th:nth-child(2),
   table.min-w-\[560px\] td:nth-child(2) {
-    width: 38%;
+    width: 28%;
+  }
+
+  table.min-w-\[560px\] th:nth-child(5),
+  table.min-w-\[560px\] td:nth-child(5) {
+    display: table-cell;
+    width: 20%;
+    padding-left: 0.25rem !important;
+    padding-right: 0.4rem !important;
+  }
+
+  table.min-w-\[560px\] td:nth-child(5) > div {
+    gap: 0.1rem !important;
+  }
+
+  table.min-w-\[560px\] td:nth-child(5) button {
+    width: 2rem !important;
+    min-width: 2rem !important;
+    height: 2rem !important;
+    min-height: 2rem !important;
+    padding: 0 !important;
   }
 
   table.min-w-\[560px\] th,
   table.min-w-\[560px\] td {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
+    padding-left: 0.65rem !important;
+    padding-right: 0.65rem !important;
     overflow-wrap: anywhere;
   }
 
