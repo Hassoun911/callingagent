@@ -174,8 +174,18 @@ select,
     padding-bottom: 5rem;
   }
 
-  /* Long dialogs use a fixed header, one scrolling body and a visible bottom action. */
-  [role="dialog"] {
+  /* Normal alerts and confirmations stay compact instead of becoming full-screen. */
+  [role="alertdialog"],
+  [role="dialog"]:not(:has(> div.space-y-4.pt-4)) {
+    width: calc(100vw - 1.5rem) !important;
+    max-width: calc(100vw - 1.5rem) !important;
+    height: auto !important;
+    max-height: calc(100dvh - 2rem) !important;
+    overflow-y: auto !important;
+  }
+
+  /* Long form dialogs use a fixed header, one scrolling body and a visible bottom action. */
+  [role="dialog"]:has(> div.space-y-4.pt-4) {
     display: flex !important;
     flex-direction: column !important;
     width: calc(100vw - 1rem) !important;
