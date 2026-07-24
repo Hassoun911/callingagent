@@ -1,0 +1,115 @@
+/* Global responsive and accessibility refinements shared by every dashboard page. */
+
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+button,
+a,
+input,
+textarea,
+select,
+[role="button"],
+[role="combobox"],
+[role="option"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent mobile browsers from zooming when a form control receives focus. */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select,
+  [role="combobox"] {
+    font-size: 16px !important;
+  }
+
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    color-scheme: dark;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    filter: invert(0.75);
+    opacity: 0.9;
+  }
+
+  /* Keep validation messages and toast notifications inside the phone viewport. */
+  [data-radix-toast-viewport] {
+    left: 0.75rem !important;
+    right: 0.75rem !important;
+    bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  /* Long dialogs and sheets should use the real browser viewport and safe areas. */
+  [role="dialog"] {
+    max-width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+  }
+
+  /* Avoid content being hidden behind sticky mobile headers or bottom controls. */
+  [id] {
+    scroll-margin-top: 5rem;
+  }
+
+  /* Lists of setup controls should never force horizontal scrolling. */
+  form,
+  fieldset,
+  section,
+  article,
+  [data-slot="card"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  label:has([role="switch"]),
+  label:has(input[type="checkbox"]) {
+    align-items: flex-start;
+    line-height: 1.45;
+  }
+}
+
+/* Improve keyboard and screen-reader clarity for disabled controls. */
+button:disabled,
+input:disabled,
+textarea:disabled,
+select:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Respect users who reduce motion while retaining immediate state changes. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Better high-contrast behavior for selected and urgent dashboard items. */
+@media (forced-colors: active) {
+  button,
+  a,
+  input,
+  textarea,
+  [role="button"],
+  [role="combobox"] {
+    forced-color-adjust: auto;
+  }
+}
