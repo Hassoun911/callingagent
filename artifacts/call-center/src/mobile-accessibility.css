@@ -72,6 +72,68 @@ select,
     line-height: 1.45;
   }
 
+  /* Stack page titles and primary actions instead of squeezing them side by side. */
+  main .flex.items-center.justify-between:has(h1) {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+
+  main .flex.items-center.justify-between:has(h1) > button,
+  main .flex.items-center.justify-between:has(h1) > a {
+    width: 100% !important;
+    min-height: 3rem;
+    justify-content: center;
+  }
+
+  main h1 {
+    font-size: clamp(1.75rem, 8vw, 2.15rem) !important;
+    line-height: 1.15 !important;
+    overflow-wrap: anywhere;
+  }
+
+  /* The companies desktop table becomes a focused two-column mobile list. */
+  table.min-w-\[560px\] {
+    min-width: 100% !important;
+    table-layout: fixed;
+  }
+
+  table.min-w-\[560px\] th:nth-child(n + 3),
+  table.min-w-\[560px\] td:nth-child(n + 3) {
+    display: none;
+  }
+
+  table.min-w-\[560px\] th:first-child,
+  table.min-w-\[560px\] td:first-child {
+    width: 62%;
+  }
+
+  table.min-w-\[560px\] th:nth-child(2),
+  table.min-w-\[560px\] td:nth-child(2) {
+    width: 38%;
+  }
+
+  table.min-w-\[560px\] th,
+  table.min-w-\[560px\] td {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    overflow-wrap: anywhere;
+  }
+
+  /* Keep the floating AI helper compact and away from form actions. */
+  button.fixed.rounded-full {
+    right: 0.75rem !important;
+    bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
+    width: 3rem !important;
+    min-width: 3rem !important;
+    height: 3rem !important;
+    min-height: 3rem !important;
+  }
+
+  main > div:last-child > div {
+    padding-bottom: 7rem;
+  }
+
   /* Keep validation messages and toast notifications inside the phone viewport. */
   [data-radix-toast-viewport] {
     left: 0.75rem !important;
