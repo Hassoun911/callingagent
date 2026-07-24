@@ -1,50 +1,62 @@
 /* Mobile SMS conversations behave like a focused messaging screen. */
 @media (max-width: 767px) {
-  main:has(button[aria-label="Back to conversations"]) {
+  body.messages-thread-open {
     overflow: hidden;
   }
 
-  main:has(button[aria-label="Back to conversations"]) > div {
+  body.messages-thread-open main > div:last-child {
     padding: 0 !important;
+    overflow: hidden !important;
   }
 
-  main:has(button[aria-label="Back to conversations"]) header,
-  main:has(button[aria-label="Back to conversations"]) > div > div.rounded-xl.border-amber-500\/20 {
+  body.messages-thread-open main > div:last-child > div {
+    max-width: none !important;
+    padding-bottom: 0 !important;
+  }
+
+  body.messages-thread-open main header,
+  body.messages-thread-open main > div:last-child > div > div > div.rounded-xl.border-amber-500\/20 {
     display: none !important;
   }
 
-  main:has(button[aria-label="Back to conversations"]) .flex.min-h-0.flex-1.gap-4 {
-    position: fixed;
-    inset: 4rem 0 0;
-    z-index: 30;
-    display: block;
+  body.messages-thread-open main .flex.min-h-0.flex-col.gap-4.pb-24 {
+    gap: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  body.messages-thread-open main .flex.min-h-0.flex-1.gap-4 {
+    position: fixed !important;
+    inset: 4rem 0 0 !important;
+    z-index: 45 !important;
+    display: block !important;
     background: hsl(var(--background));
   }
 
-  main:has(button[aria-label="Back to conversations"]) .flex.min-h-0.flex-1.gap-4 > [data-slot="card"]:has(button[aria-label="Back to conversations"]),
-  main:has(button[aria-label="Back to conversations"]) .flex.min-h-0.flex-1.gap-4 > div:has(button[aria-label="Back to conversations"]) {
+  body.messages-thread-open main .flex.min-h-0.flex-1.gap-4 > .flex.min-h-\[520px\] {
     width: 100% !important;
     height: calc(100dvh - 4rem) !important;
     min-height: 0 !important;
     max-height: calc(100dvh - 4rem) !important;
-    border-left: 0 !important;
-    border-right: 0 !important;
-    border-bottom: 0 !important;
+    border: 0 !important;
     border-radius: 0 !important;
   }
 
-  main:has(button[aria-label="Back to conversations"]) button[aria-label="Back to conversations"] {
+  body.messages-thread-open button.fixed.rounded-full {
+    display: none !important;
+  }
+
+  body.messages-thread-open button[aria-label="Back to conversations"] {
     width: 2.75rem !important;
     min-width: 2.75rem !important;
     height: 2.75rem !important;
     min-height: 2.75rem !important;
   }
 
-  main:has(button[aria-label="Back to conversations"]) input[placeholder^="Reply to"] {
+  body.messages-thread-open input[placeholder^="Reply to"] {
     scroll-margin-bottom: 6rem;
   }
 
-  main:has(button[aria-label="Back to conversations"]) .border-t.border-border.bg-card {
+  body.messages-thread-open .border-t.border-border.bg-card {
     position: sticky;
     bottom: 0;
     z-index: 2;
