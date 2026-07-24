@@ -60,7 +60,7 @@ function formatPhone(raw: string | null | undefined): string {
 }
 
 function formatDuration(seconds: number | null | undefined): string {
-  if (!seconds || !Number.isFinite(seconds)) return "--:--";
+  if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return "0:00";
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.floor(seconds % 60);
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
