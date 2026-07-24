@@ -132,10 +132,10 @@ export function Layout({ children }: { children: ReactNode }) {
           )}
         </div>
 
-        <div className={`flex-1 overflow-y-auto overscroll-contain ${compact ? "px-2 py-2" : "px-3 py-4"} space-y-0.5`}>
+        <div className={`flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${compact ? "px-2 py-2" : "px-3 py-4"} space-y-0.5`}>
           <SectionLabel label="Overview" compact={compact} />
           <Link href="/" onClick={onNav} className={navCls("/", compact)}>
-            <LayoutDashboard className={`${compact ? "h-4 w-4" : "h-4 w-4"} flex-shrink-0`} /> Dashboard
+            <LayoutDashboard className="h-4 w-4 flex-shrink-0" /> Dashboard
           </Link>
 
           <SectionLabel label="Companies" compact={compact} />
@@ -214,14 +214,16 @@ export function Layout({ children }: { children: ReactNode }) {
               })}
             </div>
           )}
+        </div>
 
-          <SectionLabel label="System" compact={compact} />
+        <div className={`${compact ? "px-2 pt-2" : "px-3 pt-3"} flex-shrink-0 border-t border-border bg-card`}>
+          <SectionLabel label="System" compact />
           <Link href="/billing" onClick={onNav} className={navCls("/billing", compact)}>
             <CreditCard className="h-4 w-4 flex-shrink-0" /> Billing
           </Link>
         </div>
 
-        <div className={`${compact ? "p-3" : "p-4"} flex-shrink-0 border-t border-border bg-card`}>
+        <div className={`${compact ? "p-3" : "p-4"} flex-shrink-0 bg-card`}>
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">A</div>
             <div className="min-w-0 flex-1 text-xs">
