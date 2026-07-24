@@ -27,6 +27,14 @@ function formatPhone(raw: string | null | undefined): string {
   return raw;
 }
 
+function formatLineLabel(lineName: string | null | undefined, lineNumber: string): string {
+  const formattedNumber = formatPhone(lineNumber);
+  if (!lineName) return formattedNumber;
+  const nameDigits = lineName.replace(/\D/g, "");
+  const numberDigits = lineNumber.replace(/\D/g, "");
+  return nameDigits && nameDigits === numberDigits ? formattedNumber : `${lineName} · ${formattedNumber}`;
+}
+
 const ET = "America/New_York";
 
 function formatTime(iso: string): string {
@@ -230,7 +238,7 @@ export default function Messages() {
                         </div>
                         <p className="truncate text-xs text-muted-foreground">{conversation.lastBody || "Media message"}</p>
                         <div className="mt-1 flex items-center justify-between gap-2">
-                          <p className="truncate text-[10px] text-muted-foreground/60">via {conversation.lineName || formatPhone(conversation.lineNumber)}</p>
+                          <p className="truncate text-[10px] text-muted-foreground/60">via {formatLineLabel(conversation.lineName, conversation.lineNumber)}</p>
                           <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground/40 md:hidden" />
                         </div>
                       </div>
@@ -247,7 +255,7 @@ export default function Messages() {
             <div className="flex min-h-16 flex-shrink-0 items-center gap-3 border-b border-border px-3 py-3 sm:px-4">
               <Button variant="ghost" size="icon" className="h-11 w-11 flex-shrink-0 md:hidden" onClick={() => setSelected(null)} aria-label="Back to conversations"><ChevronLeft className="h-5 w-5" /></Button>
               <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground"><Phone className="h-4 w-4" /></div>
-              <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-foreground">{formatPhone(selected.contactNumber)}</p><p className="truncate text-xs text-muted-foreground">{selected.lineName ? `${selected.lineName} · ` : ""}{formatPhone(selected.lineNumber)}</p></div>
+              <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-foreground">{formatPhone(selected.contactNumber)}</p><p className="truncate text-xs text-muted-foreground">{formatLineLabel(selected.lineName, selected.lineNumber)}</p></div>
               <Badge variant="outline" className="flex-shrink-0 border-primary/30 text-[10px] text-primary">SMS</Badge>
             </div>
 
