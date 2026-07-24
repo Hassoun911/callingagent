@@ -120,18 +120,52 @@ select,
     overflow-wrap: anywhere;
   }
 
-  /* Keep the floating AI helper compact and away from form actions. */
+  /* Keep the floating AI helper compact and out of the bottom action zone. */
   button.fixed.rounded-full {
-    right: 0.75rem !important;
-    bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
-    width: 3rem !important;
-    min-width: 3rem !important;
-    height: 3rem !important;
-    min-height: 3rem !important;
+    right: 0.65rem !important;
+    top: 5rem !important;
+    bottom: auto !important;
+    width: 2.75rem !important;
+    min-width: 2.75rem !important;
+    height: 2.75rem !important;
+    min-height: 2.75rem !important;
+    z-index: 35 !important;
   }
 
   main > div:last-child > div {
-    padding-bottom: 7rem;
+    padding-bottom: 5rem;
+  }
+
+  /* Long dialogs use a fixed header, one scrolling body and a visible bottom action. */
+  [role="dialog"] {
+    display: flex !important;
+    flex-direction: column !important;
+    width: calc(100vw - 1rem) !important;
+    max-width: calc(100vw - 1rem) !important;
+    height: calc(100dvh - 1rem) !important;
+    max-height: calc(100dvh - 1rem) !important;
+    overflow: hidden !important;
+  }
+
+  [role="dialog"] > [data-radix-dialog-close],
+  [role="dialog"] > button.absolute {
+    z-index: 3;
+  }
+
+  [role="dialog"] > div.space-y-4.pt-4 {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  [role="dialog"] > div.space-y-4.pt-4 > button:last-child {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin-top: 1rem !important;
+    box-shadow: 0 -12px 24px hsl(var(--card));
   }
 
   /* Keep validation messages and toast notifications inside the phone viewport. */
@@ -141,12 +175,6 @@ select,
     bottom: max(0.75rem, env(safe-area-inset-bottom)) !important;
     width: auto !important;
     max-width: none !important;
-  }
-
-  /* Long dialogs and sheets should use the real browser viewport and safe areas. */
-  [role="dialog"] {
-    max-width: calc(100vw - 1rem);
-    max-height: calc(100dvh - 1rem);
   }
 
   /* Avoid content being hidden behind sticky mobile headers or bottom controls. */
@@ -166,7 +194,7 @@ select,
 
   /* Prevent floating helpers from covering the last form action. */
   main > div:last-child {
-    scroll-padding-bottom: 7rem;
+    scroll-padding-bottom: 5rem;
   }
 }
 
