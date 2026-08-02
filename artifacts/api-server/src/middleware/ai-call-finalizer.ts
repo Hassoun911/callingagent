@@ -11,6 +11,7 @@ import { logger } from "../lib/logger";
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "busy", "no-answer", "canceled"]);
 const DEFAULT_TIMEZONE = "America/Toronto";
+const RECENT_APPOINTMENT_WINDOW_MS = 20 * 60 * 1000;
 
 type Extraction = {
   callerName: string | null;
@@ -91,7 +92,7 @@ async function extract(transcript: string): Promise<Extraction | null> {
         content: [
           "Analyze the caller statements from a business phone call and return JSON only.",
           `The business timezone is ${DEFAULT_TIMEZONE}. The exact current business date and time is ${easternNowText()}.`,
-          "Resolve relative dates such as today and tomorrow from that exact business date.",
+          "Resolve relative dates such as today, tomorrow, and days from now from that exact business date.",
           "Never invent a name, time, date, email, service, or confirmation that the caller did not provide.",
           "appointmentStartTime must be an ISO 8601 datetime with the correct Eastern UTC offset, or null.",
           "Return exactly these keys: callerName, callerEmail, callType, callSummary, actionRequired, priority, appointmentRequested, appointmentTitle, appointmentStartTime, appointmentNotes.",
@@ -146,26 +147,53 @@ async function finalize(callSid: string): Promise<void> {
       const companyAppointments = await db.select().from(appointmentsTable)
         .where(eq(appointmentsTable.companyId, phoneNumber.companyId));
 
-      const matching = companyAppointments.find((appointment) => {
-        if (appointment.status === "cancelled") return false;
-        const sameTime = Math.abs(appointment.startTime.getTime() - startTime.getTime()) <= 10 * 60 * 1000;
-        const samePerson = appointment.customerPhone === callerPhone ||
-          appointment.customerPhone === phoneNumber.number ||
-          appointment.customerName.toLowerCase() === details.callerName!.toLowerCase();
-        return sameTime && samePerson;
+      const samePerson = (appointment: typeof appointmentsTable.$inferSelect) =>
+        appointment.customerPhone === callerPhone ||
+        appointment.customerPhone === phoneNumber.number ||
+        appointment.customerName.toLowerCase() === details.callerName!.toLowerCase();
+
+      const exact = companyAppointments.find((appointment) => {
+        if (appointment.status === "cancelled" || !samePerson(appointment)) return false;
+        return Math.abs(appointment.startTime.getTime() - startTime.getTime()) <= 10 * 60 * 1000;
+      });
+
+      const now = Date.now();
+      const recentBad = companyAppointments.find((appointment) => {
+        if (appointment.status === "cancelled" || !samePerson(appointment)) return false;
+        const createdRecently = Math.abs(appointment.createdAt.getTime() - log.createdAt.getTime()) <= RECENT_APPOINTMENT_WINDOW_MS;
+        const invalidPastDate = appointment.startTime.getTime() < now - 60 * 60 * 1000;
+        return createdRecently && invalidPastDate;
       });
 
       let appointmentId: number;
-      if (matching) {
-        appointmentId = matching.id;
-        if (matching.customerPhone !== callerPhone || matching.startTime.getTime() !== startTime.getTime()) {
+      if (exact) {
+        appointmentId = exact.id;
+        if (exact.customerPhone !== callerPhone) {
           await db.update(appointmentsTable).set({
             customerPhone: callerPhone,
-            customerEmail: matching.customerEmail ?? details.callerEmail,
-            startTime,
+            customerEmail: exact.customerEmail ?? details.callerEmail,
             updatedAt: new Date(),
-          }).where(eq(appointmentsTable.id, matching.id));
+          }).where(eq(appointmentsTable.id, exact.id));
         }
+        if (recentBad && recentBad.id !== exact.id) {
+          await db.update(appointmentsTable).set({
+            status: "cancelled",
+            notes: `${recentBad.notes ?? ""}\nAutomatically cancelled: invalid duplicate date created during AI call.`.trim(),
+            updatedAt: new Date(),
+          }).where(eq(appointmentsTable.id, recentBad.id));
+        }
+      } else if (recentBad) {
+        appointmentId = recentBad.id;
+        await db.update(appointmentsTable).set({
+          customerPhone: callerPhone,
+          customerEmail: recentBad.customerEmail ?? details.callerEmail,
+          title: details.appointmentTitle ?? recentBad.title,
+          notes: details.appointmentNotes ?? recentBad.notes,
+          startTime,
+          status: "scheduled",
+          callLogId: log.id,
+          updatedAt: new Date(),
+        }).where(eq(appointmentsTable.id, recentBad.id));
       } else {
         const [created] = await db.insert(appointmentsTable).values({
           companyId: phoneNumber.companyId,
