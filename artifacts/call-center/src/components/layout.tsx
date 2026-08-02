@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
-  Phone,
   PhoneCall,
   Users,
   Building2,
@@ -21,8 +21,22 @@ import {
   PhoneCall as PhoneSetup,
 } from "lucide-react";
 import { useWatches } from "@/hooks/use-watches";
-import { useListCompanies, useListPhoneNumbers } from "@workspace/api-client-react";
+import {
+  useListCallLogs,
+  useListCompanies,
+  useListPhoneNumbers,
+  useListSmsMessages,
+} from "@workspace/api-client-react";
 import { useAuthContext } from "@/App";
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+type Appointment = {
+  id: number;
+  companyId: number | null;
+  startTime: string;
+  status: string;
+};
 
 function NotificationBell() {
   const { data: watches } = useWatches();
@@ -39,11 +53,25 @@ function NotificationBell() {
   );
 }
 
+function ActionBadge({ count, severity = "warning" }: { count: number; severity?: "warning" | "danger" }) {
+  if (count <= 0) return null;
+  const classes = severity === "danger"
+    ? "border-red-500/30 bg-red-500/15 text-red-300"
+    : "border-amber-500/30 bg-amber-500/15 text-amber-300";
+  return (
+    <span className={`ml-auto inline-flex min-w-5 items-center justify-center rounded-full border px-1.5 py-0.5 text-[10px] font-bold leading-none ${classes}`}>
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: companies } = useListCompanies();
   const { data: allNumbers } = useListPhoneNumbers();
+  const { data: allCalls = [] } = useListCallLogs({ limit: 200 });
+  const { data: allMessages = [] } = useListSmsMessages({ limit: 500 });
 
   const activeCompanyId = (() => {
     const companyMatch = location.match(/^\/companies\/(\d+)/);
@@ -60,6 +88,47 @@ export function Layout({ children }: { children: ReactNode }) {
   })();
 
   const contextCompany = activeCompanyId ? companies?.find(company => company.id === activeCompanyId) : null;
+  const companyNumbers = useMemo(
+    () => contextCompany ? allNumbers?.filter(number => number.companyId === contextCompany.id) ?? [] : [],
+    [allNumbers, contextCompany],
+  );
+  const companyNumberSet = useMemo(() => new Set(companyNumbers.map(number => number.number)), [companyNumbers]);
+
+  const { data: appointments = [] } = useQuery<Appointment[]>({
+    queryKey: ["sidebar-appointments", activeCompanyId ?? "none"],
+    enabled: activeCompanyId !== null,
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const response = await fetch(`${BASE}/api/companies/${activeCompanyId}/appointments`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!response.ok) return [];
+      return response.json();
+    },
+  });
+
+  const callActionCount = useMemo(() => allCalls.filter((call: any) => {
+    if (!companyNumberSet.has(call.toNumber) && !companyNumberSet.has(call.fromNumber)) return false;
+    const action = String(call.actionRequired ?? "").trim();
+    const priority = String(call.priority ?? "").toLowerCase();
+    const type = String(call.callType ?? "").toLowerCase();
+    const status = String(call.status ?? "").toLowerCase();
+    return Boolean(action) || priority === "high" || type === "emergency" || ["failed", "busy", "no-answer"].includes(status);
+  }).length, [allCalls, companyNumberSet]);
+
+  const unreadMessageCount = useMemo(() => allMessages.filter((message: any) => {
+    const lineNumber = message.lineNumber ?? message.to ?? message.from ?? "";
+    return companyNumberSet.has(lineNumber) && message.direction === "inbound" && Number(message.unread ?? 0) > 0;
+  }).reduce((total: number, message: any) => total + Math.max(1, Number(message.unread ?? 0)), 0), [allMessages, companyNumberSet]);
+
+  const appointmentActionCount = useMemo(() => {
+    const now = Date.now();
+    return appointments.filter(appointment => {
+      const start = Date.parse(appointment.startTime);
+      return Number.isFinite(start) && start >= now && appointment.status === "scheduled";
+    }).length;
+  }, [appointments]);
 
   const activeNumberId = (() => {
     const numberMatch = location.match(/^\/numbers\/(\d+)/);
@@ -104,12 +173,15 @@ export function Layout({ children }: { children: ReactNode }) {
       : `flex items-center ${sizing} rounded-md font-medium text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground`;
   }
 
-  function companyNavClass(href: string, compact = false) {
+  function companyNavClass(href: string, compact = false, count = 0, severity: "warning" | "danger" = "warning") {
     const sizing = compact ? "gap-2.5 px-2.5 py-2 text-sm" : "gap-2 px-2 py-1.5 text-xs";
+    const alertClass = count > 0
+      ? severity === "danger"
+        ? "border border-red-500/20 bg-red-500/5 text-red-300 hover:bg-red-500/10"
+        : "border border-amber-500/20 bg-amber-500/5 text-amber-300 hover:bg-amber-500/10"
+      : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground";
     return `flex items-center ${sizing} rounded-md transition-colors ${
-      isActive(href)
-        ? "bg-primary/10 font-medium text-primary"
-        : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+      isActive(href) ? "bg-primary/10 font-medium text-primary" : alertClass
     }`;
   }
 
@@ -132,18 +204,13 @@ export function Layout({ children }: { children: ReactNode }) {
   function NavContent({ onNav, compact = false, onClose }: { onNav?: () => void; compact?: boolean; onClose?: () => void }) {
     const onCompanyDetail = !!location.match(/^\/companies\/\d+/);
     const { logout } = useAuthContext();
-    const companyNumbers = contextCompany ? allNumbers?.filter(number => number.companyId === contextCompany.id) ?? [] : [];
 
     return (
       <>
         <div className={`${compact ? "h-14 px-3" : "h-16 px-4"} flex flex-shrink-0 items-center justify-between border-b border-border`}>
           <img src="/logo.png" alt="CallingAgent" className={`${compact ? "h-7 max-w-[175px]" : "h-8 max-w-[190px]"} w-auto object-contain`} />
           {onClose && (
-            <button
-              onClick={onClose}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground"
-              aria-label="Close navigation"
-            >
+            <button onClick={onClose} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground" aria-label="Close navigation">
               <X className="h-5 w-5" />
             </button>
           )}
@@ -162,13 +229,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
           {contextCompany && (
             <div className={`${compact ? "mt-1 p-1.5" : "ml-1 mt-2 p-2"} space-y-0.5 rounded-lg border border-border/60 bg-background/30`}>
-              <Link
-                href={`/companies/${contextCompany.id}`}
-                onClick={onNav}
-                className={`flex items-center gap-2 truncate rounded-md px-2 py-2 font-semibold transition-colors ${compact ? "text-sm" : "text-xs"} ${
-                  onCompanyDetail ? "bg-primary/10 text-primary" : "text-primary/80 hover:bg-primary/5 hover:text-primary"
-                }`}
-              >
+              <Link href={`/companies/${contextCompany.id}`} onClick={onNav} className={`flex items-center gap-2 truncate rounded-md px-2 py-2 font-semibold transition-colors ${compact ? "text-sm" : "text-xs"} ${onCompanyDetail ? "bg-primary/10 text-primary" : "text-primary/80 hover:bg-primary/5 hover:text-primary"}`}>
                 <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="truncate">{contextCompany.name}</span>
               </Link>
@@ -177,17 +238,17 @@ export function Layout({ children }: { children: ReactNode }) {
               <Link href={`/contacts?companyId=${contextCompany.id}`} onClick={onNav} className={companyNavClass(`/contacts?companyId=${contextCompany.id}`, compact)}>
                 <Users className="h-3.5 w-3.5 flex-shrink-0" /> Contacts
               </Link>
-              <Link href={`/calls?companyId=${contextCompany.id}`} onClick={onNav} className={companyNavClass(`/calls?companyId=${contextCompany.id}`, compact)}>
-                <PhoneCall className="h-3.5 w-3.5 flex-shrink-0" /> Call Logs
+              <Link href={`/calls?companyId=${contextCompany.id}`} onClick={onNav} className={companyNavClass(`/calls?companyId=${contextCompany.id}`, compact, callActionCount, "danger")}>
+                <PhoneCall className="h-3.5 w-3.5 flex-shrink-0" /> <span>Call Logs</span><ActionBadge count={callActionCount} severity="danger" />
               </Link>
-              <Link href={`/messages?companyId=${contextCompany.id}`} onClick={onNav} className={companyNavClass(`/messages?companyId=${contextCompany.id}`, compact)}>
-                <MessageSquare className="h-3.5 w-3.5 flex-shrink-0" /> Messages
+              <Link href={`/messages?companyId=${contextCompany.id}`} onClick={onNav} className={companyNavClass(`/messages?companyId=${contextCompany.id}`, compact, unreadMessageCount, "danger")}>
+                <MessageSquare className="h-3.5 w-3.5 flex-shrink-0" /> <span>Messages</span><ActionBadge count={unreadMessageCount} severity="danger" />
               </Link>
               <Link href={`/leads?companyId=${contextCompany.id}`} onClick={onNav} className={companyNavClass(`/leads?companyId=${contextCompany.id}`, compact)}>
                 <TrendingUp className="h-3.5 w-3.5 flex-shrink-0" /> Leads
               </Link>
-              <Link href={`/bookings?companyId=${contextCompany.id}`} onClick={onNav} className={companyNavClass(`/bookings?companyId=${contextCompany.id}`, compact)}>
-                <CalendarDays className="h-3.5 w-3.5 flex-shrink-0" /> Appointments
+              <Link href={`/bookings?companyId=${contextCompany.id}`} onClick={onNav} className={companyNavClass(`/bookings?companyId=${contextCompany.id}`, compact, appointmentActionCount, "warning")}>
+                <CalendarDays className="h-3.5 w-3.5 flex-shrink-0" /> <span>Appointments</span><ActionBadge count={appointmentActionCount} />
               </Link>
 
               <CompanyGroupLabel label="Setup & Control" compact={compact} />
@@ -206,24 +267,14 @@ export function Layout({ children }: { children: ReactNode }) {
                 const numberActive = activeNumberId === number.id;
                 return (
                   <div key={number.id} className="space-y-0.5">
-                    <Link
-                      href={`/numbers/${number.id}`}
-                      onClick={onNav}
-                      className={`flex items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors ${compact ? "text-sm" : "text-xs"} ${
-                        numberActive ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-                      }`}
-                    >
+                    <Link href={`/numbers/${number.id}`} onClick={onNav} className={`flex items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors ${compact ? "text-sm" : "text-xs"} ${numberActive ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}`}>
                       <PhoneSetup className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
                       <div className="min-w-0">
                         <div className="truncate">Phone Line Setup</div>
                         <div className="truncate font-mono text-[10px] text-muted-foreground/60">{formatPhone(number.number)}</div>
                       </div>
                     </Link>
-                    <Link
-                      href={`/campaigns?companyId=${contextCompany.id}&numberId=${number.id}`}
-                      onClick={onNav}
-                      className={companyNavClass(`/campaigns?companyId=${contextCompany.id}&numberId=${number.id}`, compact)}
-                    >
+                    <Link href={`/campaigns?companyId=${contextCompany.id}&numberId=${number.id}`} onClick={onNav} className={companyNavClass(`/campaigns?companyId=${contextCompany.id}&numberId=${number.id}`, compact)}>
                       <Target className="h-3.5 w-3.5 flex-shrink-0" /> Campaign Setup
                     </Link>
                   </div>
@@ -246,12 +297,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 <div className="truncate font-medium text-foreground">Admin User</div>
                 <div className="truncate text-muted-foreground">System Operator</div>
               </div>
-              <button
-                onClick={logout}
-                title="Sign out"
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                aria-label="Sign out"
-              >
+              <button onClick={logout} title="Sign out" className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Sign out">
                 <LogOut className="h-4 w-4" />
               </button>
             </div>
@@ -277,11 +323,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
         <div className="z-10 flex h-14 flex-shrink-0 items-center justify-between border-b border-border bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:h-16 sm:px-4 md:px-6">
           <div className="flex items-center gap-2.5 sm:gap-3">
-            <button
-              className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground md:hidden"
-              onClick={() => setMobileOpen(true)}
-              aria-label="Open navigation"
-            >
+            <button className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground md:hidden" onClick={() => setMobileOpen(true)} aria-label="Open navigation">
               <Menu className="h-6 w-6" />
             </button>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
