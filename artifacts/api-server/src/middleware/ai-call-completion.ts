@@ -1,8 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import OpenAI from "openai";
 import {
   appointmentsTable,
+  bookingSettingsTable,
   callLogsTable,
   db,
   phoneNumbersTable,
@@ -10,6 +11,7 @@ import {
 import { logger } from "../lib/logger";
 
 const TERMINAL_STATUSES = new Set(["completed", "failed", "busy", "no-answer", "canceled"]);
+const DEFAULT_TIMEZONE = "America/Toronto";
 
 interface CompletionExtraction {
   callerName: string | null;
@@ -33,14 +35,77 @@ function getOpenAI(): OpenAI | null {
   return new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
 }
 
-async function appendCallerSpeech(callSid: string, speech: string): Promise<void> {
-  const cleanSpeech = speech.trim();
-  if (!callSid || !cleanSpeech) return;
+function validTimezone(value: string | null | undefined): string {
+  if (!value) return DEFAULT_TIMEZONE;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value }).format(new Date());
+    return value;
+  } catch {
+    return DEFAULT_TIMEZONE;
+  }
+}
 
+function businessDateContext(timezone: string): string {
+  const now = new Date();
+  const date = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(now);
+  const time = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(now);
+  return `${date} at ${time}`;
+}
+
+async function getCallContext(callSid: string): Promise<{
+  log: typeof callLogsTable.$inferSelect | null;
+  phoneNumber: typeof phoneNumbersTable.$inferSelect | null;
+  timezone: string;
+}> {
   const [log] = await db
     .select()
     .from(callLogsTable)
     .where(eq(callLogsTable.twilioCallSid, callSid));
+
+  if (!log) return { log: null, phoneNumber: null, timezone: DEFAULT_TIMEZONE };
+
+  let phoneNumber: typeof phoneNumbersTable.$inferSelect | null = null;
+  if (log.phoneNumberId) {
+    [phoneNumber] = await db
+      .select()
+      .from(phoneNumbersTable)
+      .where(eq(phoneNumbersTable.id, log.phoneNumberId));
+  }
+  if (!phoneNumber && log.toNumber) {
+    [phoneNumber] = await db
+      .select()
+      .from(phoneNumbersTable)
+      .where(eq(phoneNumbersTable.number, log.toNumber));
+  }
+
+  let timezone = DEFAULT_TIMEZONE;
+  if (phoneNumber?.companyId) {
+    const [settings] = await db
+      .select()
+      .from(bookingSettingsTable)
+      .where(eq(bookingSettingsTable.companyId, phoneNumber.companyId));
+    timezone = validTimezone(settings?.timezone);
+  }
+
+  return { log, phoneNumber, timezone };
+}
+
+async function appendCallerSpeech(callSid: string, speech: string): Promise<void> {
+  const cleanSpeech = speech.trim();
+  if (!callSid || !cleanSpeech) return;
+
+  const { log } = await getCallContext(callSid);
   if (!log) return;
 
   const line = `Caller: ${cleanSpeech}`;
@@ -56,7 +121,23 @@ async function appendCallerSpeech(callSid: string, speech: string): Promise<void
     .where(eq(callLogsTable.id, log.id));
 }
 
-async function extractCompletion(transcript: string): Promise<CompletionExtraction | null> {
+async function decorateLiveSpeech(callSid: string, speech: string): Promise<string> {
+  const cleanSpeech = speech.trim();
+  if (!callSid || !cleanSpeech) return speech;
+
+  const { log, timezone } = await getCallContext(callSid);
+  const callerNumber = log?.direction === "inbound" ? log.fromNumber : log?.toNumber;
+  const numberGuidance = callerNumber
+    ? `The caller's phone number is ${callerNumber}. Do not repeat it unless confirmation is necessary. If spoken, say it naturally in three-three-four groups, not as one robotic number.`
+    : "Do not repeat a phone number unless confirmation is necessary. If spoken, say it naturally in three-three-four groups.";
+
+  return `${cleanSpeech}\n\n[Live call context: The business timezone is ${timezone}. The current business date and time is ${businessDateContext(timezone)}. Resolve today, tomorrow, weekdays, and all relative dates only from this exact context. Never invent a date. Keep the reply to one short natural sentence whenever possible. ${numberGuidance} Never say an appointment is booked unless the booking tool returns a real database appointment.]`;
+}
+
+async function extractCompletion(
+  transcript: string,
+  timezone: string,
+): Promise<CompletionExtraction | null> {
   const openai = getOpenAI();
   if (!openai || !transcript.trim()) return null;
 
@@ -64,17 +145,20 @@ async function extractCompletion(transcript: string): Promise<CompletionExtracti
     model: "gpt-4o-mini",
     response_format: { type: "json_object" },
     temperature: 0,
+    max_tokens: 450,
     messages: [
       {
         role: "system",
         content:
-          "Analyze a phone-call transcript. Return JSON only. Never invent missing details. " +
-          "Determine whether the caller requested an appointment and whether the conversation indicates it was confirmed. " +
-          "Use an ISO 8601 datetime only when a specific date and time can be determined. " +
+          `Analyze a phone-call transcript. The business timezone is ${timezone}. ` +
+          `The current business date and time is ${businessDateContext(timezone)}. ` +
+          "Resolve relative dates such as today, tomorrow, and weekdays from that exact business date. " +
+          "Return JSON only. Never invent missing details. Determine whether the caller requested an appointment. " +
+          "Use an ISO 8601 datetime with the correct timezone offset only when a date and time can be determined. " +
           "Return these keys: callerName, callerEmail, callType, callSummary, actionRequired, priority, " +
           "appointmentRequested, appointmentConfirmed, appointmentTitle, appointmentStartTime, appointmentEndTime, appointmentNotes. " +
           "callType must be Emergency, Appointment, Pricing Inquiry, General Inquiry, or null. " +
-          "priority must be Low, Medium, High, or null. callSummary should be two or three concise sentences.",
+          "priority must be Low, Medium, High, or null. callSummary should be two concise sentences.",
       },
       { role: "user", content: transcript },
     ],
@@ -97,9 +181,9 @@ async function extractCompletion(transcript: string): Promise<CompletionExtracti
   };
 }
 
-function formatAppointmentTime(value: Date): string {
+function formatAppointmentTime(value: Date, timezone: string): string {
   return value.toLocaleString("en-CA", {
-    timeZone: "America/Toronto",
+    timeZone: timezone,
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -140,13 +224,15 @@ async function recoverAppointment(
 
   if (matching) {
     const needsRepair = matching.customerPhone !== callerPhone ||
-      (!matching.customerEmail && extraction.callerEmail);
+      (!matching.customerEmail && extraction.callerEmail) ||
+      matching.callLogId !== log.id;
     if (needsRepair) {
       await db
         .update(appointmentsTable)
         .set({
           customerPhone: callerPhone,
           customerEmail: matching.customerEmail ?? extraction.callerEmail,
+          callLogId: log.id,
           updatedAt: new Date(),
         })
         .where(eq(appointmentsTable.id, matching.id));
@@ -159,11 +245,12 @@ async function recoverAppointment(
     .values({
       companyId: phoneNumber.companyId,
       phoneNumberId: phoneNumber.id,
+      callLogId: log.id,
       customerName: extraction.callerName,
       customerPhone: callerPhone,
       customerEmail: extraction.callerEmail,
       title: extraction.appointmentTitle ?? "Appointment",
-      notes: extraction.appointmentNotes ?? "Recovered from AI phone call",
+      notes: extraction.appointmentNotes ?? "Created from AI phone call",
       startTime,
       endTime: extraction.appointmentEndTime ? new Date(extraction.appointmentEndTime) : null,
       status: "scheduled",
@@ -177,27 +264,10 @@ async function recoverAppointment(
 }
 
 async function finalizeCall(callSid: string): Promise<void> {
-  const [log] = await db
-    .select()
-    .from(callLogsTable)
-    .where(eq(callLogsTable.twilioCallSid, callSid));
+  const { log, phoneNumber, timezone } = await getCallContext(callSid);
   if (!log?.transcription?.trim()) return;
 
-  let phoneNumber: typeof phoneNumbersTable.$inferSelect | null = null;
-  if (log.phoneNumberId) {
-    [phoneNumber] = await db
-      .select()
-      .from(phoneNumbersTable)
-      .where(eq(phoneNumbersTable.id, log.phoneNumberId));
-  }
-  if (!phoneNumber && log.toNumber) {
-    [phoneNumber] = await db
-      .select()
-      .from(phoneNumbersTable)
-      .where(eq(phoneNumbersTable.number, log.toNumber));
-  }
-
-  const extraction = await extractCompletion(log.transcription);
+  const extraction = await extractCompletion(log.transcription, timezone);
   if (!extraction) return;
 
   const appointment = await recoverAppointment(log, phoneNumber, extraction);
@@ -205,7 +275,7 @@ async function finalizeCall(callSid: string): Promise<void> {
   let summary = extraction.callSummary;
 
   if (appointment) {
-    const time = formatAppointmentTime(appointment.startTime);
+    const time = formatAppointmentTime(appointment.startTime, timezone);
     actionRequired = `Appointment booked (#${appointment.appointmentId}) for ${time}.`;
     summary = summary
       ? `${summary} Appointment booked for ${time}.`
@@ -221,23 +291,31 @@ async function finalizeCall(callSid: string): Promise<void> {
       callerName: log.callerName ?? extraction.callerName,
       callerEmail: log.callerEmail ?? extraction.callerEmail,
       callType: log.callType ?? extraction.callType,
-      callSummary: log.callSummary ?? summary,
-      actionRequired: log.actionRequired ?? actionRequired,
+      callSummary: summary ?? log.callSummary,
+      actionRequired: actionRequired ?? log.actionRequired,
       priority: log.priority ?? extraction.priority,
       updatedAt: new Date(),
     })
     .where(eq(callLogsTable.id, log.id));
 }
 
-export function aiCallCompletionSafetyNet(req: Request, res: Response, next: NextFunction): void {
+export async function aiCallCompletionSafetyNet(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   const path = req.path;
 
   if (path === "/twilio/ai-gather") {
     const callSid = String(req.body?.CallSid ?? "");
-    const speech = String(req.body?.SpeechResult ?? "");
-    appendCallerSpeech(callSid, speech).catch((err) =>
-      logger.warn({ err: err?.message, callSid }, "Failed to persist AI caller speech"),
-    );
+    const originalSpeech = String(req.body?.SpeechResult ?? "");
+
+    try {
+      await appendCallerSpeech(callSid, originalSpeech);
+      req.body.SpeechResult = await decorateLiveSpeech(callSid, originalSpeech);
+    } catch (err: any) {
+      logger.warn({ err: err?.message, callSid }, "Failed to enrich AI live-call context");
+    }
   }
 
   if (path === "/twilio/status") {
