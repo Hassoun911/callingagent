@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { db, contactsTable, companiesTable } from "@workspace/db";
 import { getCompanyScope } from "../lib/scope";
 import {
@@ -16,6 +16,13 @@ import {
 
 const router: IRouter = Router();
 
+function contactScopeCondition(req: Parameters<typeof getCompanyScope>[0], contactId: number) {
+  const companyId = getCompanyScope(req);
+  return companyId === null
+    ? eq(contactsTable.id, contactId)
+    : and(eq(contactsTable.id, contactId), eq(contactsTable.companyId, companyId));
+}
+
 router.get("/contacts", async (req, res): Promise<void> => {
   const query = ListContactsQueryParams.safeParse(req.query);
   if (!query.success) {
@@ -26,7 +33,7 @@ router.get("/contacts", async (req, res): Promise<void> => {
   const { search, forCompanyId } = query.data;
   let { companyId } = query.data;
 
-  // Company-scoped users can only see their own company's contacts
+  // Company-scoped users can only see their own company's contacts.
   const scopedCompanyId = getCompanyScope(req);
   if (scopedCompanyId !== null) {
     companyId = scopedCompanyId;
@@ -66,9 +73,8 @@ router.get("/contacts", async (req, res): Promise<void> => {
     contacts = contacts.filter(c => c.companyId === companyId);
   }
 
-  // forCompanyId: return contacts accessible to this company
-  // accessType="all" → always included; accessType="selected" → only if company is in allowedCompanyIds
-  if (forCompanyId) {
+  // Only platform users may request the cross-company accessibility view.
+  if (forCompanyId && scopedCompanyId === null) {
     contacts = contacts.filter(c => {
       if (c.accessType === "all" || !c.accessType) return true;
       if (!c.allowedCompanyIds) return false;
@@ -91,9 +97,10 @@ router.post("/contacts/import", async (req, res): Promise<void> => {
     return;
   }
 
+  const scopedCompanyId = getCompanyScope(req);
   const contacts: any[] = body.contacts;
-  const accessType: string = body.accessType ?? "all";
-  const allowedCompanyIds: string | null = body.allowedCompanyIds ?? null;
+  const accessType: string = scopedCompanyId === null ? (body.accessType ?? "all") : "all";
+  const allowedCompanyIds: string | null = scopedCompanyId === null ? (body.allowedCompanyIds ?? null) : null;
   let imported = 0;
   const errors: string[] = [];
 
@@ -104,11 +111,11 @@ router.post("/contacts/import", async (req, res): Promise<void> => {
         lastName: contact.lastName,
         email: contact.email ?? null,
         phone: contact.phone ?? null,
-        companyId: contact.companyId ?? null,
+        companyId: scopedCompanyId ?? contact.companyId ?? null,
         notes: contact.notes ?? null,
         tags: contact.tags ?? null,
-        accessType: accessType ?? "all",
-        allowedCompanyIds: allowedCompanyIds ?? null,
+        accessType,
+        allowedCompanyIds,
       });
       imported++;
     } catch (e: any) {
@@ -126,8 +133,15 @@ router.post("/contacts", async (req, res): Promise<void> => {
     return;
   }
 
-  const { accessType, ...restData } = parsed.data;
-  const [contact] = await db.insert(contactsTable).values({ ...restData, accessType: accessType ?? undefined }).returning();
+  const scopedCompanyId = getCompanyScope(req);
+  const { accessType, allowedCompanyIds, companyId, ...restData } = parsed.data;
+  const [contact] = await db.insert(contactsTable).values({
+    ...restData,
+    companyId: scopedCompanyId ?? companyId ?? null,
+    accessType: scopedCompanyId === null ? (accessType ?? undefined) : "all",
+    allowedCompanyIds: scopedCompanyId === null ? (allowedCompanyIds ?? null) : null,
+  }).returning();
+
   res.status(201).json(GetContactResponse.parse({
     ...contact,
     companyName: null,
@@ -160,7 +174,7 @@ router.get("/contacts/:id", async (req, res): Promise<void> => {
     })
     .from(contactsTable)
     .leftJoin(companiesTable, eq(contactsTable.companyId, companiesTable.id))
-    .where(eq(contactsTable.id, params.data.id));
+    .where(contactScopeCondition(req, params.data.id));
 
   if (!contact) {
     res.status(404).json({ error: "Contact not found" });
@@ -183,21 +197,22 @@ router.patch("/contacts/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const scopedCompanyId = getCompanyScope(req);
   const updateData: any = {};
   const body = parsed.data;
   if (body.firstName != null) updateData.firstName = body.firstName;
   if (body.lastName != null) updateData.lastName = body.lastName;
   if (body.email !== undefined) updateData.email = body.email;
   if (body.phone !== undefined) updateData.phone = body.phone;
-  if (body.companyId !== undefined) updateData.companyId = body.companyId;
+  if (scopedCompanyId === null && body.companyId !== undefined) updateData.companyId = body.companyId;
   if (body.notes !== undefined) updateData.notes = body.notes;
   if (body.tags !== undefined) updateData.tags = body.tags;
-  if (body.accessType !== undefined) updateData.accessType = body.accessType ?? "all";
-  if (body.allowedCompanyIds !== undefined) updateData.allowedCompanyIds = body.allowedCompanyIds;
+  if (scopedCompanyId === null && body.accessType !== undefined) updateData.accessType = body.accessType ?? "all";
+  if (scopedCompanyId === null && body.allowedCompanyIds !== undefined) updateData.allowedCompanyIds = body.allowedCompanyIds;
 
   const [updated] = await db.update(contactsTable)
     .set(updateData)
-    .where(eq(contactsTable.id, params.data.id))
+    .where(contactScopeCondition(req, params.data.id))
     .returning();
 
   if (!updated) {
@@ -221,7 +236,7 @@ router.delete("/contacts/:id", async (req, res): Promise<void> => {
   }
 
   const [deleted] = await db.delete(contactsTable)
-    .where(eq(contactsTable.id, params.data.id))
+    .where(contactScopeCondition(req, params.data.id))
     .returning();
 
   if (!deleted) {
