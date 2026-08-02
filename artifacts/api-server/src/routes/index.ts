@@ -18,12 +18,15 @@ import platformUsersRouter from "./platform-users";
 import appointmentsRouter from "./appointments";
 import { routeAccessControl } from "../middleware/route-access";
 import { phoneNumberScopeGuard } from "../middleware/phone-number-scope";
+import { aiCallCompletionSafetyNet } from "../middleware/ai-call-completion";
 
 const router: IRouter = Router();
 
 // Public routes and Twilio callbacks remain outside the dashboard permission gate.
 router.use(healthRouter);
 router.use(authRouter);
+// Persist caller speech and finalize missing summaries/bookings around the legacy Twilio handlers.
+router.use(aiCallCompletionSafetyNet);
 router.use(twilioWebhooksRouter);
 
 // Every dashboard/API route below is checked against the authenticated user's role.
