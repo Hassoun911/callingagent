@@ -18,12 +18,14 @@ import platformUsersRouter from "./platform-users";
 import appointmentsRouter from "./appointments";
 import { routeAccessControl } from "../middleware/route-access";
 import { aiCallFinalizer } from "../middleware/ai-call-finalizer";
+import { aiDateContext } from "../middleware/ai-date-context";
 
 const router: IRouter = Router();
 
 // Public routes and Twilio callbacks remain outside the dashboard permission gate.
 router.use(healthRouter);
 router.use(authRouter);
+router.use(aiDateContext);
 router.use(aiCallFinalizer);
 router.use(twilioWebhooksRouter);
 
