@@ -17,6 +17,7 @@ import extensionsRouter from "./extensions";
 import platformUsersRouter from "./platform-users";
 import appointmentsRouter from "./appointments";
 import { routeAccessControl } from "../middleware/route-access";
+import { phoneNumberScopeGuard } from "../middleware/phone-number-scope";
 
 const router: IRouter = Router();
 
@@ -27,6 +28,7 @@ router.use(twilioWebhooksRouter);
 
 // Every dashboard/API route below is checked against the authenticated user's role.
 router.use(routeAccessControl);
+router.use(phoneNumberScopeGuard);
 router.use(platformUsersRouter);
 router.use(phoneNumbersRouter);
 router.use(contactsRouter);
