@@ -1,15 +1,10 @@
 (() => {
-  const POLL_MS = 3000;
+  const POLL_MS = 1000;
   const state = {
     companyId: null,
     numberSet: new Set(),
-    numberIdSet: new Set(),
-    numbers: [],
-    campaigns: [],
     calls: [],
-    contacts: [],
     appointments: [],
-    users: [],
     busy: false,
   };
 
@@ -38,16 +33,6 @@
     render();
   }
 
-  function markCollectionSeen(type, collection) {
-    if (!state.companyId) return;
-    const seen = readSeen(type);
-    for (const item of collection || []) {
-      if (item?.id != null) seen.add(String(item.id));
-    }
-    writeSeen(type, seen);
-    render();
-  }
-
   async function getJson(url) {
     const response = await fetch(url, { credentials: "include", cache: "no-store" });
     if (!response.ok) throw new Error(`${response.status}`);
@@ -60,34 +45,22 @@
 
   async function resolveCompany() {
     if (state.companyId) return;
-    const allNumbers = await getJson("/api/phone-numbers").catch(() => []);
-    const visibleNumbers = [...document.querySelectorAll("body *")]
-      .map((node) => normalizePhone(node.textContent))
-      .filter((value) => value.length === 10);
-    const visibleSet = new Set(visibleNumbers);
-    const own = allNumbers.filter((number) => visibleSet.has(normalizePhone(number.number)));
-    const chosen = own[0] || (allNumbers.length === 1 ? allNumbers[0] : null);
-    if (!chosen?.companyId) return;
 
-    state.companyId = Number(chosen.companyId);
-    state.numbers = allNumbers.filter((number) => Number(number.companyId) === state.companyId);
-    state.numberSet = new Set(state.numbers.map((number) => normalizePhone(number.number)));
-    state.numberIdSet = new Set(state.numbers.map((number) => Number(number.id)));
+    const auth = await getJson("/api/auth/user").catch(() => null);
+    const companyId = Number(auth?.user?.companyId);
+    if (!Number.isFinite(companyId) || companyId <= 0) return;
+
+    state.companyId = companyId;
+    const numbers = await getJson("/api/phone-numbers").catch(() => []);
+    state.numberSet = new Set(
+      (Array.isArray(numbers) ? numbers : [])
+        .filter((number) => Number(number.companyId) === companyId)
+        .map((number) => normalizePhone(number.number)),
+    );
   }
 
   function belongsToCompany(call) {
     return state.numberSet.has(normalizePhone(call.toNumber)) || state.numberSet.has(normalizePhone(call.fromNumber));
-  }
-
-  function campaignBelongs(campaign) {
-    const id = Number(campaign.fromPhoneNumberId ?? campaign.phoneNumberId ?? campaign.numberId);
-    return state.numberIdSet.has(id) || Number(campaign.companyId) === state.companyId;
-  }
-
-  function contactBelongs(contact) {
-    if (Number(contact.companyId) === state.companyId) return true;
-    const line = normalizePhone(contact.phoneNumber ?? contact.lineNumber ?? contact.toNumber);
-    return line && state.numberSet.has(line);
   }
 
   async function refresh() {
@@ -97,26 +70,29 @@
       await resolveCompany();
       if (!state.companyId) return;
 
-      const [allNumbers, campaigns, calls, contacts, appointments, users] = await Promise.all([
-        getJson("/api/phone-numbers").catch(() => state.numbers),
-        getJson("/api/campaigns").catch(() => []),
+      const [callsResult, appointments] = await Promise.all([
         getJson("/api/call-logs?limit=200").catch(() => []),
-        getJson(`/api/contacts?companyId=${state.companyId}`).catch(() => []),
         getJson(`/api/companies/${state.companyId}/appointments`).catch(() => []),
-        getJson(`/api/platform-users?companyId=${state.companyId}`).catch(() => []),
       ]);
 
-      state.numbers = Array.isArray(allNumbers)
-        ? allNumbers.filter((number) => Number(number.companyId) === state.companyId)
-        : state.numbers;
-      state.numberSet = new Set(state.numbers.map((number) => normalizePhone(number.number)));
-      state.numberIdSet = new Set(state.numbers.map((number) => Number(number.id)));
-      state.campaigns = Array.isArray(campaigns) ? campaigns.filter(campaignBelongs) : [];
-      state.calls = Array.isArray(calls) ? calls.filter(belongsToCompany) : [];
-      state.contacts = Array.isArray(contacts) ? contacts.filter(contactBelongs) : [];
+      const calls = Array.isArray(callsResult)
+        ? callsResult
+        : Array.isArray(callsResult?.items)
+          ? callsResult.items
+          : Array.isArray(callsResult?.data)
+            ? callsResult.data
+            : [];
+
+      state.calls = calls.filter(belongsToCompany);
       state.appointments = Array.isArray(appointments) ? appointments : [];
-      state.users = Array.isArray(users) ? users : [];
       render();
+      window.dispatchEvent(new CustomEvent("callingagent:portal-live-refresh", {
+        detail: {
+          companyId: state.companyId,
+          calls: state.calls,
+          appointments: state.appointments,
+        },
+      }));
     } finally {
       state.busy = false;
     }
@@ -124,42 +100,33 @@
 
   function navLink(label) {
     return [...document.querySelectorAll("a")].find((anchor) => {
-      const clone = anchor.cloneNode(true);
-      clone.querySelectorAll?.("[data-live-status-badge]").forEach((node) => node.remove());
-      return clone.textContent?.trim() === label;
+      const clean = anchor.textContent?.replace(/\s*\d+\+?\s*$/, "").trim();
+      return clean === label;
     }) || null;
   }
 
-  function setBadge(label, count, tone = "warning") {
+  function setBadge(label, count, tone) {
     const link = navLink(label);
     if (!link) return;
     let badge = link.querySelector("[data-live-status-badge]");
-
     if (count <= 0) {
       badge?.remove();
       link.removeAttribute("data-live-alert");
       link.style.removeProperty("color");
       return;
     }
-
     if (!badge) {
       badge = document.createElement("span");
       badge.setAttribute("data-live-status-badge", "true");
       badge.style.cssText = "margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;line-height:1;";
       link.appendChild(badge);
     }
-
     badge.textContent = count > 99 ? "99+" : String(count);
     if (tone === "danger") {
       badge.style.background = "rgba(239,68,68,.18)";
       badge.style.border = "1px solid rgba(239,68,68,.45)";
       badge.style.color = "rgb(252,165,165)";
       link.style.color = "rgb(252,165,165)";
-    } else if (tone === "info") {
-      badge.style.background = "rgba(14,165,233,.18)";
-      badge.style.border = "1px solid rgba(14,165,233,.45)";
-      badge.style.color = "rgb(125,211,252)";
-      link.style.color = "rgb(125,211,252)";
     } else {
       badge.style.background = "rgba(245,158,11,.18)";
       badge.style.border = "1px solid rgba(245,158,11,.45)";
@@ -169,67 +136,66 @@
     link.setAttribute("data-live-alert", "true");
   }
 
-  function unseenCount(type, collection, predicate = () => true) {
-    const seen = readSeen(type);
-    return (collection || []).filter((item) => item?.id != null && predicate(item) && !seen.has(String(item.id))).length;
-  }
-
   function render() {
     if (!state.companyId) return;
+    const callSeen = readSeen("calls");
+    const bookingSeen = readSeen("bookings");
 
-    const callCount = unseenCount("calls", state.calls, (call) => {
+    const callCount = state.calls.filter((call) => {
       const status = String(call.status || "").toLowerCase();
-      return status !== "in-progress";
-    });
+      return !callSeen.has(String(call.id)) && status !== "in-progress";
+    }).length;
 
     const now = Date.now();
-    const bookingCount = unseenCount("bookings", state.appointments, (appointment) => {
+    const bookingCount = state.appointments.filter((appointment) => {
       const active = ["scheduled", "confirmed"].includes(String(appointment.status || "").toLowerCase());
       const future = Date.parse(appointment.startTime) >= now;
-      return active && future;
-    });
+      return active && future && !bookingSeen.has(String(appointment.id));
+    }).length;
 
-    setBadge("Phone Numbers", unseenCount("numbers", state.numbers), "info");
-    setBadge("Campaigns", unseenCount("campaigns", state.campaigns), "info");
     setBadge("Call Logs", callCount, "danger");
-    setBadge("Contacts", unseenCount("contacts", state.contacts), "info");
     setBadge("Bookings", bookingCount, "warning");
-    setBadge("Users", unseenCount("users", state.users), "info");
+  }
+
+  function markCurrentBookingsSeen() {
+    if (!state.companyId) return;
+    const seen = readSeen("bookings");
+    for (const appointment of state.appointments) seen.add(String(appointment.id));
+    writeSeen("bookings", seen);
+    render();
+  }
+
+  function markCallFromRecordingSource(source) {
+    const match = String(source || "").match(/\/api\/call-logs\/(\d+)\/recording/);
+    if (!match) return;
+    markSeen("calls", match[1]);
   }
 
   const originalPlay = HTMLMediaElement.prototype.play;
   if (!HTMLMediaElement.prototype.__callingAgentLivePatched) {
     Object.defineProperty(HTMLMediaElement.prototype, "__callingAgentLivePatched", { value: true });
     HTMLMediaElement.prototype.play = function (...args) {
-      const source = String(this.currentSrc || this.src || "");
-      const match = source.match(/\/api\/call-logs\/(\d+)\/recording/);
-      if (match) {
-        markSeen("calls", match[1]);
-        window.dispatchEvent(new CustomEvent("callingagent:call-viewed", { detail: { id: Number(match[1]) } }));
-      }
+      markCallFromRecordingSource(this.currentSrc || this.src);
       return originalPlay.apply(this, args);
     };
   }
 
   document.addEventListener("click", (event) => {
     const link = event.target.closest?.("a");
-    if (!link) return;
-    const clone = link.cloneNode(true);
-    clone.querySelectorAll?.("[data-live-status-badge]").forEach((node) => node.remove());
-    const label = clone.textContent?.trim();
+    if (link) {
+      const label = link.textContent?.replace(/\s*\d+\+?\s*$/, "").trim();
+      if (label === "Bookings") markCurrentBookingsSeen();
+    }
 
-    if (label === "Phone Numbers") markCollectionSeen("numbers", state.numbers);
-    if (label === "Campaigns") markCollectionSeen("campaigns", state.campaigns);
-    if (label === "Contacts") markCollectionSeen("contacts", state.contacts);
-    if (label === "Bookings") markCollectionSeen("bookings", state.appointments);
-    if (label === "Users") markCollectionSeen("users", state.users);
+    const recordingLink = event.target.closest?.('a[href*="/api/call-logs/"][href*="/recording"]');
+    if (recordingLink) markCallFromRecordingSource(recordingLink.getAttribute("href"));
   }, true);
 
   window.addEventListener("callingagent:call-viewed", (event) => markSeen("calls", event.detail?.id));
   window.addEventListener("focus", refresh);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
-  window.addEventListener("popstate", () => setTimeout(refresh, 50));
+  window.addEventListener("popstate", () => setTimeout(refresh, 25));
 
   setInterval(refresh, POLL_MS);
-  setTimeout(refresh, 100);
+  setTimeout(refresh, 50);
 })();
