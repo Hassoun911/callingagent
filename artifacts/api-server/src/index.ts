@@ -5,6 +5,11 @@ import { startReminderPoller } from "./lib/reminders";
 import { ensureBookingSchema } from "./lib/booking-schema";
 import { warmTtsCache } from "./routes/twilio-webhooks";
 
+// All server-side date formatting defaults to Eastern Time unless a
+// phone-number-specific timezone is supplied by the notification workflow.
+// This prevents customer SMS/email reminders from exposing raw UTC times.
+process.env.TZ = process.env.DEFAULT_TIMEZONE || "America/Toronto";
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
@@ -23,7 +28,7 @@ async function start(): Promise<void> {
       logger.error({ err }, "Error listening on port");
       process.exit(1);
     }
-    logger.info({ port }, "Server listening");
+    logger.info({ port, timezone: process.env.TZ }, "Server listening");
     startWatchPoller();
     startReminderPoller();
     warmTtsCache();
