@@ -1,5 +1,20 @@
 (() => {
   const MARKER = "data-call-audio-seek-controls";
+  const NativeAudio = window.Audio;
+  const trackedAudio = [];
+
+  // The React player creates recordings with `new Audio(src)` but does not render
+  // an <audio> tag. Capture those real media objects so the injected controls can
+  // seek the recording directly instead of faking a click on the progress bar.
+  function TrackedAudio(src) {
+    const audio = new NativeAudio(src);
+    trackedAudio.push(audio);
+    if (trackedAudio.length > 20) trackedAudio.shift();
+    return audio;
+  }
+  TrackedAudio.prototype = NativeAudio.prototype;
+  Object.setPrototypeOf(TrackedAudio, NativeAudio);
+  window.Audio = TrackedAudio;
 
   function parseTime(text) {
     const match = String(text || "").trim().match(/^(\d+):(\d{2})$/);
@@ -20,21 +35,45 @@
     return null;
   }
 
-  function seek(track, seconds, duration) {
-    if (!duration || duration <= 0) return;
-    const target = Math.max(0, Math.min(duration, seconds));
-    const rect = track.getBoundingClientRect();
-    const clientX = rect.left + (target / duration) * rect.width;
-    track.dispatchEvent(new MouseEvent("click", {
-      bubbles: true,
-      cancelable: true,
-      clientX,
-      clientY: rect.top + rect.height / 2,
-      view: window,
-    }));
+  function getCurrentAudio() {
+    // Prefer the actively playing recording. Otherwise use the newest recording
+    // object, which corresponds to the currently open call-details dialog.
+    for (let index = trackedAudio.length - 1; index >= 0; index -= 1) {
+      const audio = trackedAudio[index];
+      if (!audio.paused && !audio.ended) return audio;
+    }
+    return trackedAudio[trackedAudio.length - 1] || null;
   }
 
-  function makeButton(label, title, onClick) {
+  function seekBy(deltaSeconds) {
+    const audio = getCurrentAudio();
+    if (!audio) return;
+
+    const current = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    let upperLimit = Number.isFinite(audio.duration) && audio.duration > 0
+      ? audio.duration
+      : Number.POSITIVE_INFINITY;
+
+    if (audio.seekable && audio.seekable.length > 0) {
+      upperLimit = Math.min(upperLimit, audio.seekable.end(audio.seekable.length - 1));
+    }
+
+    const requested = Math.max(0, current + deltaSeconds);
+    const target = Number.isFinite(upperLimit) ? Math.min(requested, upperLimit) : requested;
+
+    try {
+      if (typeof audio.fastSeek === "function") audio.fastSeek(target);
+      else audio.currentTime = target;
+    } catch {
+      audio.currentTime = target;
+    }
+
+    // Force the React player display to refresh promptly in browsers that delay
+    // the normal timeupdate event after a programmatic seek.
+    audio.dispatchEvent(new Event("timeupdate"));
+  }
+
+  function makeButton(label, title, deltaSeconds) {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = label;
@@ -58,7 +97,7 @@
     button.addEventListener("click", event => {
       event.preventDefault();
       event.stopPropagation();
-      onClick();
+      seekBy(deltaSeconds);
     });
     return button;
   }
@@ -75,18 +114,8 @@
       const controls = document.createElement("div");
       controls.setAttribute(MARKER, "true");
       controls.style.cssText = "display:flex;align-items:center;gap:6px;flex-shrink:0";
-
-      const current = () => {
-        const values = player.times.map(item => parseTime(item.el.textContent)).filter(value => value !== null);
-        return values[0] ?? 0;
-      };
-      const duration = () => {
-        const values = player.times.map(item => parseTime(item.el.textContent)).filter(value => value !== null);
-        return values[values.length - 1] ?? 0;
-      };
-
-      controls.appendChild(makeButton("−10s", "Go back 10 seconds", () => seek(track, current() - 10, duration())));
-      controls.appendChild(makeButton("+10s", "Go forward 10 seconds", () => seek(track, current() + 10, duration())));
+      controls.appendChild(makeButton("−10s", "Go back 10 seconds", -10));
+      controls.appendChild(makeButton("+10s", "Go forward 10 seconds", 10));
 
       const download = Array.from(player.container.querySelectorAll("a")).find(a => a.hasAttribute("download"));
       if (download?.parentElement) download.parentElement.insertBefore(controls, download);
