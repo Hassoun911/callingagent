@@ -1,6 +1,6 @@
 (() => {
   const POLL_MS = 1000;
-  const VERSION = "v2";
+  const VERSION = "v3";
   const state = { companyId: 0, phoneNumbers: new Set(), calls: [], bookings: [], loading: false };
 
   const digits = (value) => String(value ?? "").replace(/\D/g, "").slice(-10);
@@ -97,7 +97,6 @@
   function render() {
     if (!state.companyId) return;
     const seenCalls = readSeen("calls");
-    const seenBookings = readSeen("bookings");
     const now = Date.now();
 
     const callCount = state.calls.filter((call) => {
@@ -105,11 +104,12 @@
       return status !== "in-progress" && !seenCalls.has(String(call.id));
     }).length;
 
+    // A scheduled future appointment is unresolved work. It stays highlighted
+    // until its status changes to confirmed, cancelled, no_show, or completed.
     const bookingCount = state.bookings.filter((item) => {
       const status = String(item.status || "").toLowerCase();
-      return ["scheduled", "confirmed"].includes(status)
-        && Date.parse(item.startTime) >= now
-        && !seenBookings.has(String(item.id));
+      const start = Date.parse(item.startTime);
+      return status === "scheduled" && Number.isFinite(start) && start >= now;
     }).length;
 
     badge("Call Logs", callCount, true);
@@ -133,28 +133,15 @@
     }
   }
 
-  function markAllBookingsSeen() {
-    if (!state.companyId) return;
-    const seen = readSeen("bookings");
-    state.bookings.forEach((item) => seen.add(String(item.id)));
-    saveSeen("bookings", seen);
-    render();
-  }
-
   const nativePlay = HTMLMediaElement.prototype.play;
-  if (!HTMLMediaElement.prototype.__callingAgentPortalV2) {
-    Object.defineProperty(HTMLMediaElement.prototype, "__callingAgentPortalV2", { value: true });
+  if (!HTMLMediaElement.prototype.__callingAgentPortalV3) {
+    Object.defineProperty(HTMLMediaElement.prototype, "__callingAgentPortalV3", { value: true });
     HTMLMediaElement.prototype.play = function (...args) {
       const match = String(this.currentSrc || this.src || "").match(/\/api\/call-logs\/(\d+)\/recording/);
       if (match) markSeen("calls", match[1]);
       return nativePlay.apply(this, args);
     };
   }
-
-  document.addEventListener("click", (event) => {
-    const link = event.target.closest?.("a");
-    if (link && link.textContent?.includes("Bookings")) markAllBookingsSeen();
-  }, true);
 
   window.addEventListener("focus", refresh);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
