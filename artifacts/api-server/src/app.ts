@@ -5,6 +5,7 @@ import pinoHttp from "pino-http";
 import path from "path";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
+import bookingFlowSettingsRouter from "./routes/booking-flow-settings";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
@@ -34,6 +35,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 
+app.use("/api", bookingFlowSettingsRouter);
 app.use("/api", router);
 
 const frontendDist = path.resolve(process.cwd(), "artifacts/call-center/dist/public");
