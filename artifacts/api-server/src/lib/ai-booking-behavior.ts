@@ -18,7 +18,7 @@ For tomorrow or any future date:
 5. After a successful booking, repeat the full local weekday, month, day, year, and time and ask the caller to confirm that it is correct.
 
 For same-day service requests:
-Do not guarantee or confirm a same-day appointment and do not call the booking tool. Collect the caller's name, callback number, service address or location, vehicle and service details, and preferred time. Then say, "I’ll send this to our team now. Someone from our team will get back to you shortly to confirm whether same-day service is available." Mark the call as requiring staff follow-up.
+Do not guarantee or confirm a same-day appointment and do not call the booking tool. Collect the caller's name, callback number, service address or location, vehicle and service details, and preferred time. Then say, "I’ll send this to our team now. Someone from our team will get back to you shortly to confirm whether same-day service is available." Mark the call action required with the exact words "Same-day request — staff confirmation required".
 
 Never send or promise a confirmation message unless an appointment was successfully created in the calendar. Never create a duplicate or overlapping appointment.`;
 
@@ -28,8 +28,6 @@ export function ensureAiBookingBehavior(): Promise<void> {
   if (readyPromise) return readyPromise;
 
   readyPromise = (async () => {
-    // Add the calendar-first policy to the global AI prompt and any line-specific
-    // prompts. The marker makes this safe to run on every deployment.
     await db.execute(sql`
       UPDATE ai_voice_config
       SET system_prompt = system_prompt || E'\n\n' || ${BOOKING_POLICY},
@@ -45,9 +43,8 @@ export function ensureAiBookingBehavior(): Promise<void> {
         AND position(${POLICY_MARKER} in ai_system_prompt) = 0
     `);
 
-    // The voice agent currently creates the appointment as its calendar action.
-    // This guard makes that operation an actual availability check: an overlapping
-    // active appointment is rejected before it can be confirmed or messaged.
+    // Reject overlapping active appointments. Creating the appointment therefore
+    // becomes a real calendar availability check, not merely a verbal promise.
     await db.execute(sql`
       CREATE OR REPLACE FUNCTION callingagent_prevent_appointment_overlap()
       RETURNS trigger AS $$
@@ -91,6 +88,36 @@ export function ensureAiBookingBehavior(): Promise<void> {
       ON appointments
       FOR EACH ROW
       EXECUTE FUNCTION callingagent_prevent_appointment_overlap()
+    `);
+
+    // The existing post-call notifier sends a booking confirmation whenever a
+    // call is classified as Appointment. Reclassify explicitly pending same-day
+    // requests before that notifier reads the record, preventing a false booking SMS.
+    await db.execute(sql`
+      CREATE OR REPLACE FUNCTION callingagent_keep_same_day_request_pending()
+      RETURNS trigger AS $$
+      BEGIN
+        IF NEW.call_type = 'Appointment'
+          AND lower(COALESCE(NEW.action_required, '')) LIKE '%same-day%staff confirmation required%'
+        THEN
+          NEW.call_type := 'General Inquiry';
+          NEW.priority := 'Medium';
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql
+    `);
+
+    await db.execute(sql`
+      DROP TRIGGER IF EXISTS callingagent_keep_same_day_request_pending_trigger ON call_logs
+    `);
+
+    await db.execute(sql`
+      CREATE TRIGGER callingagent_keep_same_day_request_pending_trigger
+      BEFORE INSERT OR UPDATE OF call_type, action_required, priority
+      ON call_logs
+      FOR EACH ROW
+      EXECUTE FUNCTION callingagent_keep_same_day_request_pending()
     `);
 
     logger.info("Calendar-first AI booking behavior ready");
