@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Building2,
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuthContext } from "@/App";
+import { DEFAULT_PORTAL_VISIBILITY, getPortalVisibility, type PortalVisibility } from "@/lib/portal-visibility";
 
 const PORTAL = "/portal";
 
@@ -41,6 +42,7 @@ type NavigationItem = {
   label: string;
   href: string;
   icon: LucideIcon;
+  visibilityKey: keyof PortalVisibility["pages"];
   badgeKey?: keyof PortalLiveStats;
   companyAdminOnly?: boolean;
 };
@@ -53,22 +55,22 @@ type NavigationGroup = {
 const navigationGroups: NavigationGroup[] = [
   {
     label: "Overview",
-    items: [{ label: "Dashboard", href: PORTAL, icon: LayoutDashboard }],
+    items: [{ label: "Dashboard", href: PORTAL, icon: LayoutDashboard, visibilityKey: "dashboard" }],
   },
   {
     label: "Operations",
     items: [
-      { label: "Phone Numbers", href: `${PORTAL}/numbers`, icon: Phone },
-      { label: "Campaigns", href: `${PORTAL}/campaigns`, icon: Target },
-      { label: "Call Logs", href: `${PORTAL}/calls`, icon: PhoneIncoming, badgeKey: "recentCalls" },
-      { label: "Messages", href: `${PORTAL}/messages`, icon: MessageSquare, badgeKey: "unreadMessages" },
-      { label: "Contacts", href: `${PORTAL}/contacts`, icon: Users },
-      { label: "Bookings", href: `${PORTAL}/bookings`, icon: CalendarDays, badgeKey: "newBookings" },
+      { label: "Phone Numbers", href: `${PORTAL}/numbers`, icon: Phone, visibilityKey: "phoneNumbers" },
+      { label: "Campaigns", href: `${PORTAL}/campaigns`, icon: Target, visibilityKey: "campaigns" },
+      { label: "Call Logs", href: `${PORTAL}/calls`, icon: PhoneIncoming, visibilityKey: "callLogs", badgeKey: "recentCalls" },
+      { label: "Messages", href: `${PORTAL}/messages`, icon: MessageSquare, visibilityKey: "messages", badgeKey: "unreadMessages" },
+      { label: "Contacts", href: `${PORTAL}/contacts`, icon: Users, visibilityKey: "contacts" },
+      { label: "Bookings", href: `${PORTAL}/bookings`, icon: CalendarDays, visibilityKey: "bookings", badgeKey: "newBookings" },
     ],
   },
   {
     label: "Administration",
-    items: [{ label: "Users", href: `${PORTAL}/users`, icon: Users, companyAdminOnly: true }],
+    items: [{ label: "Users", href: `${PORTAL}/users`, icon: Users, visibilityKey: "users", companyAdminOnly: true }],
   },
 ];
 
@@ -105,15 +107,32 @@ export default function PortalNavigation({
   const [location] = useLocation();
   const { user, logout } = useAuthContext();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const [visibility, setVisibility] = useState<PortalVisibility>(DEFAULT_PORTAL_VISIBILITY);
+
+  useEffect(() => {
+    if (!user?.companyId) return;
+    let active = true;
+    const load = () => getPortalVisibility(user.companyId!).then(value => active && setVisibility(value));
+    void load();
+    const onVisibilityChanged = () => void load();
+    window.addEventListener("portal-visibility-changed", onVisibilityChanged);
+    return () => {
+      active = false;
+      window.removeEventListener("portal-visibility-changed", onVisibilityChanged);
+    };
+  }, [user?.companyId]);
 
   const visibleGroups = useMemo(
     () => navigationGroups
       .map(group => ({
         ...group,
-        items: group.items.filter(item => !item.companyAdminOnly || user?.role === "company_admin"),
+        items: group.items.filter(item =>
+          visibility.pages[item.visibilityKey]
+          && (!item.companyAdminOnly || user?.role === "company_admin"),
+        ),
       }))
       .filter(group => group.items.length > 0),
-    [user?.role],
+    [user?.role, visibility.pages],
   );
 
   useEffect(() => {
