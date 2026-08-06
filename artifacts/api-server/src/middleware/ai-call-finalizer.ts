@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import OpenAI from "openai";
 import twilio from "twilio";
 import {
-  aiVoiceConfigTable,
   appointmentsTable,
   callLogsTable,
   companiesTable,
@@ -79,6 +78,11 @@ function normalizeE164(value: string | null | undefined): string | null {
   return null;
 }
 
+function whatsappAddress(value: string | null | undefined): string | null {
+  const normalized = normalizeE164(value);
+  return normalized ? `whatsapp:${normalized}` : null;
+}
+
 async function sendInterruptedBookingSms(params: {
   callerPhone: string | null;
   fromNumber: string | null;
@@ -102,46 +106,59 @@ async function sendInterruptedBookingSms(params: {
 }
 
 async function sendAdminWhatsApp(params: {
+  companyId: number;
   companyName: string;
+  adminWhatsapp: string | null;
   callerPhone: string | null;
   callerName: string | null;
+  callType: string | null;
   summary: string | null;
   actionRequired: string | null;
-  appointmentRequested: boolean;
 }): Promise<void> {
   const client = twilioClient();
   if (!client) return;
 
-  const [config] = await db.select().from(aiVoiceConfigTable).limit(1);
-  const adminTarget = normalizeE164(config?.adminNotifyPhone);
-  const configuredSender = process.env.TWILIO_WHATSAPP_FROM;
-  const whatsappFrom = configuredSender
-    ? (configuredSender.toLowerCase().startsWith("whatsapp:") ? configuredSender : `whatsapp:${configuredSender}`)
-    : null;
+  const to = whatsappAddress(params.adminWhatsapp);
+  const from = whatsappAddress(process.env.TWILIO_WHATSAPP_FROM);
+  const contentSid = process.env.TWILIO_WHATSAPP_CONTENT_SID?.trim();
 
-  if (!adminTarget) return;
-  if (!whatsappFrom) {
-    logger.warn({ adminTarget }, "Admin WhatsApp number is configured but TWILIO_WHATSAPP_FROM is missing");
+  if (!to) {
+    logger.info({ companyId: params.companyId }, "Company has no admin WhatsApp recipient configured");
+    return;
+  }
+  if (!from || !contentSid) {
+    logger.warn(
+      { companyId: params.companyId, hasFrom: Boolean(from), hasContentSid: Boolean(contentSid) },
+      "WhatsApp sender or approved Content SID is missing",
+    );
     return;
   }
 
-  const body = [
-    `📞 New AI call — ${params.companyName}`,
-    `Caller: ${params.callerName || "Unknown"}${params.callerPhone ? ` (${params.callerPhone})` : ""}`,
-    params.appointmentRequested ? "Type: Appointment request" : "Type: Call",
-    params.summary ? `Summary: ${params.summary}` : "Summary: Call ended before a complete summary was available.",
-    params.actionRequired ? `Action: ${params.actionRequired}` : "Action: Review the call log.",
-  ].join("\n");
+  const caller = `${params.callerName || "Unknown"}${params.callerPhone ? `, ${params.callerPhone}` : ""}`;
+  const variables = {
+    "1": params.companyName,
+    "2": caller,
+    "3": params.callType || "Call",
+    "4": params.summary || "Call ended before a complete summary was available.",
+    "5": params.actionRequired || "Review the call log.",
+  };
 
   try {
-    await client.messages.create({
-      from: whatsappFrom,
-      to: `whatsapp:${adminTarget}`,
-      body,
+    const message = await client.messages.create({
+      from,
+      to,
+      contentSid,
+      contentVariables: JSON.stringify(variables),
     });
-    logger.info({ to: adminTarget }, "Admin post-call WhatsApp sent");
+    logger.info(
+      { companyId: params.companyId, to, messageSid: message.sid },
+      "Company admin post-call WhatsApp template sent",
+    );
   } catch (error: any) {
-    logger.warn({ error: error?.message, to: adminTarget }, "Could not send admin post-call WhatsApp");
+    logger.warn(
+      { companyId: params.companyId, error: error?.message, code: error?.code, to },
+      "Could not send company admin WhatsApp template",
+    );
   }
 }
 
@@ -212,7 +229,7 @@ async function finalize(callSid: string): Promise<void> {
   const details = await extract(log.transcription);
   if (!details) return;
 
-  let phoneNumber = null;
+  let phoneNumber: typeof phoneNumbersTable.$inferSelect | null = null;
   if (log.phoneNumberId) {
     [phoneNumber] = await db.select().from(phoneNumbersTable)
       .where(eq(phoneNumbersTable.id, log.phoneNumberId));
@@ -222,25 +239,31 @@ async function finalize(callSid: string): Promise<void> {
       .where(eq(phoneNumbersTable.number, log.toNumber));
   }
 
-  let companyName = phoneNumber?.friendlyName || "the business";
-  if (phoneNumber?.companyId) {
-    const [company] = await db.select().from(companiesTable)
-      .where(eq(companiesTable.id, phoneNumber.companyId));
-    if (company?.name) companyName = company.name;
+  if (!phoneNumber?.companyId) {
+    logger.warn({ callSid }, "Could not resolve a company for the completed call");
+    return;
   }
 
+  const [company] = await db.select().from(companiesTable)
+    .where(eq(companiesTable.id, phoneNumber.companyId));
+  if (!company) {
+    logger.warn({ callSid, companyId: phoneNumber.companyId }, "Call company was not found");
+    return;
+  }
+
+  const companyName = company.name || phoneNumber.friendlyName || "the business";
   let actionRequired = details.actionRequired;
   let summary = details.callSummary;
   let appointmentCreated = false;
 
-  if (details.appointmentRequested && phoneNumber?.companyId) {
+  if (details.appointmentRequested) {
     const callerPhone = log.direction === "inbound" ? log.fromNumber : log.toNumber;
     const startTime = details.appointmentStartTime ? new Date(details.appointmentStartTime) : null;
 
     try {
       if (details.callerName && callerPhone && startTime && !Number.isNaN(startTime.getTime())) {
         const companyAppointments = await db.select().from(appointmentsTable)
-          .where(eq(appointmentsTable.companyId, phoneNumber.companyId));
+          .where(eq(appointmentsTable.companyId, company.id));
 
         const samePerson = (appointment: typeof appointmentsTable.$inferSelect) =>
           appointment.customerPhone === callerPhone ||
@@ -252,11 +275,10 @@ async function finalize(callSid: string): Promise<void> {
           return Math.abs(appointment.startTime.getTime() - startTime.getTime()) <= 10 * 60 * 1000;
         });
 
-        const now = Date.now();
         const recentBad = companyAppointments.find((appointment) => {
           if (appointment.status === "cancelled" || !samePerson(appointment)) return false;
           const createdRecently = Math.abs(appointment.createdAt.getTime() - log.createdAt.getTime()) <= RECENT_APPOINTMENT_WINDOW_MS;
-          const invalidPastDate = appointment.startTime.getTime() < now - 60 * 60 * 1000;
+          const invalidPastDate = appointment.startTime.getTime() < Date.now() - 60 * 60 * 1000;
           return createdRecently && invalidPastDate;
         });
 
@@ -291,7 +313,7 @@ async function finalize(callSid: string): Promise<void> {
           }).where(eq(appointmentsTable.id, recentBad.id));
         } else {
           const [created] = await db.insert(appointmentsTable).values({
-            companyId: phoneNumber.companyId,
+            companyId: company.id,
             phoneNumberId: phoneNumber.id,
             callLogId: log.id,
             source: "ai_voice",
@@ -341,12 +363,14 @@ async function finalize(callSid: string): Promise<void> {
   }).where(eq(callLogsTable.id, log.id));
 
   await sendAdminWhatsApp({
+    companyId: company.id,
     companyName,
+    adminWhatsapp: company.adminWhatsapp,
     callerPhone: log.direction === "inbound" ? log.fromNumber : log.toNumber,
     callerName: log.callerName ?? details.callerName,
+    callType: log.callType ?? details.callType,
     summary,
     actionRequired,
-    appointmentRequested: details.appointmentRequested,
   });
 }
 
