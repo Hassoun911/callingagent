@@ -108,7 +108,7 @@ export default function PortalNavigation({ companyName, mobile = false, onClose 
     return () => window.removeEventListener("keydown", handleEscape);
   }, [mobile, onClose]);
 
-  const userName = user?.firstName?.trim() || user?.username?.trim() || `User ${user?.id ?? ""}`.trim();
+  const userName = user?.firstName?.trim() || user?.email?.trim() || `User ${user?.id ?? ""}`.trim();
 
   return (
     <aside
