@@ -16,6 +16,7 @@ import campaignsRouter from "./campaigns";
 import extensionsRouter from "./extensions";
 import platformUsersRouter from "./platform-users";
 import appointmentsRouter from "./appointments";
+import companyAppointmentsRouter from "./company-appointments";
 import companyEventsRouter from "./company-events";
 import { routeAccessControl } from "../middleware/route-access";
 import { aiCallFinalizer } from "../middleware/ai-call-finalizer";
@@ -49,6 +50,8 @@ router.use(watchesRouter);
 router.use(smsRouter);
 router.use(campaignsRouter);
 router.use(extensionsRouter);
+// Company users must be scoped before the shared appointments router can handle the request.
+router.use(companyAppointmentsRouter);
 router.use(appointmentsRouter);
 
 export default router;
