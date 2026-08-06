@@ -54,6 +54,8 @@
           answerMode: "forward",
           callerExperience: "ringing",
           ringCount: 1,
+          callScreen: true,
+          callScreenFallback: "ai_voice",
           forwardNoAnswerAction: "ai_voice"
         })
       });
@@ -83,8 +85,8 @@
       <span class="ca-radio">⚡</span>
       <span>
         <span class="ca-title">AI answers after first ring</span>
-        <span class="ca-desc">The caller hears one normal ring on the forwarded number. If it is not answered within about 5 seconds, this line's configured AI agent takes over.</span>
-        <span class="ca-note">Keeps forwarding enabled and uses the same AI voice, greeting, instructions and booking rules shown under AI Agent.</span>
+        <span class="ca-desc">The forwarded phone rings once. A person must answer and press 1 to accept the call. If nobody accepts it, the configured AI agent takes over.</span>
+        <span class="ca-note">Prevents the forwarded phone's personal voicemail from taking the call. Uses the same AI voice, greeting, instructions and booking rules shown under AI Agent.</span>
       </span>`;
     button.addEventListener("click", () => applyPreset(button));
     options.appendChild(button);
