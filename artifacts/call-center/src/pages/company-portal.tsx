@@ -1,1 +1,1 @@
-export { default } from "./company-portal-stable";
+export { default } from "./company-portal-controlled";
