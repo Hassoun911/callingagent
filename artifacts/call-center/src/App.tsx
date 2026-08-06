@@ -15,7 +15,7 @@ import Calls from "@/pages/calls";
 import Contacts from "@/pages/contacts";
 import Companies from "@/pages/companies";
 import CompanyDetail from "@/pages/company-detail";
-import CompanySetupOverview from "@/pages/company-setup-overview";
+import CompanyAdministrationCenter from "@/pages/company-administration-center";
 import Settings from "@/pages/settings";
 import Billing from "@/pages/billing";
 import Messages from "@/pages/messages";
@@ -208,7 +208,7 @@ function AdminRouter() {
         <Route path="/contacts" component={Contacts} />
         <Route path="/companies/:id" component={CompanyDetail} />
         <Route path="/companies" component={Companies} />
-        <Route path="/company-setup" component={CompanySetupOverview} />
+        <Route path="/company-setup" component={CompanyAdministrationCenter} />
         <Route path="/settings" component={Settings} />
         <Route path="/billing" component={Billing} />
         <Route path="/messages" component={Messages} />
