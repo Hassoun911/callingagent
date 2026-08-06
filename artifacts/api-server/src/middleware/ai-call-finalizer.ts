@@ -1,9 +1,12 @@
 import type { NextFunction, Request, Response } from "express";
 import { eq } from "drizzle-orm";
 import OpenAI from "openai";
+import twilio from "twilio";
 import {
+  aiVoiceConfigTable,
   appointmentsTable,
   callLogsTable,
+  companiesTable,
   db,
   phoneNumbersTable,
 } from "@workspace/db";
@@ -33,6 +36,13 @@ function openAIClient(): OpenAI | null {
   return new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
 }
 
+function twilioClient(): twilio.Twilio | null {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!accountSid || !authToken) return null;
+  return twilio(accountSid, authToken);
+}
+
 function easternNowText(): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: DEFAULT_TIMEZONE,
@@ -57,6 +67,82 @@ function formatEastern(value: Date): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(value);
+}
+
+function normalizeE164(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const raw = value.replace(/^whatsapp:/i, "").trim();
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  if (raw.startsWith("+") && digits.length >= 8) return `+${digits}`;
+  return null;
+}
+
+async function sendInterruptedBookingSms(params: {
+  callerPhone: string | null;
+  fromNumber: string | null;
+  companyName: string;
+}): Promise<void> {
+  const client = twilioClient();
+  const to = normalizeE164(params.callerPhone);
+  const from = normalizeE164(params.fromNumber);
+  if (!client || !to || !from) return;
+
+  try {
+    await client.messages.create({
+      from,
+      to,
+      body: `We’re sorry—the call ended before we could finish confirming your appointment with ${params.companyName}. Please call us back or reply with your preferred date and time, and our team will follow up. Reply STOP to opt out.`,
+    });
+    logger.info({ to }, "Interrupted booking recovery SMS sent");
+  } catch (error: any) {
+    logger.warn({ error: error?.message, to }, "Could not send interrupted booking recovery SMS");
+  }
+}
+
+async function sendAdminWhatsApp(params: {
+  companyName: string;
+  callerPhone: string | null;
+  callerName: string | null;
+  summary: string | null;
+  actionRequired: string | null;
+  appointmentRequested: boolean;
+}): Promise<void> {
+  const client = twilioClient();
+  if (!client) return;
+
+  const [config] = await db.select().from(aiVoiceConfigTable).limit(1);
+  const adminTarget = normalizeE164(config?.adminNotifyPhone);
+  const configuredSender = process.env.TWILIO_WHATSAPP_FROM;
+  const whatsappFrom = configuredSender
+    ? (configuredSender.toLowerCase().startsWith("whatsapp:") ? configuredSender : `whatsapp:${configuredSender}`)
+    : null;
+
+  if (!adminTarget) return;
+  if (!whatsappFrom) {
+    logger.warn({ adminTarget }, "Admin WhatsApp number is configured but TWILIO_WHATSAPP_FROM is missing");
+    return;
+  }
+
+  const body = [
+    `📞 New AI call — ${params.companyName}`,
+    `Caller: ${params.callerName || "Unknown"}${params.callerPhone ? ` (${params.callerPhone})` : ""}`,
+    params.appointmentRequested ? "Type: Appointment request" : "Type: Call",
+    params.summary ? `Summary: ${params.summary}` : "Summary: Call ended before a complete summary was available.",
+    params.actionRequired ? `Action: ${params.actionRequired}` : "Action: Review the call log.",
+  ].join("\n");
+
+  try {
+    await client.messages.create({
+      from: whatsappFrom,
+      to: `whatsapp:${adminTarget}`,
+      body,
+    });
+    logger.info({ to: adminTarget }, "Admin post-call WhatsApp sent");
+  } catch (error: any) {
+    logger.warn({ error: error?.message, to: adminTarget }, "Could not send admin post-call WhatsApp");
+  }
 }
 
 async function appendCallerSpeech(callSid: string, speech: string): Promise<void> {
@@ -136,89 +222,111 @@ async function finalize(callSid: string): Promise<void> {
       .where(eq(phoneNumbersTable.number, log.toNumber));
   }
 
+  let companyName = phoneNumber?.friendlyName || "the business";
+  if (phoneNumber?.companyId) {
+    const [company] = await db.select().from(companiesTable)
+      .where(eq(companiesTable.id, phoneNumber.companyId));
+    if (company?.name) companyName = company.name;
+  }
+
   let actionRequired = details.actionRequired;
   let summary = details.callSummary;
+  let appointmentCreated = false;
 
   if (details.appointmentRequested && phoneNumber?.companyId) {
     const callerPhone = log.direction === "inbound" ? log.fromNumber : log.toNumber;
     const startTime = details.appointmentStartTime ? new Date(details.appointmentStartTime) : null;
 
-    if (details.callerName && callerPhone && startTime && !Number.isNaN(startTime.getTime())) {
-      const companyAppointments = await db.select().from(appointmentsTable)
-        .where(eq(appointmentsTable.companyId, phoneNumber.companyId));
+    try {
+      if (details.callerName && callerPhone && startTime && !Number.isNaN(startTime.getTime())) {
+        const companyAppointments = await db.select().from(appointmentsTable)
+          .where(eq(appointmentsTable.companyId, phoneNumber.companyId));
 
-      const samePerson = (appointment: typeof appointmentsTable.$inferSelect) =>
-        appointment.customerPhone === callerPhone ||
-        appointment.customerPhone === phoneNumber.number ||
-        appointment.customerName.toLowerCase() === details.callerName!.toLowerCase();
+        const samePerson = (appointment: typeof appointmentsTable.$inferSelect) =>
+          appointment.customerPhone === callerPhone ||
+          appointment.customerPhone === phoneNumber.number ||
+          appointment.customerName.toLowerCase() === details.callerName!.toLowerCase();
 
-      const exact = companyAppointments.find((appointment) => {
-        if (appointment.status === "cancelled" || !samePerson(appointment)) return false;
-        return Math.abs(appointment.startTime.getTime() - startTime.getTime()) <= 10 * 60 * 1000;
-      });
+        const exact = companyAppointments.find((appointment) => {
+          if (appointment.status === "cancelled" || !samePerson(appointment)) return false;
+          return Math.abs(appointment.startTime.getTime() - startTime.getTime()) <= 10 * 60 * 1000;
+        });
 
-      const now = Date.now();
-      const recentBad = companyAppointments.find((appointment) => {
-        if (appointment.status === "cancelled" || !samePerson(appointment)) return false;
-        const createdRecently = Math.abs(appointment.createdAt.getTime() - log.createdAt.getTime()) <= RECENT_APPOINTMENT_WINDOW_MS;
-        const invalidPastDate = appointment.startTime.getTime() < now - 60 * 60 * 1000;
-        return createdRecently && invalidPastDate;
-      });
+        const now = Date.now();
+        const recentBad = companyAppointments.find((appointment) => {
+          if (appointment.status === "cancelled" || !samePerson(appointment)) return false;
+          const createdRecently = Math.abs(appointment.createdAt.getTime() - log.createdAt.getTime()) <= RECENT_APPOINTMENT_WINDOW_MS;
+          const invalidPastDate = appointment.startTime.getTime() < now - 60 * 60 * 1000;
+          return createdRecently && invalidPastDate;
+        });
 
-      let appointmentId: number;
-      if (exact) {
-        appointmentId = exact.id;
-        if (exact.customerPhone !== callerPhone) {
+        let appointmentId: number;
+        if (exact) {
+          appointmentId = exact.id;
+          if (exact.customerPhone !== callerPhone) {
+            await db.update(appointmentsTable).set({
+              customerPhone: callerPhone,
+              customerEmail: exact.customerEmail ?? details.callerEmail,
+              updatedAt: new Date(),
+            }).where(eq(appointmentsTable.id, exact.id));
+          }
+          if (recentBad && recentBad.id !== exact.id) {
+            await db.update(appointmentsTable).set({
+              status: "cancelled",
+              notes: `${recentBad.notes ?? ""}\nAutomatically cancelled: invalid duplicate date created during AI call.`.trim(),
+              updatedAt: new Date(),
+            }).where(eq(appointmentsTable.id, recentBad.id));
+          }
+        } else if (recentBad) {
+          appointmentId = recentBad.id;
           await db.update(appointmentsTable).set({
             customerPhone: callerPhone,
-            customerEmail: exact.customerEmail ?? details.callerEmail,
-            updatedAt: new Date(),
-          }).where(eq(appointmentsTable.id, exact.id));
-        }
-        if (recentBad && recentBad.id !== exact.id) {
-          await db.update(appointmentsTable).set({
-            status: "cancelled",
-            notes: `${recentBad.notes ?? ""}\nAutomatically cancelled: invalid duplicate date created during AI call.`.trim(),
+            customerEmail: recentBad.customerEmail ?? details.callerEmail,
+            title: details.appointmentTitle ?? recentBad.title,
+            notes: details.appointmentNotes ?? recentBad.notes,
+            startTime,
+            status: "scheduled",
+            callLogId: log.id,
             updatedAt: new Date(),
           }).where(eq(appointmentsTable.id, recentBad.id));
+        } else {
+          const [created] = await db.insert(appointmentsTable).values({
+            companyId: phoneNumber.companyId,
+            phoneNumberId: phoneNumber.id,
+            callLogId: log.id,
+            source: "ai_voice",
+            customerName: details.callerName,
+            customerPhone: callerPhone,
+            customerEmail: details.callerEmail,
+            title: details.appointmentTitle ?? "Appointment",
+            notes: details.appointmentNotes ?? "Booked from AI phone call",
+            startTime,
+            status: "scheduled",
+          }).returning();
+          if (!created) throw new Error("Appointment insert returned no record");
+          appointmentId = created.id;
         }
-      } else if (recentBad) {
-        appointmentId = recentBad.id;
-        await db.update(appointmentsTable).set({
-          customerPhone: callerPhone,
-          customerEmail: recentBad.customerEmail ?? details.callerEmail,
-          title: details.appointmentTitle ?? recentBad.title,
-          notes: details.appointmentNotes ?? recentBad.notes,
-          startTime,
-          status: "scheduled",
-          callLogId: log.id,
-          updatedAt: new Date(),
-        }).where(eq(appointmentsTable.id, recentBad.id));
-      } else {
-        const [created] = await db.insert(appointmentsTable).values({
-          companyId: phoneNumber.companyId,
-          phoneNumberId: phoneNumber.id,
-          callLogId: log.id,
-          source: "ai_voice",
-          customerName: details.callerName,
-          customerPhone: callerPhone,
-          customerEmail: details.callerEmail,
-          title: details.appointmentTitle ?? "Appointment",
-          notes: details.appointmentNotes ?? "Booked from AI phone call",
-          startTime,
-          status: "scheduled",
-        }).returning();
-        if (!created) throw new Error("Appointment insert returned no record");
-        appointmentId = created.id;
-      }
 
-      const formatted = formatEastern(startTime);
-      actionRequired = `Appointment #${appointmentId} booked for ${formatted}.`;
-      summary = summary
-        ? `${summary} Appointment booked for ${formatted}.`
-        : `The caller requested an appointment. Appointment booked for ${formatted}.`;
-    } else {
-      actionRequired = "Appointment requested, but the caller's name or exact date/time was missing. Follow up with the caller.";
+        appointmentCreated = true;
+        const formatted = formatEastern(startTime);
+        actionRequired = `Appointment #${appointmentId} booked for ${formatted}.`;
+        summary = summary
+          ? `${summary} Appointment booked for ${formatted}.`
+          : `The caller requested an appointment. Appointment booked for ${formatted}.`;
+      } else {
+        actionRequired = "Appointment requested, but the call ended before the caller's name and exact date/time were fully confirmed. Follow up with the caller.";
+      }
+    } catch (error: any) {
+      logger.error({ error: error?.message, callSid }, "Could not complete appointment after AI call");
+      actionRequired = `Appointment requested but calendar confirmation failed: ${error?.message || "unknown error"}. Follow up with the caller.`;
+    }
+
+    if (!appointmentCreated) {
+      await sendInterruptedBookingSms({
+        callerPhone,
+        fromNumber: phoneNumber.number,
+        companyName,
+      });
     }
   }
 
@@ -231,6 +339,15 @@ async function finalize(callSid: string): Promise<void> {
     priority: log.priority ?? details.priority,
     updatedAt: new Date(),
   }).where(eq(callLogsTable.id, log.id));
+
+  await sendAdminWhatsApp({
+    companyName,
+    callerPhone: log.direction === "inbound" ? log.fromNumber : log.toNumber,
+    callerName: log.callerName ?? details.callerName,
+    summary,
+    actionRequired,
+    appointmentRequested: details.appointmentRequested,
+  });
 }
 
 export function aiCallFinalizer(req: Request, res: Response, next: NextFunction): void {
