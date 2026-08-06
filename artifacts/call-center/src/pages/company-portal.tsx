@@ -36,7 +36,7 @@ import CampaignDetail from "@/pages/campaign-detail";
 import Campaigns from "@/pages/campaigns";
 import Contacts from "@/pages/contacts";
 import Messages from "@/pages/messages";
-import NumberDetail from "@/pages/number-detail";
+import PortalNumberDetail from "@/pages/portal-number-detail";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 const PORTAL = "/portal";
@@ -418,7 +418,7 @@ export default function CompanyPortal({ user }: { user: AuthUser }) {
         <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <Switch>
             <Route path={PORTAL}>{() => <LiveDashboard companyId={companyId} numbers={companyNumbers} campaigns={campaignsQuery.data ?? []} calls={callsQuery.data ?? []} messages={messagesQuery.data ?? []} appointments={appointments} connected={connected} lastUpdatedAt={lastUpdatedAt} refresh={() => void refresh()} />}</Route>
-            <Route path={`${PORTAL}/numbers/:id`} component={NumberDetail} />
+            <Route path={`${PORTAL}/numbers/:id`}>{() => <PortalNumberDetail companyId={companyId} />}</Route>
             <Route path={`${PORTAL}/numbers`}>{() => <PhoneNumbersPage companyNumbers={companyNumbers} />}</Route>
             <Route path={`${PORTAL}/campaigns/:id`} component={CampaignDetail} />
             <Route path={`${PORTAL}/campaigns`} component={Campaigns} />
