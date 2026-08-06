@@ -19,6 +19,7 @@ import appointmentsRouter from "./appointments";
 import { routeAccessControl } from "../middleware/route-access";
 import { aiCallFinalizer } from "../middleware/ai-call-finalizer";
 import { aiDateContext } from "../middleware/ai-date-context";
+import { companyAdminWhatsappSync } from "../middleware/company-admin-whatsapp";
 
 const router: IRouter = Router();
 
@@ -31,6 +32,7 @@ router.use(twilioWebhooksRouter);
 
 // Every dashboard/API route below is checked against the authenticated user's role.
 router.use(routeAccessControl);
+router.use(companyAdminWhatsappSync);
 router.use(platformUsersRouter);
 router.use(phoneNumbersRouter);
 router.use(contactsRouter);
