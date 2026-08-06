@@ -1,7 +1,11 @@
 (() => {
   const POLL_MS = 2000;
   const BADGE_ATTR = "data-ca-portal-activity-badge";
+  const REVIEWED_PREFIX = "ca_portal_reviewed_calls_";
+  const RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
   let busy = false;
+  let companyId = 0;
+  let currentCalls = [];
 
   const asArray = (value) => {
     if (Array.isArray(value)) return value;
@@ -12,6 +16,8 @@
   };
 
   const digits = (value) => String(value ?? "").replace(/\D/g, "").slice(-10);
+  const callId = (call) => String(call?.id ?? call?.twilioCallSid ?? call?.sid ?? "");
+  const callTime = (call) => Date.parse(call?.createdAt ?? call?.startedAt ?? call?.date ?? "");
 
   async function getJson(url) {
     const response = await fetch(url, {
@@ -21,6 +27,34 @@
     });
     if (!response.ok) throw new Error(`${response.status} ${url}`);
     return response.json();
+  }
+
+  function reviewedKey() {
+    return `${REVIEWED_PREFIX}${companyId || "unknown"}`;
+  }
+
+  function readReviewed() {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(reviewedKey()) || "[]"));
+    } catch {
+      return new Set();
+    }
+  }
+
+  function writeReviewed(values) {
+    try {
+      localStorage.setItem(reviewedKey(), JSON.stringify([...new Set(values)].slice(-500)));
+    } catch {
+      // Local storage may be disabled; the live badge still works for this page load.
+    }
+  }
+
+  function markReviewed(id) {
+    if (!id) return;
+    const reviewed = readReviewed();
+    reviewed.add(id);
+    writeReviewed([...reviewed]);
+    renderCallBadge();
   }
 
   function portalLink(path) {
@@ -65,15 +99,49 @@
     link.style.border = `1px solid rgba(${rgb},.20)`;
   }
 
+  function unreviewedCalls() {
+    const reviewed = readReviewed();
+    const cutoff = Date.now() - RECENT_WINDOW_MS;
+    return currentCalls.filter((call) => {
+      const id = callId(call);
+      const created = callTime(call);
+      return id && !reviewed.has(id) && (!Number.isFinite(created) || created >= cutoff);
+    });
+  }
+
+  function renderCallBadge() {
+    setBadge("/portal/calls", unreviewedCalls().length, "danger");
+  }
+
+  function bindVisibleCallRows() {
+    if (location.pathname !== "/portal/calls") return;
+    const rows = [...document.querySelectorAll("table tbody tr")];
+    if (!rows.length) return;
+
+    const sortedCalls = [...currentCalls].sort((a, b) => {
+      const aTime = callTime(a);
+      const bTime = callTime(b);
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+    });
+
+    rows.forEach((row, index) => {
+      const id = callId(sortedCalls[index]);
+      if (!id || row.dataset.caReviewBound === id) return;
+      row.dataset.caReviewBound = id;
+      row.addEventListener("click", () => markReviewed(id));
+      row.querySelectorAll("button").forEach((button) => {
+        button.addEventListener("click", () => markReviewed(id));
+      });
+    });
+  }
+
   async function refresh() {
     if (busy || !location.pathname.startsWith("/portal")) return;
     busy = true;
 
     try {
-      // Portal APIs are tenant-filtered. Use the assigned line itself as the
-      // authoritative company context instead of the platform auth endpoint.
       const numbers = asArray(await getJson("/api/phone-numbers"));
-      const companyId = Number(numbers.find((item) => Number(item?.companyId) > 0)?.companyId || 0);
+      companyId = Number(numbers.find((item) => Number(item?.companyId) > 0)?.companyId || 0);
       const companyNumbers = new Set(numbers.map((item) => digits(item?.number)).filter(Boolean));
 
       const callsPromise = getJson("/api/call-logs?limit=250").catch(() => []);
@@ -82,20 +150,13 @@
         : Promise.resolve([]);
 
       const [callsBody, appointmentsBody] = await Promise.all([callsPromise, appointmentsPromise]);
-      const calls = asArray(callsBody).filter((call) => {
+      currentCalls = asArray(callsBody).filter((call) => {
         if (companyId && Number(call?.companyId) === companyId) return true;
         return companyNumbers.has(digits(call?.toNumber)) || companyNumbers.has(digits(call?.fromNumber));
       });
 
-      // Match the master dashboard rule: calls needing attention stay visible,
-      // including incomplete booking calls and emergency/high-priority calls.
-      const callActionCount = calls.filter((call) => {
-        const action = String(call?.actionRequired ?? "").trim();
-        const priority = String(call?.priority ?? "").toLowerCase();
-        const type = String(call?.callType ?? "").toLowerCase();
-        const status = String(call?.status ?? "").toLowerCase();
-        return Boolean(action) || priority === "high" || type === "emergency" || ["failed", "busy", "no-answer", "canceled"].includes(status);
-      }).length;
+      renderCallBadge();
+      bindVisibleCallRows();
 
       const now = Date.now();
       const scheduledCount = asArray(appointmentsBody).filter((appointment) => {
@@ -103,8 +164,6 @@
         const start = Date.parse(appointment?.startTime ?? "");
         return status === "scheduled" && Number.isFinite(start) && start >= now;
       }).length;
-
-      setBadge("/portal/calls", callActionCount, "danger");
       setBadge("/portal/bookings", scheduledCount, "warning");
     } catch (error) {
       console.warn("CallingAgent portal activity refresh failed", error);
