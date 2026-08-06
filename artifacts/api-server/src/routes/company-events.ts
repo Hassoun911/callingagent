@@ -34,21 +34,18 @@ router.get("/companies/:companyId/events", (req: Request, res: Response) => {
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
-  const send = (event: string, data: Record<string, unknown>) => {
-    res.write(`event: ${event}\n`);
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
-  };
-
-  send("connected", {
-    companyId,
-    at: new Date().toISOString(),
-  });
-
-  const heartbeat = setInterval(() => {
-    send("sync", {
+  const send = (type: string) => {
+    res.write(`data: ${JSON.stringify({
+      type,
       companyId,
       at: new Date().toISOString(),
-    });
+    })}\n\n`);
+  };
+
+  send("connected");
+
+  const heartbeat = setInterval(() => {
+    send("sync");
   }, HEARTBEAT_MS);
 
   req.on("close", () => {
