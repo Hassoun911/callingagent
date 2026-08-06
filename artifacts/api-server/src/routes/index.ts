@@ -18,6 +18,7 @@ import platformUsersRouter from "./platform-users";
 import appointmentsRouter from "./appointments";
 import companyAppointmentsRouter from "./company-appointments";
 import companyEventsRouter from "./company-events";
+import portalVisibilityRouter, { enforceCompanyPortalVisibility } from "./portal-visibility";
 import { routeAccessControl } from "../middleware/route-access";
 import { aiCallFinalizer } from "../middleware/ai-call-finalizer";
 import { aiDateContext } from "../middleware/ai-date-context";
@@ -35,6 +36,8 @@ router.use(twilioWebhooksRouter);
 // Every dashboard/API route below is checked against the authenticated user's role.
 router.use(routeAccessControl);
 router.use(companyAdminWhatsappSync);
+router.use(portalVisibilityRouter);
+router.use(enforceCompanyPortalVisibility);
 router.use(companyEventsRouter);
 router.use(platformUsersRouter);
 router.use(phoneNumbersRouter);
