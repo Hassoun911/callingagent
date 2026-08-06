@@ -20,24 +20,32 @@ function initializedKey(id: string): string {
   return `${INITIALIZED_PREFIX}${id}`;
 }
 
+function normalizeState(state: CallState): CallState {
+  return {
+    read: Array.from(new Set(state.read)).slice(-1000),
+    known: Array.from(new Set(state.known)).slice(-1000),
+  };
+}
+
 function loadState(id: string): CallState {
   try {
     const parsed = JSON.parse(localStorage.getItem(storageKey(id)) || "null");
-    return {
+    return normalizeState({
       read: Array.isArray(parsed?.read) ? parsed.read.map(String) : [],
       known: Array.isArray(parsed?.known) ? parsed.known.map(String) : [],
-    };
+    });
   } catch {
     return { read: [], known: [] };
   }
 }
 
-function saveState(id: string, state: CallState): void {
-  localStorage.setItem(storageKey(id), JSON.stringify({
-    read: Array.from(new Set(state.read)).slice(-1000),
-    known: Array.from(new Set(state.known)).slice(-1000),
-  }));
+function saveState(id: string, state: CallState): boolean {
+  const normalized = normalizeState(state);
+  const next = JSON.stringify(normalized);
+  if (localStorage.getItem(storageKey(id)) === next) return false;
+  localStorage.setItem(storageKey(id), next);
   window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { companyId: id } }));
+  return true;
 }
 
 function callSignature(row: HTMLElement): string {
@@ -74,8 +82,8 @@ function updateBadge(id: string, unread: number): void {
   if (!link) return;
 
   let badge = link.querySelector<HTMLElement>("[data-call-unread-badge]");
-  const existingCandidates = Array.from(link.querySelectorAll<HTMLElement>("span"));
-  const existing = existingCandidates.find(node => /^\d+\+?$/.test((node.textContent || "").trim()));
+  const existing = Array.from(link.querySelectorAll<HTMLElement>("span"))
+    .find(node => /^\d+\+?$/.test((node.textContent || "").trim()));
 
   if (!badge && existing) {
     badge = existing;
@@ -84,7 +92,6 @@ function updateBadge(id: string, unread: number): void {
 
   if (unread <= 0) {
     badge?.remove();
-    link.classList.remove("border", "border-red-500/20", "bg-red-500/5", "text-red-300");
     return;
   }
 
@@ -145,10 +152,14 @@ function apply(): void {
       localStorage.setItem(initializedKey(id), "true");
       saveState(id, state);
     } else {
+      let changed = false;
       for (const signature of signatures) {
-        if (!state.known.includes(signature)) state.known.push(signature);
+        if (!state.known.includes(signature)) {
+          state.known.push(signature);
+          changed = true;
+        }
       }
-      saveState(id, state);
+      if (changed) saveState(id, state);
     }
 
     const refreshed = loadState(id);
@@ -161,14 +172,7 @@ function apply(): void {
 
       if (!row.dataset.callUnreadBound) {
         row.dataset.callUnreadBound = "true";
-        row.addEventListener("click", event => {
-          const target = event.target as HTMLElement;
-          if (target.closest("button, a") || row.matches("article")) {
-            markRead(id, callSignature(row));
-            return;
-          }
-          markRead(id, callSignature(row));
-        }, true);
+        row.addEventListener("click", () => markRead(id, callSignature(row)), true);
       }
     });
     updateBadge(id, unread);
