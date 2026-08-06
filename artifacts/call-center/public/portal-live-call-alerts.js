@@ -1,133 +1,123 @@
 (() => {
-  const BADGE_ID = "ca-portal-live-call-badge";
-  const STORAGE_PREFIX = "ca_seen_portal_calls_";
-  let companyId = null;
-  let currentCallIds = [];
-  let running = false;
+  const POLL_MS = 2000;
+  const BADGE_ATTR = "data-ca-portal-activity-badge";
+  let busy = false;
 
-  function asArray(value) {
+  const asArray = (value) => {
     if (Array.isArray(value)) return value;
     if (Array.isArray(value?.data)) return value.data;
     if (Array.isArray(value?.items)) return value.items;
     if (Array.isArray(value?.results)) return value.results;
     return [];
-  }
+  };
 
-  async function json(url) {
-    const response = await fetch(url, { credentials: "include", cache: "no-store" });
+  const digits = (value) => String(value ?? "").replace(/\D/g, "").slice(-10);
+
+  async function getJson(url) {
+    const response = await fetch(url, {
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
     if (!response.ok) throw new Error(`${response.status} ${url}`);
     return response.json();
   }
 
-  function callLink() {
-    return document.querySelector('a[href="/portal/calls"], a[href^="/portal/calls?"]');
+  function portalLink(path) {
+    return [...document.querySelectorAll("a")].find((anchor) => {
+      try {
+        return new URL(anchor.href, location.origin).pathname === path;
+      } catch {
+        return false;
+      }
+    }) || null;
   }
 
-  function seenKey() {
-    return `${STORAGE_PREFIX}${companyId || "unknown"}`;
-  }
+  function setBadge(path, count, tone) {
+    const link = portalLink(path);
+    if (!link) return;
 
-  function readSeen() {
-    try {
-      return new Set(JSON.parse(localStorage.getItem(seenKey()) || "[]"));
-    } catch {
-      return new Set();
-    }
-  }
-
-  function writeSeen(ids) {
-    localStorage.setItem(seenKey(), JSON.stringify([...new Set(ids)].slice(-300)));
-  }
-
-  function removeBadge() {
-    document.getElementById(BADGE_ID)?.remove();
-  }
-
-  function render(count) {
-    const link = callLink();
-    if (!link || count <= 0) {
-      removeBadge();
+    let badge = link.querySelector(`[${BADGE_ATTR}="${path}"]`);
+    if (count <= 0) {
+      badge?.remove();
+      link.style.removeProperty("color");
+      link.style.removeProperty("background");
+      link.style.removeProperty("border");
       return;
     }
 
-    let badge = document.getElementById(BADGE_ID);
     if (!badge) {
       badge = document.createElement("span");
-      badge.id = BADGE_ID;
-      Object.assign(badge.style, {
-        marginLeft: "auto",
-        minWidth: "20px",
-        height: "20px",
-        padding: "0 6px",
-        borderRadius: "9999px",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(239,68,68,.18)",
-        border: "1px solid rgba(239,68,68,.42)",
-        color: "rgb(252,165,165)",
-        fontSize: "10px",
-        fontWeight: "700",
-        lineHeight: "1",
-      });
+      badge.setAttribute(BADGE_ATTR, path);
+      badge.style.cssText = "margin-left:auto;display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:9999px;font-size:10px;font-weight:800;line-height:1;flex-shrink:0";
       link.appendChild(badge);
     }
+
+    const danger = tone === "danger";
+    const rgb = danger ? "239,68,68" : "245,158,11";
+    const text = danger ? "rgb(252,165,165)" : "rgb(253,230,138)";
     badge.textContent = count > 99 ? "99+" : String(count);
-    link.style.color = "rgb(252,165,165)";
-    link.style.background = "rgba(239,68,68,.07)";
-  }
-
-  function installClickHandler() {
-    const link = callLink();
-    if (!link || link.dataset.caLiveCallHandler === "true") return;
-    link.dataset.caLiveCallHandler = "true";
-    link.addEventListener("click", () => {
-      writeSeen([...readSeen(), ...currentCallIds]);
-      removeBadge();
-    });
-  }
-
-  async function resolveCompanyId() {
-    const user = await json("/api/auth/user");
-    const id = Number(user?.companyId ?? user?.company?.id ?? user?.user?.companyId);
-    companyId = Number.isFinite(id) && id > 0 ? id : null;
+    badge.style.background = `rgba(${rgb},.20)`;
+    badge.style.border = `1px solid rgba(${rgb},.48)`;
+    badge.style.color = text;
+    link.style.color = text;
+    link.style.background = `rgba(${rgb},.07)`;
+    link.style.border = `1px solid rgba(${rgb},.20)`;
   }
 
   async function refresh() {
-    if (running || !window.location.pathname.startsWith("/portal")) return;
-    running = true;
-    try {
-      if (!companyId) await resolveCompanyId();
-      installClickHandler();
-      if (!companyId) return;
+    if (busy || !location.pathname.startsWith("/portal")) return;
+    busy = true;
 
-      const [numbersBody, callsBody] = await Promise.all([
-        json("/api/phone-numbers"),
-        json("/api/call-logs?limit=200"),
-      ]);
-      const numbers = asArray(numbersBody).filter(number => Number(number.companyId) === companyId);
-      const lineNumbers = new Set(numbers.map(number => String(number.number || "")));
-      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-      const calls = asArray(callsBody).filter(call => {
-        const belongs = Number(call.companyId) === companyId || lineNumbers.has(String(call.toNumber || ""));
-        const created = Date.parse(call.createdAt || call.startedAt || call.date || "");
-        return belongs && (!Number.isFinite(created) || created >= cutoff);
+    try {
+      // Portal APIs are tenant-filtered. Use the assigned line itself as the
+      // authoritative company context instead of the platform auth endpoint.
+      const numbers = asArray(await getJson("/api/phone-numbers"));
+      const companyId = Number(numbers.find((item) => Number(item?.companyId) > 0)?.companyId || 0);
+      const companyNumbers = new Set(numbers.map((item) => digits(item?.number)).filter(Boolean));
+
+      const callsPromise = getJson("/api/call-logs?limit=250").catch(() => []);
+      const appointmentsPromise = companyId
+        ? getJson(`/api/companies/${companyId}/appointments`).catch(() => [])
+        : Promise.resolve([]);
+
+      const [callsBody, appointmentsBody] = await Promise.all([callsPromise, appointmentsPromise]);
+      const calls = asArray(callsBody).filter((call) => {
+        if (companyId && Number(call?.companyId) === companyId) return true;
+        return companyNumbers.has(digits(call?.toNumber)) || companyNumbers.has(digits(call?.fromNumber));
       });
 
-      currentCallIds = calls.map(call => String(call.id ?? call.twilioCallSid ?? call.sid)).filter(Boolean);
-      const seen = readSeen();
-      render(currentCallIds.filter(id => !seen.has(id)).length);
+      // Match the master dashboard rule: calls needing attention stay visible,
+      // including incomplete booking calls and emergency/high-priority calls.
+      const callActionCount = calls.filter((call) => {
+        const action = String(call?.actionRequired ?? "").trim();
+        const priority = String(call?.priority ?? "").toLowerCase();
+        const type = String(call?.callType ?? "").toLowerCase();
+        const status = String(call?.status ?? "").toLowerCase();
+        return Boolean(action) || priority === "high" || type === "emergency" || ["failed", "busy", "no-answer", "canceled"].includes(status);
+      }).length;
+
+      const now = Date.now();
+      const scheduledCount = asArray(appointmentsBody).filter((appointment) => {
+        const status = String(appointment?.status ?? "").toLowerCase();
+        const start = Date.parse(appointment?.startTime ?? "");
+        return status === "scheduled" && Number.isFinite(start) && start >= now;
+      }).length;
+
+      setBadge("/portal/calls", callActionCount, "danger");
+      setBadge("/portal/bookings", scheduledCount, "warning");
     } catch (error) {
-      console.warn("CallingAgent live call alert refresh failed", error);
+      console.warn("CallingAgent portal activity refresh failed", error);
     } finally {
-      running = false;
+      busy = false;
     }
   }
 
   window.addEventListener("focus", refresh);
+  window.addEventListener("popstate", () => setTimeout(refresh, 50));
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) refresh();
   });
-  setInterval(refresh, 2000);
-  setTimeout(refresh, 300);
+  setInterval(refresh, POLL_MS);
+  setTimeout(refresh, 250);
 })();
