@@ -180,12 +180,37 @@ export default function PortalNavigation({
                   const Icon = item.icon;
                   const active = isActivePath(location, item.href);
                   const badge = item.badgeKey ? liveStats[item.badgeKey] : 0;
+                  const bookingAlert = item.badgeKey === "newBookings" && badge > 0;
+                  const linkClass = bookingAlert
+                    ? "min-h-[52px] border border-red-500/55 bg-red-500/15 text-red-100 shadow-[0_0_20px_rgba(239,68,68,0.14),inset_0_0_0_1px_rgba(239,68,68,0.08)] hover:bg-red-500/20 focus-visible:ring-red-400"
+                    : active
+                      ? "min-h-11 bg-cyan-400/[0.11] text-cyan-300 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.12)] focus-visible:ring-cyan-400"
+                      : "min-h-11 text-slate-400 hover:bg-white/[0.045] hover:text-slate-100 focus-visible:ring-cyan-400";
+                  const iconClass = bookingAlert
+                    ? "h-[21px] w-[21px] text-red-400"
+                    : active
+                      ? "h-[18px] w-[18px] text-cyan-400"
+                      : "h-[18px] w-[18px] text-slate-500 group-hover:text-slate-300";
+
                   return (
-                    <Link key={item.href} href={item.href} onClick={onClose} aria-current={active ? "page" : undefined} className={`group relative flex min-h-11 items-center gap-3 overflow-hidden rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none transition-all focus-visible:ring-2 focus-visible:ring-cyan-400 ${active ? "bg-cyan-400/[0.11] text-cyan-300 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.12)]" : "text-slate-400 hover:bg-white/[0.045] hover:text-slate-100"}`}>
-                      <span className={`absolute inset-y-2 left-0 w-0.5 rounded-r-full bg-cyan-400 transition-opacity ${active ? "opacity-100" : "opacity-0"}`} />
-                      <Icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${active ? "text-cyan-400" : "text-slate-500 group-hover:text-slate-300"}`} strokeWidth={1.8} />
-                      <span className="truncate">{item.label}</span>
-                      {badge > 0 && <span className={`ml-auto min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold ${item.badgeKey === "unreadMessages" ? "bg-cyan-400 text-slate-950" : "bg-white/[0.08] text-slate-300"}`}>{badgeLabel(badge)}</span>}
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={onClose}
+                      aria-current={active ? "page" : undefined}
+                      className={`group relative flex items-center gap-3 overflow-hidden rounded-xl px-3.5 py-2.5 font-medium outline-none transition-all focus-visible:ring-2 ${linkClass}`}
+                    >
+                      <span className={`absolute inset-y-2 left-0 w-0.5 rounded-r-full transition-opacity ${bookingAlert ? "bg-red-400 opacity-100" : `bg-cyan-400 ${active ? "opacity-100" : "opacity-0"}`}`} />
+                      <Icon className={`shrink-0 transition-colors ${iconClass}`} strokeWidth={bookingAlert ? 2.2 : 1.8} />
+                      <span className={`truncate ${bookingAlert ? "text-[16px] font-extrabold tracking-[0.01em]" : "text-sm"}`}>{item.label}</span>
+                      {badge > 0 && (
+                        <span className={`ml-auto rounded-full text-center font-black ${bookingAlert
+                          ? "min-w-8 bg-red-500 px-2.5 py-1 text-[12px] text-white ring-2 ring-red-300/20"
+                          : item.badgeKey === "unreadMessages"
+                            ? "min-w-5 bg-cyan-400 px-1.5 py-0.5 text-[10px] text-slate-950"
+                            : "min-w-5 bg-white/[0.08] px-1.5 py-0.5 text-[10px] text-slate-300"
+                        }`}>{badgeLabel(badge)}</span>
+                      )}
                     </Link>
                   );
                 })}
