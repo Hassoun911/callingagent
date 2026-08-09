@@ -6,6 +6,7 @@ import path from "path";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 import bookingFlowSettingsRouter from "./routes/booking-flow-settings";
+import aiBookingV2Router from "./routes/ai-booking-v2";
 import twilioAiGuardRouter from "./routes/twilio-ai-guard";
 import { logger } from "./lib/logger";
 
@@ -36,8 +37,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 
-// Must run before the main API router. It prevents booking/availability turns
-// from hanging up when the AI tells the caller to wait and the caller stays silent.
+// Real calendar availability and absolute-date protection must run before the
+// generic AI route and before the silent-hold continuation guard.
+app.use("/api", aiBookingV2Router);
 app.use("/api", twilioAiGuardRouter);
 app.use("/api", bookingFlowSettingsRouter);
 app.use("/api", router);
