@@ -52,13 +52,6 @@ async function sendCompanyWhatsapp(callSid: string): Promise<void> {
     return;
   }
 
-  // Successful appointment bookings send their own detailed admin template at the
-  // moment the appointment is created. Avoid sending a duplicate post-call alert.
-  if (log.callType === "Appointment") {
-    logger.info({ callSid, companyId: phone.companyId }, "Skipping generic post-call template for appointment; booking notification owns this event");
-    return;
-  }
-
   const configuredSender = process.env.TWILIO_WHATSAPP_FROM?.trim();
   const sender = configuredSender || phone.number;
   const caller = log.contactName ?? log.callerIdName ?? log.callerName ?? log.fromNumber ?? "Unknown caller";
@@ -79,12 +72,13 @@ async function sendCompanyWhatsapp(callSid: string): Promise<void> {
         location: log.callerLocation,
         summary: log.callSummary,
         action: log.actionRequired,
+        appointmentTitle: log.callType === "Appointment" ? "Appointment" : null,
         status: log.status,
       },
     });
-    logger.info({ callSid, companyId: phone.companyId, adminWhatsapp }, "Company admin post-call WhatsApp template sent");
+    logger.info({ callSid, companyId: phone.companyId, adminWhatsapp }, "Company admin WhatsApp template sent");
   } catch (error: any) {
-    logger.error({ callSid, companyId: phone.companyId, err: error?.message }, "Company admin post-call WhatsApp template failed");
+    logger.error({ callSid, companyId: phone.companyId, err: error?.message }, "Company admin WhatsApp template failed");
   }
 }
 
