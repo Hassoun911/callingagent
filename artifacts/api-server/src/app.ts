@@ -8,6 +8,7 @@ import router from "./routes";
 import bookingFlowSettingsRouter from "./routes/booking-flow-settings";
 import aiBookingV2Router from "./routes/ai-booking-v2";
 import twilioAiGuardRouter from "./routes/twilio-ai-guard";
+import companyWhatsappNotificationsRouter, { disableLegacyGlobalAdminSms } from "./routes/company-whatsapp-notifications";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
@@ -37,10 +38,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 
+// The old notification phone is a single global destination. Clear it so one
+// company's completed calls can never generate SMS notifications for another
+// company. Per-company WhatsApp routing below replaces it.
+disableLegacyGlobalAdminSms().catch(() => {});
+
 // Real calendar availability and absolute-date protection must run before the
 // generic AI route and before the silent-hold continuation guard.
 app.use("/api", aiBookingV2Router);
 app.use("/api", twilioAiGuardRouter);
+app.use("/api", companyWhatsappNotificationsRouter);
 app.use("/api", bookingFlowSettingsRouter);
 app.use("/api", router);
 
