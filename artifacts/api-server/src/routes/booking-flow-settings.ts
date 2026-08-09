@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, phoneNumbersTable } from "@workspace/db";
 import { getCompanyScope } from "../lib/scope";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -30,7 +31,7 @@ function bookingBlock(mode: BookingFlowMode): string {
   return `${START}
 BOOKING_FLOW_MODE=${mode}
 ${modeInstruction}
-For every mode: never claim an appointment is booked, confirmed, reserved, or available until the real calendar operation succeeds. If you offer one or more available slots, STOP and ask the caller which exact slot they want. Never call the booking tool for an offered slot until the caller explicitly accepts that exact date and time. Words such as "soonest", "earliest", "ASAP", or "whatever is first" mean you must check the real calendar and OFFER the earliest available choices; they are not permission to book one automatically. Never invent a year or infer an old year from examples in the prompt; use the live current date/time supplied by the scheduling system. For same-day requests, do not guarantee service or create a confirmed appointment; collect the service address/location, vehicle and service details, callback number, and preferred time, then say that someone from the team will get back to them shortly to confirm same-day availability. Use the phone line's configured timezone, defaulting to America/Toronto Eastern Time, and never mention UTC to callers.
+For every mode: never claim an appointment is booked, confirmed, reserved, or available until the real calendar operation succeeds. If you offer one or more available slots, STOP and ask the caller which exact slot they want. Never call the booking tool for an offered slot until the caller explicitly accepts that exact date and time. Words such as "soonest", "earliest", "ASAP", "first available", "next available", "as soon as you can", "whatever you have first", or "book me the soonest" ALWAYS mean search the real calendar from the earliest valid slot forward and OFFER the earliest choices. These phrases are NEVER a same-day request and NEVER permission to book automatically. Only treat the request as same-day when the caller explicitly says "today", "this afternoon", "tonight", "right now", or gives today's date. Never invent a year or infer an old year from examples in the prompt; use the live current date/time supplied by the scheduling system. For an explicit same-day request, do not guarantee service or create a confirmed appointment unless the real calendar check returns a valid same-day slot and the caller explicitly accepts it; otherwise collect the service address/location, vehicle and service details, callback number, and preferred time, then say that someone from the team will get back to them shortly. Use the phone line's configured timezone, defaulting to America/Toronto Eastern Time, and never mention UTC to callers.
 ${END}`;
 }
 
@@ -42,6 +43,27 @@ async function getNumberForRequest(req: any, id: number) {
     return { error: 403 as const, message: "Access denied" };
   }
   return { number };
+}
+
+export async function refreshStoredBookingFlowPrompts(): Promise<void> {
+  try {
+    const numbers = await db.select().from(phoneNumbersTable);
+    let updated = 0;
+    for (const number of numbers) {
+      if (!number.aiSystemPrompt?.includes(START)) continue;
+      const mode = detectMode(number.aiSystemPrompt);
+      const basePrompt = removeExistingBlock(number.aiSystemPrompt);
+      const aiSystemPrompt = `${basePrompt}${basePrompt ? "\n\n" : ""}${bookingBlock(mode)}`;
+      if (aiSystemPrompt === number.aiSystemPrompt) continue;
+      await db.update(phoneNumbersTable)
+        .set({ aiSystemPrompt, updatedAt: new Date() })
+        .where(eq(phoneNumbersTable.id, number.id));
+      updated++;
+    }
+    if (updated) logger.info({ updated }, "Refreshed stored booking-flow instructions");
+  } catch (error: any) {
+    logger.warn({ err: error?.message }, "Could not refresh stored booking-flow instructions");
+  }
 }
 
 router.get("/phone-numbers/:id/booking-flow", async (req, res): Promise<void> => {
