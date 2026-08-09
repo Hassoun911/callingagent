@@ -15,8 +15,11 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 const FALLBACK_VOICE = "Google.en-US-Neural2-F";
-const SOONEST = /\b(soonest|earliest|first available|as soon as possible|asap|next available|whatever is soonest)\b/i;
-const BOOKING_WORDS = /\b(book|booking|appointment|schedule|availability|available|slot|service|tire|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
+
+// Treat every natural way of asking for the earliest appointment as a calendar
+// lookup request. "Soonest" is never synonymous with "same day".
+const SOONEST = /\b(soonest|earliest|first\s+(?:available|opening|slot|appointment|one)|next\s+(?:available|opening|slot|appointment)|as\s+soon\s+as\s+(?:possible|you\s+can|you\s+have)|soon\s+as\s+(?:possible|you\s+can)|whatever\s+(?:is|you\s+have)\s+(?:first|soonest|earliest)|whatever\s+comes\s+first|first\s+thing\s+available|book\s+me\s+(?:the\s+)?(?:soonest|earliest)|any\s+time\s+(?:soon|available)|asap)\b/i;
+const BOOKING_WORDS = /\b(book|booking|appointment|schedule|availability|available|slot|service|tire|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|soonest|earliest|asap)\b/i;
 
 type Slot = { start: Date; end: Date; resourceId: number; serviceId: number | null; label: string; iso: string };
 type PendingOffer = { companyId: number; slots: Slot[]; expiresAt: number };
@@ -32,6 +35,12 @@ function baseUrl(req: any): string {
 
 function xml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+function normalizedPhone(value?: string | null): string {
+  if (!value) return "";
+  const digits = value.replace(/\D/g, "");
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
 }
 
 function localParts(date: Date, timeZone: string) {
@@ -103,12 +112,27 @@ function spokenOptions(slots: Slot[], timeZone: string): string {
   return `The soonest openings I have are ${labels[0]}, ${labels[1]}, or ${labels[2]}. Which one would you like?`;
 }
 
-async function resolveCall(callSid: string) {
+async function resolveCall(req: any, callSid: string) {
   const [log] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, callSid));
-  if (!log?.phoneNumberId) return null;
-  const [phone] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, log.phoneNumberId));
+
+  if (log?.phoneNumberId) {
+    const [phone] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, log.phoneNumberId));
+    if (phone?.companyId) return { log, phone, companyId: phone.companyId };
+  }
+
+  // During the first few Gather turns the call log can exist before phoneNumberId
+  // has been attached. Resolve directly from Twilio's destination or the log's
+  // toNumber so booking availability never falls back to prompt-only behavior.
+  const destination = normalizedPhone(
+    req.body?.To || req.body?.Called || req.body?.DialCallTo || log?.toNumber,
+  );
+  if (!destination) return null;
+
+  const phones = await db.select().from(phoneNumbersTable);
+  const phone = phones.find(row => normalizedPhone(row.number) === destination);
   if (!phone?.companyId) return null;
-  return { log, phone, companyId: phone.companyId };
+
+  return { log: log ?? null, phone, companyId: phone.companyId };
 }
 
 async function findSoonest(companyId: number, speech: string): Promise<{ slots: Slot[]; timeZone: string }> {
@@ -214,8 +238,12 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
   if (!callSid || !speech) { next(); return; }
 
   try {
-    const call = await resolveCall(callSid);
-    if (!call) { next(); return; }
+    const call = await resolveCall(req, callSid);
+    if (!call) {
+      logger.warn({ callSid, to: req.body?.To, speech: speech.slice(0, 120) }, "Could not resolve company for live booking turn");
+      next();
+      return;
+    }
 
     const [settings] = await db.select().from(bookingSettingsTable).where(eq(bookingSettingsTable.companyId, call.companyId));
     const timeZone = settings?.timezone || "America/Toronto";
@@ -249,19 +277,19 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     if (SOONEST.test(speech)) {
       const { slots } = await findSoonest(call.companyId, speech);
       if (!slots.length) {
-        res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say voice="${FALLBACK_VOICE}">${xml("I don't see an open appointment slot on the configured calendar right now. I can take your details and have the team contact you to arrange the soonest time.")}</Say>\n  <Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="en-US" action="${baseUrl(req)}/api/twilio/ai-gather" method="POST"></Gather>\n  <Hangup/>\n</Response>`);
+        res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say voice="${FALLBACK_VOICE}">${xml("I checked the calendar, but I don't see an open appointment slot in the configured booking window. I can take your details and have the team contact you, or you can give me another date preference.")}</Say>\n  <Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="en-US" action="${baseUrl(req)}/api/twilio/ai-gather" method="POST"></Gather>\n  <Hangup/>\n</Response>`);
         return;
       }
 
       pendingOffers.set(callSid, { companyId: call.companyId, slots, expiresAt: Date.now() + 10 * 60_000 });
       const offer = spokenOptions(slots, timeZone);
-      logger.info({ callSid, slots: slots.map(s => s.iso) }, "Offered real calendar availability to caller");
+      logger.info({ callSid, companyId: call.companyId, slots: slots.map(s => s.iso) }, "Offered real calendar availability to caller");
       res.type("text/xml").send(`<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say voice="${FALLBACK_VOICE}">${xml(offer)}</Say>\n  <Gather input="speech" timeout="10" speechTimeout="auto" speechModel="experimental_conversations" language="en-US" action="${baseUrl(req)}/api/twilio/ai-gather" method="POST"></Gather>\n  <Redirect method="POST">${baseUrl(req)}/api/twilio/ai-continue?callSid=${encodeURIComponent(callSid)}</Redirect>\n</Response>`);
       return;
     }
 
     if (BOOKING_WORDS.test(speech)) {
-      req.body.SpeechResult = `${speech}. [Reliable scheduling context: the current local date/time is ${nowText}. Never infer a past year. Never book a time the caller has not explicitly accepted.]`;
+      req.body.SpeechResult = `${speech}. [Reliable scheduling context: the current local date/time is ${nowText}. IMPORTANT: "soonest", "earliest", "ASAP", "first available", and similar wording do NOT mean same-day service; they mean search the calendar from the earliest valid slot forward. Never infer a past year. Never book a time the caller has not explicitly accepted.]`;
     }
 
     next();
