@@ -30,7 +30,7 @@ function bookingBlock(mode: BookingFlowMode): string {
   return `${START}
 BOOKING_FLOW_MODE=${mode}
 ${modeInstruction}
-For every mode: never claim an appointment is booked, confirmed, reserved, or available until the real calendar operation succeeds. For same-day requests, do not guarantee service or create a confirmed appointment; collect the service address/location, vehicle and service details, callback number, and preferred time, then say that someone from the team will get back to them shortly to confirm same-day availability. Use the phone line's configured timezone, defaulting to America/Toronto Eastern Time, and never mention UTC to callers.
+For every mode: never claim an appointment is booked, confirmed, reserved, or available until the real calendar operation succeeds. If you offer one or more available slots, STOP and ask the caller which exact slot they want. Never call the booking tool for an offered slot until the caller explicitly accepts that exact date and time. Words such as "soonest", "earliest", "ASAP", or "whatever is first" mean you must check the real calendar and OFFER the earliest available choices; they are not permission to book one automatically. Never invent a year or infer an old year from examples in the prompt; use the live current date/time supplied by the scheduling system. For same-day requests, do not guarantee service or create a confirmed appointment; collect the service address/location, vehicle and service details, callback number, and preferred time, then say that someone from the team will get back to them shortly to confirm same-day availability. Use the phone line's configured timezone, defaulting to America/Toronto Eastern Time, and never mention UTC to callers.
 ${END}`;
 }
 
