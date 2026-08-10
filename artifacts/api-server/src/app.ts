@@ -6,6 +6,7 @@ import path from "path";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 import bookingFlowSettingsRouter, { refreshStoredBookingFlowPrompts } from "./routes/booking-flow-settings";
+import bookingIntakeGuardRouter from "./routes/booking-intake-guard";
 import bookingOrchestratorRouter from "./routes/booking-orchestrator";
 import twilioAiGuardRouter from "./routes/twilio-ai-guard";
 import companyWhatsappNotificationsRouter, { disableLegacyGlobalAdminSms } from "./routes/company-whatsapp-notifications";
@@ -43,10 +44,10 @@ app.use(authMiddleware);
 disableLegacyGlobalAdminSms().catch(() => {});
 refreshStoredBookingFlowPrompts().catch(() => {});
 
-// The state-driven orchestrator owns new appointment conversations. It keeps a
-// deterministic per-call booking state, checks the real calendar, invalidates
-// only the scheduling field the caller changed, and temporarily holds selected
-// slots while the generic AI collects the remaining customer details.
+// Booking calls are now handled in layers: the intake guard prevents generic
+// booking intent from guessing a service, then the state-driven orchestrator
+// owns scheduling state, real availability, preference changes, and slot holds.
+app.use("/api", bookingIntakeGuardRouter);
 app.use("/api", bookingOrchestratorRouter);
 app.use("/api", twilioAiGuardRouter);
 app.use("/api", companyWhatsappNotificationsRouter);
