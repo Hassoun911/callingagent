@@ -140,7 +140,9 @@ export async function sendAdminWhatsappTemplate(args: {
   const client = twilioClient();
   if (!client) throw new Error("Twilio credentials are not configured");
 
-  const sender = assertProductionWhatsappSender(args.from);
+  // All company admin alerts use one approved CallingAgent production WhatsApp
+  // sender. Never fall back to the voice/SMS number supplied by a caller route.
+  const sender = getProductionWhatsappSender();
   const contentSid = process.env.TWILIO_ADMIN_ALERT_CONTENT_SID?.trim() || DEFAULT_ADMIN_CONTENT_SID;
   const template = await loadTemplate(contentSid);
   const contentVariables = buildVariables(template, args.context);
