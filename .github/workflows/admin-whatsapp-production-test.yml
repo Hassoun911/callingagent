@@ -1,0 +1,47 @@
+name: Admin WhatsApp Production Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/admin-whatsapp-production-test.yml'
+
+jobs:
+  test-admin-whatsapp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Wait for deploy and send one-shot test
+        shell: bash
+        run: |
+          set -u
+          URL='https://callingagent.ca/api/internal/admin-whatsapp-test'
+          TOKEN='zM8yQ1nK5vT7pR2cL9xF4aH6wD3sJ0uB'
+          for attempt in $(seq 1 24); do
+            echo "Attempt $attempt"
+            BODY_FILE=$(mktemp)
+            HTTP_CODE=$(curl -sS -o "$BODY_FILE" -w '%{http_code}' \
+              -X POST "$URL" \
+              -H "x-whatsapp-test-token: $TOKEN" \
+              -H 'content-type: application/json' \
+              --data '{"companyName":"All Tire Mobile Shop"}' || true)
+            BODY=$(cat "$BODY_FILE")
+            rm -f "$BODY_FILE"
+            echo "HTTP $HTTP_CODE"
+            echo "$BODY"
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Production WhatsApp test accepted by Twilio."
+              exit 0
+            fi
+
+            if [ "$HTTP_CODE" = "404" ]; then
+              sleep 20
+              continue
+            fi
+
+            exit 1
+          done
+
+          echo 'Timed out waiting for the live test endpoint to deploy.'
+          exit 1
