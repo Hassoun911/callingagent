@@ -1,22 +1,30 @@
 export type BookingDaypart = "morning" | "afternoon" | "evening" | null;
 export type BookingSlotStatus = "none" | "offered" | "held" | "expired" | "confirmed";
+export type BookingAvailabilityStatus = "not_searched" | "stale" | "searching" | "searched";
+export type BookingPhoneSource = "caller_id" | "spoken" | "existing_contact" | null;
 export type BookingAction =
   | "ASK_SERVICE"
   | "ASK_DATE"
   | "ASK_DAYPART"
   | "SEARCH_AVAILABILITY"
+  | "REVALIDATE_AVAILABILITY"
   | "OFFER_SLOTS"
   | "ASK_NAME"
   | "ASK_PHONE_CONFIRMATION"
   | "ASK_SERVICE_DETAIL"
   | "HOLD_SLOT"
+  | "RELEASE_HOLD"
+  | "HOLD_EXPIRED"
   | "CONFIRM_BOOKING"
   | "CREATE_BOOKING"
   | "BOOKING_COMPLETE"
-  | "NO_AVAILABILITY";
+  | "NO_AVAILABILITY"
+  | "ESCALATE_TO_HUMAN"
+  | "CANCEL_BOOKING_FLOW";
 
 export interface BookingSlotState {
   iso: string;
+  endIso: string;
   label: string;
   resourceId: number;
   serviceId: number | null;
@@ -31,6 +39,7 @@ export interface LiveBookingState {
   requestedDay: string | null;
   requestedDaypart: BookingDaypart;
   requestedTime: string | null;
+  availabilityStatus: BookingAvailabilityStatus;
   availabilityChecked: boolean;
   offeredSlots: BookingSlotState[];
   selectedSlot: BookingSlotState | null;
@@ -39,12 +48,17 @@ export interface LiveBookingState {
   holdExpiresAt: number | null;
   customerName: string | null;
   customerPhone: string | null;
+  customerPhoneSource: BookingPhoneSource;
   customerPhoneConfirmed: boolean;
   customerEmail: string | null;
   notes: Record<string, string>;
+  serviceAnswers: Record<string, string>;
   confirmed: boolean;
+  bookingAttempt: number;
+  idempotencyKey: string;
   bookingId: number | null;
   lastAction: BookingAction | null;
+  stateVersion: number;
   updatedAt: number;
   expiresAt: number;
 }
@@ -53,22 +67,32 @@ type SlotHold = {
   id: string;
   callSid: string;
   companyId: number;
+  serviceId: number | null;
   resourceId: number;
-  iso: string;
+  startIso: string;
+  endIso: string;
   expiresAt: number;
 };
+
+export class StaleBookingStateError extends Error {
+  constructor(public expectedVersion: number, public actualVersion: number) {
+    super(`Stale booking state update: expected version ${expectedVersion}, current version ${actualVersion}`);
+    this.name = "StaleBookingStateError";
+  }
+}
 
 const DEFAULT_TTL_MS = 15 * 60_000;
 const DEFAULT_HOLD_MS = 4 * 60_000;
 const states = new Map<string, LiveBookingState>();
 const slotHolds = new Map<string, SlotHold>();
 
-function holdKey(companyId: number, resourceId: number, iso: string): string {
-  return `${companyId}:${resourceId}:${iso}`;
+function exactHoldKey(companyId: number, slot: BookingSlotState): string {
+  return [companyId, slot.serviceId ?? "none", slot.resourceId, slot.iso, slot.endIso].join(":");
 }
 
 function fresh(callSid: string, companyId: number): LiveBookingState {
   const now = Date.now();
+  const bookingAttempt = 1;
   return {
     callSid,
     companyId,
@@ -78,6 +102,7 @@ function fresh(callSid: string, companyId: number): LiveBookingState {
     requestedDay: null,
     requestedDaypart: null,
     requestedTime: null,
+    availabilityStatus: "not_searched",
     availabilityChecked: false,
     offeredSlots: [],
     selectedSlot: null,
@@ -86,42 +111,59 @@ function fresh(callSid: string, companyId: number): LiveBookingState {
     holdExpiresAt: null,
     customerName: null,
     customerPhone: null,
+    customerPhoneSource: null,
     customerPhoneConfirmed: false,
     customerEmail: null,
     notes: {},
+    serviceAnswers: {},
     confirmed: false,
+    bookingAttempt,
+    idempotencyKey: `${callSid}:${bookingAttempt}`,
     bookingId: null,
     lastAction: null,
+    stateVersion: 1,
     updatedAt: now,
     expiresAt: now + DEFAULT_TTL_MS,
   };
 }
 
-function touch(state: LiveBookingState): LiveBookingState {
+function refreshTtl(state: LiveBookingState): LiveBookingState {
+  state.expiresAt = Date.now() + DEFAULT_TTL_MS;
+  return state;
+}
+
+function mutate(state: LiveBookingState, expectedVersion?: number): LiveBookingState {
+  if (expectedVersion !== undefined && state.stateVersion !== expectedVersion) {
+    throw new StaleBookingStateError(expectedVersion, state.stateVersion);
+  }
+  state.stateVersion += 1;
   state.updatedAt = Date.now();
   state.expiresAt = state.updatedAt + DEFAULT_TTL_MS;
   return state;
 }
 
-function releaseHoldsForCall(callSid: string, expired = false): void {
+function releaseHoldsForCall(callSid: string, expired = false, mutateState = true): void {
   for (const [key, hold] of slotHolds) {
-    if (hold.callSid !== callSid) continue;
-    slotHolds.delete(key);
+    if (hold.callSid === callSid) slotHolds.delete(key);
   }
   const state = states.get(callSid);
-  if (state && state.slotStatus === "held") {
-    state.slotStatus = expired ? "expired" : "none";
-    state.holdId = null;
-    state.holdExpiresAt = null;
-    if (expired) state.selectedSlot = null;
-    touch(state);
+  if (!state || state.slotStatus !== "held") return;
+  state.slotStatus = expired ? "expired" : "none";
+  state.holdId = null;
+  state.holdExpiresAt = null;
+  if (expired) {
+    state.selectedSlot = null;
+    state.availabilityStatus = "stale";
+    state.availabilityChecked = false;
+    state.lastAction = "HOLD_EXPIRED";
   }
+  if (mutateState) mutate(state);
 }
 
 export function getBookingState(callSid: string, companyId: number): LiveBookingState {
   const existing = states.get(callSid);
-  if (existing && existing.expiresAt > Date.now() && existing.companyId === companyId) return touch(existing);
-  if (existing) releaseHoldsForCall(callSid, true);
+  if (existing && existing.expiresAt > Date.now() && existing.companyId === companyId) return refreshTtl(existing);
+  if (existing) releaseHoldsForCall(callSid, true, false);
   const state = fresh(callSid, companyId);
   states.set(callSid, state);
   return state;
@@ -133,13 +175,18 @@ export function peekBookingState(callSid: string): LiveBookingState | null {
   if (state.holdExpiresAt && state.holdExpiresAt <= Date.now() && state.slotStatus === "held") {
     releaseHoldsForCall(callSid, true);
   }
-  return states.get(callSid) ?? null;
+  const current = states.get(callSid) ?? null;
+  if (current) refreshTtl(current);
+  return current;
 }
 
-export function setBookingAction(callSid: string, companyId: number, action: BookingAction): LiveBookingState {
+export function setBookingAction(callSid: string, companyId: number, action: BookingAction, expectedVersion?: number): LiveBookingState {
   const state = getBookingState(callSid, companyId);
+  if (expectedVersion !== undefined && state.stateVersion !== expectedVersion) throw new StaleBookingStateError(expectedVersion, state.stateVersion);
+  if (state.lastAction === action) return refreshTtl(state);
   state.lastAction = action;
-  return touch(state);
+  if (action === "SEARCH_AVAILABILITY" || action === "REVALIDATE_AVAILABILITY") state.availabilityStatus = "searching";
+  return mutate(state);
 }
 
 export function setSchedulingPreference(
@@ -152,13 +199,20 @@ export function setSchedulingPreference(
     serviceId?: number | null;
     serviceName?: string | null;
   },
+  expectedVersion?: number,
 ): LiveBookingState {
   const state = getBookingState(callSid, companyId);
+  if (expectedVersion !== undefined && state.stateVersion !== expectedVersion) throw new StaleBookingStateError(expectedVersion, state.stateVersion);
+
   const dayChanged = patch.requestedDay !== undefined && patch.requestedDay !== state.requestedDay;
   const partChanged = patch.requestedDaypart !== undefined && patch.requestedDaypart !== state.requestedDaypart;
   const timeChanged = patch.requestedTime !== undefined && patch.requestedTime !== state.requestedTime;
   const serviceChanged = patch.serviceId !== undefined && patch.serviceId !== state.serviceId;
   const serviceNameChanged = patch.serviceName !== undefined && patch.serviceName !== state.serviceName;
+  const changed = dayChanged || partChanged || timeChanged || serviceChanged || serviceNameChanged;
+
+  if (!changed) return refreshTtl(state);
+  releaseHoldsForCall(callSid, false, false);
 
   if (patch.requestedDay !== undefined) state.requestedDay = patch.requestedDay;
   if (patch.requestedDaypart !== undefined) state.requestedDaypart = patch.requestedDaypart;
@@ -166,26 +220,24 @@ export function setSchedulingPreference(
   if (patch.serviceId !== undefined) state.serviceId = patch.serviceId;
   if (patch.serviceName !== undefined) state.serviceName = patch.serviceName;
 
-  if (dayChanged || partChanged || timeChanged || serviceChanged || serviceNameChanged) {
-    // Dependency-based invalidation: keep caller identity and unrelated details,
-    // but invalidate all calendar-derived data whenever scheduling inputs change.
-    releaseHoldsForCall(callSid);
-    state.availabilityChecked = false;
-    state.offeredSlots = [];
-    state.selectedSlot = null;
-    state.slotStatus = "none";
-    state.holdId = null;
-    state.holdExpiresAt = null;
-    state.confirmed = false;
-    state.bookingId = null;
-  }
-
-  return touch(state);
+  state.availabilityStatus = "stale";
+  state.availabilityChecked = false;
+  state.offeredSlots = [];
+  state.selectedSlot = null;
+  state.slotStatus = "none";
+  state.holdId = null;
+  state.holdExpiresAt = null;
+  state.confirmed = false;
+  state.bookingId = null;
+  if (serviceChanged || serviceNameChanged) state.serviceAnswers = {};
+  return mutate(state);
 }
 
-export function setAvailabilityResult(callSid: string, companyId: number, slots: BookingSlotState[]): LiveBookingState {
+export function setAvailabilityResult(callSid: string, companyId: number, slots: BookingSlotState[], expectedVersion?: number): LiveBookingState {
   const state = getBookingState(callSid, companyId);
-  releaseHoldsForCall(callSid);
+  if (expectedVersion !== undefined && state.stateVersion !== expectedVersion) throw new StaleBookingStateError(expectedVersion, state.stateVersion);
+  releaseHoldsForCall(callSid, false, false);
+  state.availabilityStatus = "searched";
   state.availabilityChecked = true;
   state.offeredSlots = slots;
   state.selectedSlot = null;
@@ -193,7 +245,7 @@ export function setAvailabilityResult(callSid: string, companyId: number, slots:
   state.holdId = null;
   state.holdExpiresAt = null;
   state.confirmed = false;
-  return touch(state);
+  return mutate(state);
 }
 
 export function holdBookingSlot(
@@ -201,38 +253,43 @@ export function holdBookingSlot(
   companyId: number,
   slot: BookingSlotState,
   holdMs = DEFAULT_HOLD_MS,
+  expectedVersion?: number,
 ): LiveBookingState {
+  const state = getBookingState(callSid, companyId);
+  if (expectedVersion !== undefined && state.stateVersion !== expectedVersion) throw new StaleBookingStateError(expectedVersion, state.stateVersion);
   const now = Date.now();
-  const key = holdKey(companyId, slot.resourceId, slot.iso);
+  const key = exactHoldKey(companyId, slot);
   const existing = slotHolds.get(key);
   if (existing && existing.expiresAt > now && existing.callSid !== callSid) {
     throw new Error("That appointment time is temporarily being held for another caller.");
   }
 
-  releaseHoldsForCall(callSid);
+  releaseHoldsForCall(callSid, false, false);
   const hold: SlotHold = {
-    id: `${callSid}:${slot.resourceId}:${now}`,
+    id: `${state.idempotencyKey}:${slot.serviceId ?? "none"}:${slot.resourceId}:${slot.iso}:${slot.endIso}`,
     callSid,
     companyId,
+    serviceId: slot.serviceId,
     resourceId: slot.resourceId,
-    iso: slot.iso,
+    startIso: slot.iso,
+    endIso: slot.endIso,
     expiresAt: now + holdMs,
   };
   slotHolds.set(key, hold);
 
-  const state = getBookingState(callSid, companyId);
   state.selectedSlot = slot;
   state.offeredSlots = state.offeredSlots.length ? state.offeredSlots : [slot];
+  state.availabilityStatus = "searched";
   state.availabilityChecked = true;
   state.slotStatus = "held";
   state.holdId = hold.id;
   state.holdExpiresAt = hold.expiresAt;
   state.confirmed = false;
-  return touch(state);
+  return mutate(state);
 }
 
-export function isSlotHeldByAnother(callSid: string, companyId: number, resourceId: number, iso: string): boolean {
-  const key = holdKey(companyId, resourceId, iso);
+export function isSlotHeldByAnother(callSid: string, companyId: number, slot: BookingSlotState): boolean {
+  const key = exactHoldKey(companyId, slot);
   const hold = slotHolds.get(key);
   if (!hold) return false;
   if (hold.expiresAt <= Date.now()) {
@@ -246,12 +303,17 @@ export function hasValidBookingHold(callSid: string): boolean {
   const state = peekBookingState(callSid);
   if (!state || state.slotStatus !== "held" || !state.selectedSlot || !state.holdId || !state.holdExpiresAt) return false;
   if (state.holdExpiresAt <= Date.now()) return false;
-  const hold = slotHolds.get(holdKey(state.companyId, state.selectedSlot.resourceId, state.selectedSlot.iso));
+  const hold = slotHolds.get(exactHoldKey(state.companyId, state.selectedSlot));
   return !!hold && hold.callSid === callSid && hold.id === state.holdId && hold.expiresAt > Date.now();
 }
 
-export function releaseBookingHold(callSid: string): void {
-  releaseHoldsForCall(callSid);
+export function releaseBookingHold(callSid: string, expectedVersion?: number): LiveBookingState | null {
+  const state = peekBookingState(callSid);
+  if (!state) return null;
+  if (expectedVersion !== undefined && state.stateVersion !== expectedVersion) throw new StaleBookingStateError(expectedVersion, state.stateVersion);
+  releaseHoldsForCall(callSid, false, false);
+  state.lastAction = "RELEASE_HOLD";
+  return mutate(state);
 }
 
 export function setCustomerDetails(
@@ -260,35 +322,57 @@ export function setCustomerDetails(
   patch: {
     customerName?: string | null;
     customerPhone?: string | null;
+    customerPhoneSource?: BookingPhoneSource;
     customerPhoneConfirmed?: boolean;
     customerEmail?: string | null;
     notes?: Record<string, string>;
+    serviceAnswers?: Record<string, string>;
   },
+  expectedVersion?: number,
 ): LiveBookingState {
   const state = getBookingState(callSid, companyId);
-  if (patch.customerName !== undefined) state.customerName = patch.customerName;
-  if (patch.customerPhone !== undefined) state.customerPhone = patch.customerPhone;
-  if (patch.customerPhoneConfirmed !== undefined) state.customerPhoneConfirmed = patch.customerPhoneConfirmed;
-  if (patch.customerEmail !== undefined) state.customerEmail = patch.customerEmail;
-  if (patch.notes) state.notes = { ...state.notes, ...patch.notes };
-  return touch(state);
+  if (expectedVersion !== undefined && state.stateVersion !== expectedVersion) throw new StaleBookingStateError(expectedVersion, state.stateVersion);
+  let changed = false;
+  const assign = <K extends keyof LiveBookingState>(key: K, value: LiveBookingState[K]) => {
+    if (state[key] !== value) { state[key] = value; changed = true; }
+  };
+  if (patch.customerName !== undefined) assign("customerName", patch.customerName);
+  if (patch.customerPhone !== undefined) assign("customerPhone", patch.customerPhone);
+  if (patch.customerPhoneSource !== undefined) assign("customerPhoneSource", patch.customerPhoneSource);
+  if (patch.customerPhoneConfirmed !== undefined) assign("customerPhoneConfirmed", patch.customerPhoneConfirmed);
+  if (patch.customerEmail !== undefined) assign("customerEmail", patch.customerEmail);
+  if (patch.notes) { state.notes = { ...state.notes, ...patch.notes }; changed = true; }
+  if (patch.serviceAnswers) { state.serviceAnswers = { ...state.serviceAnswers, ...patch.serviceAnswers }; changed = true; }
+  return changed ? mutate(state) : refreshTtl(state);
 }
 
-export function markBookingConfirmed(callSid: string, companyId: number): LiveBookingState {
+export function markBookingConfirmed(callSid: string, companyId: number, expectedVersion?: number): LiveBookingState {
   const state = getBookingState(callSid, companyId);
+  if (expectedVersion !== undefined && state.stateVersion !== expectedVersion) throw new StaleBookingStateError(expectedVersion, state.stateVersion);
+  if (state.confirmed) return refreshTtl(state);
   state.confirmed = true;
-  return touch(state);
+  return mutate(state);
 }
 
-export function markBookingCreated(callSid: string, companyId: number, bookingId: number): LiveBookingState {
+export function beginNewBookingAttempt(callSid: string, companyId: number, expectedVersion?: number): LiveBookingState {
   const state = getBookingState(callSid, companyId);
+  if (expectedVersion !== undefined && state.stateVersion !== expectedVersion) throw new StaleBookingStateError(expectedVersion, state.stateVersion);
+  state.bookingAttempt += 1;
+  state.idempotencyKey = `${callSid}:${state.bookingAttempt}`;
+  state.bookingId = null;
+  state.confirmed = false;
+  return mutate(state);
+}
+
+export function markBookingCreated(callSid: string, companyId: number, bookingId: number, expectedVersion?: number): LiveBookingState {
+  const state = getBookingState(callSid, companyId);
+  if (expectedVersion !== undefined && state.stateVersion !== expectedVersion) throw new StaleBookingStateError(expectedVersion, state.stateVersion);
   state.confirmed = true;
   state.bookingId = bookingId;
+  releaseHoldsForCall(callSid, false, false);
   state.slotStatus = "confirmed";
   state.lastAction = "BOOKING_COMPLETE";
-  releaseHoldsForCall(callSid);
-  state.slotStatus = "confirmed";
-  return touch(state);
+  return mutate(state);
 }
 
 export function bookingStatePrompt(state: LiveBookingState): string {
@@ -302,12 +386,11 @@ export function bookingStatePrompt(state: LiveBookingState): string {
     state.customerPhone ? `customer_phone=${state.customerPhone}` : null,
     state.customerEmail ? `customer_email=${state.customerEmail}` : null,
   ].filter(Boolean).join(", ");
-
-  return `[BOOKING STATE - INTERNAL ONLY: ${known || "intent detected; scheduling details not collected yet"}. availability_checked=${state.availabilityChecked}. slot_status=${state.slotStatus}. last_action=${state.lastAction ?? "none"}. offered_slots=${state.offeredSlots.map(slot => slot.label).join(" | ") || "none"}. Ask only for the next missing piece. Never ask for a value already present here. If the caller changes one field, preserve every unrelated field and invalidate only dependent scheduling data.]`;
+  return `[BOOKING STATE - INTERNAL ONLY: ${known || "intent detected; scheduling details not collected yet"}. state_version=${state.stateVersion}. availability_status=${state.availabilityStatus}. slot_status=${state.slotStatus}. last_action=${state.lastAction ?? "none"}. offered_slots=${state.offeredSlots.map(slot => slot.label).join(" | ") || "none"}. Ask only for the next missing piece. Never ask for a value already present here. If the caller changes one field, preserve every unrelated field and invalidate only dependent scheduling data.]`;
 }
 
 export function clearBookingState(callSid: string): void {
-  releaseHoldsForCall(callSid);
+  releaseHoldsForCall(callSid, false, false);
   states.delete(callSid);
 }
 
@@ -315,11 +398,9 @@ export function expireBookingStates(now = Date.now()): void {
   for (const [callSid, state] of states) {
     if (state.holdExpiresAt && state.holdExpiresAt <= now && state.slotStatus === "held") releaseHoldsForCall(callSid, true);
     if (state.expiresAt <= now) {
-      releaseHoldsForCall(callSid, true);
+      releaseHoldsForCall(callSid, true, false);
       states.delete(callSid);
     }
   }
-  for (const [key, hold] of slotHolds) {
-    if (hold.expiresAt <= now) slotHolds.delete(key);
-  }
+  for (const [key, hold] of slotHolds) if (hold.expiresAt <= now) slotHolds.delete(key);
 }
