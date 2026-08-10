@@ -7,6 +7,7 @@ import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 import bookingFlowSettingsRouter, { refreshStoredBookingFlowPrompts } from "./routes/booking-flow-settings";
 import bookingIntakeGuardRouter from "./routes/booking-intake-guard";
+import bookingPreferenceGuardRouter from "./routes/booking-preference-guard";
 import bookingOrchestratorRouter from "./routes/booking-orchestrator";
 import twilioAiGuardRouter from "./routes/twilio-ai-guard";
 import companyWhatsappNotificationsRouter, { disableLegacyGlobalAdminSms } from "./routes/company-whatsapp-notifications";
@@ -44,10 +45,12 @@ app.use(authMiddleware);
 disableLegacyGlobalAdminSms().catch(() => {});
 refreshStoredBookingFlowPrompts().catch(() => {});
 
-// Booking calls are now handled in layers: the intake guard prevents generic
-// booking intent from guessing a service, then the state-driven orchestrator
-// owns scheduling state, real availability, preference changes, and slot holds.
+// Booking calls are handled in layers. Intake prevents generic service guesses;
+// preference interrupts make a newly requested day/time or explicit "book it"
+// outrank stale offered slots; the orchestrator then owns validated state,
+// calendar search, holds, confirmation, and appointment creation.
 app.use("/api", bookingIntakeGuardRouter);
+app.use("/api", bookingPreferenceGuardRouter);
 app.use("/api", bookingOrchestratorRouter);
 app.use("/api", twilioAiGuardRouter);
 app.use("/api", companyWhatsappNotificationsRouter);
