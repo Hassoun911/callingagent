@@ -45,6 +45,7 @@ const SERVICE_SYNONYMS: Record<string, string> = {
   puncture: "repair",
   leaking: "leak",
 };
+const NAME_CONTROL_WORDS = /\b(?:book|booking|appointment|schedule|service|available|availability|morning|afternoon|evening|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|cancel|change|phone|number|email|address)\b/i;
 
 function baseUrl(req: any): string {
   return process.env.APP_URL
@@ -136,10 +137,6 @@ function cleanServicePhrase(value: string): string | null {
 
 function explicitServiceCandidate(speech: string, askedForService: boolean): string | null {
   const lower = speech.toLowerCase().replace(/\bappt\b/g, "appointment");
-
-  // Prefer the noun phrase that follows normal booking language. This keeps
-  // greetings/filler out of the service: "Hi Nancy, I'm trying to book an
-  // appointment for oil change" -> "oil change".
   const patterns = [
     /\b(?:appointment|booking)\s+(?:for|to get|to have)\s+(.+)$/i,
     /\b(?:book|schedule)\s+(?:me\s+)?(?:an?\s+)?(.+)$/i,
@@ -150,20 +147,32 @@ function explicitServiceCandidate(speech: string, askedForService: boolean): str
     const candidate = match?.[1] ? cleanServicePhrase(match[1]) : null;
     if (candidate) return candidate;
   }
-
-  // If Nancy explicitly asked for the service, a short direct reply such as
-  // "oil change" or "tire repair" is itself the service phrase.
   if (askedForService) return cleanServicePhrase(lower);
   if (!BOOKING_INTENT.test(lower)) return null;
   return null;
 }
 
 function simpleName(speech: string): string | null {
-  const explicit = speech.match(/\b(?:my name is|name is|this is)\s+([A-Za-z][A-Za-z' -]{1,60})/i)?.[1]?.trim();
-  if (explicit) return explicit;
-  const trimmed = speech.trim();
-  if (/^[A-Za-z][A-Za-z' -]{1,60}$/.test(trimmed) && !YES.test(trimmed) && !BOOK_NOW.test(trimmed)) return trimmed;
-  return null;
+  let candidate = speech.trim();
+  if (!candidate) return null;
+
+  // ASK_NAME is a constrained turn. Accept natural receptionist answers such as
+  // "it's Sam", "yeah, Sam Hassoun", "the name is Sam", or "Sam here".
+  candidate = candidate
+    .replace(/^[\s,.!-]*(?:yes|yeah|yep|yup|sure|okay|ok|correct|right)[\s,.!-]+/i, "")
+    .replace(/^\s*(?:my\s+name(?:\s+is|'s)|the\s+name\s+is|name\s+is|this\s+is|it\s+is|it's|i\s+am|i'm)\s+/i, "")
+    .replace(/\s+(?:here|speaking)\s*[.!]?$/i, "")
+    .replace(/[.!?,]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!candidate || candidate.length > 60) return null;
+  if (NAME_CONTROL_WORDS.test(candidate) || BOOK_NOW.test(candidate)) return null;
+  if (/\d|@/.test(candidate)) return null;
+  if (!/^[A-Za-z][A-Za-z' -]*$/.test(candidate)) return null;
+  const words = candidate.split(/\s+/).filter(Boolean);
+  if (words.length < 1 || words.length > 5) return null;
+  return candidate;
 }
 
 function parseTimeText(speech: string, state: LiveBookingState): string | null {
@@ -224,6 +233,21 @@ async function ensureCallerIdSource(state: LiveBookingState, call: any): Promise
   return state;
 }
 
+function respondAfterName(req: any, res: any, state: LiveBookingState): LiveBookingState {
+  if (!state.customerPhone) {
+    const nextState = setBookingAction(state.callSid, state.companyId, "ASK_PHONE_CONFIRMATION", state.stateVersion);
+    res.type("text/xml").send(gatherResponse(req, "Thanks. What's the best phone number for the confirmation?"));
+    return nextState;
+  }
+
+  // Whether caller ID, saved contact, or a phone already confirmed earlier in
+  // the call, once the name is known the next conversational step is one final
+  // booking summary. Never ask for the name again.
+  const nextState = setBookingAction(state.callSid, state.companyId, "CONFIRM_BOOKING", state.stateVersion);
+  res.type("text/xml").send(gatherResponse(req, finalSummary(nextState)));
+  return nextState;
+}
+
 router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
   const callSid = String(req.body?.CallSid ?? "");
   const speech = String(req.body?.SpeechResult ?? "").trim();
@@ -274,6 +298,24 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
       return;
     }
 
+    // ASK_NAME is owned by this guard. Never fall through to another layer that
+    // could emit the same question again. Save a natural name reply once, then
+    // immediately advance; otherwise ask one explicit clarification.
+    if (state.lastAction === "ASK_NAME") {
+      if (!state.customerName) {
+        const name = simpleName(speech);
+        if (!name) {
+          logger.info({ callSid, speech }, "Could not safely normalize ASK_NAME reply; requesting one clarification without falling through");
+          res.type("text/xml").send(gatherResponse(req, "Sorry, I didn't catch the name. Please say the name you'd like on the appointment."));
+          return;
+        }
+        state = setCustomerDetails(callSid, state.companyId, { customerName: name }, state.stateVersion);
+        logger.info({ callSid, customerName: name }, "Captured customer name and advanced booking flow");
+      }
+      respondAfterName(req, res, state);
+      return;
+    }
+
     if (state.offeredSlots.length && !state.selectedSlot) {
       const chosen = selectOfferedSlot(speech, state);
       if (chosen) {
@@ -298,23 +340,6 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
         }
         next();
         return;
-      }
-    }
-
-    if (state.selectedSlot && state.lastAction === "ASK_NAME") {
-      const name = simpleName(speech);
-      if (name) {
-        state = setCustomerDetails(callSid, state.companyId, { customerName: name }, state.stateVersion);
-        if (!state.customerPhone) {
-          state = setBookingAction(callSid, state.companyId, "ASK_PHONE_CONFIRMATION", state.stateVersion);
-          res.type("text/xml").send(gatherResponse(req, "Thanks. What's the best phone number for the confirmation?"));
-          return;
-        }
-        if (knownPhone(state) && !state.customerPhoneConfirmed) {
-          state = setBookingAction(callSid, state.companyId, "CONFIRM_BOOKING", state.stateVersion);
-          res.type("text/xml").send(gatherResponse(req, finalSummary(state)));
-          return;
-        }
       }
     }
 
