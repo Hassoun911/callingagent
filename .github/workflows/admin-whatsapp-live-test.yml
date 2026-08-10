@@ -1,0 +1,49 @@
+name: Admin WhatsApp Live Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/admin-whatsapp-live-test.yml'
+
+jobs:
+  test-admin-whatsapp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Wait for deploy and send one-shot test
+        shell: bash
+        run: |
+          set -u
+          URL='https://callingagent.ca/api/internal/admin-whatsapp-test'
+          TOKEN='iknY2eEb8AH0nZERqrBOqk_iRXiHFxJc'
+          for attempt in $(seq 1 24); do
+            echo "Attempt $attempt"
+            BODY_FILE=$(mktemp)
+            HTTP_CODE=$(curl -sS -o "$BODY_FILE" -w '%{http_code}' \
+              -X POST "$URL" \
+              -H "x-whatsapp-test-token: $TOKEN" \
+              -H 'content-type: application/json' \
+              --data '{"companyName":"All Tire Mobile Shop"}' || true)
+            BODY=$(cat "$BODY_FILE")
+            rm -f "$BODY_FILE"
+            echo "HTTP $HTTP_CODE"
+            echo "$BODY"
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "WhatsApp test accepted by Twilio."
+              exit 0
+            fi
+
+            # 404 can mean Render has not deployed the new endpoint yet.
+            if [ "$HTTP_CODE" = "404" ]; then
+              sleep 20
+              continue
+            fi
+
+            # Any other response is the useful production error; stop and expose it in logs.
+            exit 1
+          done
+
+          echo 'Timed out waiting for the live test endpoint to deploy.'
+          exit 1
