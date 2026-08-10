@@ -54,20 +54,6 @@ export async function validateBookingBeforeCreate(
     return { ok: false, code: "INVALID_PHONE", reason: "The confirmation phone number is not valid." };
   }
 
-  // Persistent retry protection: a Twilio callback can be delivered more than once.
-  // A completed AI booking tied to this call log is returned instead of inserted again.
-  if (options.callLogId) {
-    const existingForCall = await executor.select().from(appointmentsTable).where(and(
-      eq(appointmentsTable.callLogId, options.callLogId),
-      eq(appointmentsTable.companyId, state.companyId),
-      eq(appointmentsTable.source, "ai_voice"),
-      ne(appointmentsTable.status, "cancelled"),
-    ));
-    if (existingForCall.length) {
-      return { ok: true, startTime: existingForCall[0].startTime, endTime: existingForCall[0].endTime ?? existingForCall[0].startTime, durationMinutes: 0, existingBookingId: existingForCall[0].id };
-    }
-  }
-
   const [resource] = await executor.select().from(bookingResourcesTable).where(and(
     eq(bookingResourcesTable.id, state.selectedSlot.resourceId),
     eq(bookingResourcesTable.companyId, state.companyId),
@@ -101,8 +87,28 @@ export async function validateBookingBeforeCreate(
     return { ok: false, code: "INVALID_SLOT", reason: "The selected appointment duration no longer matches the service." };
   }
 
-  // Re-read current appointments immediately before insert. When called from the
-  // create transaction, this executes after advisory locks are acquired.
+  // Persistent retry protection. The transaction is already serialized by the
+  // CallSid+bookingAttempt advisory lock. This DB check identifies the exact
+  // appointment produced by a retried callback without blocking a legitimate
+  // second booking later in the same phone call.
+  if (options.callLogId) {
+    const bookingsForCall = await executor.select().from(appointmentsTable).where(and(
+      eq(appointmentsTable.callLogId, options.callLogId),
+      eq(appointmentsTable.companyId, state.companyId),
+      eq(appointmentsTable.source, "ai_voice"),
+      ne(appointmentsTable.status, "cancelled"),
+    ));
+    const exactExisting = bookingsForCall.find((appointment: any) =>
+      appointment.resourceId === state.selectedSlot!.resourceId &&
+      appointment.serviceId === state.selectedSlot!.serviceId &&
+      appointment.startTime.getTime() === startTime.getTime() &&
+      (appointment.endTime?.getTime() ?? expectedEnd.getTime()) === endTime.getTime(),
+    );
+    if (exactExisting) {
+      return { ok: true, startTime: exactExisting.startTime, endTime: exactExisting.endTime ?? expectedEnd, durationMinutes, existingBookingId: exactExisting.id };
+    }
+  }
+
   const existing = await executor.select().from(appointmentsTable).where(and(
     eq(appointmentsTable.companyId, state.companyId),
     ne(appointmentsTable.status, "cancelled"),
