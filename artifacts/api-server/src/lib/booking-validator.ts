@@ -9,7 +9,7 @@ import { hasValidBookingHold, type LiveBookingState } from "./booking-state-mana
 
 export type BookingValidationResult =
   | { ok: true; startTime: Date; endTime: Date; durationMinutes: number }
-  | { ok: false; reason: string; code: "MISSING_STATE" | "HOLD_EXPIRED" | "MISSING_DETAILS" | "INVALID_PHONE" | "INVALID_SERVICE" | "INVALID_RESOURCE" | "SLOT_CONFLICT" | "DUPLICATE" };
+  | { ok: false; reason: string; code: "MISSING_STATE" | "HOLD_EXPIRED" | "MISSING_DETAILS" | "NOT_CONFIRMED" | "INVALID_PHONE" | "INVALID_SERVICE" | "INVALID_RESOURCE" | "SLOT_CONFLICT" | "DUPLICATE" };
 
 function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
   return aStart < bEnd && aEnd > bStart;
@@ -28,11 +28,17 @@ export async function validateBookingBeforeCreate(state: LiveBookingState): Prom
   if (state.bookingId) {
     return { ok: false, code: "DUPLICATE", reason: "This call already created an appointment." };
   }
+  if (!state.confirmed) {
+    return { ok: false, code: "NOT_CONFIRMED", reason: "The caller has not confirmed the final booking summary." };
+  }
   if (!hasValidBookingHold(state.callSid)) {
     return { ok: false, code: "HOLD_EXPIRED", reason: "The temporary hold expired before the booking was completed." };
   }
   if (!state.customerName?.trim() || !state.customerPhone?.trim()) {
     return { ok: false, code: "MISSING_DETAILS", reason: "Name and phone number are required before booking." };
+  }
+  if (!state.customerPhoneConfirmed) {
+    return { ok: false, code: "NOT_CONFIRMED", reason: "The caller has not confirmed the phone number for the appointment." };
   }
   if (!validPhone(state.customerPhone)) {
     return { ok: false, code: "INVALID_PHONE", reason: "The confirmation phone number is not valid." };
@@ -66,9 +72,9 @@ export async function validateBookingBeforeCreate(state: LiveBookingState): Prom
   }
   const endTime = new Date(startTime.getTime() + durationMinutes * 60_000);
 
-  // Re-read current appointments immediately before insert. The temporary hold
-  // protects callers inside this process; this final DB check also catches any
-  // appointment created by another process, dashboard user, or stale worker.
+  // Re-read the database immediately before insert. The in-memory hold protects
+  // live callers on this worker; this DB check also catches appointments created
+  // by another worker, a dashboard user, or an integration while the call ran.
   const existing = await db.select().from(appointmentsTable).where(and(
     eq(appointmentsTable.companyId, state.companyId),
     ne(appointmentsTable.status, "cancelled"),
