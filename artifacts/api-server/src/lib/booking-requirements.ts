@@ -2,19 +2,21 @@ import type { LiveBookingState } from "./booking-state-manager";
 
 export interface BookingRequirements {
   requireServiceLocation: boolean;
+  requirePostalCode: boolean;
   requireVehicle: boolean;
   requireTireCount: boolean;
   requireMountedStatus: boolean;
 }
 
 export type MissingBookingDetail = {
-  key: "service_location" | "vehicle" | "tire_count" | "mounted_on_rims";
+  key: "service_location" | "postal_code" | "vehicle" | "tire_count" | "mounted_on_rims";
   prompt: string;
   reason: string;
 };
 
 const DEFAULT_REQUIREMENTS: BookingRequirements = {
   requireServiceLocation: false,
+  requirePostalCode: false,
   requireVehicle: false,
   requireTireCount: false,
   requireMountedStatus: false,
@@ -30,6 +32,7 @@ export function bookingRequirementsForCompanyName(companyName?: string | null): 
   if (normalized === "all tire mobile shop") {
     return {
       requireServiceLocation: true,
+      requirePostalCode: true,
       requireVehicle: true,
       requireTireCount: true,
       requireMountedStatus: true,
@@ -47,6 +50,13 @@ export function missingRequiredBookingDetail(
       key: "service_location",
       prompt: "Before I finalize the appointment, what's the service address, including the city?",
       reason: "The service location is required before this company can book the appointment.",
+    };
+  }
+  if (requirements.requirePostalCode && !state.notes.postal_code?.trim()) {
+    return {
+      key: "postal_code",
+      prompt: "And what's the postal code for that service address?",
+      reason: "The postal code is required before this company can book the appointment.",
     };
   }
   if (requirements.requireVehicle && !state.notes.vehicle?.trim()) {
