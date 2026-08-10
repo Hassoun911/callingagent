@@ -106,7 +106,7 @@ export async function sendAdminWhatsappTemplate(args: {
   to: string;
   from: string;
   context: TemplateContext;
-}): Promise<void> {
+}): Promise<string> {
   const client = twilioClient();
   if (!client) throw new Error("Twilio credentials are not configured");
 
@@ -121,8 +121,9 @@ export async function sendAdminWhatsappTemplate(args: {
   };
   if (contentVariables) payload.contentVariables = contentVariables;
 
-  await client.messages.create(payload);
-  logger.info({ to: payload.to, contentSid }, "Admin WhatsApp template sent");
+  const result = await client.messages.create(payload);
+  logger.info({ to: payload.to, contentSid, sid: result.sid }, "Admin WhatsApp template sent");
+  return result.sid;
 }
 
 export { DEFAULT_ADMIN_CONTENT_SID };
