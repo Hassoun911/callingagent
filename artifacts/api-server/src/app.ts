@@ -9,6 +9,7 @@ import bookingFlowSettingsRouter, { refreshStoredBookingFlowPrompts } from "./ro
 import bookingContextGuardRouter from "./routes/booking-context-guard";
 import bookingIntakeGuardRouter from "./routes/booking-intake-guard";
 import bookingPreferenceGuardRouter from "./routes/booking-preference-guard";
+import bookingIntegrityGuardRouter from "./routes/booking-integrity-guard";
 import bookingOrchestratorRouter from "./routes/booking-orchestrator";
 import twilioAiGuardRouter from "./routes/twilio-ai-guard";
 import companyWhatsappNotificationsRouter, { disableLegacyGlobalAdminSms } from "./routes/company-whatsapp-notifications";
@@ -46,15 +47,15 @@ app.use(authMiddleware);
 disableLegacyGlobalAdminSms().catch(() => {});
 refreshStoredBookingFlowPrompts().catch(() => {});
 
-// Booking calls are handled in layers. Context first preserves an explicit
-// service from the caller's first booking turn and folds caller-ID confirmation
-// into the final booking summary. Intake prevents generic service guesses;
-// preference interrupts make a newly requested day/time or explicit "book it"
-// outrank stale offered slots; the orchestrator then owns validated state,
-// calendar search, holds, confirmation, and appointment creation.
+// Booking calls are handled in layers. Context first persists normalized facts
+// from every caller turn. Intake prevents generic service guesses; preference
+// interrupts make new day/time corrections outrank stale offers; integrity then
+// enforces company-scoped required details before the orchestrator is allowed to
+// confirm or create an appointment.
 app.use("/api", bookingContextGuardRouter);
 app.use("/api", bookingIntakeGuardRouter);
 app.use("/api", bookingPreferenceGuardRouter);
+app.use("/api", bookingIntegrityGuardRouter);
 app.use("/api", bookingOrchestratorRouter);
 app.use("/api", twilioAiGuardRouter);
 app.use("/api", companyWhatsappNotificationsRouter);
