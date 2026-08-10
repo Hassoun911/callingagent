@@ -21,16 +21,17 @@ import { logger } from "../lib/logger";
 const router: IRouter = Router();
 const FALLBACK_VOICE = "Google.en-US-Neural2-F";
 
-const BOOKING_INTENT = /\b(book|booking|appointment|schedule|scheduled|scheduling)\b/i;
+const BOOKING_INTENT = /\b(book|booking|appointment|appt|schedule|scheduled|scheduling)\b/i;
 const YES = /\b(yes|yeah|yep|yup|sure|correct|right|that's right|that is right|perfect|sounds good|go ahead|confirm|book it)\b/i;
 const BOOK_NOW = /\b(book it|book that|go ahead(?: and)? book(?: it| that)?|let'?s book(?: it| that)?|confirm it|take it|lock it in)\b/i;
 const TIME_SELECTION = /\b(?:i(?:'ll| will)? take|works|work for me|is good|sounds good|perfect|that one|that works|let'?s do)\b/i;
 const SERVICE_STOPWORDS = new Set([
-  "i", "me", "my", "we", "a", "an", "the", "to", "for", "please", "need", "want", "would", "like",
-  "book", "booking", "appointment", "schedule", "scheduled", "scheduling", "service", "services",
+  "i", "im", "i'm", "me", "my", "we", "a", "an", "the", "to", "for", "please", "need", "want", "would", "like",
+  "book", "booking", "appointment", "appointments", "appt", "schedule", "scheduled", "scheduling", "service", "services",
   "today", "tomorrow", "morning", "afternoon", "evening", "night", "available", "availability", "opening", "slot",
   "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "this", "next",
   "at", "around", "about", "am", "pm", "if", "you", "have", "something",
+  "hi", "hello", "hey", "nancy", "trying", "try", "just", "looking", "hoping", "get", "getting", "can", "could",
 ]);
 const SPOKEN_HOURS: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
@@ -112,16 +113,49 @@ function serviceScore(speech: string, name: string, description?: string | null)
   return score;
 }
 
-function explicitServiceCandidate(speech: string, askedForService: boolean): string | null {
-  const lower = speech.toLowerCase();
-  const words = lower
-    .replace(/\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?\b/g, " ")
-    .split(/[^a-z0-9]+/)
+function cleanServicePhrase(value: string): string | null {
+  const cleaned = value
+    .toLowerCase()
+    .replace(/\b(?:please|thanks|thank you)\b/g, " ")
+    .replace(/\b(?:on|this|next)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b.*$/i, " ")
+    .replace(/\b(?:today|tomorrow|morning|afternoon|evening|tonight)\b.*$/i, " ")
+    .replace(/\b(?:at|around|about)\s+\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)?\b.*$/i, " ")
+    .replace(/\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b.*$/i, " ")
+    .replace(/[^a-z0-9' -]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return null;
+
+  const words = cleaned
+    .split(/\s+/)
     .filter(Boolean)
     .filter(word => !SERVICE_STOPWORDS.has(word));
-  if (askedForService) return words.length ? words.join(" ") : null;
-  if (!BOOKING_INTENT.test(speech)) return null;
-  return words.length ? words.join(" ") : null;
+  if (!words.length) return null;
+  return words.slice(0, 6).join(" ");
+}
+
+function explicitServiceCandidate(speech: string, askedForService: boolean): string | null {
+  const lower = speech.toLowerCase().replace(/\bappt\b/g, "appointment");
+
+  // Prefer the noun phrase that follows normal booking language. This keeps
+  // greetings/filler out of the service: "Hi Nancy, I'm trying to book an
+  // appointment for oil change" -> "oil change".
+  const patterns = [
+    /\b(?:appointment|booking)\s+(?:for|to get|to have)\s+(.+)$/i,
+    /\b(?:book|schedule)\s+(?:me\s+)?(?:an?\s+)?(.+)$/i,
+    /\b(?:need|want|looking for|trying to get)\s+(?:an?\s+)?(.+?)(?:\s+appointment)?$/i,
+  ];
+  for (const pattern of patterns) {
+    const match = lower.match(pattern);
+    const candidate = match?.[1] ? cleanServicePhrase(match[1]) : null;
+    if (candidate) return candidate;
+  }
+
+  // If Nancy explicitly asked for the service, a short direct reply such as
+  // "oil change" or "tire repair" is itself the service phrase.
+  if (askedForService) return cleanServicePhrase(lower);
+  if (!BOOKING_INTENT.test(lower)) return null;
+  return null;
 }
 
 function simpleName(speech: string): string | null {
