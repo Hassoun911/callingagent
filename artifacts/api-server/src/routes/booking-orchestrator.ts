@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import {
   db,
   appointmentsTable,
@@ -16,6 +16,7 @@ import { logger } from "../lib/logger";
 import { sendBookingNotifications } from "../lib/notifications";
 import { validateBookingBeforeCreate } from "../lib/booking-validator";
 import {
+  clearBookingState,
   expireBookingStates,
   getBookingState,
   holdBookingSlot,
@@ -28,6 +29,7 @@ import {
   setBookingAction,
   setCustomerDetails,
   setSchedulingPreference,
+  StaleBookingStateError,
   type BookingAction,
   type BookingDaypart,
   type BookingSlotState,
@@ -44,13 +46,15 @@ const SOONEST = /\b(soonest|earliest|first available|next available|as soon as p
 const REJECT_OFFER = /\b(no|nope|nah|none|not that|not those|another|different|something else|other option|other time|another spot|another time|later one|find me another|none of those)\b/i;
 const YES = /\b(yes|yeah|yep|yup|sure|correct|right|that's right|that is right|perfect|sounds good|go ahead|book it|confirm)\b/i;
 const NO = /\b(no|nope|nah|not correct|that's wrong|that is wrong|change it)\b/i;
-const RESCHEDULE_OR_CANCEL = /\b(reschedule|cancel|change my appointment|move my appointment)\b/i;
+const CANCEL_FLOW = /\b(never mind|nevermind|forget it|don't book|do not book|stop booking|cancel this booking|cancel the booking process)\b/i;
+const HUMAN_REQUEST = /\b(human|person|representative|agent|someone from (?:the )?(?:team|office)|talk to someone|speak to someone)\b/i;
+const RESCHEDULE_OR_CANCEL = /\b(reschedule|cancel my appointment|cancel an appointment|change my appointment|move my appointment)\b/i;
 const SERVICE_STOPWORDS = new Set(["book", "booking", "appointment", "schedule", "scheduled", "scheduling", "availability", "available", "opening", "openings", "slot", "slots", "service", "services", "need", "want", "would", "like", "please", "today", "tomorrow", "morning", "afternoon", "evening"]);
 
 type Slot = BookingSlotState & { start: Date; end: Date };
 type CalendarResult = { slots: Slot[]; timeZone: string };
 type PendingCheck = { callSid: string; companyId: number; stateVersion: number; expiresAt: number; result?: CalendarResult; error?: string };
-type Decision = { action: BookingAction; text?: string; slots?: Slot[]; timeZone?: string };
+type Decision = { action: BookingAction; text?: string };
 
 const pendingChecks = new Map<string, PendingCheck>();
 
@@ -273,30 +277,32 @@ async function loadServices(companyId: number) {
   return db.select().from(bookingServicesTable).where(and(eq(bookingServicesTable.companyId, companyId), eq(bookingServicesTable.active, true)));
 }
 
-async function updateStateFromSpeech(state: LiveBookingState, speech: string) {
+async function updateStateFromSpeech(state: LiveBookingState, speech: string): Promise<{ services: any[]; state: LiveBookingState }> {
   const services = await loadServices(state.companyId);
   const ranked = services.map(service => ({ service, score: serviceScore(speech, service.name, service.description) })).sort((a, b) => b.score - a.score);
   const matched = ranked[0]?.score > 0 ? ranked[0].service : null;
   const singleService = services.length === 1 ? services[0] : null;
-  const requestedDay = extractRequestedDay(speech);
-  const requestedDaypart = extractDaypart(speech);
-  const requestedTime = extractRequestedTime(speech);
 
-  setSchedulingPreference(state.callSid, state.companyId, {
+  // Conversation understanding only extracts and normalizes facts here. The
+  // normalized patch is applied atomically against the version we actually read.
+  const schedulingPatch = {
     ...(matched ? { serviceId: matched.id, serviceName: matched.name } : (!state.serviceId && singleService ? { serviceId: singleService.id, serviceName: singleService.name } : {})),
-    ...(requestedDay ? { requestedDay } : {}),
-    ...(requestedDaypart !== undefined ? { requestedDaypart } : {}),
-    ...(requestedTime !== undefined ? { requestedTime } : {}),
-  });
+    ...(extractRequestedDay(speech) ? { requestedDay: extractRequestedDay(speech)! } : {}),
+    ...(extractDaypart(speech) !== undefined ? { requestedDaypart: extractDaypart(speech)! } : {}),
+    ...(extractRequestedTime(speech) !== undefined ? { requestedTime: extractRequestedTime(speech)! } : {}),
+  };
 
+  let current = setSchedulingPreference(state.callSid, state.companyId, schedulingPatch, state.stateVersion);
   const details = extractCustomerDetails(speech, state.lastAction);
   if (details.customerName || details.customerEmail || details.customerPhone) {
-    setCustomerDetails(state.callSid, state.companyId, {
-      ...details,
-      ...(details.customerPhone ? { customerPhoneConfirmed: true } : {}),
-    });
+    current = setCustomerDetails(state.callSid, state.companyId, {
+      customerName: details.customerName,
+      customerEmail: details.customerEmail,
+      customerPhone: details.customerPhone,
+      ...(details.customerPhone ? { customerPhoneSource: "spoken" as const, customerPhoneConfirmed: true } : {}),
+    }, current.stateVersion);
   }
-  return services;
+  return { services, state: current };
 }
 
 async function findAvailability(callSid: string, state: LiveBookingState): Promise<CalendarResult> {
@@ -347,9 +353,17 @@ async function findAvailability(callSid: string, state: LiveBookingState): Promi
             const appointmentEnd = appointment.endTime ?? new Date(appointment.startTime.getTime() + durationMinutes * 60_000);
             return overlaps(occupiedStart, occupiedEnd, appointment.startTime, appointmentEnd);
           })) continue;
-          const iso = start.toISOString();
-          if (isSlotHeldByAnother(callSid, state.companyId, resource.id, iso)) continue;
-          candidates.push({ start, end, iso, label: slotLabel(start, timeZone), resourceId: resource.id, serviceId: selectedService?.id ?? null });
+          const slot: Slot = {
+            start,
+            end,
+            iso: start.toISOString(),
+            endIso: end.toISOString(),
+            label: slotLabel(start, timeZone),
+            resourceId: resource.id,
+            serviceId: selectedService?.id ?? null,
+          };
+          if (isSlotHeldByAnother(callSid, state.companyId, slot)) continue;
+          candidates.push(slot);
         }
       }
     }
@@ -357,7 +371,7 @@ async function findAvailability(callSid: string, state: LiveBookingState): Promi
     if (candidates.length >= 12) break;
   }
 
-  const unique = Array.from(new Map(candidates.map(slot => [`${slot.resourceId}:${slot.iso}`, slot])).values());
+  const unique = Array.from(new Map(candidates.map(slot => [`${slot.serviceId ?? "none"}:${slot.resourceId}:${slot.iso}:${slot.endIso}`, slot])).values());
   unique.sort((a, b) => {
     if (preferredMinutes == null) return a.start.getTime() - b.start.getTime();
     const pa = localParts(a.start, timeZone); const pb = localParts(b.start, timeZone);
@@ -386,12 +400,12 @@ function selectedSlot(speech: string, slots: BookingSlotState[], timeZone: strin
   return null;
 }
 
-function startAvailabilityCheck(callSid: string, state: LiveBookingState): PendingCheck {
-  setBookingAction(callSid, state.companyId, "SEARCH_AVAILABILITY");
-  const currentState = getBookingState(callSid, state.companyId);
-  const check: PendingCheck = { callSid, companyId: state.companyId, stateVersion: currentState.updatedAt, expiresAt: Date.now() + 60_000 };
+function startAvailabilityCheck(callSid: string, state: LiveBookingState, revalidate = false): PendingCheck {
+  const action: BookingAction = revalidate ? "REVALIDATE_AVAILABILITY" : "SEARCH_AVAILABILITY";
+  const actionState = setBookingAction(callSid, state.companyId, action, state.stateVersion);
+  const check: PendingCheck = { callSid, companyId: state.companyId, stateVersion: actionState.stateVersion, expiresAt: Date.now() + 60_000 };
   pendingChecks.set(callSid, check);
-  void findAvailability(callSid, currentState).then(result => {
+  void findAvailability(callSid, actionState).then(result => {
     const current = pendingChecks.get(callSid); if (current === check) current.result = result;
   }).catch((error: any) => {
     const current = pendingChecks.get(callSid); if (current === check) current.error = error?.message || "Availability lookup failed";
@@ -407,9 +421,13 @@ function bookingSummary(state: LiveBookingState): string {
 }
 
 function nextDecision(state: LiveBookingState, servicesCount: number): Decision {
+  if (state.slotStatus === "expired" || state.availabilityStatus === "stale" && state.selectedSlot) {
+    return { action: "REVALIDATE_AVAILABILITY", text: "That hold expired, so I'll quickly recheck that time for you." };
+  }
+  if (servicesCount === 0) return { action: "ESCALATE_TO_HUMAN", text: "I can't safely complete that booking from the schedule I have. I'll have someone from the team help with this request." };
   if (!state.serviceId && servicesCount > 1) return { action: "ASK_SERVICE", text: "Absolutely. What would you like the appointment for?" };
   if (!state.requestedDay) return { action: "ASK_DATE", text: "Sure. What day works best for you?" };
-  if (!state.availabilityChecked) return { action: "SEARCH_AVAILABILITY" };
+  if (state.availabilityStatus === "not_searched" || state.availabilityStatus === "stale" || !state.availabilityChecked) return { action: "SEARCH_AVAILABILITY" };
   if (!state.selectedSlot) return state.offeredSlots.length ? { action: "OFFER_SLOTS" } : { action: "NO_AVAILABILITY", text: "I don't have an opening for that request. Would you like me to check another day or time?" };
   if (!state.customerName) return { action: "ASK_NAME", text: "Perfect. What's the name for the appointment?" };
   if (state.customerPhone && !state.customerPhoneConfirmed) return { action: "ASK_PHONE_CONFIRMATION", text: `And should I use the number you're calling from, ${naturalPhone(state.customerPhone)}, for the confirmation?` };
@@ -418,53 +436,89 @@ function nextDecision(state: LiveBookingState, servicesCount: number): Decision 
   return { action: "CREATE_BOOKING" };
 }
 
+function scheduleNotificationRetry(payload: Parameters<typeof sendBookingNotifications>[0], appointmentId: number, attempt = 1): void {
+  void sendBookingNotifications(payload).catch(error => {
+    logger.warn({ err: error?.message, appointmentId, attempt }, "Post-commit booking notification attempt failed");
+    if (attempt >= 3) return;
+    const delay = attempt * 15_000;
+    const timer = setTimeout(() => scheduleNotificationRetry(payload, appointmentId, attempt + 1), delay);
+    timer.unref();
+  });
+}
+
 async function createValidatedBooking(call: any, state: LiveBookingState): Promise<{ ok: true; text: string } | { ok: false; text: string; retryAvailability?: boolean }> {
-  const validation = await validateBookingBeforeCreate(state);
-  if (!validation.ok) {
-    logger.warn({ callSid: state.callSid, code: validation.code, reason: validation.reason }, "Booking validator rejected create");
+  if (!state.selectedSlot) return { ok: false, text: "I no longer have a selected appointment time. Let's choose a time again." };
+  const slotIdentity = [state.companyId, state.selectedSlot.serviceId ?? "none", state.selectedSlot.resourceId, state.selectedSlot.iso, state.selectedSlot.endIso].join(":");
+  const callLogId = call.log?.id ?? null;
+
+  const transactionResult = await db.transaction(async tx => {
+    // Idempotency lock serializes duplicate Twilio callbacks for the same booking attempt.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${state.idempotencyKey}))`);
+    // Exact-slot lock serializes cross-worker creates for company+service+resource+start+end.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${slotIdentity}))`);
+
+    const validation = await validateBookingBeforeCreate(state, { executor: tx, callLogId });
+    if (!validation.ok) return { validation } as const;
+
+    if (validation.existingBookingId) {
+      const [existing] = await tx.select().from(appointmentsTable).where(eq(appointmentsTable.id, validation.existingBookingId));
+      return { validation, appointment: existing, alreadyExisted: true } as const;
+    }
+
+    const notes = Object.keys(state.notes).length ? Object.entries(state.notes).map(([key, value]) => `${key}: ${value}`).join("; ") : null;
+    const [appointment] = await tx.insert(appointmentsTable).values({
+      companyId: state.companyId,
+      phoneNumberId: call.phone?.id ?? null,
+      callLogId,
+      resourceId: state.selectedSlot!.resourceId,
+      serviceId: state.selectedSlot!.serviceId,
+      source: "ai_voice",
+      customerName: state.customerName!,
+      customerPhone: normalizedPhone(state.customerPhone),
+      customerEmail: state.customerEmail,
+      title: state.serviceName || "Appointment",
+      notes,
+      startTime: validation.startTime,
+      endTime: validation.endTime,
+      status: "scheduled",
+    }).returning();
+    return { validation, appointment, alreadyExisted: false } as const;
+  });
+
+  if ("validation" in transactionResult && !transactionResult.validation.ok) {
+    const validation = transactionResult.validation;
+    logger.warn({ callSid: state.callSid, code: validation.code, reason: validation.reason, idempotencyKey: state.idempotencyKey }, "Booking validator rejected create");
     if (validation.code === "HOLD_EXPIRED" || validation.code === "SLOT_CONFLICT") {
       releaseBookingHold(state.callSid);
-      setAvailabilityResult(state.callSid, state.companyId, []);
+      const current = getBookingState(state.callSid, state.companyId);
+      setAvailabilityResult(state.callSid, state.companyId, [], current.stateVersion);
       return { ok: false, retryAvailability: true, text: validation.code === "SLOT_CONFLICT" ? "That time was just taken. I'll check the next closest options." : "That temporary hold expired. I'll check that time again for you." };
     }
     return { ok: false, text: validation.reason };
   }
 
-  const notes = Object.keys(state.notes).length ? Object.entries(state.notes).map(([key, value]) => `${key}: ${value}`).join("; ") : null;
-  const [appointment] = await db.insert(appointmentsTable).values({
-    companyId: state.companyId,
-    phoneNumberId: call.phone?.id ?? null,
-    callLogId: call.log?.id ?? null,
-    resourceId: state.selectedSlot!.resourceId,
-    serviceId: state.selectedSlot!.serviceId,
-    source: "ai_voice",
-    customerName: state.customerName!,
-    customerPhone: normalizedPhone(state.customerPhone),
-    customerEmail: state.customerEmail,
-    title: state.serviceName || "Appointment",
-    notes,
-    startTime: validation.startTime,
-    endTime: validation.endTime,
-    status: "scheduled",
-  }).returning();
-
+  const appointment = transactionResult.appointment;
   if (!appointment) return { ok: false, text: "I couldn't finish the booking just now. Please try again." };
-  markBookingCreated(state.callSid, state.companyId, appointment.id);
+  const current = getBookingState(state.callSid, state.companyId);
+  markBookingCreated(state.callSid, state.companyId, appointment.id, current.stateVersion);
 
-  const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, state.companyId));
-  sendBookingNotifications({
-    companyName: company?.name ?? "the business",
-    companyAdminEmail: company?.adminNotificationEmail ?? company?.email ?? null,
-    companyAdminWhatsapp: company?.adminWhatsapp ?? null,
-    customerName: appointment.customerName,
-    customerPhone: appointment.customerPhone,
-    customerEmail: appointment.customerEmail,
-    title: appointment.title,
-    notes: appointment.notes,
-    startTime: appointment.startTime,
-    endTime: appointment.endTime,
-    twilioFromNumber: call.phone?.number ?? call.log?.toNumber ?? null,
-  }).catch(error => logger.warn({ err: error?.message, appointmentId: appointment.id }, "Booking notification failed"));
+  // Notifications are post-commit side effects. Failures never invalidate the booking.
+  if (!transactionResult.alreadyExisted) {
+    const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, state.companyId));
+    scheduleNotificationRetry({
+      companyName: company?.name ?? "the business",
+      companyAdminEmail: company?.adminNotificationEmail ?? company?.email ?? null,
+      companyAdminWhatsapp: company?.adminWhatsapp ?? null,
+      customerName: appointment.customerName,
+      customerPhone: appointment.customerPhone,
+      customerEmail: appointment.customerEmail,
+      title: appointment.title,
+      notes: appointment.notes,
+      startTime: appointment.startTime,
+      endTime: appointment.endTime,
+      twilioFromNumber: call.phone?.number ?? call.log?.toNumber ?? null,
+    }, appointment.id);
+  }
 
   const [settings] = await db.select().from(bookingSettingsTable).where(eq(bookingSettingsTable.companyId, state.companyId));
   const timeZone = settings?.timezone || "America/Toronto";
@@ -481,23 +535,23 @@ router.post("/twilio/booking-availability-result", async (req: any, res): Promis
 
   pendingChecks.delete(callSid);
   const state = peekBookingState(callSid);
-  if (!state || state.companyId !== check.companyId || state.updatedAt !== check.stateVersion) {
-    if (state) startAvailabilityCheck(callSid, state);
+  if (!state || state.companyId !== check.companyId || state.stateVersion !== check.stateVersion) {
+    if (state) startAvailabilityCheck(callSid, state, true);
     res.type("text/xml").send(workingResponse(req, callSid, false, state?.requestedDay ?? null));
     return;
   }
 
   const { slots, timeZone } = check.result;
-  setAvailabilityResult(callSid, state.companyId, slots);
+  const resultState = setAvailabilityResult(callSid, state.companyId, slots, state.stateVersion);
   if (!slots.length) {
-    setBookingAction(callSid, state.companyId, "NO_AVAILABILITY");
-    const requested = state.requestedDay && state.requestedDay !== "soonest" ? ` on ${state.requestedDay}` : "";
+    setBookingAction(callSid, resultState.companyId, "NO_AVAILABILITY", resultState.stateVersion);
+    const requested = resultState.requestedDay && resultState.requestedDay !== "soonest" ? ` on ${resultState.requestedDay}` : "";
     res.type("text/xml").send(gatherResponse(req, `I don't have an opening${requested}. Would you like me to check another day or time?`));
     return;
   }
-  setBookingAction(callSid, state.companyId, "OFFER_SLOTS");
-  logger.info({ callSid, companyId: state.companyId, slots: slots.slice(0, 3).map(slot => slot.iso) }, "Offering validated real calendar slots");
-  res.type("text/xml").send(gatherResponse(req, spokenOptions(slots, timeZone, state.requestedDay)));
+  setBookingAction(callSid, resultState.companyId, "OFFER_SLOTS", resultState.stateVersion);
+  logger.info({ callSid, companyId: resultState.companyId, stateVersion: resultState.stateVersion, slots: slots.slice(0, 3).map(slot => slot.iso) }, "Offering validated real calendar slots");
+  res.type("text/xml").send(gatherResponse(req, spokenOptions(slots, timeZone, resultState.requestedDay)));
 });
 
 router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
@@ -512,26 +566,43 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     const hasIntent = BOOKING_INTENT.test(speech) || SOONEST.test(speech);
     if (!existing && !hasIntent) { next(); return; }
 
+    if (existing && CANCEL_FLOW.test(speech)) {
+      setBookingAction(callSid, existing.companyId, "CANCEL_BOOKING_FLOW", existing.stateVersion);
+      clearBookingState(callSid);
+      res.type("text/xml").send(gatherResponse(req, "No problem. I won't book anything. What else can I help you with?"));
+      return;
+    }
+    if (existing && HUMAN_REQUEST.test(speech)) {
+      setBookingAction(callSid, existing.companyId, "ESCALATE_TO_HUMAN", existing.stateVersion);
+      releaseBookingHold(callSid);
+      res.type("text/xml").send(gatherResponse(req, "Absolutely. I'll have someone from the team help with this request."));
+      return;
+    }
+
     let state = getBookingState(callSid, call.companyId);
     if (!state.customerPhone && call.log?.fromNumber && call.log.fromNumber !== "Anonymous") {
-      state = setCustomerDetails(callSid, call.companyId, { customerPhone: normalizedPhone(call.log.fromNumber), customerPhoneConfirmed: false });
+      state = setCustomerDetails(callSid, call.companyId, {
+        customerPhone: normalizedPhone(call.log.fromNumber),
+        customerPhoneSource: "caller_id",
+        customerPhoneConfirmed: false,
+      }, state.stateVersion);
     }
 
     const before = { serviceId: state.serviceId, requestedDay: state.requestedDay, requestedDaypart: state.requestedDaypart, requestedTime: state.requestedTime };
     const previousAction = state.lastAction;
-    const services = await updateStateFromSpeech(state, speech);
-    state = getBookingState(callSid, call.companyId);
+    const updated = await updateStateFromSpeech(state, speech);
+    const services = updated.services;
+    state = updated.state;
     const schedulingChanged = before.serviceId !== state.serviceId || before.requestedDay !== state.requestedDay || before.requestedDaypart !== state.requestedDaypart || before.requestedTime !== state.requestedTime;
 
     if (SOONEST.test(speech) && !state.requestedDay) {
-      state = setSchedulingPreference(callSid, state.companyId, { requestedDay: "soonest" });
+      state = setSchedulingPreference(callSid, state.companyId, { requestedDay: "soonest" }, state.stateVersion);
     }
 
-    // Confirmation of caller ID is handled as state, not as a new AI question.
     if (previousAction === "ASK_PHONE_CONFIRMATION" && state.customerPhone && !state.customerPhoneConfirmed && YES.test(speech)) {
-      state = setCustomerDetails(callSid, state.companyId, { customerPhoneConfirmed: true });
+      state = setCustomerDetails(callSid, state.companyId, { customerPhoneConfirmed: true }, state.stateVersion);
     } else if (previousAction === "ASK_PHONE_CONFIRMATION" && state.customerPhone && !state.customerPhoneConfirmed && NO.test(speech) && !extractCustomerDetails(speech, previousAction).customerPhone) {
-      state = setCustomerDetails(callSid, state.companyId, { customerPhone: null, customerPhoneConfirmed: false });
+      state = setCustomerDetails(callSid, state.companyId, { customerPhone: null, customerPhoneSource: null, customerPhoneConfirmed: false }, state.stateVersion);
     }
 
     if (state.offeredSlots.length && !state.selectedSlot && !schedulingChanged) {
@@ -540,69 +611,66 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
       const chosen = selectedSlot(speech, state.offeredSlots, timeZone);
       if (chosen) {
         try {
-          state = holdBookingSlot(callSid, state.companyId, chosen);
-          setBookingAction(callSid, state.companyId, "HOLD_SLOT");
-          logger.info({ callSid, selected: chosen.iso, holdExpiresAt: state.holdExpiresAt }, "Held selected slot for caller");
-        } catch {
-          setAvailabilityResult(callSid, state.companyId, []);
-          startAvailabilityCheck(callSid, state);
+          state = holdBookingSlot(callSid, state.companyId, chosen, undefined, state.stateVersion);
+          state = setBookingAction(callSid, state.companyId, "HOLD_SLOT", state.stateVersion);
+          logger.info({ callSid, selected: chosen.iso, end: chosen.endIso, holdExpiresAt: state.holdExpiresAt, stateVersion: state.stateVersion }, "Held exact selected slot for caller");
+        } catch (error: any) {
+          if (error instanceof StaleBookingStateError) throw error;
+          const current = getBookingState(callSid, state.companyId);
+          state = setAvailabilityResult(callSid, state.companyId, [], current.stateVersion);
+          startAvailabilityCheck(callSid, state, true);
           res.type("text/xml").send(workingResponse(req, callSid, true, state.requestedDay));
           return;
         }
       } else if (REJECT_OFFER.test(speech)) {
         const remaining = state.offeredSlots.slice(Math.min(3, state.offeredSlots.length));
         if (remaining.length) {
-          setAvailabilityResult(callSid, state.companyId, remaining);
-          setBookingAction(callSid, state.companyId, "OFFER_SLOTS");
-          res.type("text/xml").send(gatherResponse(req, `No problem. ${spokenOptions(remaining.map(slot => ({ ...slot, start: new Date(slot.iso), end: new Date(slot.iso) })), timeZone, state.requestedDay)}`));
+          state = setAvailabilityResult(callSid, state.companyId, remaining, state.stateVersion);
+          state = setBookingAction(callSid, state.companyId, "OFFER_SLOTS", state.stateVersion);
+          res.type("text/xml").send(gatherResponse(req, `No problem. ${spokenOptions(remaining.map(slot => ({ ...slot, start: new Date(slot.iso), end: new Date(slot.endIso) })), timeZone, state.requestedDay)}`));
           return;
         }
-        setAvailabilityResult(callSid, state.companyId, []);
-        setBookingAction(callSid, state.companyId, "NO_AVAILABILITY");
+        state = setAvailabilityResult(callSid, state.companyId, [], state.stateVersion);
+        setBookingAction(callSid, state.companyId, "NO_AVAILABILITY", state.stateVersion);
         res.type("text/xml").send(gatherResponse(req, "No problem. Would later that day work, or should I check another day?"));
         return;
       } else {
-        res.type("text/xml").send(gatherResponse(req, spokenOptions(state.offeredSlots.slice(0, 3).map(slot => ({ ...slot, start: new Date(slot.iso), end: new Date(slot.iso) })), timeZone, state.requestedDay)));
+        res.type("text/xml").send(gatherResponse(req, spokenOptions(state.offeredSlots.slice(0, 3).map(slot => ({ ...slot, start: new Date(slot.iso), end: new Date(slot.endIso) })), timeZone, state.requestedDay)));
         return;
       }
-      state = getBookingState(callSid, state.companyId);
     }
 
-    // A changed date/daypart/time/service invalidates only calendar-dependent state.
     if (schedulingChanged && state.serviceId !== null && state.requestedDay) {
       startAvailabilityCheck(callSid, state);
       res.type("text/xml").send(workingResponse(req, callSid, true, state.requestedDay));
       return;
     }
 
-    // Final confirmation is an explicit state transition. A plain "yes" after
-    // CONFIRM_BOOKING cannot be mistaken for selecting a slot or answering another question.
     if (previousAction === "CONFIRM_BOOKING" && state.selectedSlot && YES.test(speech)) {
-      state = markBookingConfirmed(callSid, state.companyId);
-      setBookingAction(callSid, state.companyId, "CREATE_BOOKING");
+      state = markBookingConfirmed(callSid, state.companyId, state.stateVersion);
+      state = setBookingAction(callSid, state.companyId, "CREATE_BOOKING", state.stateVersion);
       const created = await createValidatedBooking(call, state);
       if (!created.ok && created.retryAvailability) {
         state = getBookingState(callSid, state.companyId);
-        startAvailabilityCheck(callSid, state);
-        res.type("text/xml").send(`${gatherResponse(req, created.text).replace("</Response>", "")}<Redirect method="POST">${baseUrl(req)}/api/twilio/booking-availability-result?callSid=${encodeURIComponent(callSid)}</Redirect></Response>`);
+        startAvailabilityCheck(callSid, state, true);
+        res.type("text/xml").send(gatherResponse(req, `${created.text} One moment.`));
         return;
       }
       res.type("text/xml").send(gatherResponse(req, created.text));
       return;
     }
     if (previousAction === "CONFIRM_BOOKING" && NO.test(speech) && !schedulingChanged) {
-      state = markBookingConfirmed(callSid, state.companyId);
       state.confirmed = false;
-      setBookingAction(callSid, state.companyId, "CONFIRM_BOOKING");
+      state = setBookingAction(callSid, state.companyId, "CONFIRM_BOOKING", state.stateVersion);
       res.type("text/xml").send(gatherResponse(req, "No problem. What would you like to change?"));
       return;
     }
 
     const decision = nextDecision(state, services.length);
-    setBookingAction(callSid, state.companyId, decision.action);
+    state = setBookingAction(callSid, state.companyId, decision.action, state.stateVersion);
 
-    if (decision.action === "SEARCH_AVAILABILITY") {
-      startAvailabilityCheck(callSid, state);
+    if (decision.action === "SEARCH_AVAILABILITY" || decision.action === "REVALIDATE_AVAILABILITY") {
+      startAvailabilityCheck(callSid, state, decision.action === "REVALIDATE_AVAILABILITY");
       res.type("text/xml").send(workingResponse(req, callSid, true, state.requestedDay));
       return;
     }
@@ -614,12 +682,21 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     if (decision.action === "OFFER_SLOTS") {
       const [settings] = await db.select().from(bookingSettingsTable).where(eq(bookingSettingsTable.companyId, state.companyId));
       const timeZone = settings?.timezone || "America/Toronto";
-      res.type("text/xml").send(gatherResponse(req, spokenOptions(state.offeredSlots.map(slot => ({ ...slot, start: new Date(slot.iso), end: new Date(slot.iso) })), timeZone, state.requestedDay)));
+      res.type("text/xml").send(gatherResponse(req, spokenOptions(state.offeredSlots.map(slot => ({ ...slot, start: new Date(slot.iso), end: new Date(slot.endIso) })), timeZone, state.requestedDay)));
       return;
+    }
+    if (decision.action === "ESCALATE_TO_HUMAN") {
+      releaseBookingHold(callSid);
     }
 
     res.type("text/xml").send(gatherResponse(req, decision.text || "What would you like to do?"));
   } catch (error: any) {
+    if (error instanceof StaleBookingStateError) {
+      logger.warn({ callSid, expected: error.expectedVersion, actual: error.actualVersion }, "Ignored stale concurrent booking webhook update");
+      const state = peekBookingState(callSid);
+      res.type("text/xml").send(gatherResponse(req, state?.lastAction === "OFFER_SLOTS" ? "I have the latest availability ready. Which time works best for you?" : "Got it. What would you like to do next?"));
+      return;
+    }
     logger.error({ callSid, err: error?.message, stack: error?.stack }, "Action-driven booking orchestrator failed; falling back to general AI");
     next();
   }
