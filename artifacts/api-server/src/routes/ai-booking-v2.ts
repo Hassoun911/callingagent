@@ -509,6 +509,24 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
 
     const pending = pendingOffers.get(callSid);
     if (pending && pending.expiresAt > Date.now()) {
+      const changedWeekday = requestedWeekday(speech);
+      const changedRelativeDay = /\b(today|tomorrow)\b/i.test(speech);
+      const changedDaypart = /\b(morning|afternoon|evening|tonight|night)\b/i.test(speech);
+
+      // A caller changing the requested day/time is a new calendar request, not
+      // a failed attempt to select one of the old slots. This must run BEFORE
+      // selectedSlot(), otherwise "I'd like Wednesday" can replay Monday offers.
+      if (changedWeekday || changedRelativeDay || changedDaypart) {
+        pendingOffers.delete(callSid);
+        const check = startAvailabilityCheck(callSid, call.companyId, speech);
+        logger.info(
+          { callSid, companyId: call.companyId, requestedDay: check.requestedDay, speech: speech.slice(0, 100) },
+          "Caller changed availability preference; replaced previous offer set",
+        );
+        res.type("text/xml").send(workingResponse(req, callSid, true, check.requestedDay));
+        return;
+      }
+
       const chosen = selectedSlot(speech, pending.slots, timeZone);
       if (chosen) {
         pendingOffers.delete(callSid);
@@ -555,7 +573,7 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     }
 
     if (BOOKING_WORDS.test(speech)) {
-      req.body.SpeechResult = `${speech}. [Scheduling context for internal use only: current Eastern local date/time is ${nowText}. A named weekday such as Thursday must be checked against the real calendar; never answer with a generic team-callback message when the calendar can answer. Keep spoken replies short. Do not read the current year, timezone, ISO timestamp, or calendar mechanics aloud. When real availability is known, answer yes/no and give actual available times. If the caller rejects a slot, offer another real slot. Never book a time the caller has not explicitly accepted.]`;
+      req.body.SpeechResult = `${speech}. [Scheduling context for internal use only: current Eastern local date/time is ${nowText}. A named weekday such as Thursday must be checked against the real calendar; never answer with a generic team-callback message when the calendar can answer. Keep spoken replies short. Do not read the current year, timezone, ISO timestamp, or calendar mechanics aloud. When real availability is known, answer yes/no and give actual available times. If the caller rejects a slot or changes the requested weekday/daypart, immediately run a fresh real-calendar lookup for the new preference and do not repeat the old slots. Never book a time the caller has not explicitly accepted.]`;
     }
 
     next();
