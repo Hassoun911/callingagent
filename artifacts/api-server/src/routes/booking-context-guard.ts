@@ -272,7 +272,7 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
       if (name) {
         state = setCustomerDetails(callSid, state.companyId, { customerName: name }, state.stateVersion);
         if (!state.customerPhone) {
-          state = setBookingAction(callSid, state.companyId, "ASK_PHONE_CONFIRMIRMATION" as any, state.stateVersion);
+          state = setBookingAction(callSid, state.companyId, "ASK_PHONE_CONFIRMATION", state.stateVersion);
           res.type("text/xml").send(gatherResponse(req, "Thanks. What's the best phone number for the confirmation?"));
           return;
         }
