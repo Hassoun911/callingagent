@@ -36,6 +36,14 @@ const SPOKEN_HOURS: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
   seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
 };
+const SERVICE_SYNONYMS: Record<string, string> = {
+  fix: "repair",
+  fixing: "repair",
+  patched: "repair",
+  patch: "repair",
+  puncture: "repair",
+  leaking: "leak",
+};
 
 function baseUrl(req: any): string {
   return process.env.APP_URL
@@ -88,13 +96,18 @@ async function loadServices(companyId: number) {
     .where(and(eq(bookingServicesTable.companyId, companyId), eq(bookingServicesTable.active, true)));
 }
 
+function normalizedServiceWords(value: string): string[] {
+  return value.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(word => SERVICE_SYNONYMS[word] ?? word);
+}
+
 function serviceScore(speech: string, name: string, description?: string | null): number {
   const lower = speech.toLowerCase();
-  const source = `${name} ${description ?? ""}`.toLowerCase();
-  let score = lower.includes(name.toLowerCase()) ? 50 : 0;
-  const words = lower.split(/[^a-z0-9]+/).filter(word => word.length > 2 && !SERVICE_STOPWORDS.has(word));
+  if (lower.includes(name.toLowerCase())) return 50;
+  const source = normalizedServiceWords(`${name} ${description ?? ""}`);
+  const words = normalizedServiceWords(lower).filter(word => word.length > 2 && !SERVICE_STOPWORDS.has(word));
+  let score = 0;
   for (const word of words) {
-    if (source.includes(word)) score += word.length >= 5 ? 3 : 1;
+    if (source.includes(word)) score += word.length >= 5 ? 3 : 2;
   }
   return score;
 }
@@ -106,7 +119,6 @@ function explicitServiceCandidate(speech: string, askedForService: boolean): str
     .split(/[^a-z0-9]+/)
     .filter(Boolean)
     .filter(word => !SERVICE_STOPWORDS.has(word));
-
   if (askedForService) return words.length ? words.join(" ") : null;
   if (!BOOKING_INTENT.test(speech)) return null;
   return words.length ? words.join(" ") : null;
@@ -142,18 +154,21 @@ function selectOfferedSlot(speech: string, state: LiveBookingState): BookingSlot
   if (/\b(first|one|1)\b/i.test(speech) && !/\b(?:a\.?m\.?|p\.?m\.?)\b/i.test(speech)) return visible[0] ?? null;
   if (/\b(second|two|2)\b/i.test(speech) && !/\b(?:a\.?m\.?|p\.?m\.?)\b/i.test(speech)) return visible[1] ?? null;
   if (/\b(third|three|3)\b/i.test(speech) && !/\b(?:a\.?m\.?|p\.?m\.?)\b/i.test(speech)) return visible[2] ?? null;
-
   const time = parseTimeText(speech, state);
   if (!time || !TIME_SELECTION.test(speech)) return null;
-  const canonical = time.toUpperCase();
-  return visible.find(slot => slot.label.toUpperCase().includes(canonical)) ?? null;
+  return visible.find(slot => slot.label.toUpperCase().includes(time.toUpperCase())) ?? null;
+}
+
+function knownPhone(state: LiveBookingState): boolean {
+  return !!state.customerPhone && (state.customerPhoneSource === "caller_id" || state.customerPhoneSource === "existing_contact");
 }
 
 function finalSummary(state: LiveBookingState): string {
   const service = state.serviceName || "appointment";
   const slot = state.selectedSlot?.label || "the selected time";
-  const phone = state.customerPhone ? naturalPhone(state.customerPhone) : "the number you're calling from";
-  return `Perfect. I have ${state.customerName} for ${service}, ${slot}, and I'll use the number you're calling from, ${phone}, for the confirmation. Is all of that correct?`;
+  const phone = state.customerPhone ? naturalPhone(state.customerPhone) : "the saved number";
+  const phoneLead = state.customerPhoneSource === "caller_id" ? "the number you're calling from" : "your saved number";
+  return `Perfect. I have ${state.customerName} for ${service}, ${slot}, and I'll use ${phoneLead}, ${phone}, for the confirmation. Is all of that correct?`;
 }
 
 async function ensureCallerIdSource(state: LiveBookingState, call: any): Promise<LiveBookingState> {
@@ -166,7 +181,7 @@ async function ensureCallerIdSource(state: LiveBookingState, call: any): Promise
       customerPhoneConfirmed: false,
     }, state.stateVersion);
   }
-  if (normalizedPhone(state.customerPhone) === from && state.customerPhoneSource !== "caller_id") {
+  if (normalizedPhone(state.customerPhone) === from && state.customerPhoneSource === null) {
     return setCustomerDetails(state.callSid, state.companyId, {
       customerPhoneSource: "caller_id",
       customerPhoneConfirmed: false,
@@ -187,15 +202,13 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     let state = peekBookingState(callSid);
     if (state) state = await ensureCallerIdSource(state, call);
 
-    // Preserve the service from the first booking turn. If a caller says
-    // "book an oil change", do not later ask what the appointment is for.
     const askedForService = state?.lastAction === "ASK_SERVICE";
-    if ((!state?.serviceId && (BOOKING_INTENT.test(speech) || askedForService))) {
+    if (!state?.serviceId && (BOOKING_INTENT.test(speech) || askedForService)) {
       const services = await loadServices(call.companyId);
       const ranked = services
         .map(service => ({ service, score: serviceScore(speech, service.name, service.description) }))
         .sort((a, b) => b.score - a.score);
-      const matched = ranked[0]?.score > 0 ? ranked[0].service : null;
+      const matched = ranked[0]?.score >= 4 ? ranked[0].service : null;
       const candidate = explicitServiceCandidate(speech, askedForService);
 
       if (matched) {
@@ -220,17 +233,13 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     if (!state) { next(); return; }
     state = await ensureCallerIdSource(state, call);
 
-    // Caller-ID is known, but do not make the caller confirm it as a separate
-    // step. Confirm it together with the service/date/time in the final summary.
-    if (state.lastAction === "CONFIRM_BOOKING" && state.customerPhoneSource === "caller_id" && state.customerPhone && !state.customerPhoneConfirmed && YES.test(speech)) {
+    if (state.lastAction === "CONFIRM_BOOKING" && knownPhone(state) && !state.customerPhoneConfirmed && YES.test(speech)) {
       state = setCustomerDetails(callSid, state.companyId, { customerPhoneConfirmed: true }, state.stateVersion);
-      logger.info({ callSid }, "Confirmed caller-ID phone as part of final booking confirmation");
+      logger.info({ callSid, phoneSource: state.customerPhoneSource }, "Confirmed known phone as part of final booking confirmation");
       next();
       return;
     }
 
-    // Handle offered-slot acceptance before the orchestrator can reinterpret it
-    // as a new time preference. This covers explicit times and first/second/third.
     if (state.offeredSlots.length && !state.selectedSlot) {
       const chosen = selectOfferedSlot(speech, state);
       if (chosen) {
@@ -248,7 +257,7 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
           res.type("text/xml").send(gatherResponse(req, "What's the best phone number for the confirmation?"));
           return;
         }
-        if (state.customerPhoneSource === "caller_id" && !state.customerPhoneConfirmed) {
+        if (knownPhone(state) && !state.customerPhoneConfirmed) {
           state = setBookingAction(callSid, state.companyId, "CONFIRM_BOOKING", state.stateVersion);
           res.type("text/xml").send(gatherResponse(req, finalSummary(state)));
           return;
@@ -258,18 +267,16 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
       }
     }
 
-    // When the held slot exists and the caller supplies their name, skip the
-    // separate caller-ID question and go directly to one combined confirmation.
     if (state.selectedSlot && state.lastAction === "ASK_NAME") {
       const name = simpleName(speech);
       if (name) {
         state = setCustomerDetails(callSid, state.companyId, { customerName: name }, state.stateVersion);
         if (!state.customerPhone) {
-          state = setBookingAction(callSid, state.companyId, "ASK_PHONE_CONFIRMATION", state.stateVersion);
+          state = setBookingAction(callSid, state.companyId, "ASK_PHONE_CONFIRMIRMATION" as any, state.stateVersion);
           res.type("text/xml").send(gatherResponse(req, "Thanks. What's the best phone number for the confirmation?"));
           return;
         }
-        if (state.customerPhoneSource === "caller_id" && !state.customerPhoneConfirmed) {
+        if (knownPhone(state) && !state.customerPhoneConfirmed) {
           state = setBookingAction(callSid, state.companyId, "CONFIRM_BOOKING", state.stateVersion);
           res.type("text/xml").send(gatherResponse(req, finalSummary(state)));
           return;
@@ -277,8 +284,6 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
       }
     }
 
-    // "Book it" with a held slot should also go to the combined confirmation,
-    // never to a standalone caller-ID confirmation question.
     if (state.selectedSlot && BOOK_NOW.test(speech)) {
       if (!state.customerName) {
         state = setBookingAction(callSid, state.companyId, "ASK_NAME", state.stateVersion);
@@ -290,7 +295,7 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
         res.type("text/xml").send(gatherResponse(req, "What's the best phone number for the confirmation?"));
         return;
       }
-      if (state.customerPhoneSource === "caller_id" && !state.customerPhoneConfirmed) {
+      if (knownPhone(state) && !state.customerPhoneConfirmed) {
         state = setBookingAction(callSid, state.companyId, "CONFIRM_BOOKING", state.stateVersion);
         res.type("text/xml").send(gatherResponse(req, finalSummary(state)));
         return;
