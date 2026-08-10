@@ -15,6 +15,7 @@ export interface LiveBookingState {
   serviceName: string | null;
   requestedDay: string | null;
   requestedDaypart: BookingDaypart;
+  requestedTime: string | null;
   availabilityChecked: boolean;
   offeredSlots: BookingSlotState[];
   selectedSlot: BookingSlotState | null;
@@ -54,6 +55,7 @@ function fresh(callSid: string, companyId: number): LiveBookingState {
     serviceName: null,
     requestedDay: null,
     requestedDaypart: null,
+    requestedTime: null,
     availabilityChecked: false,
     offeredSlots: [],
     selectedSlot: null,
@@ -95,22 +97,28 @@ export function peekBookingState(callSid: string): LiveBookingState | null {
 export function setSchedulingPreference(
   callSid: string,
   companyId: number,
-  patch: { requestedDay?: string | null; requestedDaypart?: BookingDaypart; serviceId?: number | null; serviceName?: string | null },
+  patch: {
+    requestedDay?: string | null;
+    requestedDaypart?: BookingDaypart;
+    requestedTime?: string | null;
+    serviceId?: number | null;
+    serviceName?: string | null;
+  },
 ): LiveBookingState {
   const state = getBookingState(callSid, companyId);
   const dayChanged = patch.requestedDay !== undefined && patch.requestedDay !== state.requestedDay;
   const partChanged = patch.requestedDaypart !== undefined && patch.requestedDaypart !== state.requestedDaypart;
+  const timeChanged = patch.requestedTime !== undefined && patch.requestedTime !== state.requestedTime;
   const serviceChanged = patch.serviceId !== undefined && patch.serviceId !== state.serviceId;
   const serviceNameChanged = patch.serviceName !== undefined && patch.serviceName !== state.serviceName;
 
   if (patch.requestedDay !== undefined) state.requestedDay = patch.requestedDay;
   if (patch.requestedDaypart !== undefined) state.requestedDaypart = patch.requestedDaypart;
+  if (patch.requestedTime !== undefined) state.requestedTime = patch.requestedTime;
   if (patch.serviceId !== undefined) state.serviceId = patch.serviceId;
   if (patch.serviceName !== undefined) state.serviceName = patch.serviceName;
 
-  if (dayChanged || partChanged || serviceChanged || serviceNameChanged) {
-    // Preserve unrelated caller information, but invalidate only data that
-    // depends on the scheduling preference that changed.
+  if (dayChanged || partChanged || timeChanged || serviceChanged || serviceNameChanged) {
     releaseHoldsForCall(callSid);
     state.availabilityChecked = false;
     state.offeredSlots = [];
@@ -165,10 +173,11 @@ export function holdBookingSlot(
 }
 
 export function isSlotHeldByAnother(callSid: string, companyId: number, resourceId: number, iso: string): boolean {
-  const hold = slotHolds.get(holdKey(companyId, resourceId, iso));
+  const key = holdKey(companyId, resourceId, iso);
+  const hold = slotHolds.get(key);
   if (!hold) return false;
   if (hold.expiresAt <= Date.now()) {
-    slotHolds.delete(holdKey(companyId, resourceId, iso));
+    slotHolds.delete(key);
     return false;
   }
   return hold.callSid !== callSid;
@@ -203,6 +212,7 @@ export function bookingStatePrompt(state: LiveBookingState): string {
     state.serviceName ? `service=${state.serviceName}` : null,
     state.requestedDay ? `requested_day=${state.requestedDay}` : null,
     state.requestedDaypart ? `daypart=${state.requestedDaypart}` : null,
+    state.requestedTime ? `preferred_time=${state.requestedTime}` : null,
     state.selectedSlot ? `selected_slot=${state.selectedSlot.label}` : null,
     state.customerName ? `customer_name=${state.customerName}` : null,
     state.customerPhone ? `customer_phone=${state.customerPhone}` : null,
