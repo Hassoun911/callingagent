@@ -11,19 +11,36 @@ import { logger } from "../lib/logger";
 const router: IRouter = Router();
 const FALLBACK_VOICE = "Google.en-US-Neural2-F";
 
-const BOOK_NOW = /\b(book it|book that|go ahead(?: and)? book(?: it| that)?|let'?s book(?: it| that)?|confirm it|take it)\b/i;
-const TIME_QUESTION = /\b(do you have|have you got|anything (?:at|around|for)|is .* available|what about|how about|can you do|could you do)\b/i;
-const TIME_SELECTION = /\b(?:i(?:'ll| will)? take|works|work for me|is good|sounds good|perfect|please|let'?s do)\b/i;
+const BOOK_NOW = /\b(book it|book that|go ahead(?: and)? book(?: it| that)?|let'?s book(?: it| that)?|confirm it|take it|lock it in)\b/i;
+const TIME_QUESTION = /\b(do you have|have you got|anything (?:at|around|for)|is .* available|what about|how about|can you do|could you do|do you have anything)\b/i;
+const TIME_SELECTION = /\b(?:i(?:'ll| will)? take|works|work for me|is good|sounds good|perfect|please|let'?s do|that one|that works)\b/i;
 
+// Include common ASR/mis-hearing variants because callers say these words; they
+// do not type them. A recognized new weekday must always outrank stale offers.
 const DAY_ALIASES: Array<[RegExp, string]> = [
   [/\b(?:monday|mon)\b/i, "Monday"],
   [/\b(?:tuesday|tues|tue)\b/i, "Tuesday"],
-  [/\b(?:wednesday|weds|wed)\b/i, "Wednesday"],
+  [/\b(?:wednesday|weds|wed|wensday|wensday|wednsday|when'?s\s*day)\b/i, "Wednesday"],
   [/\b(?:thursday|thurs|thur|thu)\b/i, "Thursday"],
   [/\b(?:friday|fri)\b/i, "Friday"],
   [/\b(?:saturday|sat)\b/i, "Saturday"],
   [/\b(?:sunday|sun)\b/i, "Sunday"],
 ];
+
+const SPOKEN_HOURS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+};
 
 function baseUrl(req: any): string {
   return process.env.APP_URL
@@ -60,16 +77,24 @@ function explicitDaypart(speech: string): BookingDaypart | undefined {
 
 function bareTime(speech: string): { hour: number; minute: number } | null {
   // Explicit AM/PM is already handled by the orchestrator. This specifically
-  // catches normal receptionist language such as "do you have 4?".
-  if (/\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b/i.test(speech)) return null;
-  const match = speech.match(/\b(?:at|around|about|near|for)?\s*(\d{1,2})(?::(\d{2}))?\b/);
-  if (!match) return null;
-  const hour = Number(match[1]);
-  const minute = match[2] ? Number(match[2]) : 0;
-  if (hour < 1 || hour > 12 || minute < 0 || minute > 59) return null;
+  // catches normal receptionist language such as "do you have four?".
+  if (/\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b/i.test(speech)) return null;
 
-  // Do not treat unrelated bare numbers as times unless the utterance clearly
-  // refers to availability/selection or is a very short booking reply.
+  const digitMatch = speech.match(/\b(?:at|around|about|near|for)?\s*(\d{1,2})(?::(\d{2}))?\b/i);
+  let hour: number | null = null;
+  let minute = 0;
+  if (digitMatch) {
+    hour = Number(digitMatch[1]);
+    minute = digitMatch[2] ? Number(digitMatch[2]) : 0;
+  } else {
+    const wordMatch = speech.match(/\b(?:at|around|about|near|for)?\s*(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i);
+    if (wordMatch) hour = SPOKEN_HOURS[wordMatch[1].toLowerCase()] ?? null;
+  }
+
+  if (hour == null || hour < 1 || hour > 12 || minute < 0 || minute > 59) return null;
+
+  // Do not treat unrelated numbers as times unless the utterance clearly refers
+  // to availability/selection or is a very short booking reply.
   const bookingTimeContext = TIME_QUESTION.test(speech) || TIME_SELECTION.test(speech) || speech.trim().split(/\s+/).length <= 3;
   return bookingTimeContext ? { hour, minute } : null;
 }
@@ -77,8 +102,8 @@ function bareTime(speech: string): { hour: number; minute: number } | null {
 function inferPeriod(hour: number, state: LiveBookingState, speech: string): "AM" | "PM" {
   if (/\bmorning\b/i.test(speech) || state.requestedDaypart === "morning") return "AM";
   if (/\b(afternoon|evening|tonight|night)\b/i.test(speech) || state.requestedDaypart === "afternoon" || state.requestedDaypart === "evening") return "PM";
-  // In appointment conversation, 1–6 without a period is overwhelmingly an
-  // afternoon request. 7–11 defaults to morning; 12 defaults to noon.
+  // For normal business-hour booking conversation, 1–6 without a period means
+  // afternoon; 7–11 means morning; 12 means noon.
   if (hour >= 1 && hour <= 6) return "PM";
   if (hour === 12) return "PM";
   return "AM";
@@ -137,7 +162,8 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     const dayChanged = !!newDay && newDay !== state.requestedDay;
 
     // New day requests always beat old offered slots. This prevents Monday
-    // choices from being replayed after "do you have Wednesday?".
+    // choices from being replayed after "do you have Wednesday?" or "I'm asking
+    // for Wed". State invalidation clears old offered/selected slots immediately.
     if (dayChanged) {
       const patch: Parameters<typeof setSchedulingPreference>[2] = { requestedDay: newDay };
       if (part !== undefined) patch.requestedDaypart = part;
@@ -156,8 +182,8 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
       const period = inferPeriod(time.hour, state, speech);
       const normalizedTime = formatTime(time.hour, time.minute, period);
 
-      // "Do you have 4?" is an availability request, not permission to claim 4
-      // is open. Invalidate the old offer set and make the calendar check 4 PM.
+      // "Do you have four?" is an availability request, not permission to claim
+      // four is open. Invalidate the old offers and make the calendar prove it.
       if (TIME_QUESTION.test(speech)) {
         const patch: Parameters<typeof setSchedulingPreference>[2] = {
           requestedTime: normalizedTime,
@@ -169,8 +195,8 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
         return;
       }
 
-      // A short choice such as "4 works" should be understandable by the
-      // existing slot selector, which expects an explicit AM/PM value.
+      // A short choice such as "four works" is normalized so the existing slot
+      // selector can match the exact slot deterministically.
       if (TIME_SELECTION.test(speech) || speech.trim().split(/\s+/).length <= 2) {
         req.body.SpeechResult = `${speech} ${normalizedTime}`;
       }
