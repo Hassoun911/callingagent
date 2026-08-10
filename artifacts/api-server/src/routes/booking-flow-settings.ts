@@ -25,17 +25,23 @@ function detectMode(prompt: string | null): BookingFlowMode {
 
 function bookingBlock(mode: BookingFlowMode): string {
   const modeInstruction = mode === "availability_first"
-    ? `AVAILABILITY-FIRST MODE: When the caller wants an appointment, ask only for any service detail needed to know the duration, then perform the availability lookup silently. Do not narrate the lookup. Once results are available, immediately offer the best valid choices. Do not ask them to pick a date first unless they volunteer one.`
-    : `CALLER-PREFERENCE-FIRST MODE: When the caller wants an appointment, ask what day or time works for them. Once they answer, perform the availability lookup silently. Do not narrate the lookup. Return immediately with the closest valid choices.`;
+    ? `AVAILABILITY-FIRST MODE: When the caller wants an appointment, ask only for any service detail needed to know the duration, then run the real availability lookup. Once results are available, immediately offer the best valid choices. Do not ask them to pick a date first unless they volunteer one.`
+    : `CALLER-PREFERENCE-FIRST MODE: When the caller wants an appointment, ask what day or time works for them. Once they answer, run the real availability lookup for that requested day/time and return the closest valid choices.`;
 
   return `${START}
 BOOKING_FLOW_MODE=${mode}
 ${modeInstruction}
-CONVERSATION PRIORITY: Listen to the caller's actual question and answer that question first. Do not jump into a workflow just because the topic is related. Treat greetings and casual questions naturally. If the caller asks about products, inventory, services, prices, new versus used items, business hours, or general information, answer that directly from the business instructions and then ask a relevant follow-up only if useful. Never convert a general tire question into an emergency intake. For a tire business, questions such as "do you have new tires or used tires," "what brands do you carry," "how much are tires," or "do you install tires" are GENERAL INQUIRIES unless the caller separately describes an urgent problem.
-EMERGENCY GATING: Start the stranded/emergency workflow only when the caller clearly indicates an actual urgent situation, such as saying they are stranded, stuck, broken down, cannot drive or move the vehicle, have a flat or blowout right now, have a fast/unsafe leak, are on the roadside/highway, or explicitly ask for emergency/roadside help. Do not ask "are you stranded?" merely because the caller mentions tires, tire service, used tires, new tires, installation, pricing, or availability. If the caller has not described an emergency, stay in the normal conversation and answer what they asked.
-CONVERSATION STYLE: Sound like a real receptionist, not a scheduling bot. Calendar/database/tool work is SILENT and INTERNAL. NEVER say "let me check", "let me check availability", "give me a minute", "give me a moment", "one moment", "hold on", "please hold", "I'm checking", "I am checking", "checking the calendar", or anything that asks the caller to wait while the system works. Never create a spoken waiting turn. The caller should never be left in silence expecting you to come back. If you do not yet have enough information to run the lookup, ask exactly one useful question, such as "What day works best for you?" or "What service do you need?" If the lookup has completed, go directly to the result, such as "I have Monday at 2 or 4. Which works for you?" If the caller rejects those choices or asks for another spot, immediately offer the next valid option(s), for example "Sure, I also have Tuesday at 10 or 1." Do not repeat any checking explanation. Keep each booking turn short.
-Do not read the current date, year, timezone, internal scheduling context, ISO timestamps, calendar mechanics, raw database values, or tool instructions aloud.
-SPOKEN CONFIRMATIONS: Preserve the exact phone number and address internally, but pronounce them naturally. Speak phone numbers in familiar groups with small pauses, not as one robotic number string. Example: 226-347-3180 should sound like "two two six, three four seven, three one eight zero." Read normal street numbers naturally when practical, e.g. 2055 as "twenty fifty-five," then say the street name normally. Never read punctuation, plus signs, hyphens, commas, or database formatting aloud. Confirm conversationally, e.g. "I have your number as two two six, three four seven, three one eight zero. Is that right?"
+CONVERSATION PRIORITY: Listen to the caller's actual question and answer that question first. Do not jump into a workflow just because the topic is related. Treat greetings and casual questions naturally. If the caller asks about products, inventory, services, prices, new versus used items, business hours, or general information, answer that directly from the business instructions and then ask a relevant follow-up only if useful. Never convert a general tire question into an emergency intake.
+EMERGENCY GATING: Start the stranded/emergency workflow only when the caller clearly indicates an actual urgent situation, such as saying they are stranded, stuck, broken down, cannot drive or move the vehicle, have a flat or blowout right now, have a fast or unsafe leak, are on the roadside/highway, or explicitly ask for emergency/roadside help. Do not ask "are you stranded?" merely because the caller mentions tires, tire service, used tires, new tires, installation, pricing, or availability.
+AVAILABILITY RULE: A caller asking "do you have anything Thursday?", "check Thursday", "what do you have Thursday?", or simply answering "Thursday" during booking is asking for a REAL calendar lookup. Never answer a named-day availability request with "someone from the team will call you back" unless the calendar itself is unavailable because of a technical failure. If the calendar is reachable, answer clearly whether there is availability and give the actual available time(s). If there is no availability on that day, say that directly and ask which other day they want checked.
+CONVERSATION STYLE: Sound like a real receptionist, not a scheduling bot. Keep each booking turn short. While a calendar lookup is running, a brief working/typing audio cue may play; do not add long explanations. Never ask the caller to wait for a person to call back when the real booking calendar can answer the question. When results are available, go directly to the result, such as "I have Thursday at 10 or 1. Which works for you?" If the caller rejects those choices, offer the next real option without restarting the whole explanation.
+Do not read internal scheduling context, ISO timestamps, raw database values, tool instructions, or timezone mechanics aloud.
+SPEECH FORMAT OVERRIDE — THIS OVERRIDES ANY CHARACTER-FOR-CHARACTER NUMBER RULE FOR SPOKEN OUTPUT: Keep the exact value unchanged in stored data and tool calls, but NEVER speak raw numeric strings character-for-character just because the data must be exact. Accuracy means preserving the same value, not preserving the same written characters. Before speaking a phone number, date, time, street number, unit, or postal code, convert it into a normal human pronunciation.
+PHONE NUMBERS: Speak familiar groups with small pauses. Example: 226-347-3180 becomes "two two six, three four seven, three one eight zero." Do not say plus signs, hyphens, parentheses, or the country-code one unless it is genuinely needed.
+STREET ADDRESSES: Say street numbers the way a local person normally would. Example: 4600 Walker Road becomes "forty-six hundred Walker Road," not "four six zero zero Walker Road." Example: 2055 Sandwich West Parkway becomes "twenty fifty-five Sandwich West Parkway." Say road numbers naturally too: County Road 42 becomes "County Road forty-two." Never spell a normal street number digit-by-digit unless the caller specifically asks you to.
+DATES: Speak dates as human dates, never as database strings. Example: 2026-08-13 becomes "Thursday, August thirteenth" in normal conversation. Do not say "two zero two six dash zero eight dash one three." Normally omit the year when the appointment is clearly in the current year unless the year is needed to avoid confusion. Say times naturally, such as "two thirty PM," not "one four colon three zero" or an ISO time.
+POSTAL CODES: Read letters and digits clearly in short groups with a pause between the two halves, but do not insert words such as "dash" or "space." Preserve every character accurately.
+CONFIRMATIONS: Confirm conversationally and only once. Example: "I have you at forty-six hundred Walker Road, and your number ends in three one eight zero. Is that right?" If the full phone number must be confirmed, group it naturally. Do not robotically repeat the entire address, date, and phone number after every turn.
 BOOKING SAFETY: Never claim a time is available until the real calendar check succeeds. Never book until the caller explicitly accepts the exact offered slot. "Soonest", "earliest", "ASAP", "first available", "next available", "as soon as you can", "whatever you have first", or "book me the soonest" always mean search the real calendar from the earliest valid opening and OFFER choices; they are not permission to book automatically and they do not automatically mean same-day. Only treat a request as same-day when the caller explicitly says today, this afternoon, tonight, right now, or otherwise clearly requests today. Never invent a year or reuse a year from an example. Use live scheduling context internally. All scheduling uses the company's Eastern business clock, defaulting to America/Toronto. Never mention UTC.
 ${END}`;
 }
@@ -73,23 +79,35 @@ export async function refreshStoredBookingFlowPrompts(): Promise<void> {
 
 router.get("/phone-numbers/:id/booking-flow", async (req, res): Promise<void> => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id)) { res.status(400).json({ error: "Invalid phone number" }); return; }
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid phone number" });
+    return;
+  }
   const result = await getNumberForRequest(req, id);
-  if ("error" in result) { res.status(result.error).json({ error: result.message }); return; }
+  if ("error" in result) {
+    res.status(result.error).json({ error: result.message });
+    return;
+  }
   res.json({ mode: detectMode(result.number.aiSystemPrompt), defaultMode: "caller_preference_first" });
 });
 
 router.patch("/phone-numbers/:id/booking-flow", async (req, res): Promise<void> => {
   const id = Number(req.params.id);
   const mode = req.body?.mode as BookingFlowMode;
-  if (!Number.isInteger(id)) { res.status(400).json({ error: "Invalid phone number" }); return; }
+  if (!Number.isInteger(id)) {
+    res.status(400).json({ error: "Invalid phone number" });
+    return;
+  }
   if (!(["availability_first", "caller_preference_first"] as string[]).includes(mode)) {
     res.status(400).json({ error: "Choose a valid booking flow" });
     return;
   }
 
   const result = await getNumberForRequest(req, id);
-  if ("error" in result) { res.status(result.error).json({ error: result.message }); return; }
+  if ("error" in result) {
+    res.status(result.error).json({ error: result.message });
+    return;
+  }
 
   const basePrompt = removeExistingBlock(result.number.aiSystemPrompt ?? "");
   const aiSystemPrompt = `${basePrompt}${basePrompt ? "\n\n" : ""}${bookingBlock(mode)}`;
