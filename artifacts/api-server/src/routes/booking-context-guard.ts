@@ -13,6 +13,7 @@ import {
   setBookingAction,
   setCustomerDetails,
   setSchedulingPreference,
+  type BookingPhoneSource,
   type BookingSlotState,
   type LiveBookingState,
 } from "../lib/booking-state-manager";
@@ -20,9 +21,12 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 const FALLBACK_VOICE = "Google.en-US-Neural2-F";
+const INTAKE_TTL_MS = 15 * 60_000;
 
 const BOOKING_INTENT = /\b(book|booking|appointment|appt|schedule|scheduled|scheduling)\b/i;
 const SERVICE_REQUEST = /\b(need|want|looking for|trying to get|come in for|get|have)\b/i;
+const SOONEST = /\b(soonest|earliest|first available|next available|as soon as possible|as soon as you can|asap)\b/i;
+const SCHEDULING_PREFERENCE = /\b(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|afternoon|evening|tonight)\b/i;
 const YES = /\b(yes|yeah|yep|yup|sure|correct|right|that's right|that is right|perfect|sounds good|go ahead|confirm|book it)\b/i;
 const BOOK_NOW = /\b(book it|book that|go ahead(?: and)? book(?: it| that)?|let'?s book(?: it| that)?|confirm it|take it|lock it in)\b/i;
 const TIME_SELECTION = /\b(?:i(?:'ll| will)? take|works|work for me|is good|sounds good|perfect|that one|that works|let'?s do|i want|i need|i said|again)\b/i;
@@ -40,14 +44,27 @@ const SPOKEN_HOURS: Record<string, number> = {
 };
 const NUMBER_WORDS: Record<string, string> = { one: "1", two: "2", three: "3", four: "4" };
 const SERVICE_SYNONYMS: Record<string, string> = {
-  fix: "repair",
-  fixing: "repair",
-  patched: "repair",
-  patch: "repair",
-  puncture: "repair",
-  leaking: "leak",
+  fix: "repair", fixing: "repair", patched: "repair", patch: "repair", puncture: "repair", leaking: "leak",
 };
 const NAME_CONTROL_WORDS = /\b(?:book|booking|appointment|schedule|service|available|availability|morning|afternoon|evening|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|cancel|change|phone|number|email|address)\b/i;
+
+type FactCarrier = {
+  customerName: string | null;
+  customerPhone: string | null;
+  customerPhoneSource: BookingPhoneSource;
+  notes: Record<string, string>;
+  serviceAnswers: Record<string, string>;
+};
+
+type IntakeMemory = FactCarrier & {
+  companyId: number;
+  serviceId: number | null;
+  serviceName: string | null;
+  customerPhoneConfirmed: boolean;
+  expiresAt: number;
+};
+
+const intakeMemory = new Map<string, IntakeMemory>();
 
 function baseUrl(req: any): string {
   return process.env.APP_URL
@@ -186,54 +203,100 @@ function vehicleDescription(speech: string): string | null {
   return match?.[1]?.trim() ?? null;
 }
 
-function durableFactPatch(state: LiveBookingState, speech: string): Parameters<typeof setCustomerDetails>[2] | null {
+function durableFactPatch(carrier: FactCarrier, speech: string): Parameters<typeof setCustomerDetails>[2] | null {
   const patch: Parameters<typeof setCustomerDetails>[2] = {};
   const notes: Record<string, string> = {};
   const serviceAnswers: Record<string, string> = {};
 
-  if (!state.customerName) {
+  if (!carrier.customerName) {
     const name = simpleName(speech);
     if (name && /\b(?:name|this is|it is|it's|i am|i'm)\b/i.test(speech)) patch.customerName = name;
   }
-
   const phone = spokenPhone(speech);
-  if (phone && (state.customerPhoneSource !== "spoken" || normalizedPhone(state.customerPhone) !== phone)) {
+  if (phone && (carrier.customerPhoneSource !== "spoken" || normalizedPhone(carrier.customerPhone) !== phone)) {
     patch.customerPhone = phone;
     patch.customerPhoneSource = "spoken";
     patch.customerPhoneConfirmed = true;
   }
-
-  if (!state.notes.service_location) {
+  if (!carrier.notes.service_location) {
     const location = serviceLocation(speech);
     if (location) notes.service_location = location;
   }
-  if (!state.notes.vehicle) {
+  if (!carrier.notes.vehicle) {
     const vehicle = vehicleDescription(speech);
     if (vehicle) notes.vehicle = vehicle;
   }
-  if (!state.serviceAnswers.tire_size && /\btire\s+size\b/i.test(speech) && /\b(?:don't know|do not know|not sure|unknown)\b/i.test(speech)) {
+  if (!carrier.serviceAnswers.tire_size && /\btire\s+size\b/i.test(speech) && /\b(?:don't know|do not know|not sure|unknown)\b/i.test(speech)) {
     serviceAnswers.tire_size = "unknown";
   }
-  if (!state.serviceAnswers.tire_size) {
+  if (!carrier.serviceAnswers.tire_size) {
     const size = speech.match(/\b\d{3}\/\d{2}\s*[Rr]\s*\d{2}\b/)?.[0];
     if (size) serviceAnswers.tire_size = size.replace(/\s+/g, "").toUpperCase();
   }
-  if (!state.serviceAnswers.tire_count && /\b(?:tire|tires|rim|rims|mounted)\b/i.test(speech)) {
+  if (!carrier.serviceAnswers.tire_count && /\b(?:tire|tires|rim|rims|mounted)\b/i.test(speech)) {
     const countMatch = speech.match(/\b(one|two|three|four|1|2|3|4)\b/i)?.[1]?.toLowerCase();
     if (countMatch) serviceAnswers.tire_count = NUMBER_WORDS[countMatch] ?? countMatch;
   }
-  if (!state.serviceAnswers.mounted_on_rims && /\b(?:rim|rims|mounted)\b/i.test(speech)) {
+  if (!carrier.serviceAnswers.mounted_on_rims && /\b(?:rim|rims|mounted)\b/i.test(speech)) {
     if (/\b(?:not|isn't|is not|aren't|are not)\s+(?:already\s+)?mounted\b/i.test(speech)) serviceAnswers.mounted_on_rims = "no";
     else if (/\b(?:already\s+)?mounted\s+on\s+(?:the\s+)?rims?\b/i.test(speech)) serviceAnswers.mounted_on_rims = "yes";
   }
-  if (!state.serviceAnswers.service_urgency) {
+  if (!carrier.serviceAnswers.service_urgency) {
     if (/\bregular\b/i.test(speech)) serviceAnswers.service_urgency = "regular";
     else if (/\b(?:stranded|unsafe to drive|emergency)\b/i.test(speech)) serviceAnswers.service_urgency = "emergency";
   }
-
   if (Object.keys(notes).length) patch.notes = notes;
   if (Object.keys(serviceAnswers).length) patch.serviceAnswers = serviceAnswers;
   return Object.keys(patch).length ? patch : null;
+}
+
+function memoryFor(callSid: string): IntakeMemory | null {
+  const memory = intakeMemory.get(callSid);
+  if (!memory) return null;
+  if (memory.expiresAt <= Date.now()) { intakeMemory.delete(callSid); return null; }
+  memory.expiresAt = Date.now() + INTAKE_TTL_MS;
+  return memory;
+}
+
+function mergeMemory(callSid: string, companyId: number, patch: Partial<IntakeMemory>): IntakeMemory {
+  const current = memoryFor(callSid) ?? {
+    companyId,
+    serviceId: null,
+    serviceName: null,
+    customerName: null,
+    customerPhone: null,
+    customerPhoneSource: null,
+    customerPhoneConfirmed: false,
+    notes: {},
+    serviceAnswers: {},
+    expiresAt: Date.now() + INTAKE_TTL_MS,
+  };
+  const next: IntakeMemory = {
+    ...current,
+    ...patch,
+    notes: { ...current.notes, ...(patch.notes ?? {}) },
+    serviceAnswers: { ...current.serviceAnswers, ...(patch.serviceAnswers ?? {}) },
+    expiresAt: Date.now() + INTAKE_TTL_MS,
+  };
+  intakeMemory.set(callSid, next);
+  return next;
+}
+
+function hydrateBookingState(callSid: string, companyId: number, memory: IntakeMemory): LiveBookingState {
+  let state = getBookingState(callSid, companyId);
+  if (memory.serviceId) {
+    state = setSchedulingPreference(callSid, companyId, { serviceId: memory.serviceId, serviceName: memory.serviceName }, state.stateVersion);
+  }
+  state = setCustomerDetails(callSid, companyId, {
+    customerName: memory.customerName,
+    customerPhone: memory.customerPhone,
+    customerPhoneSource: memory.customerPhoneSource,
+    customerPhoneConfirmed: memory.customerPhoneConfirmed,
+    notes: memory.notes,
+    serviceAnswers: memory.serviceAnswers,
+  }, state.stateVersion);
+  intakeMemory.delete(callSid);
+  return state;
 }
 
 function parseTimeText(speech: string, state: LiveBookingState): string | null {
@@ -267,17 +330,10 @@ async function ensureCallerIdSource(state: LiveBookingState, call: any): Promise
   const from = call.log?.fromNumber && call.log.fromNumber !== "Anonymous" ? normalizedPhone(call.log.fromNumber) : "";
   if (!from) return state;
   if (!state.customerPhone) {
-    return setCustomerDetails(state.callSid, state.companyId, {
-      customerPhone: from,
-      customerPhoneSource: "caller_id",
-      customerPhoneConfirmed: false,
-    }, state.stateVersion);
+    return setCustomerDetails(state.callSid, state.companyId, { customerPhone: from, customerPhoneSource: "caller_id", customerPhoneConfirmed: false }, state.stateVersion);
   }
   if (normalizedPhone(state.customerPhone) === from && state.customerPhoneSource === null) {
-    return setCustomerDetails(state.callSid, state.companyId, {
-      customerPhoneSource: "caller_id",
-      customerPhoneConfirmed: false,
-    }, state.stateVersion);
+    return setCustomerDetails(state.callSid, state.companyId, { customerPhoneSource: "caller_id", customerPhoneConfirmed: false }, state.stateVersion);
   }
   return state;
 }
@@ -292,49 +348,62 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     if (!call) { next(); return; }
 
     let state = peekBookingState(callSid);
-    if (state) state = await ensureCallerIdSource(state, call);
-
+    let memory = memoryFor(callSid);
     const askedForService = state?.lastAction === "ASK_SERVICE";
+    const activateScheduling = BOOKING_INTENT.test(speech) || SOONEST.test(speech) || SCHEDULING_PREFERENCE.test(speech) || askedForService;
     const serviceSignal = BOOKING_INTENT.test(speech) || SERVICE_REQUEST.test(speech) || askedForService;
-    if (!state?.serviceId && serviceSignal) {
+
+    if (!state?.serviceId && !memory?.serviceId && serviceSignal) {
       const services = await loadServices(call.companyId);
-      const ranked = services
-        .map(service => ({ service, score: serviceScore(speech, service.name, service.description) }))
-        .sort((a, b) => b.score - a.score);
+      const ranked = services.map(service => ({ service, score: serviceScore(speech, service.name, service.description) })).sort((a, b) => b.score - a.score);
       const matched = ranked[0]?.score >= 10 ? ranked[0].service : null;
       const candidate = explicitServiceCandidate(speech, askedForService);
 
       if (matched) {
-        state = state ?? getBookingState(callSid, call.companyId);
-        state = await ensureCallerIdSource(state, call);
-        state = setSchedulingPreference(callSid, state.companyId, {
-          serviceId: matched.id,
-          serviceName: matched.name,
-        }, state.stateVersion);
-        logger.info({ callSid, companyId: state.companyId, serviceId: matched.id, serviceName: matched.name }, "Captured and persisted service intent before booking intake");
+        if (activateScheduling) {
+          state = state ?? getBookingState(callSid, call.companyId);
+          state = setSchedulingPreference(callSid, state.companyId, { serviceId: matched.id, serviceName: matched.name }, state.stateVersion);
+        } else {
+          memory = mergeMemory(callSid, call.companyId, { serviceId: matched.id, serviceName: matched.name });
+        }
+        logger.info({ callSid, companyId: call.companyId, serviceId: matched.id, serviceName: matched.name, activated: activateScheduling }, "Captured durable service intent");
       } else if (candidate && services.length && (askedForService || BOOKING_INTENT.test(speech))) {
         state = state ?? getBookingState(callSid, call.companyId);
-        state = await ensureCallerIdSource(state, call);
         state = setBookingAction(callSid, state.companyId, "ESCALATE_TO_HUMAN", state.stateVersion);
-        logger.info({ callSid, companyId: state.companyId, requestedService: candidate }, "Explicit service is not an approved bookable service");
         res.type("text/xml").send(gatherResponse(req, `I don't see ${candidate} as an approved bookable service on this schedule. I'll have someone from the team help with that request.`));
         return;
       }
     }
 
-    state = peekBookingState(callSid);
+    if (!state) {
+      memory = memoryFor(callSid);
+      if (memory) {
+        const factPatch = durableFactPatch(memory, speech);
+        if (factPatch) {
+          memory = mergeMemory(callSid, call.companyId, {
+            customerName: factPatch.customerName ?? memory.customerName,
+            customerPhone: factPatch.customerPhone ?? memory.customerPhone,
+            customerPhoneSource: factPatch.customerPhoneSource ?? memory.customerPhoneSource,
+            customerPhoneConfirmed: factPatch.customerPhoneConfirmed ?? memory.customerPhoneConfirmed,
+            notes: factPatch.notes,
+            serviceAnswers: factPatch.serviceAnswers,
+          });
+          logger.info({ callSid, customerName: memory.customerName, phoneSource: memory.customerPhoneSource, notes: memory.notes, serviceAnswers: memory.serviceAnswers }, "Stored receptionist intake facts before scheduling activation");
+        }
+        if (activateScheduling && memory.serviceId) {
+          state = hydrateBookingState(callSid, call.companyId, memory);
+          logger.info({ callSid, companyId: state.companyId, serviceId: state.serviceId, customerName: state.customerName }, "Hydrated central booking state from receptionist intake memory");
+        }
+      }
+    }
+
     if (!state) { next(); return; }
     state = await ensureCallerIdSource(state, call);
-
     const factPatch = durableFactPatch(state, speech);
-    if (factPatch) {
-      state = setCustomerDetails(callSid, state.companyId, factPatch, state.stateVersion);
-      logger.info({ callSid, customerName: state.customerName, phoneSource: state.customerPhoneSource, notes: state.notes, serviceAnswers: state.serviceAnswers }, "Persisted normalized booking intake facts");
-    }
+    if (factPatch) state = setCustomerDetails(callSid, state.companyId, factPatch, state.stateVersion);
 
     if (state.lastAction === "CONFIRM_BOOKING" && state.customerPhone && !state.customerPhoneConfirmed && YES.test(speech)) {
       state = setCustomerDetails(callSid, state.companyId, { customerPhoneConfirmed: true }, state.stateVersion);
-      logger.info({ callSid, phoneSource: state.customerPhoneSource }, "Confirmed phone as part of final booking confirmation");
       next();
       return;
     }
@@ -343,12 +412,10 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
       if (!state.customerName) {
         const name = simpleName(speech);
         if (!name) {
-          logger.info({ callSid }, "Could not safely normalize ASK_NAME reply; requesting one clarification without falling through");
           res.type("text/xml").send(gatherResponse(req, "Sorry, I didn't catch the name. Please say the name you'd like on the appointment."));
           return;
         }
         state = setCustomerDetails(callSid, state.companyId, { customerName: name }, state.stateVersion);
-        logger.info({ callSid, customerName: name }, "Captured customer name and advanced booking flow");
       }
       if (!state.customerPhone) {
         state = setBookingAction(state.callSid, state.companyId, "ASK_PHONE_CONFIRMATION", state.stateVersion);
@@ -364,7 +431,6 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
       if (chosen) {
         state = holdBookingSlot(callSid, state.companyId, chosen, undefined, state.stateVersion);
         state = setBookingAction(callSid, state.companyId, "HOLD_SLOT", state.stateVersion);
-        logger.info({ callSid, selected: chosen.iso, label: chosen.label }, "Context guard held accepted offered slot");
         if (!state.customerName) {
           state = setBookingAction(callSid, state.companyId, "ASK_NAME", state.stateVersion);
           res.type("text/xml").send(gatherResponse(req, "Great. What's the name for the appointment?"));
@@ -401,5 +467,10 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     next();
   }
 });
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [callSid, memory] of intakeMemory) if (memory.expiresAt <= now) intakeMemory.delete(callSid);
+}, 60_000).unref();
 
 export default router;
