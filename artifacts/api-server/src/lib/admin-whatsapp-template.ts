@@ -3,6 +3,7 @@ import { logger } from "./logger";
 
 const DEFAULT_ADMIN_CONTENT_SID = "HX53b587342dccf2d5b638c470e1da7ef7";
 const TWILIO_WHATSAPP_SANDBOX_NUMBER = "+14155238886";
+const DEFAULT_PRODUCTION_WHATSAPP_NUMBER = "+12498000025";
 
 type TemplateContext = {
   companyName?: string | null;
@@ -42,21 +43,29 @@ function assertProductionWhatsappSender(value: string): string {
   const sender = value.trim();
   if (!sender) throw new Error("WhatsApp sender is not configured");
   if (bareWhatsappNumber(sender) === TWILIO_WHATSAPP_SANDBOX_NUMBER) {
-    throw new Error(
-      "TWILIO_WHATSAPP_FROM is still set to the Twilio WhatsApp Sandbox (+14155238886). Configure an approved production WhatsApp sender.",
-    );
+    throw new Error("Twilio WhatsApp Sandbox cannot be used for production admin notifications.");
   }
   return sender;
 }
 
 export function getProductionWhatsappSender(): string {
   const configured = process.env.TWILIO_WHATSAPP_FROM?.trim();
-  if (!configured) {
-    throw new Error(
-      "TWILIO_WHATSAPP_FROM is required for admin WhatsApp notifications and must be an approved production WhatsApp sender.",
+
+  // +1 249-800-0025 is the approved production WhatsApp sender for this Twilio
+  // account. Keep an environment override for future migrations, but never let
+  // the legacy sandbox value override the approved production sender.
+  if (configured && bareWhatsappNumber(configured) !== TWILIO_WHATSAPP_SANDBOX_NUMBER) {
+    return assertProductionWhatsappSender(configured);
+  }
+
+  if (configured && bareWhatsappNumber(configured) === TWILIO_WHATSAPP_SANDBOX_NUMBER) {
+    logger.warn(
+      { configured, productionSender: DEFAULT_PRODUCTION_WHATSAPP_NUMBER },
+      "Ignoring Twilio WhatsApp Sandbox sender and using approved production sender",
     );
   }
-  return assertProductionWhatsappSender(configured);
+
+  return DEFAULT_PRODUCTION_WHATSAPP_NUMBER;
 }
 
 function twilioClient(): twilio.Twilio | null {
@@ -159,4 +168,4 @@ export async function sendAdminWhatsappTemplate(args: {
   return result.sid;
 }
 
-export { DEFAULT_ADMIN_CONTENT_SID, TWILIO_WHATSAPP_SANDBOX_NUMBER };
+export { DEFAULT_ADMIN_CONTENT_SID, TWILIO_WHATSAPP_SANDBOX_NUMBER, DEFAULT_PRODUCTION_WHATSAPP_NUMBER };
