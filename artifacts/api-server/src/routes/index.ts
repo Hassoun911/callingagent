@@ -18,7 +18,6 @@ import platformUsersRouter from "./platform-users";
 import appointmentsRouter from "./appointments";
 import companyAppointmentsRouter from "./company-appointments";
 import companyEventsRouter from "./company-events";
-import adminWhatsappTestRouter from "./admin-whatsapp-test";
 import portalVisibilityRouter, { enforceCompanyPortalVisibility } from "./portal-visibility";
 import { routeAccessControl } from "../middleware/route-access";
 import { aiCallFinalizer } from "../middleware/ai-call-finalizer";
@@ -33,8 +32,6 @@ router.use(authRouter);
 router.use(aiDateContext);
 router.use(aiCallFinalizer);
 router.use(twilioWebhooksRouter);
-// Temporary one-shot endpoint, protected by an unguessable header token. Remove after test.
-router.use(adminWhatsappTestRouter);
 
 // Every dashboard/API route below is checked against the authenticated user's role.
 router.use(routeAccessControl);
