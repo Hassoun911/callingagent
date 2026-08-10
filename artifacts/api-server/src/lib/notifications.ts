@@ -54,9 +54,6 @@ export interface AppointmentNotificationData {
 }
 
 function formatDateTime(dt: Date, timezone = EASTERN_TZ): string {
-  // All customer/admin booking communications use the Eastern business clock.
-  // Keep the display label stable as EST as requested by the business owner,
-  // while America/Toronto keeps the actual local clock aligned year-round.
   const formatted = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone || EASTERN_TZ,
     weekday: "long",
@@ -99,6 +96,7 @@ async function sendAdminTemplate(data: AppointmentNotificationData, status: stri
     logger.info({ to: data.companyAdminWhatsapp, status }, "Admin appointment WhatsApp template sent");
   } catch (err: any) {
     logger.error({ err: err?.message, to: data.companyAdminWhatsapp, status }, "Admin appointment WhatsApp template failed");
+    throw err;
   }
 }
 
@@ -116,6 +114,7 @@ async function sendCustomerSms(data: AppointmentNotificationData, body: string, 
     logger.info({ to, from, sid: result.sid }, `${logLabel} sent`);
   } catch (err: any) {
     logger.error({ err: err?.message, code: err?.code, to, from }, `${logLabel} failed`);
+    throw err;
   }
 }
 
@@ -145,6 +144,7 @@ async function sendAdminEmail(data: AppointmentNotificationData, subject: string
     logger.info({ to: data.companyAdminEmail }, "Admin appointment email sent");
   } catch (err: any) {
     logger.warn({ err: err?.message, to: data.companyAdminEmail }, "Admin appointment email failed");
+    throw err;
   }
 }
 
@@ -155,7 +155,7 @@ export interface ReminderNotificationData extends AppointmentNotificationData {
 export async function sendBookingNotifications(data: AppointmentNotificationData): Promise<void> {
   const dateStr = formatDateTime(data.startTime, data.timezone || EASTERN_TZ);
   const endStr = data.endTime ? ` – ${formatDateTime(data.endTime, data.timezone || EASTERN_TZ)}` : "";
-  await Promise.allSettled([
+  const results = await Promise.allSettled([
     sendCustomerSms(data, [
       `Hi ${data.customerName}, your appointment is confirmed.`,
       `${data.title} with ${data.companyName}`,
@@ -166,6 +166,11 @@ export async function sendBookingNotifications(data: AppointmentNotificationData
     sendAdminTemplate(data, "Booked", "New appointment booked"),
     sendAdminEmail(data, `New Booking: ${data.title} — ${data.customerName}`, `New Appointment Booked — ${data.companyName}`),
   ]);
+
+  const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failures.length) {
+    throw new Error(`Booking notifications had ${failures.length} failed delivery channel(s)`);
+  }
 }
 
 export async function sendRescheduleNotifications(data: AppointmentNotificationData & { oldStartTime: Date }): Promise<void> {
