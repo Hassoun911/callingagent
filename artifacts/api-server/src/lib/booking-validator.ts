@@ -4,7 +4,9 @@ import {
   appointmentsTable,
   bookingResourcesTable,
   bookingServicesTable,
+  companiesTable,
 } from "@workspace/db";
+import { bookingRequirementsForCompanyName, missingRequiredBookingDetail } from "./booking-requirements";
 import { hasValidBookingHold, type LiveBookingState } from "./booking-state-manager";
 
 export type BookingValidationResult =
@@ -54,6 +56,13 @@ export async function validateBookingBeforeCreate(
     return { ok: false, code: "INVALID_PHONE", reason: "The confirmation phone number is not valid." };
   }
 
+  const [company] = await executor.select().from(companiesTable).where(eq(companiesTable.id, state.companyId));
+  const requirements = bookingRequirementsForCompanyName(company?.name);
+  const missingCompanyDetail = missingRequiredBookingDetail(state, requirements);
+  if (missingCompanyDetail) {
+    return { ok: false, code: "MISSING_DETAILS", reason: missingCompanyDetail.reason };
+  }
+
   const [resource] = await executor.select().from(bookingResourcesTable).where(and(
     eq(bookingResourcesTable.id, state.selectedSlot.resourceId),
     eq(bookingResourcesTable.companyId, state.companyId),
@@ -87,10 +96,6 @@ export async function validateBookingBeforeCreate(
     return { ok: false, code: "INVALID_SLOT", reason: "The selected appointment duration no longer matches the service." };
   }
 
-  // Persistent retry protection. The transaction is already serialized by the
-  // CallSid+bookingAttempt advisory lock. This DB check identifies the exact
-  // appointment produced by a retried callback without blocking a legitimate
-  // second booking later in the same phone call.
   if (options.callLogId) {
     const bookingsForCall = await executor.select().from(appointmentsTable).where(and(
       eq(appointmentsTable.callLogId, options.callLogId),
