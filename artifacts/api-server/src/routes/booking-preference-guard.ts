@@ -13,11 +13,10 @@ const router: IRouter = Router();
 const FALLBACK_VOICE = "Google.en-US-Neural2-F";
 
 const BOOK_NOW = /\b(book it|book that|go ahead(?: and)? book(?: it| that)?|let'?s book(?: it| that)?|confirm it|take it|lock it in)\b/i;
-const TIME_QUESTION = /\b(do you have|have you got|anything (?:at|around|for)|is .* available|what about|how about|can you do|could you do|do you have anything)\b/i;
-const TIME_SELECTION = /\b(?:i(?:'ll| will)? take|works|work for me|is good|sounds good|perfect|please|let'?s do|that one|that works)\b/i;
+const TIME_QUESTION = /\b(do you have|have you got|anything (?:at|around|for)|something (?:at|around|near)|is .* available|what about|how about|can you do|could you do|do you have anything)\b/i;
+const TIME_SELECTION = /\b(?:i(?:'ll| will)? take|works|work for me|is good|sounds good|perfect|please|let'?s do|that one|that works|i want|i need|i said|again)\b/i;
+const TIME_CORRECTION = /\b(?:i said|i want|i need|again|around|about|near|prefer|preferably)\b/i;
 
-// Include common ASR/mis-hearing variants because callers say these words; they
-// do not type them. A recognized new weekday must always outrank stale offers.
 const DAY_ALIASES: Array<[RegExp, string]> = [
   [/\b(?:monday|mon)\b/i, "Monday"],
   [/\b(?:tuesday|tues|tue)\b/i, "Tuesday"],
@@ -89,9 +88,6 @@ function formatTime(hour: number, minute: number, period: "AM" | "PM"): string {
 }
 
 function parsedTime(speech: string, state: LiveBookingState): { hour: number; minute: number; period: "AM" | "PM"; normalized: string } | null {
-  // Explicit AM/PM must be recognized here too. Otherwise a reply such as
-  // "1 p.m. is good" reaches the orchestrator as a scheduling change and clears
-  // the very offered slot the caller is accepting.
   const explicit = speech.match(/\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/i);
   if (explicit) {
     const rawHour = explicit[1];
@@ -114,7 +110,13 @@ function parsedTime(speech: string, state: LiveBookingState): { hour: number; mi
   }
 
   if (hour == null || hour < 1 || hour > 12 || minute < 0 || minute > 59) return null;
-  const bookingTimeContext = TIME_QUESTION.test(speech) || TIME_SELECTION.test(speech) || speech.trim().split(/\s+/).length <= 3;
+  const wordCount = speech.trim().split(/\s+/).length;
+  const bookingTimeContext = TIME_QUESTION.test(speech)
+    || TIME_SELECTION.test(speech)
+    || TIME_CORRECTION.test(speech)
+    || /\b(?:at|around|about|near)\b/i.test(speech)
+    || wordCount <= 3
+    || (state.offeredSlots.length > 0 && wordCount <= 6);
   if (!bookingTimeContext) return null;
   const period = inferPeriod(hour, state, speech);
   return { hour, minute, period, normalized: formatTime(hour, minute, period) };
@@ -140,7 +142,6 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
   }
 
   try {
-    // "Book it" is a control instruction, never a customer name or filler.
     if (BOOK_NOW.test(speech) && state.selectedSlot) {
       if (!state.customerName) {
         state = setBookingAction(callSid, state.companyId, "ASK_NAME", state.stateVersion);
@@ -152,15 +153,6 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
         res.type("text/xml").send(gatherResponse(req, "Absolutely. What's the best phone number for the confirmation?"));
         return;
       }
-      if (!state.customerPhoneConfirmed) {
-        state = setBookingAction(callSid, state.companyId, "ASK_PHONE_CONFIRMATION", state.stateVersion);
-        res.type("text/xml").send(gatherResponse(req, "Absolutely. Should I use the number you're calling from for the confirmation?"));
-        return;
-      }
-
-      state = setBookingAction(callSid, state.companyId, "CONFIRM_BOOKING", state.stateVersion);
-      req.body.SpeechResult = "yes confirm book it";
-      logger.info({ callSid, selected: state.selectedSlot.iso }, "Promoted explicit book-it instruction to final booking confirmation");
       next();
       return;
     }
@@ -170,7 +162,6 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     const part = explicitDaypart(speech);
     const dayChanged = !!newDay && newDay !== state.requestedDay;
 
-    // New day requests always beat old offered slots.
     if (dayChanged) {
       const patch: Parameters<typeof setSchedulingPreference>[2] = { requestedDay: newDay };
       if (part !== undefined) patch.requestedDaypart = part;
@@ -180,9 +171,6 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
       }
       state = setSchedulingPreference(callSid, state.companyId, patch, state.stateVersion);
 
-      // A day without a time/daypart is not enough to launch a calendar search.
-      // Ask once for the broad preference so a follow-up such as "preferably in
-      // the afternoon" is captured before any morning slots are offered.
       if (part === undefined && !time) {
         state = setBookingAction(callSid, state.companyId, "ASK_DAYPART", state.stateVersion);
         logger.info({ callSid, requestedDay: state.requestedDay }, "Day selected without daypart; collecting preference before availability search");
@@ -196,10 +184,7 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     }
 
     if (time) {
-      // Highest priority: if the caller names a time we literally just offered
-      // and accepts it, select and hold that exact slot BEFORE requestedTime can
-      // be mutated. This fixes "1 p.m. is good" causing another calendar search.
-      if (state.offeredSlots.length && TIME_SELECTION.test(speech)) {
+      if (state.offeredSlots.length && (TIME_SELECTION.test(speech) || TIME_CORRECTION.test(speech))) {
         const offered = offeredSlotAtTime(state, time.normalized);
         if (offered) {
           state = holdBookingSlot(callSid, state.companyId, offered, undefined, state.stateVersion);
@@ -211,21 +196,17 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
         }
       }
 
-      // Questions such as "Do you have 4?" are fresh availability requests,
-      // never permission to claim that 4 is open.
-      if (TIME_QUESTION.test(speech)) {
+      if (TIME_QUESTION.test(speech) || TIME_CORRECTION.test(speech) || (state.offeredSlots.length > 0 && /\b(?:at|around|about|near)\b/i.test(speech))) {
         const patch: Parameters<typeof setSchedulingPreference>[2] = {
           requestedTime: time.normalized,
           ...(part !== undefined ? { requestedDaypart: part } : { requestedDaypart: time.period === "AM" ? "morning" : "afternoon" }),
         };
         state = setSchedulingPreference(callSid, state.companyId, patch, state.stateVersion);
-        logger.info({ callSid, requestedDay: state.requestedDay, requestedTime: time.normalized }, "Caller asked about a specific time; forcing fresh availability check");
+        logger.info({ callSid, requestedDay: state.requestedDay, requestedTime: time.normalized }, "Caller corrected or requested a specific time; forcing fresh availability check");
         next();
         return;
       }
 
-      // Short selections still get normalized for the orchestrator's exact slot
-      // matcher when there was no direct offered-slot match above.
       if (TIME_SELECTION.test(speech) || speech.trim().split(/\s+/).length <= 2) {
         req.body.SpeechResult = `${speech} ${time.normalized}`;
       }
