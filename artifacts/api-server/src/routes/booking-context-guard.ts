@@ -22,9 +22,10 @@ const router: IRouter = Router();
 const FALLBACK_VOICE = "Google.en-US-Neural2-F";
 
 const BOOKING_INTENT = /\b(book|booking|appointment|appt|schedule|scheduled|scheduling)\b/i;
+const SERVICE_REQUEST = /\b(need|want|looking for|trying to get|come in for|get|have)\b/i;
 const YES = /\b(yes|yeah|yep|yup|sure|correct|right|that's right|that is right|perfect|sounds good|go ahead|confirm|book it)\b/i;
 const BOOK_NOW = /\b(book it|book that|go ahead(?: and)? book(?: it| that)?|let'?s book(?: it| that)?|confirm it|take it|lock it in)\b/i;
-const TIME_SELECTION = /\b(?:i(?:'ll| will)? take|works|work for me|is good|sounds good|perfect|that one|that works|let'?s do)\b/i;
+const TIME_SELECTION = /\b(?:i(?:'ll| will)? take|works|work for me|is good|sounds good|perfect|that one|that works|let'?s do|i want|i need|i said|again)\b/i;
 const SERVICE_STOPWORDS = new Set([
   "i", "im", "i'm", "me", "my", "we", "a", "an", "the", "to", "for", "please", "need", "want", "would", "like",
   "book", "booking", "appointment", "appointments", "appt", "schedule", "scheduled", "scheduling", "service", "services",
@@ -37,6 +38,7 @@ const SPOKEN_HOURS: Record<string, number> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
   seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
 };
+const NUMBER_WORDS: Record<string, string> = { one: "1", two: "2", three: "3", four: "4" };
 const SERVICE_SYNONYMS: Record<string, string> = {
   fix: "repair",
   fixing: "repair",
@@ -72,13 +74,6 @@ function normalizedPhone(value?: string | null): string {
   return value.trim();
 }
 
-function naturalPhone(value: string): string {
-  const digits = value.replace(/\D/g, "");
-  const local = digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
-  if (local.length !== 10) return value;
-  return `${local.slice(0, 3).split("").join(" ")}, ${local.slice(3, 6).split("").join(" ")}, ${local.slice(6).split("").join(" ")}`;
-}
-
 async function resolveCall(req: any, callSid: string) {
   const [log] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, callSid));
   if (log?.phoneNumberId) {
@@ -104,13 +99,18 @@ function normalizedServiceWords(value: string): string[] {
 
 function serviceScore(speech: string, name: string, description?: string | null): number {
   const lower = speech.toLowerCase();
-  if (lower.includes(name.toLowerCase())) return 50;
-  const source = normalizedServiceWords(`${name} ${description ?? ""}`);
-  const words = normalizedServiceWords(lower).filter(word => word.length > 2 && !SERVICE_STOPWORDS.has(word));
+  if (lower.includes(name.toLowerCase())) return 100;
+  const speechWords = normalizedServiceWords(lower).filter(word => word.length > 2 && !SERVICE_STOPWORDS.has(word));
+  const nameWords = normalizedServiceWords(name).filter(word => word.length > 2 && !SERVICE_STOPWORDS.has(word));
+  const descriptionWords = normalizedServiceWords(description ?? "");
   let score = 0;
-  for (const word of words) {
-    if (source.includes(word)) score += word.length >= 5 ? 3 : 2;
+  for (const word of speechWords) {
+    if (nameWords.includes(word)) score += word.length >= 5 ? 4 : 3;
+    else if (descriptionWords.includes(word)) score += 1;
   }
+  const missingNameWords = nameWords.filter(word => !speechWords.includes(word));
+  score -= missingNameWords.length * 10;
+  if (nameWords.length && missingNameWords.length === 0) score += 30;
   return score;
 }
 
@@ -126,11 +126,7 @@ function cleanServicePhrase(value: string): string | null {
     .replace(/\s+/g, " ")
     .trim();
   if (!cleaned) return null;
-
-  const words = cleaned
-    .split(/\s+/)
-    .filter(Boolean)
-    .filter(word => !SERVICE_STOPWORDS.has(word));
+  const words = cleaned.split(/\s+/).filter(Boolean).filter(word => !SERVICE_STOPWORDS.has(word));
   if (!words.length) return null;
   return words.slice(0, 6).join(" ");
 }
@@ -155,9 +151,8 @@ function explicitServiceCandidate(speech: string, askedForService: boolean): str
 function simpleName(speech: string): string | null {
   let candidate = speech.trim();
   if (!candidate) return null;
-
-  // ASK_NAME is a constrained turn. Accept natural receptionist answers such as
-  // "it's Sam", "yeah, Sam Hassoun", "the name is Sam", or "Sam here".
+  const embedded = candidate.match(/\b(?:my\s+name(?:\s+is|'s)|the\s+name\s+is|name\s+is|this\s+is|it\s+is|it's|i\s+am|i'm)\s+([A-Za-z][A-Za-z' -]{0,60}?)(?=[,.!?]|\s+(?:my\s+phone|phone\s+number|callback\s+number|and\s+my)|$)/i)?.[1];
+  if (embedded) candidate = embedded;
   candidate = candidate
     .replace(/^[\s,.!-]*(?:yes|yeah|yep|yup|sure|okay|ok|correct|right)[\s,.!-]+/i, "")
     .replace(/^\s*(?:my\s+name(?:\s+is|'s)|the\s+name\s+is|name\s+is|this\s+is|it\s+is|it's|i\s+am|i'm)\s+/i, "")
@@ -165,7 +160,6 @@ function simpleName(speech: string): string | null {
     .replace(/[.!?,]+$/g, "")
     .replace(/\s+/g, " ")
     .trim();
-
   if (!candidate || candidate.length > 60) return null;
   if (NAME_CONTROL_WORDS.test(candidate) || BOOK_NOW.test(candidate)) return null;
   if (/\d|@/.test(candidate)) return null;
@@ -173,6 +167,73 @@ function simpleName(speech: string): string | null {
   const words = candidate.split(/\s+/).filter(Boolean);
   if (words.length < 1 || words.length > 5) return null;
   return candidate;
+}
+
+function spokenPhone(speech: string): string | null {
+  const raw = speech.match(/(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}/)?.[0];
+  return raw ? normalizedPhone(raw) : null;
+}
+
+function serviceLocation(speech: string): string | null {
+  const match = speech.match(/\b(?:current\s+location|service\s+address|location|address)\s*(?:is|at)?\s+(.+?)(?=(?:[.!?]\s|$))/i);
+  if (!match?.[1]) return null;
+  const value = match[1].trim().replace(/[,.!?]+$/g, "");
+  return /\d/.test(value) && value.length >= 6 ? value : null;
+}
+
+function vehicleDescription(speech: string): string | null {
+  const match = speech.match(/\b((?:19|20)\d{2}\s+[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z0-9-]+){1,4})(?=[,.!?]|$)/);
+  return match?.[1]?.trim() ?? null;
+}
+
+function durableFactPatch(state: LiveBookingState, speech: string): Parameters<typeof setCustomerDetails>[2] | null {
+  const patch: Parameters<typeof setCustomerDetails>[2] = {};
+  const notes: Record<string, string> = {};
+  const serviceAnswers: Record<string, string> = {};
+
+  if (!state.customerName) {
+    const name = simpleName(speech);
+    if (name && /\b(?:name|this is|it is|it's|i am|i'm)\b/i.test(speech)) patch.customerName = name;
+  }
+
+  const phone = spokenPhone(speech);
+  if (phone && (state.customerPhoneSource !== "spoken" || normalizedPhone(state.customerPhone) !== phone)) {
+    patch.customerPhone = phone;
+    patch.customerPhoneSource = "spoken";
+    patch.customerPhoneConfirmed = true;
+  }
+
+  if (!state.notes.service_location) {
+    const location = serviceLocation(speech);
+    if (location) notes.service_location = location;
+  }
+  if (!state.notes.vehicle) {
+    const vehicle = vehicleDescription(speech);
+    if (vehicle) notes.vehicle = vehicle;
+  }
+  if (!state.serviceAnswers.tire_size && /\btire\s+size\b/i.test(speech) && /\b(?:don't know|do not know|not sure|unknown)\b/i.test(speech)) {
+    serviceAnswers.tire_size = "unknown";
+  }
+  if (!state.serviceAnswers.tire_size) {
+    const size = speech.match(/\b\d{3}\/\d{2}\s*[Rr]\s*\d{2}\b/)?.[0];
+    if (size) serviceAnswers.tire_size = size.replace(/\s+/g, "").toUpperCase();
+  }
+  if (!state.serviceAnswers.tire_count && /\b(?:tire|tires|rim|rims|mounted)\b/i.test(speech)) {
+    const countMatch = speech.match(/\b(one|two|three|four|1|2|3|4)\b/i)?.[1]?.toLowerCase();
+    if (countMatch) serviceAnswers.tire_count = NUMBER_WORDS[countMatch] ?? countMatch;
+  }
+  if (!state.serviceAnswers.mounted_on_rims && /\b(?:rim|rims|mounted)\b/i.test(speech)) {
+    if (/\b(?:not|isn't|is not|aren't|are not)\s+(?:already\s+)?mounted\b/i.test(speech)) serviceAnswers.mounted_on_rims = "no";
+    else if (/\b(?:already\s+)?mounted\s+on\s+(?:the\s+)?rims?\b/i.test(speech)) serviceAnswers.mounted_on_rims = "yes";
+  }
+  if (!state.serviceAnswers.service_urgency) {
+    if (/\bregular\b/i.test(speech)) serviceAnswers.service_urgency = "regular";
+    else if (/\b(?:stranded|unsafe to drive|emergency)\b/i.test(speech)) serviceAnswers.service_urgency = "emergency";
+  }
+
+  if (Object.keys(notes).length) patch.notes = notes;
+  if (Object.keys(serviceAnswers).length) patch.serviceAnswers = serviceAnswers;
+  return Object.keys(patch).length ? patch : null;
 }
 
 function parseTimeText(speech: string, state: LiveBookingState): string | null {
@@ -202,18 +263,6 @@ function selectOfferedSlot(speech: string, state: LiveBookingState): BookingSlot
   return visible.find(slot => slot.label.toUpperCase().includes(time.toUpperCase())) ?? null;
 }
 
-function knownPhone(state: LiveBookingState): boolean {
-  return !!state.customerPhone && (state.customerPhoneSource === "caller_id" || state.customerPhoneSource === "existing_contact");
-}
-
-function finalSummary(state: LiveBookingState): string {
-  const service = state.serviceName || "appointment";
-  const slot = state.selectedSlot?.label || "the selected time";
-  const phone = state.customerPhone ? naturalPhone(state.customerPhone) : "the saved number";
-  const phoneLead = state.customerPhoneSource === "caller_id" ? "the number you're calling from" : "your saved number";
-  return `Perfect. I have ${state.customerName} for ${service}, ${slot}, and I'll use ${phoneLead}, ${phone}, for the confirmation. Is all of that correct?`;
-}
-
 async function ensureCallerIdSource(state: LiveBookingState, call: any): Promise<LiveBookingState> {
   const from = call.log?.fromNumber && call.log.fromNumber !== "Anonymous" ? normalizedPhone(call.log.fromNumber) : "";
   if (!from) return state;
@@ -233,21 +282,6 @@ async function ensureCallerIdSource(state: LiveBookingState, call: any): Promise
   return state;
 }
 
-function respondAfterName(req: any, res: any, state: LiveBookingState): LiveBookingState {
-  if (!state.customerPhone) {
-    const nextState = setBookingAction(state.callSid, state.companyId, "ASK_PHONE_CONFIRMATION", state.stateVersion);
-    res.type("text/xml").send(gatherResponse(req, "Thanks. What's the best phone number for the confirmation?"));
-    return nextState;
-  }
-
-  // Whether caller ID, saved contact, or a phone already confirmed earlier in
-  // the call, once the name is known the next conversational step is one final
-  // booking summary. Never ask for the name again.
-  const nextState = setBookingAction(state.callSid, state.companyId, "CONFIRM_BOOKING", state.stateVersion);
-  res.type("text/xml").send(gatherResponse(req, finalSummary(nextState)));
-  return nextState;
-}
-
 router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
   const callSid = String(req.body?.CallSid ?? "");
   const speech = String(req.body?.SpeechResult ?? "").trim();
@@ -261,12 +295,13 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     if (state) state = await ensureCallerIdSource(state, call);
 
     const askedForService = state?.lastAction === "ASK_SERVICE";
-    if (!state?.serviceId && (BOOKING_INTENT.test(speech) || askedForService)) {
+    const serviceSignal = BOOKING_INTENT.test(speech) || SERVICE_REQUEST.test(speech) || askedForService;
+    if (!state?.serviceId && serviceSignal) {
       const services = await loadServices(call.companyId);
       const ranked = services
         .map(service => ({ service, score: serviceScore(speech, service.name, service.description) }))
         .sort((a, b) => b.score - a.score);
-      const matched = ranked[0]?.score >= 4 ? ranked[0].service : null;
+      const matched = ranked[0]?.score >= 10 ? ranked[0].service : null;
       const candidate = explicitServiceCandidate(speech, askedForService);
 
       if (matched) {
@@ -277,7 +312,7 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
           serviceName: matched.name,
         }, state.stateVersion);
         logger.info({ callSid, companyId: state.companyId, serviceId: matched.id, serviceName: matched.name }, "Captured and persisted service intent before booking intake");
-      } else if (candidate && services.length) {
+      } else if (candidate && services.length && (askedForService || BOOKING_INTENT.test(speech))) {
         state = state ?? getBookingState(callSid, call.companyId);
         state = await ensureCallerIdSource(state, call);
         state = setBookingAction(callSid, state.companyId, "ESCALATE_TO_HUMAN", state.stateVersion);
@@ -291,28 +326,36 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
     if (!state) { next(); return; }
     state = await ensureCallerIdSource(state, call);
 
-    if (state.lastAction === "CONFIRM_BOOKING" && knownPhone(state) && !state.customerPhoneConfirmed && YES.test(speech)) {
+    const factPatch = durableFactPatch(state, speech);
+    if (factPatch) {
+      state = setCustomerDetails(callSid, state.companyId, factPatch, state.stateVersion);
+      logger.info({ callSid, customerName: state.customerName, phoneSource: state.customerPhoneSource, notes: state.notes, serviceAnswers: state.serviceAnswers }, "Persisted normalized booking intake facts");
+    }
+
+    if (state.lastAction === "CONFIRM_BOOKING" && state.customerPhone && !state.customerPhoneConfirmed && YES.test(speech)) {
       state = setCustomerDetails(callSid, state.companyId, { customerPhoneConfirmed: true }, state.stateVersion);
-      logger.info({ callSid, phoneSource: state.customerPhoneSource }, "Confirmed known phone as part of final booking confirmation");
+      logger.info({ callSid, phoneSource: state.customerPhoneSource }, "Confirmed phone as part of final booking confirmation");
       next();
       return;
     }
 
-    // ASK_NAME is owned by this guard. Never fall through to another layer that
-    // could emit the same question again. Save a natural name reply once, then
-    // immediately advance; otherwise ask one explicit clarification.
     if (state.lastAction === "ASK_NAME") {
       if (!state.customerName) {
         const name = simpleName(speech);
         if (!name) {
-          logger.info({ callSid, speech }, "Could not safely normalize ASK_NAME reply; requesting one clarification without falling through");
+          logger.info({ callSid }, "Could not safely normalize ASK_NAME reply; requesting one clarification without falling through");
           res.type("text/xml").send(gatherResponse(req, "Sorry, I didn't catch the name. Please say the name you'd like on the appointment."));
           return;
         }
         state = setCustomerDetails(callSid, state.companyId, { customerName: name }, state.stateVersion);
         logger.info({ callSid, customerName: name }, "Captured customer name and advanced booking flow");
       }
-      respondAfterName(req, res, state);
+      if (!state.customerPhone) {
+        state = setBookingAction(state.callSid, state.companyId, "ASK_PHONE_CONFIRMATION", state.stateVersion);
+        res.type("text/xml").send(gatherResponse(req, "Thanks. What's the best phone number for the confirmation?"));
+        return;
+      }
+      next();
       return;
     }
 
@@ -322,7 +365,6 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
         state = holdBookingSlot(callSid, state.companyId, chosen, undefined, state.stateVersion);
         state = setBookingAction(callSid, state.companyId, "HOLD_SLOT", state.stateVersion);
         logger.info({ callSid, selected: chosen.iso, label: chosen.label }, "Context guard held accepted offered slot");
-
         if (!state.customerName) {
           state = setBookingAction(callSid, state.companyId, "ASK_NAME", state.stateVersion);
           res.type("text/xml").send(gatherResponse(req, "Great. What's the name for the appointment?"));
@@ -331,11 +373,6 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
         if (!state.customerPhone) {
           state = setBookingAction(callSid, state.companyId, "ASK_PHONE_CONFIRMATION", state.stateVersion);
           res.type("text/xml").send(gatherResponse(req, "What's the best phone number for the confirmation?"));
-          return;
-        }
-        if (knownPhone(state) && !state.customerPhoneConfirmed) {
-          state = setBookingAction(callSid, state.companyId, "CONFIRM_BOOKING", state.stateVersion);
-          res.type("text/xml").send(gatherResponse(req, finalSummary(state)));
           return;
         }
         next();
@@ -354,11 +391,8 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
         res.type("text/xml").send(gatherResponse(req, "What's the best phone number for the confirmation?"));
         return;
       }
-      if (knownPhone(state) && !state.customerPhoneConfirmed) {
-        state = setBookingAction(callSid, state.companyId, "CONFIRM_BOOKING", state.stateVersion);
-        res.type("text/xml").send(gatherResponse(req, finalSummary(state)));
-        return;
-      }
+      next();
+      return;
     }
 
     next();
