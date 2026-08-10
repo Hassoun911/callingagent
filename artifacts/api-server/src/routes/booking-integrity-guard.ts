@@ -1,12 +1,13 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, companiesTable } from "@workspace/db";
-import { bookingRequirementsForCompanyName, missingRequiredBookingDetail } from "../lib/booking-requirements";
-import { peekBookingState, setBookingAction, type LiveBookingState } from "../lib/booking-state-manager";
+import { bookingRequirementsForCompanyName, missingRequiredBookingDetail, type MissingBookingDetail } from "../lib/booking-requirements";
+import { peekBookingState, setBookingAction, setCustomerDetails, type LiveBookingState } from "../lib/booking-state-manager";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 const FALLBACK_VOICE = "Google.en-US-Neural2-F";
+const NUMBER_WORDS: Record<string, string> = { one: "1", two: "2", three: "3", four: "4" };
 
 function baseUrl(req: any): string {
   return process.env.APP_URL
@@ -32,14 +33,56 @@ function naturalPhone(value: string): string {
   return `${local.slice(0, 3)}-${local.slice(3, 6)}-${local.slice(6)}`;
 }
 
+function normalizePostalCode(speech: string): string | null {
+  const compact = speech.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const match = compact.match(/[ABCEGHJKLMNPRSTVXY]\d[ABCEGHJKLMNPRSTVWXYZ]\d[ABCEGHJKLMNPRSTVWXYZ]\d/);
+  if (!match) return null;
+  return `${match[0].slice(0, 3)} ${match[0].slice(3)}`;
+}
+
+function vehicleFromSpeech(speech: string): string | null {
+  return speech.match(/\b((?:19|20)\d{2}\s+[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z0-9-]+){1,4})(?=[,.!?]|$)/)?.[1]?.trim() ?? null;
+}
+
+function captureMissingDetail(state: LiveBookingState, missing: MissingBookingDetail, speech: string): LiveBookingState {
+  const notes: Record<string, string> = {};
+  const serviceAnswers: Record<string, string> = {};
+
+  if (missing.key === "service_location") {
+    const cleaned = speech.replace(/^\s*(?:the\s+)?(?:service\s+)?(?:address|location)\s*(?:is|at)?\s*/i, "").trim().replace(/[.!?]+$/g, "");
+    if (/\d/.test(cleaned) && cleaned.length >= 6) notes.service_location = cleaned;
+  } else if (missing.key === "postal_code") {
+    const postal = normalizePostalCode(speech);
+    if (postal) notes.postal_code = postal;
+  } else if (missing.key === "vehicle") {
+    const vehicle = vehicleFromSpeech(speech);
+    if (vehicle) notes.vehicle = vehicle;
+  } else if (missing.key === "tire_count") {
+    const raw = speech.match(/\b(one|two|three|four|1|2|3|4)\b/i)?.[1]?.toLowerCase();
+    if (raw) serviceAnswers.tire_count = NUMBER_WORDS[raw] ?? raw;
+  } else if (missing.key === "mounted_on_rims") {
+    if (/\b(no|nope|not|isn't|aren't|without)\b/i.test(speech)) serviceAnswers.mounted_on_rims = "no";
+    else if (/\b(yes|yeah|yep|yup|already|mounted|correct|right)\b/i.test(speech)) serviceAnswers.mounted_on_rims = "yes";
+  }
+
+  if (!Object.keys(notes).length && !Object.keys(serviceAnswers).length) return state;
+  return setCustomerDetails(state.callSid, state.companyId, {
+    ...(Object.keys(notes).length ? { notes } : {}),
+    ...(Object.keys(serviceAnswers).length ? { serviceAnswers } : {}),
+  }, state.stateVersion);
+}
+
 function completeSummary(state: LiveBookingState): string {
+  const address = state.notes.service_location
+    ? `${state.notes.service_location}${state.notes.postal_code ? `, ${state.notes.postal_code}` : ""}`
+    : null;
   const parts = [
     `${state.customerName} for ${state.serviceName || "the appointment"}`,
     state.notes.vehicle || null,
     state.serviceAnswers.tire_count
       ? `${state.serviceAnswers.tire_count} tire${state.serviceAnswers.tire_count === "1" ? "" : "s"}${state.serviceAnswers.mounted_on_rims === "yes" ? ", already mounted on rims" : state.serviceAnswers.mounted_on_rims === "no" ? ", not mounted on rims" : ""}`
       : null,
-    state.notes.service_location ? `service at ${state.notes.service_location}` : null,
+    address ? `service at ${address}` : null,
     state.selectedSlot?.label || null,
     state.customerPhone
       ? `${state.customerPhoneSource === "spoken" ? "callback number" : state.customerPhoneSource === "caller_id" ? "the number you're calling from" : "contact number"} ${naturalPhone(state.customerPhone)}`
@@ -50,6 +93,7 @@ function completeSummary(state: LiveBookingState): string {
 
 router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
   const callSid = String(req.body?.CallSid ?? "");
+  const speech = String(req.body?.SpeechResult ?? "").trim();
   if (!callSid) { next(); return; }
 
   try {
@@ -61,6 +105,18 @@ router.use("/twilio/ai-gather", async (req: any, res: any, next: any) => {
 
     const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, state.companyId));
     const requirements = bookingRequirementsForCompanyName(company?.name);
+
+    // If the previous deterministic turn asked for a required company detail,
+    // normalize the reply directly into state before deciding what remains.
+    const previouslyMissing = missingRequiredBookingDetail(state, requirements);
+    if (speech && state.lastAction === "ASK_SERVICE_DETAIL" && previouslyMissing) {
+      const updated = captureMissingDetail(state, previouslyMissing, speech);
+      if (updated.stateVersion !== state.stateVersion) {
+        state = updated;
+        logger.info({ callSid, companyId: state.companyId, capturedDetail: previouslyMissing.key }, "Captured required booking detail");
+      }
+    }
+
     const missing = missingRequiredBookingDetail(state, requirements);
     if (missing) {
       state = setBookingAction(callSid, state.companyId, "ASK_SERVICE_DETAIL", state.stateVersion);
