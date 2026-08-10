@@ -7,6 +7,7 @@ import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 import bookingFlowSettingsRouter, { refreshStoredBookingFlowPrompts } from "./routes/booking-flow-settings";
 import bookingContextGuardRouter from "./routes/booking-context-guard";
+import bookingSoonestGuardRouter from "./routes/booking-soonest-guard";
 import bookingIntakeGuardRouter from "./routes/booking-intake-guard";
 import bookingPreferenceGuardRouter from "./routes/booking-preference-guard";
 import bookingIntegrityGuardRouter from "./routes/booking-integrity-guard";
@@ -48,11 +49,12 @@ disableLegacyGlobalAdminSms().catch(() => {});
 refreshStoredBookingFlowPrompts().catch(() => {});
 
 // Booking calls are handled in layers. Context first persists normalized facts
-// from every caller turn. Intake prevents generic service guesses; preference
-// interrupts make new day/time corrections outrank stale offers; integrity then
-// enforces company-scoped required details before the orchestrator is allowed to
-// confirm or create an appointment.
+// from every caller turn. Soonest requests become an explicit earliest-calendar
+// preference; intake prevents generic service guesses; time corrections outrank
+// stale offers; integrity enforces company-scoped required details before the
+// orchestrator is allowed to confirm or create an appointment.
 app.use("/api", bookingContextGuardRouter);
+app.use("/api", bookingSoonestGuardRouter);
 app.use("/api", bookingIntakeGuardRouter);
 app.use("/api", bookingPreferenceGuardRouter);
 app.use("/api", bookingIntegrityGuardRouter);
