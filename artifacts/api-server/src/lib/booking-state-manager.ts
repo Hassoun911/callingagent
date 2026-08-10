@@ -1,4 +1,19 @@
 export type BookingDaypart = "morning" | "afternoon" | "evening" | null;
+export type BookingSlotStatus = "none" | "offered" | "held" | "expired" | "confirmed";
+export type BookingAction =
+  | "ASK_SERVICE"
+  | "ASK_DATE"
+  | "ASK_DAYPART"
+  | "SEARCH_AVAILABILITY"
+  | "OFFER_SLOTS"
+  | "ASK_NAME"
+  | "ASK_PHONE_CONFIRMATION"
+  | "ASK_SERVICE_DETAIL"
+  | "HOLD_SLOT"
+  | "CONFIRM_BOOKING"
+  | "CREATE_BOOKING"
+  | "BOOKING_COMPLETE"
+  | "NO_AVAILABILITY";
 
 export interface BookingSlotState {
   iso: string;
@@ -19,16 +34,23 @@ export interface LiveBookingState {
   availabilityChecked: boolean;
   offeredSlots: BookingSlotState[];
   selectedSlot: BookingSlotState | null;
+  slotStatus: BookingSlotStatus;
+  holdId: string | null;
+  holdExpiresAt: number | null;
   customerName: string | null;
   customerPhone: string | null;
+  customerPhoneConfirmed: boolean;
   customerEmail: string | null;
   notes: Record<string, string>;
   confirmed: boolean;
+  bookingId: number | null;
+  lastAction: BookingAction | null;
   updatedAt: number;
   expiresAt: number;
 }
 
 type SlotHold = {
+  id: string;
   callSid: string;
   companyId: number;
   resourceId: number;
@@ -59,30 +81,47 @@ function fresh(callSid: string, companyId: number): LiveBookingState {
     availabilityChecked: false,
     offeredSlots: [],
     selectedSlot: null,
+    slotStatus: "none",
+    holdId: null,
+    holdExpiresAt: null,
     customerName: null,
     customerPhone: null,
+    customerPhoneConfirmed: false,
     customerEmail: null,
     notes: {},
     confirmed: false,
+    bookingId: null,
+    lastAction: null,
     updatedAt: now,
     expiresAt: now + DEFAULT_TTL_MS,
   };
 }
 
-function releaseHoldsForCall(callSid: string): void {
+function touch(state: LiveBookingState): LiveBookingState {
+  state.updatedAt = Date.now();
+  state.expiresAt = state.updatedAt + DEFAULT_TTL_MS;
+  return state;
+}
+
+function releaseHoldsForCall(callSid: string, expired = false): void {
   for (const [key, hold] of slotHolds) {
-    if (hold.callSid === callSid) slotHolds.delete(key);
+    if (hold.callSid !== callSid) continue;
+    slotHolds.delete(key);
+  }
+  const state = states.get(callSid);
+  if (state && state.slotStatus === "held") {
+    state.slotStatus = expired ? "expired" : "none";
+    state.holdId = null;
+    state.holdExpiresAt = null;
+    if (expired) state.selectedSlot = null;
+    touch(state);
   }
 }
 
 export function getBookingState(callSid: string, companyId: number): LiveBookingState {
   const existing = states.get(callSid);
-  if (existing && existing.expiresAt > Date.now() && existing.companyId === companyId) {
-    existing.updatedAt = Date.now();
-    existing.expiresAt = Date.now() + DEFAULT_TTL_MS;
-    return existing;
-  }
-  if (existing) releaseHoldsForCall(callSid);
+  if (existing && existing.expiresAt > Date.now() && existing.companyId === companyId) return touch(existing);
+  if (existing) releaseHoldsForCall(callSid, true);
   const state = fresh(callSid, companyId);
   states.set(callSid, state);
   return state;
@@ -91,7 +130,16 @@ export function getBookingState(callSid: string, companyId: number): LiveBooking
 export function peekBookingState(callSid: string): LiveBookingState | null {
   const state = states.get(callSid);
   if (!state || state.expiresAt <= Date.now()) return null;
-  return state;
+  if (state.holdExpiresAt && state.holdExpiresAt <= Date.now() && state.slotStatus === "held") {
+    releaseHoldsForCall(callSid, true);
+  }
+  return states.get(callSid) ?? null;
+}
+
+export function setBookingAction(callSid: string, companyId: number, action: BookingAction): LiveBookingState {
+  const state = getBookingState(callSid, companyId);
+  state.lastAction = action;
+  return touch(state);
 }
 
 export function setSchedulingPreference(
@@ -119,25 +167,33 @@ export function setSchedulingPreference(
   if (patch.serviceName !== undefined) state.serviceName = patch.serviceName;
 
   if (dayChanged || partChanged || timeChanged || serviceChanged || serviceNameChanged) {
+    // Dependency-based invalidation: keep caller identity and unrelated details,
+    // but invalidate all calendar-derived data whenever scheduling inputs change.
     releaseHoldsForCall(callSid);
     state.availabilityChecked = false;
     state.offeredSlots = [];
     state.selectedSlot = null;
+    state.slotStatus = "none";
+    state.holdId = null;
+    state.holdExpiresAt = null;
     state.confirmed = false;
+    state.bookingId = null;
   }
 
-  state.updatedAt = Date.now();
-  state.expiresAt = Date.now() + DEFAULT_TTL_MS;
-  return state;
+  return touch(state);
 }
 
 export function setAvailabilityResult(callSid: string, companyId: number, slots: BookingSlotState[]): LiveBookingState {
   const state = getBookingState(callSid, companyId);
+  releaseHoldsForCall(callSid);
   state.availabilityChecked = true;
   state.offeredSlots = slots;
   state.selectedSlot = null;
+  state.slotStatus = slots.length ? "offered" : "none";
+  state.holdId = null;
+  state.holdExpiresAt = null;
   state.confirmed = false;
-  return state;
+  return touch(state);
 }
 
 export function holdBookingSlot(
@@ -154,22 +210,25 @@ export function holdBookingSlot(
   }
 
   releaseHoldsForCall(callSid);
-  slotHolds.set(key, {
+  const hold: SlotHold = {
+    id: `${callSid}:${slot.resourceId}:${now}`,
     callSid,
     companyId,
     resourceId: slot.resourceId,
     iso: slot.iso,
     expiresAt: now + holdMs,
-  });
+  };
+  slotHolds.set(key, hold);
 
   const state = getBookingState(callSid, companyId);
   state.selectedSlot = slot;
   state.offeredSlots = state.offeredSlots.length ? state.offeredSlots : [slot];
   state.availabilityChecked = true;
+  state.slotStatus = "held";
+  state.holdId = hold.id;
+  state.holdExpiresAt = hold.expiresAt;
   state.confirmed = false;
-  state.updatedAt = now;
-  state.expiresAt = now + DEFAULT_TTL_MS;
-  return state;
+  return touch(state);
 }
 
 export function isSlotHeldByAnother(callSid: string, companyId: number, resourceId: number, iso: string): boolean {
@@ -183,6 +242,14 @@ export function isSlotHeldByAnother(callSid: string, companyId: number, resource
   return hold.callSid !== callSid;
 }
 
+export function hasValidBookingHold(callSid: string): boolean {
+  const state = peekBookingState(callSid);
+  if (!state || state.slotStatus !== "held" || !state.selectedSlot || !state.holdId || !state.holdExpiresAt) return false;
+  if (state.holdExpiresAt <= Date.now()) return false;
+  const hold = slotHolds.get(holdKey(state.companyId, state.selectedSlot.resourceId, state.selectedSlot.iso));
+  return !!hold && hold.callSid === callSid && hold.id === state.holdId && hold.expiresAt > Date.now();
+}
+
 export function releaseBookingHold(callSid: string): void {
   releaseHoldsForCall(callSid);
 }
@@ -190,21 +257,38 @@ export function releaseBookingHold(callSid: string): void {
 export function setCustomerDetails(
   callSid: string,
   companyId: number,
-  patch: { customerName?: string | null; customerPhone?: string | null; customerEmail?: string | null; notes?: Record<string, string> },
+  patch: {
+    customerName?: string | null;
+    customerPhone?: string | null;
+    customerPhoneConfirmed?: boolean;
+    customerEmail?: string | null;
+    notes?: Record<string, string>;
+  },
 ): LiveBookingState {
   const state = getBookingState(callSid, companyId);
   if (patch.customerName !== undefined) state.customerName = patch.customerName;
   if (patch.customerPhone !== undefined) state.customerPhone = patch.customerPhone;
+  if (patch.customerPhoneConfirmed !== undefined) state.customerPhoneConfirmed = patch.customerPhoneConfirmed;
   if (patch.customerEmail !== undefined) state.customerEmail = patch.customerEmail;
   if (patch.notes) state.notes = { ...state.notes, ...patch.notes };
-  return state;
+  return touch(state);
 }
 
 export function markBookingConfirmed(callSid: string, companyId: number): LiveBookingState {
   const state = getBookingState(callSid, companyId);
   state.confirmed = true;
+  return touch(state);
+}
+
+export function markBookingCreated(callSid: string, companyId: number, bookingId: number): LiveBookingState {
+  const state = getBookingState(callSid, companyId);
+  state.confirmed = true;
+  state.bookingId = bookingId;
+  state.slotStatus = "confirmed";
+  state.lastAction = "BOOKING_COMPLETE";
   releaseHoldsForCall(callSid);
-  return state;
+  state.slotStatus = "confirmed";
+  return touch(state);
 }
 
 export function bookingStatePrompt(state: LiveBookingState): string {
@@ -219,7 +303,7 @@ export function bookingStatePrompt(state: LiveBookingState): string {
     state.customerEmail ? `customer_email=${state.customerEmail}` : null,
   ].filter(Boolean).join(", ");
 
-  return `[BOOKING STATE - INTERNAL ONLY: ${known || "intent detected; scheduling details not collected yet"}. availability_checked=${state.availabilityChecked}. offered_slots=${state.offeredSlots.map(slot => slot.label).join(" | ") || "none"}. Ask only for the next missing piece. Never ask for a value already present here. If the caller changes one field, preserve every other known field and update only that field. If caller ID is already present, ask whether to use that number instead of making the caller repeat it.]`;
+  return `[BOOKING STATE - INTERNAL ONLY: ${known || "intent detected; scheduling details not collected yet"}. availability_checked=${state.availabilityChecked}. slot_status=${state.slotStatus}. last_action=${state.lastAction ?? "none"}. offered_slots=${state.offeredSlots.map(slot => slot.label).join(" | ") || "none"}. Ask only for the next missing piece. Never ask for a value already present here. If the caller changes one field, preserve every unrelated field and invalidate only dependent scheduling data.]`;
 }
 
 export function clearBookingState(callSid: string): void {
@@ -229,8 +313,9 @@ export function clearBookingState(callSid: string): void {
 
 export function expireBookingStates(now = Date.now()): void {
   for (const [callSid, state] of states) {
+    if (state.holdExpiresAt && state.holdExpiresAt <= now && state.slotStatus === "held") releaseHoldsForCall(callSid, true);
     if (state.expiresAt <= now) {
-      releaseHoldsForCall(callSid);
+      releaseHoldsForCall(callSid, true);
       states.delete(callSid);
     }
   }
