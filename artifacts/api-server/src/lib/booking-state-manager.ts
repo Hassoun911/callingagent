@@ -198,6 +198,7 @@ export function setSchedulingPreference(
     requestedTime?: string | null;
     serviceId?: number | null;
     serviceName?: string | null;
+    allowServiceChange?: boolean;
   },
   expectedVersion?: number,
 ): LiveBookingState {
@@ -207,8 +208,13 @@ export function setSchedulingPreference(
   const dayChanged = patch.requestedDay !== undefined && patch.requestedDay !== state.requestedDay;
   const partChanged = patch.requestedDaypart !== undefined && patch.requestedDaypart !== state.requestedDaypart;
   const timeChanged = patch.requestedTime !== undefined && patch.requestedTime !== state.requestedTime;
-  const serviceChanged = patch.serviceId !== undefined && patch.serviceId !== state.serviceId;
-  const serviceNameChanged = patch.serviceName !== undefined && patch.serviceName !== state.serviceName;
+
+  // Once a service has been explicitly captured, unrelated later speech must
+  // never silently remap it. A deliberate service-change flow must opt in with
+  // allowServiceChange=true and will then invalidate only service-dependent data.
+  const canChangeService = state.serviceId === null || patch.allowServiceChange === true;
+  const serviceChanged = canChangeService && patch.serviceId !== undefined && patch.serviceId !== state.serviceId;
+  const serviceNameChanged = canChangeService && patch.serviceName !== undefined && patch.serviceName !== state.serviceName;
   const changed = dayChanged || partChanged || timeChanged || serviceChanged || serviceNameChanged;
 
   if (!changed) return refreshTtl(state);
@@ -217,8 +223,8 @@ export function setSchedulingPreference(
   if (patch.requestedDay !== undefined) state.requestedDay = patch.requestedDay;
   if (patch.requestedDaypart !== undefined) state.requestedDaypart = patch.requestedDaypart;
   if (patch.requestedTime !== undefined) state.requestedTime = patch.requestedTime;
-  if (patch.serviceId !== undefined) state.serviceId = patch.serviceId;
-  if (patch.serviceName !== undefined) state.serviceName = patch.serviceName;
+  if (canChangeService && patch.serviceId !== undefined) state.serviceId = patch.serviceId;
+  if (canChangeService && patch.serviceName !== undefined) state.serviceName = patch.serviceName;
 
   state.availabilityStatus = "stale";
   state.availabilityChecked = false;
@@ -385,6 +391,10 @@ export function bookingStatePrompt(state: LiveBookingState): string {
     state.customerName ? `customer_name=${state.customerName}` : null,
     state.customerPhone ? `customer_phone=${state.customerPhone}` : null,
     state.customerEmail ? `customer_email=${state.customerEmail}` : null,
+    state.notes.service_location ? `service_location=${state.notes.service_location}` : null,
+    state.notes.vehicle ? `vehicle=${state.notes.vehicle}` : null,
+    state.serviceAnswers.tire_count ? `tire_count=${state.serviceAnswers.tire_count}` : null,
+    state.serviceAnswers.mounted_on_rims ? `mounted_on_rims=${state.serviceAnswers.mounted_on_rims}` : null,
   ].filter(Boolean).join(", ");
   return `[BOOKING STATE - INTERNAL ONLY: ${known || "intent detected; scheduling details not collected yet"}. state_version=${state.stateVersion}. availability_status=${state.availabilityStatus}. slot_status=${state.slotStatus}. last_action=${state.lastAction ?? "none"}. offered_slots=${state.offeredSlots.map(slot => slot.label).join(" | ") || "none"}. Ask only for the next missing piece. Never ask for a value already present here. If the caller changes one field, preserve every unrelated field and invalidate only dependent scheduling data.]`;
 }
