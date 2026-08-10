@@ -2,6 +2,7 @@ import twilio from "twilio";
 import { logger } from "./logger";
 
 const DEFAULT_ADMIN_CONTENT_SID = "HX53b587342dccf2d5b638c470e1da7ef7";
+const TWILIO_WHATSAPP_SANDBOX_NUMBER = "+14155238886";
 
 type TemplateContext = {
   companyName?: string | null;
@@ -27,6 +28,35 @@ let cachedTemplate: TwilioContent | null | undefined;
 function normalizeWhatsapp(value: string): string {
   const trimmed = value.trim();
   return trimmed.toLowerCase().startsWith("whatsapp:") ? trimmed : `whatsapp:${trimmed}`;
+}
+
+function bareWhatsappNumber(value: string): string {
+  const trimmed = value.trim().replace(/^whatsapp:/i, "");
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return trimmed.startsWith("+") ? trimmed : digits ? `+${digits}` : trimmed;
+}
+
+function assertProductionWhatsappSender(value: string): string {
+  const sender = value.trim();
+  if (!sender) throw new Error("WhatsApp sender is not configured");
+  if (bareWhatsappNumber(sender) === TWILIO_WHATSAPP_SANDBOX_NUMBER) {
+    throw new Error(
+      "TWILIO_WHATSAPP_FROM is still set to the Twilio WhatsApp Sandbox (+14155238886). Configure an approved production WhatsApp sender.",
+    );
+  }
+  return sender;
+}
+
+export function getProductionWhatsappSender(): string {
+  const configured = process.env.TWILIO_WHATSAPP_FROM?.trim();
+  if (!configured) {
+    throw new Error(
+      "TWILIO_WHATSAPP_FROM is required for admin WhatsApp notifications and must be an approved production WhatsApp sender.",
+    );
+  }
+  return assertProductionWhatsappSender(configured);
 }
 
 function twilioClient(): twilio.Twilio | null {
@@ -110,20 +140,21 @@ export async function sendAdminWhatsappTemplate(args: {
   const client = twilioClient();
   if (!client) throw new Error("Twilio credentials are not configured");
 
+  const sender = assertProductionWhatsappSender(args.from);
   const contentSid = process.env.TWILIO_ADMIN_ALERT_CONTENT_SID?.trim() || DEFAULT_ADMIN_CONTENT_SID;
   const template = await loadTemplate(contentSid);
   const contentVariables = buildVariables(template, args.context);
 
   const payload: any = {
-    from: normalizeWhatsapp(args.from),
+    from: normalizeWhatsapp(sender),
     to: normalizeWhatsapp(args.to),
     contentSid,
   };
   if (contentVariables) payload.contentVariables = contentVariables;
 
   const result = await client.messages.create(payload);
-  logger.info({ to: payload.to, contentSid, sid: result.sid }, "Admin WhatsApp template sent");
+  logger.info({ to: payload.to, from: payload.from, contentSid, sid: result.sid }, "Admin WhatsApp template sent");
   return result.sid;
 }
 
-export { DEFAULT_ADMIN_CONTENT_SID };
+export { DEFAULT_ADMIN_CONTENT_SID, TWILIO_WHATSAPP_SANDBOX_NUMBER };
