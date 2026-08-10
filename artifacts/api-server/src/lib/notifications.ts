@@ -73,10 +73,8 @@ async function sendAdminTemplate(data: AppointmentNotificationData, status: stri
     logger.info({ companyName: data.companyName }, "Admin WhatsApp template skipped: destination or sender missing");
     return;
   }
-
   const dateStr = formatDateTime(data.startTime, data.timezone || EASTERN_TZ);
   const endStr = data.endTime ? ` – ${formatDateTime(data.endTime, data.timezone || EASTERN_TZ)}` : "";
-
   try {
     await sendAdminWhatsappTemplate({
       from: sender,
@@ -106,7 +104,6 @@ async function sendCustomerSms(data: AppointmentNotificationData, body: string, 
     logger.warn({ customerPhone: data.customerPhone, from: data.twilioFromNumber }, `${logLabel} skipped: Twilio, customer, or sender missing`);
     return;
   }
-
   const to = normalizeSmsNumber(data.customerPhone);
   const from = normalizeSmsNumber(data.twilioFromNumber);
   try {
@@ -148,6 +145,22 @@ async function sendAdminEmail(data: AppointmentNotificationData, subject: string
   }
 }
 
+async function retryNotificationChannel(label: string, send: () => Promise<void>, maxAttempts = 3): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await send();
+      return;
+    } catch (error: any) {
+      logger.warn({ label, attempt, maxAttempts, err: error?.message }, "Booking notification channel attempt failed");
+      if (attempt >= maxAttempts) return;
+      await new Promise<void>(resolve => {
+        const timer = setTimeout(resolve, attempt * 15_000);
+        timer.unref();
+      });
+    }
+  }
+}
+
 export interface ReminderNotificationData extends AppointmentNotificationData {
   reminderLabel: string;
 }
@@ -155,22 +168,21 @@ export interface ReminderNotificationData extends AppointmentNotificationData {
 export async function sendBookingNotifications(data: AppointmentNotificationData): Promise<void> {
   const dateStr = formatDateTime(data.startTime, data.timezone || EASTERN_TZ);
   const endStr = data.endTime ? ` – ${formatDateTime(data.endTime, data.timezone || EASTERN_TZ)}` : "";
-  const results = await Promise.allSettled([
-    sendCustomerSms(data, [
-      `Hi ${data.customerName}, your appointment is confirmed.`,
-      `${data.title} with ${data.companyName}`,
-      `Date/Time: ${dateStr}${endStr}`,
-      data.notes ? `Details: ${data.notes}` : "",
-      "Reply STOP to opt out.",
-    ].filter(Boolean).join("\n"), "Customer booking SMS"),
-    sendAdminTemplate(data, "Booked", "New appointment booked"),
-    sendAdminEmail(data, `New Booking: ${data.title} — ${data.customerName}`, `New Appointment Booked — ${data.companyName}`),
-  ]);
+  const smsBody = [
+    `Hi ${data.customerName}, your appointment is confirmed.`,
+    `${data.title} with ${data.companyName}`,
+    `Date/Time: ${dateStr}${endStr}`,
+    data.notes ? `Details: ${data.notes}` : "",
+    "Reply STOP to opt out.",
+  ].filter(Boolean).join("\n");
 
-  const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
-  if (failures.length) {
-    throw new Error(`Booking notifications had ${failures.length} failed delivery channel(s)`);
-  }
+  // Each delivery channel retries independently after booking commit, so a failed
+  // email cannot cause a duplicate customer SMS or duplicate WhatsApp alert.
+  await Promise.allSettled([
+    retryNotificationChannel("customer_sms", () => sendCustomerSms(data, smsBody, "Customer booking SMS")),
+    retryNotificationChannel("admin_whatsapp", () => sendAdminTemplate(data, "Booked", "New appointment booked")),
+    retryNotificationChannel("admin_email", () => sendAdminEmail(data, `New Booking: ${data.title} — ${data.customerName}`, `New Appointment Booked — ${data.companyName}`)),
+  ]);
 }
 
 export async function sendRescheduleNotifications(data: AppointmentNotificationData & { oldStartTime: Date }): Promise<void> {
