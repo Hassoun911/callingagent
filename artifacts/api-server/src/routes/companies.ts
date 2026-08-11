@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, companiesTable } from "@workspace/db";
 import { getCompanyScope, isCompanyScoped, isCompanyAdmin } from "../lib/scope";
+import { getPortalVisibility } from "./portal-visibility";
 import {
   ListCompaniesResponse,
   GetCompanyResponse,
@@ -27,6 +28,16 @@ function normalizeNorthAmericanPhone(value: unknown): string | null | undefined 
   }
 
   return `+1${digits}`;
+}
+
+function normalizeNotificationEmail(value: unknown): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null || String(value).trim() === "") return null;
+  const email = String(value).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("Enter a valid notification email address");
+  }
+  return email;
 }
 
 router.get("/companies/:id/public-info", async (req, res): Promise<void> => {
@@ -63,13 +74,15 @@ router.post("/companies", async (req, res): Promise<void> => {
 
   try {
     const adminWhatsapp = normalizeNorthAmericanPhone(req.body?.adminWhatsapp ?? req.body?.companyAdminWhatsapp);
+    const adminNotificationEmail = normalizeNotificationEmail(req.body?.adminNotificationEmail);
     const [company] = await db.insert(companiesTable).values({
       ...parsed.data,
       ...(adminWhatsapp !== undefined ? { adminWhatsapp } : {}),
+      ...(adminNotificationEmail !== undefined ? { adminNotificationEmail } : {}),
     } as any).returning();
     res.status(201).json(GetCompanyResponse.parse({ ...company, createdAt: company.createdAt.toISOString() }));
   } catch (error: any) {
-    res.status(400).json({ error: error?.message ?? "Invalid WhatsApp number" });
+    res.status(400).json({ error: error?.message ?? "Invalid notification setting" });
   }
 });
 
@@ -126,7 +139,26 @@ router.patch("/companies/:id", async (req, res): Promise<void> => {
     if (body.notes !== undefined) updateData.notes = body.notes;
 
     const adminWhatsapp = normalizeNorthAmericanPhone(req.body?.adminWhatsapp ?? req.body?.companyAdminWhatsapp);
+    const adminNotificationEmail = normalizeNotificationEmail(req.body?.adminNotificationEmail);
+
+    if (companyId !== null && (adminWhatsapp !== undefined || adminNotificationEmail !== undefined)) {
+      const visibility = await getPortalVisibility(companyId);
+      if (!visibility.pages.notifications) {
+        res.status(403).json({ error: "Notification settings are managed by the main administrator" });
+        return;
+      }
+      if (adminWhatsapp !== undefined && !visibility.notifications.adminWhatsapp) {
+        res.status(403).json({ error: "WhatsApp notification number is managed by the main administrator" });
+        return;
+      }
+      if (adminNotificationEmail !== undefined && !visibility.notifications.notificationEmail) {
+        res.status(403).json({ error: "Notification email is managed by the main administrator" });
+        return;
+      }
+    }
+
     if (adminWhatsapp !== undefined) updateData.adminWhatsapp = adminWhatsapp;
+    if (adminNotificationEmail !== undefined) updateData.adminNotificationEmail = adminNotificationEmail;
 
     const [updated] = await db.update(companiesTable)
       .set(updateData)
@@ -140,7 +172,7 @@ router.patch("/companies/:id", async (req, res): Promise<void> => {
 
     res.json(UpdateCompanyResponse.parse({ ...updated, createdAt: updated.createdAt.toISOString() }));
   } catch (error: any) {
-    res.status(400).json({ error: error?.message ?? "Invalid WhatsApp number" });
+    res.status(400).json({ error: error?.message ?? "Invalid notification setting" });
   }
 });
 
