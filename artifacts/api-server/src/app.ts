@@ -6,6 +6,7 @@ import path from "path";
 import { authMiddleware } from "./middlewares/authMiddleware";
 import router from "./routes";
 import bookingFlowSettingsRouter, { refreshStoredBookingFlowPrompts } from "./routes/booking-flow-settings";
+import bookingServiceAliasGuardRouter from "./routes/booking-service-alias-guard";
 import bookingContextGuardRouter from "./routes/booking-context-guard";
 import bookingSoonestGuardRouter from "./routes/booking-soonest-guard";
 import bookingIntakeGuardRouter from "./routes/booking-intake-guard";
@@ -48,11 +49,14 @@ app.use(authMiddleware);
 disableLegacyGlobalAdminSms().catch(() => {});
 refreshStoredBookingFlowPrompts().catch(() => {});
 
-// Booking calls are handled in layers. Context first persists normalized facts
-// from every caller turn. Soonest requests become an explicit earliest-calendar
-// preference; intake prevents generic service guesses; time corrections outrank
-// stale offers; integrity enforces company-scoped required details before the
-// orchestrator is allowed to confirm or create an appointment.
+// Booking calls are handled in layers. Natural service aliases run first so
+// ordinary caller wording such as "changing my tire" resolves to the company's
+// configured service before strict context validation can reject the phrase.
+// Context then persists normalized facts from every caller turn. Soonest requests
+// become an explicit earliest-calendar preference; intake prevents generic service
+// guesses; time corrections outrank stale offers; integrity enforces company-scoped
+// required details before the orchestrator is allowed to confirm or create an appointment.
+app.use("/api", bookingServiceAliasGuardRouter);
 app.use("/api", bookingContextGuardRouter);
 app.use("/api", bookingSoonestGuardRouter);
 app.use("/api", bookingIntakeGuardRouter);
