@@ -8,6 +8,7 @@ export type PortalVisibility = {
     contacts: boolean;
     bookings: boolean;
     users: boolean;
+    notifications: boolean;
   };
   dashboard: {
     liveCalls: boolean;
@@ -32,6 +33,10 @@ export type PortalVisibility = {
     testCall: boolean;
     twilioStatus: boolean;
   };
+  notifications: {
+    adminWhatsapp: boolean;
+    notificationEmail: boolean;
+  };
 };
 
 export const DEFAULT_PORTAL_VISIBILITY: PortalVisibility = {
@@ -44,6 +49,7 @@ export const DEFAULT_PORTAL_VISIBILITY: PortalVisibility = {
     contacts: true,
     bookings: true,
     users: true,
+    notifications: false,
   },
   dashboard: {
     liveCalls: true,
@@ -68,6 +74,10 @@ export const DEFAULT_PORTAL_VISIBILITY: PortalVisibility = {
     testCall: true,
     twilioStatus: true,
   },
+  notifications: {
+    adminWhatsapp: true,
+    notificationEmail: true,
+  },
 };
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -83,6 +93,7 @@ export async function getPortalVisibility(companyId: number): Promise<PortalVisi
     pages: { ...DEFAULT_PORTAL_VISIBILITY.pages, ...(value?.pages ?? {}) },
     dashboard: { ...DEFAULT_PORTAL_VISIBILITY.dashboard, ...(value?.dashboard ?? {}) },
     phoneNumber: { ...DEFAULT_PORTAL_VISIBILITY.phoneNumber, ...(value?.phoneNumber ?? {}) },
+    notifications: { ...DEFAULT_PORTAL_VISIBILITY.notifications, ...(value?.notifications ?? {}) },
   };
 }
 
