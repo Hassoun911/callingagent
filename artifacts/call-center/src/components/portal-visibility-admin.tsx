@@ -26,6 +26,7 @@ const GROUPS: Array<{
       contacts: "Contacts",
       bookings: "Bookings",
       users: "Users",
+      notifications: "Notifications",
     },
   },
   {
@@ -56,9 +57,18 @@ const GROUPS: Array<{
       voice: "Voice selection",
       voicemailGreeting: "Voicemail greeting",
       lineIdentity: "Line identity",
-      notificationEmail: "Notification email",
+      notificationEmail: "Legacy line notification email",
       testCall: "Test call",
       twilioStatus: "Twilio line status",
+    },
+  },
+  {
+    key: "notifications",
+    title: "Notification controls",
+    description: "Choose which company-level alert destinations this company's administrator may change.",
+    labels: {
+      adminWhatsapp: "Admin WhatsApp number",
+      notificationEmail: "Admin notification email",
     },
   },
 ];
@@ -126,6 +136,7 @@ export default function PortalVisibilityAdmin({ companyId: companyIdProp, inline
     try {
       setSettings(await savePortalVisibility(companyId, settings));
       setMessage("Saved for this company only.");
+      window.dispatchEvent(new Event("portal-visibility-changed"));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Save failed.");
     } finally {
