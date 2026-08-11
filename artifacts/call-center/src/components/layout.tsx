@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { useWatches } from "@/hooks/use-watches";
 import {
-  useListCallLogs,
   useListCompanies,
   useListPhoneNumbers,
   useListSmsMessages,
@@ -70,11 +69,29 @@ export function Layout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: companies } = useListCompanies();
   const { data: allNumbers } = useListPhoneNumbers();
-  const { data: allCallsData } = useListCallLogs({ limit: 200 });
   const { data: allMessages = [] } = useListSmsMessages({ limit: 500 });
-  const stableCallsRef = useRef<any[]>([]);
-  if (allCallsData !== undefined) stableCallsRef.current = allCallsData as any[];
-  const allCalls = allCallsData ?? stableCallsRef.current;
+
+  // Keep the sidebar's call-log request completely separate from the Calls
+  // page query. The generated hook can otherwise share/replace cached call
+  // results with requests that use different limits or filters, which makes
+  // the sidebar badge and table visibly bounce between two result sets.
+  const { data: allCalls = [] } = useQuery<any[]>({
+    queryKey: ["super-admin-sidebar-call-logs"],
+    queryFn: async () => {
+      const response = await fetch(`${BASE}/api/call-logs?limit=200`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error(`Call logs request failed (${response.status})`);
+      const rows = await response.json();
+      if (!Array.isArray(rows)) return [];
+      return Array.from(new Map(rows.map((row: any) => [row.id, row])).values());
+    },
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+  });
+
   const callLogsRoute = location === "/calls" || location.startsWith("/calls/");
 
   const activeCompanyId = (() => {
