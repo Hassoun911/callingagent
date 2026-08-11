@@ -1,6 +1,7 @@
 const STORAGE_PREFIX = "callingagent:read-calls:v1:";
 const INITIALIZED_PREFIX = "callingagent:read-calls-initialized:v1:";
 const EVENT_NAME = "callingagent:call-read-state-changed";
+const STYLE_ID = "callingagent-call-unread-style";
 
 type CallState = {
   read: string[];
@@ -69,6 +70,38 @@ function sidebarLink(id: string): HTMLAnchorElement | null {
   return document.querySelector<HTMLAnchorElement>(`a[href="/calls?companyId=${id}"]`);
 }
 
+function ensureUnreadBadgeStyles(): void {
+  if (document.getElementById(STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = STYLE_ID;
+  style.textContent = `
+    a[data-call-unread-count]:not([data-call-unread-count="0"])::after {
+      content: attr(data-call-unread-count);
+      margin-left: auto;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-sizing: border-box;
+      border: 1px solid rgba(239,68,68,.30);
+      background: rgba(239,68,68,.15);
+      color: rgb(252,165,165);
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    a[data-call-unread-owned="true"] > span[data-call-unread-badge],
+    a[data-call-unread-owned="true"] > span.ml-auto {
+      display: none !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 function badgeHint(id: string): number {
   const link = sidebarLink(id);
   if (!link) return 0;
@@ -80,28 +113,17 @@ function badgeHint(id: string): number {
 function updateBadge(id: string, unread: number): void {
   const link = sidebarLink(id);
   if (!link) return;
+  ensureUnreadBadgeStyles();
 
-  let badge = link.querySelector<HTMLElement>("[data-call-unread-badge]");
-  const existing = Array.from(link.querySelectorAll<HTMLElement>("span"))
-    .find(node => /^\d+\+?$/.test((node.textContent || "").trim()));
+  // Never edit a React-owned badge's text. Older code reused the React badge,
+  // causing React to write one count and this enhancer to write another count
+  // in an endless MutationObserver loop. Hide any React/legacy badge and render
+  // the unread count with CSS from a data attribute instead.
+  if (link.dataset.callUnreadOwned !== "true") link.dataset.callUnreadOwned = "true";
+  link.querySelectorAll<HTMLElement>("[data-call-unread-badge]").forEach(node => node.remove());
 
-  if (!badge && existing) {
-    badge = existing;
-    badge.dataset.callUnreadBadge = "true";
-  }
-
-  if (unread <= 0) {
-    badge?.remove();
-    return;
-  }
-
-  if (!badge) {
-    badge = document.createElement("span");
-    badge.dataset.callUnreadBadge = "true";
-    badge.className = "ml-auto inline-flex min-w-5 items-center justify-center rounded-full border border-red-500/30 bg-red-500/15 px-1.5 py-0.5 text-[10px] font-bold leading-none text-red-300";
-    link.appendChild(badge);
-  }
-  badge.textContent = unread > 99 ? "99+" : String(unread);
+  const label = unread > 99 ? "99+" : String(Math.max(0, unread));
+  if (link.dataset.callUnreadCount !== label) link.dataset.callUnreadCount = label;
 }
 
 function markRead(id: string, signature: string): void {
@@ -114,7 +136,8 @@ function markRead(id: string, signature: string): void {
 }
 
 function styleRow(row: HTMLElement, unread: boolean): void {
-  row.dataset.callUnread = unread ? "true" : "false";
+  const unreadValue = unread ? "true" : "false";
+  if (row.dataset.callUnread !== unreadValue) row.dataset.callUnread = unreadValue;
   row.classList.toggle("bg-cyan-500/[0.08]", unread);
   row.classList.toggle("border-l-2", unread);
   row.classList.toggle("border-l-cyan-400", unread);
@@ -128,7 +151,7 @@ function styleRow(row: HTMLElement, unread: boolean): void {
     const target = row.querySelector("td") || row.querySelector("h2")?.parentElement || row.firstElementChild;
     target?.appendChild(marker);
   }
-  if (!unread) marker?.remove();
+  if (!unread && marker) marker.remove();
 }
 
 let applying = false;
@@ -187,9 +210,11 @@ function schedule(): void {
   timer = window.setTimeout(() => {
     timer = null;
     apply();
-  }, 120);
+  }, 0);
 }
 
+// Observe only structural React changes. The enhancer itself now updates only
+// attributes/classes for the badge, so it cannot trigger its own observer loop.
 const observer = new MutationObserver(schedule);
 observer.observe(document.documentElement, { childList: true, subtree: true });
 window.addEventListener("popstate", schedule);
