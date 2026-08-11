@@ -193,7 +193,8 @@ export default function CompanyPortalControlled({ user }: { user: AuthUser }) {
     recentCalls: calls.filter(item => eventTime(item) >= Date.now() - 86400000).length,
   };
   const companyName = company.data?.name ?? "Your company";
-  const companyPhone = numbers[0]?.number ? formatPhone(String(numbers[0].number)) : null;
+  const rawCompanyPhone = numbers[0]?.number ?? company.data?.phone ?? null;
+  const companyPhone = rawCompanyPhone ? formatPhone(String(rawCompanyPhone)) : null;
   const data = snapshot.data ?? { numbers: [], campaigns: [], calls: [], messages: [], appointments: [], fetchedAt: new Date().toISOString() };
 
   const allowed = (key: keyof PortalVisibility["pages"], content: JSX.Element) => visibility.pages[key] ? content : <Restricted />;
