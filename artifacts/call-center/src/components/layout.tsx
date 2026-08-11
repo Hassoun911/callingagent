@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
@@ -70,8 +70,12 @@ export function Layout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: companies } = useListCompanies();
   const { data: allNumbers } = useListPhoneNumbers();
-  const { data: allCalls = [] } = useListCallLogs({ limit: 200 });
+  const { data: allCallsData } = useListCallLogs({ limit: 200 });
   const { data: allMessages = [] } = useListSmsMessages({ limit: 500 });
+  const stableCallsRef = useRef<any[]>([]);
+  if (allCallsData !== undefined) stableCallsRef.current = allCallsData as any[];
+  const allCalls = allCallsData ?? stableCallsRef.current;
+  const callLogsRoute = location === "/calls" || location.startsWith("/calls/");
 
   const activeCompanyId = (() => {
     const companyMatch = location.match(/^\/companies\/(\d+)/);
@@ -180,7 +184,7 @@ export function Layout({ children }: { children: ReactNode }) {
         ? "border border-red-500/20 bg-red-500/5 text-red-300 hover:bg-red-500/10"
         : "border border-amber-500/20 bg-amber-500/5 text-amber-300 hover:bg-amber-500/10"
       : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground";
-    return `flex items-center ${sizing} rounded-md transition-colors ${
+    return `flex items-center ${sizing} rounded-md ${
       isActive(href) ? "bg-primary/10 font-medium text-primary" : alertClass
     }`;
   }
@@ -308,7 +312,8 @@ export function Layout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-[100dvh] w-full overflow-hidden bg-background">
+    <div className={`flex h-[100dvh] w-full overflow-hidden bg-background ${callLogsRoute ? "call-logs-no-flash" : ""}`}>
+      {callLogsRoute && <style>{`.call-logs-no-flash .animate-pulse{animation:none!important}.call-logs-no-flash tr,.call-logs-no-flash [class*="transition-"]{transition:none!important}`}</style>}
       <aside className="hidden w-64 flex-shrink-0 flex-col border-r border-border bg-card md:flex"><NavContent /></aside>
 
       {mobileOpen && (
