@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import "./company-scope-fetch";
 import "./messages-focus";
 import "./call-unread-enhancer";
+import "./portal-call-unread-stable";
 import App from "./App";
 import PortalVisibilityAdmin from "@/components/portal-visibility-admin";
 import "./index.css";
