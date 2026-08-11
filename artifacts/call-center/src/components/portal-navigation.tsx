@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
+  Bell,
   Building2,
   CalendarDays,
   LayoutDashboard,
@@ -70,7 +71,10 @@ const navigationGroups: NavigationGroup[] = [
   },
   {
     label: "Administration",
-    items: [{ label: "Users", href: `${PORTAL}/users`, icon: Users, visibilityKey: "users", companyAdminOnly: true }],
+    items: [
+      { label: "Notifications", href: `${PORTAL}/notifications`, icon: Bell, visibilityKey: "notifications", companyAdminOnly: true },
+      { label: "Users", href: `${PORTAL}/users`, icon: Users, visibilityKey: "users", companyAdminOnly: true },
+    ],
   },
 ];
 
