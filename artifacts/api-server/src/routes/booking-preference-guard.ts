@@ -18,13 +18,13 @@ const TIME_SELECTION = /\b(?:i(?:'ll| will)? take|works|work for me|is good|soun
 const TIME_CORRECTION = /\b(?:i said|i want|i need|again|around|about|near|prefer|preferably)\b/i;
 
 const DAY_ALIASES: Array<[RegExp, string]> = [
-  [/\b(?:monday|mon)\b/i, "Monday"],
-  [/\b(?:tuesday|tues|tue)\b/i, "Tuesday"],
-  [/\b(?:wednesday|weds|wed|wensday|wednsday|when'?s\s*day)\b/i, "Wednesday"],
-  [/\b(?:thursday|thurs|thur|thu)\b/i, "Thursday"],
-  [/\b(?:friday|fri)\b/i, "Friday"],
-  [/\b(?:saturday|sat)\b/i, "Saturday"],
-  [/\b(?:sunday|sun)\b/i, "Sunday"],
+  [/\b(?:mondays?|mon)\b/i, "Monday"],
+  [/\b(?:tuesdays?|tues|tue)\b/i, "Tuesday"],
+  [/\b(?:wednesdays?|weds|wed|wensday|wednsday|when'?s\s*day)\b/i, "Wednesday"],
+  [/\b(?:thursdays?|thurs|thur|thu)\b/i, "Thursday"],
+  [/\b(?:fridays?|fri)\b/i, "Friday"],
+  [/\b(?:saturdays?|sat)\b/i, "Saturday"],
+  [/\b(?:sundays?|sun)\b/i, "Sunday"],
 ];
 
 const SPOKEN_HOURS: Record<string, number> = {
