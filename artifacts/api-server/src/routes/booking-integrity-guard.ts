@@ -33,11 +33,88 @@ function naturalPhone(value: string): string {
   return `${local.slice(0, 3)}-${local.slice(3, 6)}-${local.slice(6)}`;
 }
 
+const CANADIAN_POSTAL_CODE = /[ABCEGHJKLMNPRSTVXY]\d[ABCEGHJKLMNPRSTVWXYZ]\d[ABCEGHJKLMNPRSTVWXYZ]\d/;
+const POSTAL_DIGIT_WORDS: Record<string, string> = {
+  zero: "0", oh: "0",
+  one: "1", won: "1",
+  two: "2", to: "2", too: "2",
+  three: "3",
+  four: "4", for: "4",
+  five: "5",
+  six: "6",
+  seven: "7",
+  eight: "8", ate: "8",
+  nine: "9",
+};
+const POSTAL_LETTER_WORDS: Record<string, string> = {
+  ay: "A", a: "A",
+  bee: "B", be: "B", bravo: "B",
+  cee: "C", see: "C", charlie: "C",
+  dee: "D", delta: "D",
+  ee: "E", echo: "E",
+  eff: "F", foxtrot: "F",
+  gee: "G", golf: "G",
+  aitch: "H", haitch: "H", hotel: "H",
+  eye: "I", india: "I",
+  jay: "J", juliet: "J", juliett: "J",
+  kay: "K", kilo: "K",
+  el: "L", ell: "L", lima: "L",
+  em: "M", mike: "M",
+  en: "N", november: "N",
+  oscar: "O",
+  pee: "P", papa: "P",
+  cue: "Q", queue: "Q", quebec: "Q",
+  ar: "R", are: "R", romeo: "R",
+  ess: "S", sierra: "S",
+  tee: "T", tea: "T", tango: "T",
+  you: "U", uniform: "U",
+  vee: "V", victor: "V",
+  doubleu: "W", whiskey: "W", whisky: "W",
+  ex: "X", xray: "X",
+  why: "Y", yankee: "Y",
+  zed: "Z", zee: "Z", zulu: "Z",
+};
+
 function normalizePostalCode(speech: string): string | null {
-  const compact = speech.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const match = compact.match(/[ABCEGHJKLMNPRSTVXY]\d[ABCEGHJKLMNPRSTVWXYZ]\d[ABCEGHJKLMNPRSTVWXYZ]\d/);
-  if (!match) return null;
-  return `${match[0].slice(0, 3)} ${match[0].slice(3)}`;
+  // First preserve the fast path for postal codes Twilio already transcribed
+  // correctly, including spaced forms such as "N 8 X 4 T 2".
+  const directCompact = speech.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const directMatch = directCompact.match(CANADIAN_POSTAL_CODE);
+  if (directMatch) return `${directMatch[0].slice(0, 3)} ${directMatch[0].slice(3)}`;
+
+  // Speech-to-text commonly returns letter names and number words instead of
+  // literal characters: "en eight ex four tee two". Normalize those tokens,
+  // then scan the resulting character stream for a valid Canadian postal code.
+  const prepared = speech
+    .toLowerCase()
+    .replace(/x[\s-]?ray/g, "xray")
+    .replace(/double\s+u/g, "doubleu")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+  const characters: string[] = [];
+  for (const token of prepared.split(/\s+/).filter(Boolean)) {
+    if (/^[a-z]$/.test(token)) {
+      characters.push(token.toUpperCase());
+      continue;
+    }
+    if (/^\d$/.test(token)) {
+      characters.push(token);
+      continue;
+    }
+    const digit = POSTAL_DIGIT_WORDS[token];
+    if (digit) {
+      characters.push(digit);
+      continue;
+    }
+    const letter = POSTAL_LETTER_WORDS[token];
+    if (letter) characters.push(letter);
+  }
+
+  const spokenCompact = characters.join("");
+  const spokenMatch = spokenCompact.match(CANADIAN_POSTAL_CODE);
+  if (!spokenMatch) return null;
+  return `${spokenMatch[0].slice(0, 3)} ${spokenMatch[0].slice(3)}`;
 }
 
 function vehicleFromSpeech(speech: string): string | null {
