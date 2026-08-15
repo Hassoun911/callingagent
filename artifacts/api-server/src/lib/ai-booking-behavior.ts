@@ -2,10 +2,12 @@ import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { logger } from "./logger";
 
-const POLICY_MARKER = "[CALLINGAGENT_CALENDAR_FIRST_BOOKING_V2]";
+const POLICY_MARKER = "[CALLINGAGENT_CALENDAR_FIRST_BOOKING_V3]";
+const V1_MARKER = "[CALLINGAGENT_CALENDAR_FIRST_BOOKING_V1]";
+const V2_MARKER = "[CALLINGAGENT_CALENDAR_FIRST_BOOKING_V2]";
 
 const BOOKING_POLICY = `${POLICY_MARKER}
-APPOINTMENT + EMERGENCY POLICY — follow this exactly. This V2 policy supersedes any older CallingAgent booking policy if there is a conflict.
+APPOINTMENT + EMERGENCY POLICY — follow this exactly. This V3 policy is the only active CallingAgent booking policy and supersedes all older booking policies.
 
 GENERAL CONVERSATION RULES:
 1. Answer the caller's direct question first. If they ask about services, hours, insurance, location, pricing, or another business question, answer it naturally before trying to book.
@@ -65,19 +67,47 @@ export function ensureAiBookingBehavior(): Promise<void> {
   if (readyPromise) return readyPromise;
 
   readyPromise = (async () => {
+    // Remove legacy CallingAgent booking policies before applying V3. Older versions
+    // were appended to the end of prompts, so keeping them causes conflicting rules
+    // to coexist and can make the model refuse otherwise-valid bookings.
     await db.execute(sql`
       UPDATE ai_voice_config
-      SET system_prompt = system_prompt || E'\n\n' || ${BOOKING_POLICY},
-          updated_at = NOW()
-      WHERE position(${POLICY_MARKER} in system_prompt) = 0
+      SET system_prompt =
+        CASE
+          WHEN position(${V1_MARKER} in system_prompt) > 0 THEN rtrim(split_part(system_prompt, ${V1_MARKER}, 1))
+          WHEN position(${V2_MARKER} in system_prompt) > 0 THEN rtrim(split_part(system_prompt, ${V2_MARKER}, 1))
+          WHEN position(${POLICY_MARKER} in system_prompt) > 0 THEN rtrim(split_part(system_prompt, ${POLICY_MARKER}, 1))
+          ELSE system_prompt
+        END,
+        updated_at = NOW()
+      WHERE system_prompt IS NOT NULL
     `);
 
     await db.execute(sql`
       UPDATE phone_numbers
-      SET ai_system_prompt = ai_system_prompt || E'\n\n' || ${BOOKING_POLICY},
+      SET ai_system_prompt =
+        CASE
+          WHEN position(${V1_MARKER} in ai_system_prompt) > 0 THEN rtrim(split_part(ai_system_prompt, ${V1_MARKER}, 1))
+          WHEN position(${V2_MARKER} in ai_system_prompt) > 0 THEN rtrim(split_part(ai_system_prompt, ${V2_MARKER}, 1))
+          WHEN position(${POLICY_MARKER} in ai_system_prompt) > 0 THEN rtrim(split_part(ai_system_prompt, ${POLICY_MARKER}, 1))
+          ELSE ai_system_prompt
+        END,
+        updated_at = NOW()
+      WHERE ai_system_prompt IS NOT NULL
+    `);
+
+    await db.execute(sql`
+      UPDATE ai_voice_config
+      SET system_prompt = rtrim(system_prompt) || E'\n\n' || ${BOOKING_POLICY},
+          updated_at = NOW()
+      WHERE system_prompt IS NOT NULL
+    `);
+
+    await db.execute(sql`
+      UPDATE phone_numbers
+      SET ai_system_prompt = rtrim(ai_system_prompt) || E'\n\n' || ${BOOKING_POLICY},
           updated_at = NOW()
       WHERE ai_system_prompt IS NOT NULL
-        AND position(${POLICY_MARKER} in ai_system_prompt) = 0
     `);
 
     // Reject overlapping active appointments. Creating the appointment therefore
@@ -128,7 +158,7 @@ export function ensureAiBookingBehavior(): Promise<void> {
     `);
 
     // Keep the legacy same-day trigger for old call records that may still carry the
-    // V1 action marker. New V2 calls should no longer generate this marker.
+    // old V1 action marker. New calls should no longer generate this marker.
     await db.execute(sql`
       CREATE OR REPLACE FUNCTION callingagent_keep_same_day_request_pending()
       RETURNS trigger AS $$
@@ -156,7 +186,7 @@ export function ensureAiBookingBehavior(): Promise<void> {
       EXECUTE FUNCTION callingagent_keep_same_day_request_pending()
     `);
 
-    logger.info("Calendar-first AI booking behavior V2 ready");
+    logger.info("Calendar-first AI booking behavior V3 ready");
   })().catch((error) => {
     readyPromise = null;
     logger.error({ err: error?.message }, "Failed to prepare AI booking behavior");
