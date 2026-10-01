@@ -23,8 +23,8 @@ jobs:
           node-version: '24'
       - name: Enable pnpm
         run: corepack enable
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install dependencies for typecheck
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Apply Phone Rec bridge
         run: node scripts/apply-phone-rec-bridge.mjs
       - name: Typecheck
