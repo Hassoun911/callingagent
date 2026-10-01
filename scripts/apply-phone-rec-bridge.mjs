@@ -22,7 +22,7 @@ replaceOnce(
 
 replaceOnce(
   '  companyName: string | null;\n}\n',
-  '  companyName: string | null;\n  callerNumber: string | null;\n  phoneRecAllowBooking: boolean;\n  phoneRecRuleSource: string | null;\n}\n',
+  '  companyName: string | null;\n  callerNumber?: string | null;\n  phoneRecAllowBooking?: boolean;\n  phoneRecRuleSource?: string | null;\n}\n',
   "conversation state fields",
 );
 
@@ -77,7 +77,7 @@ replaceOnce(
 
 replaceOnce(
   '    const callerPhone = conv.fromNumber ?? "unknown";\n',
-  '    const callerPhone = conv.callerNumber ?? "unknown";\n',
+  '    const callerPhone = conv.callerNumber ?? conv.fromNumber ?? "unknown";\n',
   "caller phone identity",
 );
 
@@ -86,13 +86,13 @@ s = s.replace(
   "Appointment tools are available only when the caller-specific Phone Rec rule allows booking. If the Phone Rec instructions say booking is disabled, do not book, reschedule, or cancel appointments. When booking is allowed and requested: collect the caller name, preferred date/time, and purpose, then use the appointment tools and confirm the action verbally.",
 );
 
-s = s.replaceAll('      tools: aiTools,\n      tool_choice: "auto",\n', '      tools: conv.phoneRecAllowBooking ? aiTools : undefined,\n      tool_choice: conv.phoneRecAllowBooking ? "auto" : undefined,\n');
-s = s.replaceAll('              tools: aiTools,\n              tool_choice: "auto",\n', '              tools: conv.phoneRecAllowBooking ? aiTools : undefined,\n              tool_choice: conv.phoneRecAllowBooking ? "auto" : undefined,\n');
+s = s.replaceAll('      tools: aiTools,\n      tool_choice: "auto",\n', '      tools: conv.phoneRecAllowBooking !== false ? aiTools : undefined,\n      tool_choice: conv.phoneRecAllowBooking !== false ? "auto" : undefined,\n');
+s = s.replaceAll('              tools: aiTools,\n              tool_choice: "auto",\n', '              tools: conv.phoneRecAllowBooking !== false ? aiTools : undefined,\n              tool_choice: conv.phoneRecAllowBooking !== false ? "auto" : undefined,\n');
 
 for (const required of [
   "findPhoneRecRule(To, From)",
   "buildPhoneRecSystemPrompt(phoneRecPayload",
-  "phoneRecAllowBooking",
+  "phoneRecAllowBooking?: boolean",
   "callerNumber: From ?? null",
   "const callerPhone = conv.callerNumber",
   "const phoneRecGreeting",
