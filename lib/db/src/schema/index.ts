@@ -10,3 +10,4 @@ export * from "./auth";
 export * from "./extensions";
 export * from "./appointments";
 export * from "./booking";
+export * from "./phone-rec-rules";
