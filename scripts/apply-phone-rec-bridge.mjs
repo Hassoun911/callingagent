@@ -1,7 +1,11 @@
 import fs from "node:fs";
+import nodePath from "node:path";
+import { fileURLToPath } from "node:url";
 
-const path = "artifacts/api-server/src/routes/twilio-webhooks.ts";
-let s = fs.readFileSync(path, "utf8");
+const scriptDir = nodePath.dirname(fileURLToPath(import.meta.url));
+const repoRoot = nodePath.resolve(scriptDir, "..");
+const targetPath = nodePath.join(repoRoot, "artifacts/api-server/src/routes/twilio-webhooks.ts");
+let s = fs.readFileSync(targetPath, "utf8");
 
 const marker = "PHONE_REC_BRIDGE_APPLIED";
 if (s.includes(marker)) {
@@ -101,5 +105,5 @@ for (const required of [
   if (!s.includes(required)) throw new Error(`Phone Rec bridge verification failed: ${required}`);
 }
 
-fs.writeFileSync(path, s);
+fs.writeFileSync(targetPath, s);
 console.log("CallingAgent Twilio voice route now applies Phone Rec per-caller AI rules");
