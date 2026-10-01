@@ -27,5 +27,7 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Apply Phone Rec bridge
         run: node scripts/apply-phone-rec-bridge.mjs
+      - name: Build API reference declarations
+        run: pnpm exec tsc -b lib/db lib/api-zod lib/integrations-openai-ai-server
       - name: Typecheck CallingAgent API bridge
         run: pnpm --filter @workspace/api-server run typecheck
