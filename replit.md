@@ -1,18 +1,26 @@
 # CallingAgent — Call Center Platform
 
-A full-featured call center management platform with Twilio phone number provisioning, AI voice answering, voicemail, call forwarding, CRM (contacts + companies), call logs with recordings, and a live dashboard.
+A full-featured call center management platform with Twilio phone number provisioning, AI voice answering, voicemail, call forwarding, CRM (contacts + companies), call logs with recordings, appointment booking, and a live dashboard.
 
-## Run & Operate
+## Production deployment
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080, proxied at `/api`)
-- `pnpm --filter @workspace/call-center run dev` — run the React frontend (port 21722, proxied at `/`)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — apply integration patches, typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- Production is deployed from GitHub `main` to Render; Replit is not part of the active deployment path.
+- Render service: `callingagent`
+- Production URL: `https://callingagent-cokp.onrender.com`
+- Render build: `pnpm install --frozen-lockfile && BASE_PATH=/ pnpm --filter @workspace/call-center run build && pnpm --filter @workspace/api-server run build`
+- Render start: `node artifacts/api-server/dist/index.mjs`
 - Required env: `DATABASE_URL`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`
 - Phone Rec bridge env: `PHONE_REC_INTEGRATION_KEY` — shared secret entered in Phone Rec under More → AI Receptionist
-- Optional env: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY` (for AI voice)
+- Optional AI env: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`
+
+## Local commands
+
+- `pnpm --filter @workspace/api-server run dev` — run the API server
+- `pnpm --filter @workspace/call-center run dev` — run the React frontend
+- `pnpm run typecheck` — full workspace typecheck
+- `pnpm run build` — apply integration patches, typecheck + build packages
+- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI
+- `pnpm --filter @workspace/db run push` — push DB schema changes when intentionally migrating schema
 
 ## Stack
 
@@ -20,68 +28,59 @@ A full-featured call center management platform with Twilio phone number provisi
 - API: Express 5
 - DB: PostgreSQL + Drizzle ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- API codegen: Orval
+- API build: esbuild
 - Frontend: React + Vite + Tailwind CSS v4 + shadcn/ui
-- Phone: Twilio SDK
-- AI: OpenAI via Replit AI Integrations proxy
+- Phone: Twilio
+- AI: OpenAI-compatible integration used by the CallingAgent voice engine
 
 ## Where things live
 
-- `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth for dashboard API contracts)
-- `lib/db/src/schema/` — Drizzle schema files (phone-numbers, companies, contacts, call-logs, ai-voice-config, phone-rec-rules)
-- `artifacts/api-server/src/routes/` — Express route handlers
-- `artifacts/call-center/src/pages/` — React pages (dashboard, numbers, number-detail, calls, contacts, companies, settings)
-- `artifacts/call-center/src/components/` — Shared layout and UI components
+- `lib/api-spec/openapi.yaml` — dashboard API contract source
+- `lib/db/src/schema/` — Drizzle schema files
+- `artifacts/api-server/src/routes/` — Express routes
+- `artifacts/call-center/src/pages/` — React dashboard pages
 - `artifacts/api-server/src/routes/phone-rec-bridge.ts` — authenticated Phone Rec rule-sync bridge
-- `scripts/apply-phone-rec-bridge.mjs` — applies Phone Rec caller-rule behavior to the Twilio voice route before builds/deploy sync
+- `scripts/apply-phone-rec-bridge.mjs` — applies Phone Rec caller-rule behavior to the Twilio voice route during builds
 
 ## Phone Rec Integration
 
-Phone Rec is the per-contact control surface; CallingAgent is the live telephony/AI engine.
+Phone Rec is the per-contact control surface; CallingAgent is the live Twilio/AI telephony engine.
 
-1. Set `PHONE_REC_INTEGRATION_KEY` in the CallingAgent deployment environment.
-2. In Phone Rec → More → AI Receptionist, enter the published CallingAgent server URL, the same integration key, and the CallingAgent/Twilio number that will receive forwarded calls.
-3. Use the Phone Rec Test & Sync button. Caller rules are stored in `phone_rec_rules` and matched by CallingAgent line + caller number; an `__unknown_callers__` rule acts as fallback.
-4. Configure the mobile carrier's conditional/no-answer call forwarding to the CallingAgent/Twilio line. The carrier controls the actual forwarding delay; Phone Rec cannot directly inject AI audio into an unanswered cellular carrier call.
-5. Once Twilio receives the forwarded call, CallingAgent applies the Phone Rec rule: `message` routes to voicemail; `script` and `conversation` route to CallingAgent AI voice. Business knowledge, approved offers and booking permissions come from the synchronized Phone Rec payload.
+1. Configure `PHONE_REC_INTEGRATION_KEY` in the Render `callingagent` service.
+2. In Phone Rec → More → AI Receptionist, use `https://callingagent-cokp.onrender.com`, the same integration key, and the CallingAgent/Twilio line that should receive forwarded calls.
+3. Use Phone Rec's Test & Sync action. Caller rules are stored by CallingAgent line + caller number; `__unknown_callers__` is the fallback rule.
+4. Configure the mobile carrier's conditional/no-answer forwarding to that CallingAgent/Twilio line. The carrier controls the forwarding delay; the Android app cannot inject AI speech directly into an unanswered carrier call.
+5. When Twilio receives the forwarded call, CallingAgent applies the synchronized Phone Rec rule: `message` → voicemail; `script`/`conversation` → AI voice. Business knowledge, approved offers, lead intake, and booking permission come from the Phone Rec payload.
 
 ## Architecture decisions
 
-- Contract-first: OpenAPI spec → Orval codegen → typed React Query hooks + Zod schemas
-- Twilio webhooks at `/api/twilio/voice` (call handling) and `/api/twilio/status` (status callbacks) — configured automatically when provisioning numbers
-- AI voice uses per-number `aiSystemPrompt` override; falls back to global config in `ai_voice_config` table
-- Phone Rec exact-caller rules override the line's normal answer mode for forwarded calls; unknown-caller fallback is supported
-- Phone number `answerMode` controls routing when Phone Rec does not override it: `forward` → dial forwardTo, `ai_voice` → AI greeting + conversation, `voicemail` → record, `reject` → hang up
-- Dark cockpit aesthetic forced via CSS custom properties; no light mode toggle (ops tool, always dark)
+- Twilio webhooks at `/api/twilio/voice` and `/api/twilio/status`
+- AI voice uses per-number prompt/config with Phone Rec caller-specific overrides
+- Exact Phone Rec caller rules take precedence; unknown-caller fallback is supported
+- Phone Rec bridge storage self-initializes its additive `phone_rec_rules` table/index when first used, so the Render deploy does not depend on a full DB migration step for this feature
+- Default number routing still applies when Phone Rec has no active override: `forward`, `ai_voice`, `voicemail`, or `reject`
+- Booking tools remain available only when the caller-specific Phone Rec rule permits booking
 
 ## Product
 
-- Dashboard: live stats (calls today, active numbers, AI answered, voicemails, avg duration) + recent activity feed
-- Phone Numbers: provision US/Canada numbers by area code, toll-free search; configure per-number routing
-- Number Detail: full config — caller ID, company, forward-to, ring count (1-10), answer mode, AI prompt, voicemail greeting
-- Call Logs: searchable/filterable history with inline audio recording player
-- Contacts CRM: searchable contacts with company associations and tags
-- Companies CRM: company directory with industry, phone, email, website
-- AI Settings: global voice (6 OpenAI TTS options), greeting, system prompt, max call duration
-- Phone Rec bridge: caller-specific scripts, message-taking, business answers, approved offers, lead intake and appointment permissions
-
-## User preferences
-
-- No emojis in the UI
-- Dark cockpit aesthetic (always dark, no toggle)
-- Dense, information-rich layouts — not consumer/marketing style
+- Dashboard: call stats and recent activity
+- Phone Numbers: provision and configure Twilio numbers
+- Number Detail: forwarding, AI, voicemail, caller ID and prompts
+- Call Logs: history and recordings
+- Contacts and Companies CRM
+- AI voice settings
+- Appointments and AI booking
+- Phone Rec bridge: caller-specific scripts, message-taking, business answers, offers, lead intake, and appointment permissions
 
 ## Gotchas
 
-- Twilio webhook URLs auto-configured using `REPLIT_DEV_DOMAIN` or `REPLIT_DOMAINS` env; production deploy must use the published domain
-- `PHONE_REC_INTEGRATION_KEY` must be configured before Phone Rec can sync rules
-- Mobile no-answer forwarding is carrier-controlled and must point to the CallingAgent/Twilio line for AI takeover of the user's existing cellular number
-- `@apply dark` is NOT valid in Tailwind v4 — use `.dark {}` class in CSS or add the class to the HTML element
-- DB push required after any schema changes: `pnpm --filter @workspace/db run push`
-- After adding new routes, rebuild: `pnpm --filter @workspace/api-server run build` then restart workflow
+- Render auto-deploys `main`; a successful GitHub push should normally trigger the production deploy automatically.
+- `PHONE_REC_INTEGRATION_KEY` must be configured before Phone Rec can sync rules.
+- Mobile no-answer forwarding must point to the selected CallingAgent/Twilio line for AI takeover of an existing cellular number.
+- Phone Rec's ring-delay value describes desired behavior, but the actual handoff timing for a carrier call is controlled by the mobile carrier's conditional-forwarding timer.
+- `@apply dark` is not valid in Tailwind v4.
 
 ## Pointers
 
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
-- OpenAPI spec controls generated dashboard types — edit spec first, then run codegen for dashboard-facing APIs
+- OpenAPI controls generated dashboard types; edit the spec before dashboard-facing API codegen.
