@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  typecheck:
+  bridge-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,11 +23,12 @@ jobs:
           node-version: '24'
       - name: Enable pnpm
         run: corepack enable
-      - name: Install dependencies for typecheck
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Apply Phone Rec bridge
-        run: node scripts/apply-phone-rec-bridge.mjs
-      - name: Build API reference declarations
-        run: pnpm exec tsc -b lib/db lib/api-zod lib/integrations-openai-ai-server
-      - name: Typecheck CallingAgent API bridge
-        run: pnpm --filter @workspace/api-server run typecheck
+      - name: Build CallingAgent API with Phone Rec bridge
+        run: pnpm --filter @workspace/api-server run build
+      - name: Verify bundled Phone Rec bridge
+        run: |
+          grep -q 'Phone Rec AI rule synchronized' artifacts/api-server/dist/index.mjs
+          grep -q 'PHONE REC CALLER RULE' artifacts/api-server/dist/index.mjs
+          grep -q 'phone-rec/status' artifacts/api-server/dist/index.mjs
