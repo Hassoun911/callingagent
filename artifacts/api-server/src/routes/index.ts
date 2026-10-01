@@ -10,6 +10,7 @@ import aiVoiceRouter from "./ai-voice";
 import dashboardRouter from "./dashboard";
 import costsRouter from "./costs";
 import twilioWebhooksRouter from "./twilio-webhooks";
+import phoneRecBridgeRouter from "./phone-rec-bridge";
 import watchesRouter from "./watches";
 import smsRouter from "./sms";
 import campaignsRouter from "./campaigns";
@@ -31,6 +32,7 @@ router.use(healthRouter);
 router.use(authRouter);
 router.use(aiDateContext);
 router.use(aiCallFinalizer);
+router.use(phoneRecBridgeRouter);
 router.use(twilioWebhooksRouter);
 
 // Every dashboard/API route below is checked against the authenticated user's role.
