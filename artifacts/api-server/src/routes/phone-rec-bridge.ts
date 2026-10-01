@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { timingSafeEqual } from "crypto";
 import { db, phoneNumbersTable, phoneRecRulesTable } from "@workspace/db";
 import { logger } from "../lib/logger";
@@ -8,14 +8,43 @@ const router: IRouter = Router();
 export const PHONE_REC_UNKNOWN_CALLER = "__unknown_callers__";
 
 type PhoneRecPayload = Record<string, any>;
+let storageReady: Promise<void> | null = null;
 
 function normalizePhone(raw: unknown): string {
   const value = String(raw ?? "").trim();
   if (!value) return "";
   if (value === PHONE_REC_UNKNOWN_CALLER) return value;
-  const plus = value.startsWith("+");
   const digits = value.replace(/\D/g, "");
-  return digits ? `${plus ? "+" : "+"}${digits}` : "";
+  return digits ? `+${digits}` : "";
+}
+
+/**
+ * Render deploys do not run drizzle-kit push on every build. Keep this bridge
+ * self-contained by creating only its own additive table/index when first used.
+ */
+async function ensurePhoneRecStorage(): Promise<void> {
+  if (!storageReady) {
+    storageReady = (async () => {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS phone_rec_rules (
+          id SERIAL PRIMARY KEY,
+          line_number TEXT NOT NULL,
+          caller_number TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS phone_rec_rules_line_caller_unique
+        ON phone_rec_rules (line_number, caller_number)
+      `);
+    })().catch((error) => {
+      storageReady = null;
+      throw error;
+    });
+  }
+  await storageReady;
 }
 
 function integrationAuthorized(req: any): boolean {
@@ -48,8 +77,9 @@ function parsePayload(raw: string): PhoneRecPayload | null {
   }
 }
 
-/** Resolve an exact caller rule first, then the Phone Rec unknown-caller fallback. */
+/** Resolve an exact caller rule first, then the Phone Rec fallback rule. */
 export async function findPhoneRecRule(lineNumberRaw: string, callerNumberRaw: string): Promise<{ payload: PhoneRecPayload; source: "exact" | "unknown" } | null> {
+  await ensurePhoneRecStorage();
   const lineNumber = normalizePhone(lineNumberRaw);
   const callerNumber = normalizePhone(callerNumberRaw);
   if (!lineNumber) return null;
@@ -126,61 +156,79 @@ export function buildPhoneRecSystemPrompt(payload: PhoneRecPayload, fallbackProm
 }
 
 router.get("/phone-rec/status", requireIntegrationKey, async (_req, res): Promise<void> => {
-  const lines = await db.select({ number: phoneNumbersTable.number, friendlyName: phoneNumbersTable.friendlyName, isActive: phoneNumbersTable.isActive })
-    .from(phoneNumbersTable);
-  res.json({ ok: true, service: "CallingAgent Phone Rec bridge", lines: lines.filter((x) => x.isActive) });
+  try {
+    await ensurePhoneRecStorage();
+    const lines = await db.select({ number: phoneNumbersTable.number, friendlyName: phoneNumbersTable.friendlyName, isActive: phoneNumbersTable.isActive })
+      .from(phoneNumbersTable);
+    res.json({
+      ok: true,
+      service: "CallingAgent Phone Rec bridge",
+      lines: lines.filter((item) => item.isActive).map((item) => ({ ...item, number: normalizePhone(item.number) })),
+    });
+  } catch (error: any) {
+    logger.error({ err: error?.message }, "Phone Rec bridge status failed");
+    res.status(500).json({ error: "Phone Rec bridge storage is unavailable" });
+  }
 });
 
 router.post("/phone-rec/rules", requireIntegrationKey, async (req, res): Promise<void> => {
-  const lineNumber = normalizePhone(req.body?.lineNumber);
-  const callerNumber = req.body?.callerNumber === PHONE_REC_UNKNOWN_CALLER
-    ? PHONE_REC_UNKNOWN_CALLER
-    : normalizePhone(req.body?.callerNumber);
-  const payload = req.body?.payload;
+  try {
+    await ensurePhoneRecStorage();
+    const lineNumber = normalizePhone(req.body?.lineNumber);
+    const callerNumber = req.body?.callerNumber === PHONE_REC_UNKNOWN_CALLER
+      ? PHONE_REC_UNKNOWN_CALLER
+      : normalizePhone(req.body?.callerNumber);
+    const payload = req.body?.payload;
 
-  if (!lineNumber || !callerNumber || !payload || typeof payload !== "object") {
-    res.status(400).json({ error: "lineNumber, callerNumber and payload are required" });
-    return;
-  }
-
-  const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, lineNumber)).limit(1);
-  if (!line) {
-    // Permit formatted DB numbers too, but make configuration errors obvious rather than silently storing unusable rules.
-    const allLines = await db.select().from(phoneNumbersTable);
-    const matching = allLines.find((x) => normalizePhone(x.number) === lineNumber);
-    if (!matching) {
-      res.status(404).json({ error: `CallingAgent line ${lineNumber} was not found` });
+    if (!lineNumber || !callerNumber || !payload || typeof payload !== "object") {
+      res.status(400).json({ error: "lineNumber, callerNumber and payload are required" });
       return;
     }
+
+    const allLines = await db.select().from(phoneNumbersTable);
+    const matching = allLines.find((item) => normalizePhone(item.number) === lineNumber && item.isActive);
+    if (!matching) {
+      res.status(404).json({ error: `Active CallingAgent line ${lineNumber} was not found` });
+      return;
+    }
+
+    await db.insert(phoneRecRulesTable).values({
+      lineNumber,
+      callerNumber,
+      payload: JSON.stringify(payload),
+    }).onConflictDoUpdate({
+      target: [phoneRecRulesTable.lineNumber, phoneRecRulesTable.callerNumber],
+      set: { payload: JSON.stringify(payload), updatedAt: new Date() },
+    });
+
+    logger.info({ lineNumber, callerNumber, mode: payload?.mode }, "Phone Rec AI rule synchronized");
+    res.json({ ok: true, lineNumber, callerNumber });
+  } catch (error: any) {
+    logger.error({ err: error?.message }, "Phone Rec rule synchronization failed");
+    res.status(500).json({ error: "Could not synchronize the Phone Rec rule" });
   }
-
-  await db.insert(phoneRecRulesTable).values({
-    lineNumber,
-    callerNumber,
-    payload: JSON.stringify(payload),
-  }).onConflictDoUpdate({
-    target: [phoneRecRulesTable.lineNumber, phoneRecRulesTable.callerNumber],
-    set: { payload: JSON.stringify(payload), updatedAt: new Date() },
-  });
-
-  logger.info({ lineNumber, callerNumber, mode: payload?.mode }, "Phone Rec AI rule synchronized");
-  res.json({ ok: true, lineNumber, callerNumber });
 });
 
 router.delete("/phone-rec/rules", requireIntegrationKey, async (req, res): Promise<void> => {
-  const lineNumber = normalizePhone(req.body?.lineNumber);
-  const callerNumber = req.body?.callerNumber === PHONE_REC_UNKNOWN_CALLER
-    ? PHONE_REC_UNKNOWN_CALLER
-    : normalizePhone(req.body?.callerNumber);
-  if (!lineNumber || !callerNumber) {
-    res.status(400).json({ error: "lineNumber and callerNumber are required" });
-    return;
+  try {
+    await ensurePhoneRecStorage();
+    const lineNumber = normalizePhone(req.body?.lineNumber);
+    const callerNumber = req.body?.callerNumber === PHONE_REC_UNKNOWN_CALLER
+      ? PHONE_REC_UNKNOWN_CALLER
+      : normalizePhone(req.body?.callerNumber);
+    if (!lineNumber || !callerNumber) {
+      res.status(400).json({ error: "lineNumber and callerNumber are required" });
+      return;
+    }
+    await db.delete(phoneRecRulesTable).where(and(
+      eq(phoneRecRulesTable.lineNumber, lineNumber),
+      eq(phoneRecRulesTable.callerNumber, callerNumber),
+    ));
+    res.json({ ok: true });
+  } catch (error: any) {
+    logger.error({ err: error?.message }, "Phone Rec rule deletion failed");
+    res.status(500).json({ error: "Could not remove the Phone Rec rule" });
   }
-  await db.delete(phoneRecRulesTable).where(and(
-    eq(phoneRecRulesTable.lineNumber, lineNumber),
-    eq(phoneRecRulesTable.callerNumber, callerNumber),
-  ));
-  res.json({ ok: true });
 });
 
 export default router;
