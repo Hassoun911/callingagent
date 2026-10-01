@@ -22,7 +22,7 @@ replaceOnce(
 
 replaceOnce(
   '  companyName: string | null;\n}\n',
-  '  companyName: string | null;\n  phoneRecAllowBooking: boolean;\n  phoneRecRuleSource: string | null;\n}\n',
+  '  companyName: string | null;\n  callerNumber: string | null;\n  phoneRecAllowBooking: boolean;\n  phoneRecRuleSource: string | null;\n}\n',
   "conversation state fields",
 );
 
@@ -71,8 +71,14 @@ replaceOnce(
 
 replaceOnce(
   '      fromNumber: phoneNumber?.number ?? null,\n      companyName: companyName ?? null,\n',
-  '      fromNumber: From ?? null,\n      companyName: companyName ?? null,\n      phoneRecAllowBooking: phoneRecPayload?.allow_booking !== false,\n      phoneRecRuleSource: phoneRecRule?.source ?? null,\n',
+  '      fromNumber: phoneNumber?.number ?? null,\n      companyName: companyName ?? null,\n      callerNumber: From ?? null,\n      phoneRecAllowBooking: phoneRecPayload?.allow_booking !== false,\n      phoneRecRuleSource: phoneRecRule?.source ?? null,\n',
   "conversation Phone Rec permissions",
+);
+
+replaceOnce(
+  '    const callerPhone = conv.fromNumber ?? "unknown";\n',
+  '    const callerPhone = conv.callerNumber ?? "unknown";\n',
+  "caller phone identity",
 );
 
 s = s.replace(
@@ -87,6 +93,8 @@ for (const required of [
   "findPhoneRecRule(To, From)",
   "buildPhoneRecSystemPrompt(phoneRecPayload",
   "phoneRecAllowBooking",
+  "callerNumber: From ?? null",
+  "const callerPhone = conv.callerNumber",
   "const phoneRecGreeting",
   "answerMode,",
 ]) {
