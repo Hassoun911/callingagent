@@ -677,7 +677,7 @@ export default function Numbers() {
               <TableHead className="min-w-[170px]">Phone Number</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>API Provider</TableHead>
-              <TableHead>Name / Caller ID</TableHead>
+              <TableHead>Caller ID</TableHead>
               <TableHead>Mode</TableHead>
               <TableHead>Routing</TableHead>
               <TableHead className="w-[100px]"></TableHead>
@@ -710,12 +710,12 @@ export default function Numbers() {
                     <Phone className="h-3 w-3 text-muted-foreground" />
                     {num.number}
                   </div>
-                  <div className="mt-1 text-xs font-normal text-muted-foreground">{num.friendlyName}</div>
+                  {num.friendlyName && num.friendlyName.trim().toLowerCase() !== (companyNames.get(num.companyId ?? -1) ?? "").trim().toLowerCase() && num.friendlyName.trim().toLowerCase() !== num.number.trim().toLowerCase() && <div className="mt-1 text-xs font-normal text-muted-foreground">{num.friendlyName}</div>}
                 </TableCell>
                 <TableCell className="font-semibold text-foreground">{num.companyId ? companyNames.get(num.companyId) || `Company #${num.companyId}` : "Unassigned"}</TableCell>
                 <TableCell><span className={`rounded-md px-2 py-1 text-xs font-bold ${num.twilioSid ? "bg-rose-500/10 text-rose-600" : "bg-amber-500/10 text-amber-700"}`}>{num.twilioSid ? "Twilio" : "Unverified"}</span></TableCell>
                 <TableCell>
-                  <div className="text-sm sm:text-base font-semibold text-foreground">{num.callerIdName}</div>
+                  <div className="text-sm sm:text-base font-semibold text-foreground">{num.callerIdName?.trim().toLowerCase() === (companyNames.get(num.companyId ?? -1) ?? "").trim().toLowerCase() ? "—" : (num.callerIdName || "—")}</div>
                 </TableCell>
                 <TableCell>{getModeBadge(num.answerMode)}</TableCell>
                 <TableCell>
