@@ -35,6 +35,7 @@ router.use(aiDateContext);
 router.use(aiCallFinalizer);
 router.use(phoneRecBridgeRouter);
 router.use(twilioWebhooksRouter);
+router.use(telnyxVoiceWebhooksRouter);
 
 // Every dashboard/API route below is checked against the authenticated user's role.
 router.use(routeAccessControl);
