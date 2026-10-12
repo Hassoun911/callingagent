@@ -33,7 +33,7 @@ export default function Numbers() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(new URLSearchParams(window.location.search).get("provision") === "1");
   const [areaCode, setAreaCode] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("CA");
