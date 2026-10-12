@@ -34,6 +34,7 @@ export default function Numbers() {
   const [areaCode, setAreaCode] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("CA");
+  const [numberProvider, setNumberProvider] = useState<"telnyx" | "twilio">("telnyx");
   const [province, setProvince] = useState("ON");
   const [availableNumbers, setAvailableNumbers] = useState<any[]>([]);
   const [selectedResultCity, setSelectedResultCity] = useState<string | null>(null);
@@ -128,7 +129,7 @@ export default function Numbers() {
     setSelectedResultCity(null);
     setSelectedFoundAreaCode("all");
     try {
-      const params = new URLSearchParams({ country });
+      const params = new URLSearchParams({ country, provider: numberProvider });
       if (!tollFree && city.trim()) params.set("city", city.trim());
       if (!tollFree && province) params.set("province", province);
       if (!tollFree && areaCode) params.set("areaCode", areaCode);
@@ -228,7 +229,7 @@ export default function Numbers() {
           {/* Provision dialog */}
           <Dialog open={searchOpen} onOpenChange={(open) => {
             setSearchOpen(open);
-            if (!open) { setAreaCode(""); setCity(""); setSearched(false); setTollFree(false); setCountry("CA"); setProvince("ON"); setAvailableNumbers([]); setShowRegionalAlternatives(false); setProvisionTab("provision"); }
+            if (!open) { setAreaCode(""); setCity(""); setSearched(false); setTollFree(false); setCountry("CA"); setProvince("ON"); setNumberProvider("telnyx"); setAvailableNumbers([]); setShowRegionalAlternatives(false); setProvisionTab("provision"); }
           }}>
             <DialogTrigger asChild>
               <Button className="gap-2"><Plus className="h-4 w-4" />Provision Number</Button>
@@ -296,6 +297,20 @@ export default function Numbers() {
                 </div>
               ) : (
               <div className="space-y-4 pt-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">Phone number provider</Label>
+                  <Select value={numberProvider} onValueChange={(value) => {
+                    setNumberProvider(value as "telnyx" | "twilio");
+                    setSearched(false); setAvailableNumbers([]); setSelectedResultCity(null); setSelectedFoundAreaCode("all");
+                  }}>
+                    <SelectTrigger className="bg-background"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="telnyx">Telnyx (preferred)</SelectItem>
+                      <SelectItem value="twilio">Twilio</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {numberProvider === "telnyx" && <p className="text-xs text-amber-500">Telnyx inventory search only. Buying and routing Telnyx numbers are not yet connected; no purchase will be made.</p>}
+                </div>
                 {/* Search controls */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
@@ -481,12 +496,12 @@ export default function Numbers() {
                             <Button
                               variant="secondary"
                               size="sm"
-                              disabled={provisionMutation.isPending}
+                              disabled={provisionMutation.isPending || numberProvider === "telnyx"}
                               onClick={() => provisionMutation.mutate({
                                 data: { number: n.phoneNumber, friendlyName: n.friendlyName, callerIdName: "New Number", answerMode: "forward" }
                               })}
                             >
-                              {provisionMutation.isPending ? "Provisioning…" : "Provision"}
+                              {numberProvider === "telnyx" ? "Purchase setup pending" : provisionMutation.isPending ? "Provisioning…" : "Provision"}
                             </Button>
                           </TableCell>
                         </TableRow>
