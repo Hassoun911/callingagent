@@ -11,6 +11,7 @@ import dashboardRouter from "./dashboard";
 import costsRouter from "./costs";
 import twilioWebhooksRouter from "./twilio-webhooks";
 import telnyxVoiceWebhooksRouter from "./telnyx-voice-webhooks";
+import telnyxSmsWebhooksRouter from "./telnyx-sms-webhooks";
 import phoneRecBridgeRouter from "./phone-rec-bridge";
 import watchesRouter from "./watches";
 import smsRouter from "./sms";
@@ -36,6 +37,7 @@ router.use(aiCallFinalizer);
 router.use(phoneRecBridgeRouter);
 router.use(twilioWebhooksRouter);
 router.use(telnyxVoiceWebhooksRouter);
+router.use(telnyxSmsWebhooksRouter);
 
 // Every dashboard/API route below is checked against the authenticated user's role.
 router.use(routeAccessControl);
