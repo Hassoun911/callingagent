@@ -273,22 +273,18 @@ export function Layout({ children }: { children: ReactNode }) {
             <Building2 className="h-4 w-4 flex-shrink-0" /> All Companies
           </Link>
 
-          {!contextCompany && (
-            <>
-              <SectionLabel label="Communication" compact={compact} />
-              {[
-                {href:"/numbers", name:"Phone Numbers", Icon:PhoneCall},
-                {href:"/contacts", name:"Contacts (CRM)", Icon:Users},
-                {href:"/campaigns", name:"Campaigns", Icon:Target},
-                {href:"/calls", name:"Call Logs", Icon:PhoneCall},
-                {href:"/messages", name:"SMS Inbox", Icon:MessageSquare},
-                {href:"/leads", name:"Hot Leads", Icon:TrendingUp},
-                {href:"/bookings", name:"Appointments", Icon:CalendarDays},
-              ].map(({href,name,Icon}) => <Link key={href} href={href} onClick={onNav} className={navClass(href,compact)}><Icon className="h-4 w-4 flex-shrink-0"/>{name}</Link>)}
-              <SectionLabel label="Administration" compact={compact} />
-              <Link href="/settings" onClick={onNav} className={navClass("/settings",compact)}><Bot className="h-4 w-4 flex-shrink-0"/>Settings</Link>
-            </>
-          )}
+          <div className="mt-1 space-y-1">
+            {(companies ?? []).map(company => {
+              const isSelected = activeCompanyId === company.id;
+              return <Link key={company.id} href={`/companies/${company.id}`} onClick={onNav}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${isSelected ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"}`}>
+                <Building2 className="h-4 w-4 shrink-0"/>
+                <span className="min-w-0 flex-1 truncate">{company.name}</span>
+                <span className="text-[11px] opacity-75">{(allNumbers ?? []).filter(n => n.companyId === company.id).length}</span>
+              </Link>;
+            })}
+          </div>
+          {!contextCompany && <p className="px-3 py-3 text-xs leading-relaxed text-muted-foreground">Select a company to view its phone lines, calls, contacts, messages, campaigns and settings.</p>}
           {contextCompany && (
             <div className={`${compact ? "mt-1 p-1.5" : "ml-1 mt-2 p-2"} space-y-0.5 rounded-lg border border-border/60 bg-background/30`}>
               <Link href={`/companies/${contextCompany.id}`} onClick={onNav} className={`flex items-center gap-2 truncate rounded-md px-2 py-2 font-semibold transition-colors ${compact ? "text-sm" : "text-xs"} ${onCompanyDetail ? "bg-primary/10 text-primary" : "text-primary/80 hover:bg-primary/5 hover:text-primary"}`}>
@@ -324,23 +320,18 @@ export function Layout({ children }: { children: ReactNode }) {
                 <CalendarCog className="h-3.5 w-3.5 flex-shrink-0" /> Booking & Availability
               </Link>
 
-              {companyNumbers.length > 0 && <CompanyGroupLabel label="Phone System" compact={compact} />}
+              <CompanyGroupLabel label="Phone Numbers" compact={compact} />
+              {companyNumbers.length === 0 && <div className="px-2 py-2 text-xs text-muted-foreground">No phone lines assigned</div>}
               {companyNumbers.map(number => {
                 const numberActive = activeNumberId === number.id;
-                return (
-                  <div key={number.id} className="space-y-0.5">
-                    <Link href={`/numbers/${number.id}`} onClick={onNav} className={`flex items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors ${compact ? "text-sm" : "text-xs"} ${numberActive ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"}`}>
-                      <PhoneSetup className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <div className="truncate">Phone Line Setup</div>
-                        <div className="truncate font-mono text-[10px] text-muted-foreground/60">{formatPhone(number.number)}</div>
-                      </div>
-                    </Link>
-                    <Link href={`/campaigns?companyId=${contextCompany.id}&numberId=${number.id}`} onClick={onNav} className={companyNavClass(`/campaigns?companyId=${contextCompany.id}&numberId=${number.id}`, compact)}>
-                      <Target className="h-3.5 w-3.5 flex-shrink-0" /> Campaign Setup
-                    </Link>
-                  </div>
-                );
+                return <div key={number.id} className="space-y-1 rounded-lg border border-border/60 bg-card/60 p-1.5">
+                  <Link href={`/numbers/${number.id}`} onClick={onNav} className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm font-semibold ${numberActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-secondary/50"}`}>
+                    <PhoneSetup className="h-4 w-4 shrink-0 text-primary" /><span className="truncate font-mono text-xs">{formatPhone(number.number)}</span>
+                  </Link>
+                  <Link href={`/campaigns?companyId=${contextCompany.id}&numberId=${number.id}`} onClick={onNav} className={companyNavClass(`/campaigns?companyId=${contextCompany.id}&numberId=${number.id}`,compact)}>
+                    <Target className="h-3.5 w-3.5 shrink-0"/> Line Campaigns
+                  </Link>
+                </div>;
               })}
             </div>
           )}
