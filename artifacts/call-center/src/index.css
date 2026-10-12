@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -118,7 +119,7 @@
   --chart-4: 280 65% 60%;
   --chart-5: 340 75% 55%;
 
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
 
   --app-font-sans: 'Inter', sans-serif;
   --app-font-serif: Georgia, serif;
@@ -379,3 +380,51 @@
 .admin-dashboard-light main .companies-admin-page th,
 .admin-dashboard-light main .companies-admin-page td,
 .admin-dashboard-light main .companies-admin-page button { font-size: max(0.875rem, 1em); }
+
+/* Admin-wide accessibility: shared content typography and theme-safe contrast.
+   Scoped to the super-admin layout, never the customer-facing company portal. */
+.admin-dashboard-light,
+.admin-dashboard-dark {
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.admin-dashboard-light main,
+.admin-dashboard-dark main { font-size: 14px; }
+.admin-dashboard-light main :is(.text-\[9px\],.text-\[10px\],.text-\[11px\],.text-\[12px\],.text-xs),
+.admin-dashboard-dark main :is(.text-\[9px\],.text-\[10px\],.text-\[11px\],.text-\[12px\],.text-xs) {
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.admin-dashboard-light main :is(h1,h2,h3),
+.admin-dashboard-dark main :is(h1,h2,h3) { line-height: 1.3; letter-spacing: -.018em; }
+.admin-dashboard-light main :is(button,input,select,textarea,[role="combobox"]),
+.admin-dashboard-dark main :is(button,input,select,textarea,[role="combobox"]) { font-size: max(13px, 0.875em); }
+.admin-dashboard-light main :is(th,td),
+.admin-dashboard-dark main :is(th,td) { line-height: 1.55; }
+.admin-dashboard-light main .text-muted-foreground { color: #53657b; }
+.admin-dashboard-light main .text-muted-foreground\/40,
+.admin-dashboard-light main .text-muted-foreground\/50,
+.admin-dashboard-light main .text-muted-foreground\/60,
+.admin-dashboard-light main .text-muted-foreground\/70 { color: #607187; }
+.admin-dashboard-light main :is(.text-yellow-200,.text-yellow-300,.text-yellow-400,.text-yellow-500,.text-amber-200,.text-amber-300,.text-amber-400) { color: #8a5700; }
+.admin-dashboard-light main :is(.text-blue-200,.text-blue-300,.text-blue-400,.text-blue-500) { color: #095cb4; }
+.admin-dashboard-light main :is(.text-red-300,.text-red-400) { color: #b62c39; }
+.admin-dashboard-light main .text-foreground { color: #172b46; }
+.admin-dashboard-dark main .text-muted-foreground\/40,
+.admin-dashboard-dark main .text-muted-foreground\/50,
+.admin-dashboard-dark main .text-muted-foreground\/60 { color: #b2c0d2; }
+.admin-dashboard-dark main :is(.text-yellow-300,.text-yellow-400,.text-amber-300,.text-amber-400) { color: #f8c465; }
+.admin-dashboard-dark main .text-blue-300 { color: #93c5fd; }
+.admin-dashboard-dark main input::placeholder,
+.admin-dashboard-dark main textarea::placeholder { color: #a4b3c8; opacity: 1; }
+.admin-dashboard-light main input:focus-visible,
+.admin-dashboard-dark main input:focus-visible,
+.admin-dashboard-light main button:focus-visible,
+.admin-dashboard-dark main button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.admin-dashboard-light aside .text-muted-foreground\/50,
+.admin-dashboard-dark aside .text-muted-foreground\/50 { color: #788aa3; }
+@media (max-width:639px) {
+  .admin-dashboard-light main :is(.text-\[9px\],.text-\[10px\],.text-\[11px\],.text-xs),
+  .admin-dashboard-dark main :is(.text-\[9px\],.text-\[10px\],.text-\[11px\],.text-xs) { font-size: 13px; }
+}
