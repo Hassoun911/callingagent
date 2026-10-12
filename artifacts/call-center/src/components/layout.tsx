@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
+  ChevronDown,
   PhoneCall,
   Users,
   Building2,
@@ -69,6 +70,7 @@ function ActionBadge({ count, severity = "warning" }: { count: number; severity?
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [companiesExpanded, setCompaniesExpanded] = useState(false);
   const [adminTheme, setAdminTheme] = useState<"light" | "dark">(() => {
     try { return window.localStorage.getItem("callingagent-admin-theme") === "dark" ? "dark" : "light"; }
     catch { return "light"; }
@@ -269,22 +271,28 @@ export function Layout({ children }: { children: ReactNode }) {
           </Link>
 
           <SectionLabel label="Companies" compact={compact} />
-          <Link href="/companies" onClick={onNav} className={navClass("/companies", compact)}>
-            <Building2 className="h-4 w-4 flex-shrink-0" /> All Companies
-          </Link>
-
-          <div className="mt-1 space-y-1">
-            {(companies ?? []).map(company => {
-              const isSelected = activeCompanyId === company.id;
-              return <Link key={company.id} href={`/companies/${company.id}`} onClick={onNav}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${isSelected ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"}`}>
-                <Building2 className="h-4 w-4 shrink-0"/>
-                <span className="min-w-0 flex-1 truncate">{company.name}</span>
-                <span className="text-[11px] opacity-75">{(allNumbers ?? []).filter(n => n.companyId === company.id).length}</span>
-              </Link>;
-            })}
-          </div>
-          {!contextCompany && <p className="px-3 py-3 text-xs leading-relaxed text-muted-foreground">Select a company to view its phone lines, calls, contacts, messages, campaigns and settings.</p>}
+          <button type="button" onClick={() => setCompaniesExpanded(value => !value)}
+            aria-expanded={companiesExpanded} aria-label="Toggle companies list"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-semibold text-foreground transition-colors hover:bg-secondary/60">
+            <Building2 className="h-4 w-4 shrink-0 text-primary" />
+            <span className="min-w-0 flex-1">Companies</span>
+            <span className="text-xs text-muted-foreground">{(companies ?? []).length}</span>
+            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${companiesExpanded ? "rotate-180" : ""}`}/>
+          </button>
+          {companiesExpanded && (
+            <div className="ml-3 space-y-0.5 border-l border-border pl-2">
+              <Link href="/companies" onClick={onNav} className={navClass("/companies",compact)}>
+                <Building2 className="h-4 w-4 shrink-0" /> All Companies
+              </Link>
+              {(companies ?? []).map(company => (
+                <Link key={company.id} href={`/companies/${company.id}`} onClick={onNav}
+                  className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${activeCompanyId === company.id ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"}`}>
+                  <span className="min-w-0 flex-1 truncate">{company.name}</span>
+                  <span className="text-xs opacity-75">{(allNumbers ?? []).filter(n => n.companyId === company.id).length}</span>
+                </Link>
+              ))}
+            </div>
+          )}
           {contextCompany && (
             <div className={`${compact ? "mt-1 p-1.5" : "ml-1 mt-2 p-2"} space-y-0.5 rounded-lg border border-border/60 bg-background/30`}>
               <Link href={`/companies/${contextCompany.id}`} onClick={onNav} className={`flex items-center gap-2 truncate rounded-md px-2 py-2 font-semibold transition-colors ${compact ? "text-sm" : "text-xs"} ${onCompanyDetail ? "bg-primary/10 text-primary" : "text-primary/80 hover:bg-primary/5 hover:text-primary"}`}>
