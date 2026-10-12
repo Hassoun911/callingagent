@@ -349,6 +349,16 @@ router.post("/phone-numbers/telnyx-setup", async (req, res): Promise<void> => {
   if (typeof number !== "string" || !/^\+[1-9]\d{7,14}$/.test(number)) {
     res.status(400).json({ error: "A valid phone number is required." }); return;
   }
+  const companyId = Number(req.body?.companyId);
+  if (!Number.isSafeInteger(companyId) || companyId <= 0) {
+    res.status(400).json({ error: "Company assignment is required to register this number." }); return;
+  }
+  const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId));
+  if (!company) { res.status(404).json({ error: "Company not found." }); return; }
+  const [registered] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, number));
+  if (registered && registered.companyId !== companyId) {
+    res.status(409).json({ error: "Number is already assigned to another company." }); return;
+  }
   const apiKey = process.env.TELNYX_API_KEY;
   const connectionId = process.env.TELNYX_CONNECTION_ID;
   const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;
@@ -381,7 +391,15 @@ router.post("/phone-numbers/telnyx-setup", async (req, res): Promise<void> => {
       if (!reply.ok) { res.status(502).json({ error: data.errors?.[0]?.detail || "Telnyx messaging profile assignment failed.", results }); return; }
       results.sms = "messaging profile assigned";
     }
-    res.json({ phoneNumber: number, results, warning: "Assignments completed. Test inbound/outbound calling and messaging; carrier registration and application webhooks may still be required." });
+    // Register only after provider configurations succeed. This does not declare service active.
+    if (!registered) {
+      await db.insert(phoneNumbersTable).values({
+        number, twilioSid: null, companyId, friendlyName: number,
+        callerIdName: company.name, answerMode: "forward",
+      }).onConflictDoNothing();
+    }
+    res.json({ phoneNumber: number, companyId, registered: true, results,
+      warning: "Number registered with its company. Test calling and SMS before marking the line ready; carrier approvals may still be required." });
   } catch (error: any) {
     req.log.error({ error: error?.message }, "Telnyx number setup failed");
     res.status(502).json({ error: "Telnyx configuration status is uncertain. Verify before retrying." });
