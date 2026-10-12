@@ -325,3 +325,39 @@
 .admin-dashboard-light .admin-overview .text-blue-600 { color: #125ac0 !important; }
 .admin-dashboard-light .admin-overview .text-violet-600 { color: #703eb5 !important; }
 .admin-dashboard-light .admin-overview .text-amber-600 { color: #aa6208 !important; }
+
+/* Consistent legible colors throughout admin-only screens, including companies,
+   billing, call logs and configuration pages. Scoped company screens opt out. */
+.admin-dashboard-light { color: hsl(var(--foreground)); }
+.admin-dashboard-light main .text-white:not(.bg-primary *):not(.bg-blue-600 *):not(.bg-red-600 *) { color: #172b46; }
+.admin-dashboard-light main .text-gray-300,
+.admin-dashboard-light main .text-slate-300,
+.admin-dashboard-light main .text-gray-400,
+.admin-dashboard-light main .text-slate-400 { color: #506581; }
+.admin-dashboard-light main .text-green-400 { color: #057858; }
+.admin-dashboard-light main .text-cyan-400 { color: #087eac; }
+.admin-dashboard-light main .text-blue-400 { color: #1268bc; }
+.admin-dashboard-light main .text-purple-400 { color: #7640b0; }
+.admin-dashboard-light main .text-amber-400,
+.admin-dashboard-light main .text-yellow-400 { color: #a66506; }
+.admin-dashboard-light main .text-red-400 { color: #bf3333; }
+.admin-dashboard-light main .bg-slate-900,
+.admin-dashboard-light main .bg-gray-900,
+.admin-dashboard-light main .bg-slate-950,
+.admin-dashboard-light main .bg-gray-950 { background-color: #ffffff; }
+.admin-dashboard-light main .bg-slate-800,
+.admin-dashboard-light main .bg-gray-800 { background-color: #f0f5fb; }
+.admin-dashboard-light main input,
+.admin-dashboard-light main textarea,
+.admin-dashboard-light main select { color: #1d2d45; background-color: #fff; border-color: #cdd9e7; }
+.admin-dashboard-light main input::placeholder,
+.admin-dashboard-light main textarea::placeholder { color: #667891; opacity: 1; }
+.admin-dashboard-light main table { color: #233650; }
+.admin-dashboard-light main thead { color: #536782; }
+.admin-dashboard-light main tbody tr:hover { background-color: rgba(21,103,198,.045); }
+.admin-dashboard-light main a.text-primary { color: #076bc4; }
+.admin-dashboard-light aside .text-green-400 { color: #058568; }
+.admin-dashboard-light aside .text-primary { color: #075fae; }
+.admin-dashboard-light .bg-primary .text-primary-foreground,
+.admin-dashboard-light main .bg-primary.text-primary-foreground { color: white; }
+.admin-dashboard-light [role="dialog"] { color: #172b46; }
