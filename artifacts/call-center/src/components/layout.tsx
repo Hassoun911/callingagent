@@ -263,6 +263,22 @@ export function Layout({ children }: { children: ReactNode }) {
             <Building2 className="h-4 w-4 flex-shrink-0" /> All Companies
           </Link>
 
+          {!contextCompany && (
+            <>
+              <SectionLabel label="Communication" compact={compact} />
+              {[
+                {href:"/numbers", name:"Phone Numbers", Icon:PhoneCall},
+                {href:"/contacts", name:"Contacts (CRM)", Icon:Users},
+                {href:"/campaigns", name:"Campaigns", Icon:Target},
+                {href:"/calls", name:"Call Logs", Icon:PhoneCall},
+                {href:"/messages", name:"SMS Inbox", Icon:MessageSquare},
+                {href:"/leads", name:"Hot Leads", Icon:TrendingUp},
+                {href:"/bookings", name:"Appointments", Icon:CalendarDays},
+              ].map(({href,name,Icon}) => <Link key={href} href={href} onClick={onNav} className={navClass(href,compact)}><Icon className="h-4 w-4 flex-shrink-0"/>{name}</Link>)}
+              <SectionLabel label="Administration" compact={compact} />
+              <Link href="/settings" onClick={onNav} className={navClass("/settings",compact)}><Bot className="h-4 w-4 flex-shrink-0"/>Settings</Link>
+            </>
+          )}
           {contextCompany && (
             <div className={`${compact ? "mt-1 p-1.5" : "ml-1 mt-2 p-2"} space-y-0.5 rounded-lg border border-border/60 bg-background/30`}>
               <Link href={`/companies/${contextCompany.id}`} onClick={onNav} className={`flex items-center gap-2 truncate rounded-md px-2 py-2 font-semibold transition-colors ${compact ? "text-sm" : "text-xs"} ${onCompanyDetail ? "bg-primary/10 text-primary" : "text-primary/80 hover:bg-primary/5 hover:text-primary"}`}>
@@ -385,7 +401,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
         </div>
         <div className="flex-1 overflow-auto bg-background p-3 sm:p-4 md:p-6">
-          <div className="mx-auto max-w-6xl">{children}</div>
+          <div className={`mx-auto w-full ${location === "/" ? "max-w-[1600px]" : "max-w-6xl"}`}>{children}</div>
         </div>
       </main>
     </div>
