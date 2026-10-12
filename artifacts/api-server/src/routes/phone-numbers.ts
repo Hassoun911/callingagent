@@ -167,7 +167,7 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
           const params: any = { areaCode: Number(prefix), limit: 1000, pageSize: 100 };
           if (contains) params.contains = contains;
           return (await client.availablePhoneNumbers(country).tollFree.list(params)).map(format)
-            .filter(n => n.phoneNumber?.replace(/^\\+1/, "").startsWith(prefix));
+            .filter(n => n.phoneNumber?.replace(/^\+1/, "").startsWith(prefix));
         } catch (err) {
           req.log.warn({ err, prefix, country }, "Toll-free prefix search failed");
           return [];
@@ -234,7 +234,7 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
         await find({ ...base, inLocality: targetCity });
 
       const exactCity = targetCity && [...unique.values()].some(n => normalize(n.locality) === normalize(targetCity));
-      const exactCode = areaCode && [...unique.values()].some(n => n.phoneNumber?.replace(/^\\+1/, "").startsWith(areaCode));
+      const exactCode = areaCode && [...unique.values()].some(n => n.phoneNumber?.replace(/^\+1/, "").startsWith(areaCode));
       if (!exactCity && !exactCode) {
         // Search nearby named cities in order if known, avoiding the provider's 100-item
         // province-wide cap obscuring closer localities.
@@ -251,7 +251,7 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
       const matches = [...unique.values()];
       const byPreference = (n: ReturnType<typeof format>) => {
         if (targetCity && normalize(n.locality) === normalize(targetCity)) return -2;
-        if (areaCode && n.phoneNumber?.replace(/^\\+1/, "").startsWith(areaCode)) return -1;
+        if (areaCode && n.phoneNumber?.replace(/^\+1/, "").startsWith(areaCode)) return -1;
         const pos = origin && coordinate(n.locality);
         return pos && origin ? distance(origin, pos) : Number.POSITIVE_INFINITY;
       };
@@ -272,7 +272,7 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
 router.post("/phone-numbers/telnyx-order", async (req, res): Promise<void> => {
   if (getCompanyScope(req) !== null) { res.status(403).json({ error: "Admin access required for Telnyx purchases." }); return; }
   const number = req.body?.phoneNumber;
-  if (typeof number !== "string" || !/^\\+[1-9]\\d{7,14}$/.test(number) || req.body?.confirmPurchase !== true) {
+  if (typeof number !== "string" || !/^\+[1-9]\d{7,14}$/.test(number) || req.body?.confirmPurchase !== true) {
     res.status(400).json({ error: "Valid E.164 phone number and explicit confirmation required." });
     return;
   }
@@ -340,7 +340,7 @@ router.get("/phone-numbers/telnyx-orders/:orderId", async (req, res): Promise<vo
 router.post("/phone-numbers/telnyx-setup", async (req, res): Promise<void> => {
   if (getCompanyScope(req) !== null) { res.status(403).json({ error: "Admin access required." }); return; }
   const number = req.body?.phoneNumber;
-  if (typeof number !== "string" || !/^\\+[1-9]\\d{7,14}$/.test(number)) {
+  if (typeof number !== "string" || !/^\+[1-9]\d{7,14}$/.test(number)) {
     res.status(400).json({ error: "A valid phone number is required." }); return;
   }
   const apiKey = process.env.TELNYX_API_KEY;
