@@ -101,7 +101,8 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
       for (const item of responses.flat()) {
         const number = item.phone_number;
         if (typeof number !== "string") continue;
-        const place = item.locality || item.region_information?.[0]?.region_name || null;
+        const regions: any[] = Array.isArray(item.region_information) ? item.region_information : [];
+        const place = item.locality || regions.find((r: any) => ["rate_center", "locality", "city"].includes(r.region_type))?.region_name || null;
         unique.set(number, {
           phoneNumber: number, friendlyName: number, locality: place,
           region: province || item.administrative_area || null, postalCode: null,
