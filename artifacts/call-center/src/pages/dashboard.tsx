@@ -4,10 +4,10 @@ import { useGetDashboardStats, useGetRecentCalls, useListPhoneNumbers } from "@w
 import { Activity, ArrowDownLeft, ArrowUpRight, Building2, ChevronRight, Clock, CreditCard, MessageSquare, Phone, Plus, Users, Zap } from "lucide-react";
 import { Link } from "wouter";
 
-const BASE = import.meta.env.BASE_URL.replace(/\\/$/, "");
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 const money = (amount: number, currency: string) => `${currency} ${amount.toFixed(2)}`;
 const displayNumber = (value: string) => {
-  const digits = value.replace(/\\D/g, "");
+  const digits = value.replace(/\D/g, "");
   return digits.length === 11 && digits.startsWith("1") ? `+1 ${digits.slice(1,4)} ${digits.slice(4,7)} ${digits.slice(7)}` : value;
 };
 function Panel({ title, href, link, children }: { title: string; href?: string; link?: string; children: React.ReactNode }) {
