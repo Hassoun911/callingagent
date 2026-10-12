@@ -147,6 +147,35 @@ export default function Numbers() {
   };
 
   const [orderingTelnyx, setOrderingTelnyx] = useState<string | null>(null);
+  const [telnyxOrder, setTelnyxOrder] = useState<{ orderId: string; phoneNumber: string; status: string } | null>(null);
+  const [telnyxSetupBusy, setTelnyxSetupBusy] = useState(false);
+  const [telnyxSetupResult, setTelnyxSetupResult] = useState("");
+  const refreshTelnyxOrder = async () => {
+    if (!telnyxOrder?.orderId) return;
+    setTelnyxSetupBusy(true);
+    try {
+      const response = await fetch(`${BASE}/api/phone-numbers/telnyx-orders/${encodeURIComponent(telnyxOrder.orderId)}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Status unavailable");
+      setTelnyxOrder(previous => previous ? { ...previous, status: data.status } : previous);
+      setTelnyxSetupResult(`Live order status: ${data.status}. Requirements met: ${data.requirementsMet === null ? "not reported" : String(data.requirementsMet)}.`);
+    } catch (error: any) { setTelnyxSetupResult(error.message); }
+    finally { setTelnyxSetupBusy(false); }
+  };
+  const configureTelnyxNumber = async () => {
+    if (!telnyxOrder) return;
+    setTelnyxSetupBusy(true);
+    try {
+      const response = await fetch(`${BASE}/api/phone-numbers/telnyx-setup`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: telnyxOrder.phoneNumber }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Setup not completed");
+      setTelnyxSetupResult(`${Object.entries(data.results || {}).map(([key, value]) => `${key}: ${value}`).join(" · ")}. ${data.warning || ""}`);
+    } catch (error: any) { setTelnyxSetupResult(error.message); }
+    finally { setTelnyxSetupBusy(false); }
+  };
   const purchaseTelnyx = async (number: string) => {
     if (!window.confirm(`Submit a BILLABLE Telnyx purchase order for ${number}? Recurring fees and activation requirements may apply. This will NOT automatically configure calling or SMS.`)) return;
     setOrderingTelnyx(number);
@@ -157,7 +186,9 @@ export default function Numbers() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not place Telnyx order");
-      toast({ title: "Telnyx order submitted", description: `Order ${body.orderId ?? "pending"} · ${body.status}. Check Telnyx for activation and routing.` });
+      if (body.orderId) setTelnyxOrder({ orderId: String(body.orderId), phoneNumber: number, status: body.status ?? "pending" });
+      setTelnyxSetupResult("Order submitted. Track it below, then configure when Telnyx confirms the number is active.");
+      toast({ title: "Telnyx order submitted", description: `Order ${body.orderId ?? "pending"} · ${body.status}. Track setup in this portal.` });
       setAvailableNumbers(previous => previous.filter(n => n.phoneNumber !== number));
     } catch (error: any) {
       toast({ title: "Telnyx order not confirmed", description: error?.message ?? "Check Telnyx Portal before retrying.", variant: "destructive" });
@@ -262,6 +293,18 @@ export default function Numbers() {
                 </DialogDescription>
               </DialogHeader>
 
+              {telnyxOrder && (
+                <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2 text-sm">
+                  <div className="font-semibold">Telnyx purchase and setup · {telnyxOrder.phoneNumber}</div>
+                  <div>Order: {telnyxOrder.orderId} · Last known status: {telnyxOrder.status}</div>
+                  <p className="text-xs text-muted-foreground">A submitted order is not an activated line. Check live status and assign the server-configured Telnyx connection/profile when ready.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" disabled={telnyxSetupBusy} onClick={refreshTelnyxOrder}>Refresh order status</Button>
+                    <Button type="button" size="sm" disabled={telnyxSetupBusy} onClick={configureTelnyxNumber}>Configure Telnyx routing</Button>
+                  </div>
+                  {telnyxSetupResult && <p className="text-xs text-muted-foreground">{telnyxSetupResult}</p>}
+                </div>
+              )}
               {/* Tab switcher */}
               <div className="flex gap-1 bg-secondary/40 rounded-md p-1 w-fit">
                 <button
