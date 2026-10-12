@@ -211,7 +211,35 @@ router.get("/costs", async (req, res): Promise<void> => {
     openai = { available: false, error: "No OpenAI API key configured" };
   }
 
+  // Telnyx has a separate carrier ledger. Do not fabricate charges from public
+  // rate cards, or classify Telnyx inventory searches as purchased numbers.
+  // Only confirmed Twilio SID-backed lines can be attributed to Twilio.
+  const savedLines = await db.select().from(phoneNumbersTable);
+  const telnyxLines = savedLines.filter(n => !n.twilioSid);
+  const telnyx = {
+    available: Boolean(process.env.TELNYX_API_KEY),
+    totalCost: null,
+    currency: "USD",
+    amountStatus: "unverified",
+    error: process.env.TELNYX_API_KEY
+      ? "Live Telnyx billing totals are not connected. See Telnyx Portal → Reporting → Monthly Charges."
+      : "Telnyx API key is not configured.",
+    perNumber: telnyxLines.map(n => ({
+      phoneNumber: n.number, friendlyName: n.friendlyName,
+      companyId: n.companyId, provider: "unverified",
+      cost: null, breakdown: [], status: "Provider and billing not verified"
+    }))
+  };
+  const providerTotals = {
+    twilio: twilio?.available ? { totalCost: twilio.totalCost, currency: twilio.currency, verified: true } : null,
+    telnyx: { totalCost: null, currency: "USD", verified: false },
+    combined: null,
+    note: "Combined total unavailable until both providers' actual billing is verified; currencies are not mixed."
+  };
+
   res.json({
+    telnyx,
+    providerTotals,
     twilio,
     openai,
     period,
