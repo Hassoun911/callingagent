@@ -120,7 +120,9 @@ export function Layout({ children }: { children: ReactNode }) {
     return queryCompanyId ? parseInt(queryCompanyId) : null;
   })();
 
-  const mainAdminPortal = activeCompanyId === null && !location.startsWith("/portal");
+  // Layout is only mounted by AdminRouter for super admins. A selected company
+  // is an admin management context, not the separate company-user portal.
+  const mainAdminPortal = true;
   const contextCompany = activeCompanyId ? companies?.find(company => company.id === activeCompanyId) : null;
   const companyNumbers = useMemo(
     () => contextCompany ? allNumbers?.filter(number => number.companyId === contextCompany.id) ?? [] : [],
