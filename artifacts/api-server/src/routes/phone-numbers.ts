@@ -91,35 +91,66 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
       if (contains) params.contains = contains;
       formatted = (await client.availablePhoneNumbers(country).tollFree.list(params)).map(format);
     } else {
-      const params: any = { limit: 100 };
-      if (areaCode) params.areaCode = areaCode;
-      if (contains) params.contains = contains;
-      if (province) params.inRegion = province;
-      if (city) params.inLocality = city;
-      const exact = (await client.availablePhoneNumbers(country).local.list(params)).map(format)
-        .filter(n => !province || codeMatches(n.region))
-        .filter(n => !city || normalize(n.locality) === normalize(city));
-      formatted = exact.slice(0, 20);
-      if (formatted.length === 0 && city) {
-        // Exact locality unavailable: ask Twilio for inventory within this SAME province/state.
-        const fallback: any = { limit: 100, inRegion: province };
-        if (areaCode) fallback.areaCode = areaCode;
-        if (contains) fallback.contains = contains;
-        const regional = (await client.availablePhoneNumbers(country).local.list(fallback)).map(format)
-          .filter(n => codeMatches(n.region) && normalize(n.locality) !== normalize(city));
-        // Geographic proximity ordering for Windsor, ON; other regions are explicitly labelled
-        // as same-province alternatives, not advertised as distance-ranked.
-        const essexRank = ["lasalle", "tecumseh", "amherstburg", "lakeshore", "maidstone", "essex", "kingsville", "leamington", "harrow", "cottam", "comber"];
-        if (country === "CA" && province === "ON" && normalize(city) === "windsor") {
-          regional.sort((a,b) => {
-            const rank = (n: typeof a) => {
-              const i = essexRank.indexOf(normalize(n.locality));
-              return i < 0 ? 999 : i;
-            };
-            return rank(a) - rank(b);
-          });
+      // A Southwestern Ontario area code is a preference, not a fallback restriction.
+      const isWindsor = country === "CA" && province === "ON" &&
+        (normalize(city) === "windsor" || (!city && ["226", "519", "548"].includes(areaCode)));
+      const targetCity = city || (isWindsor ? "Windsor" : "");
+      const nearby = [
+        "Windsor", "LaSalle", "Tecumseh", "Amherstburg", "Lakeshore",
+        "Essex", "Harrow", "Kingsville", "Leamington", "Tilbury",
+        "Chatham", "Blenheim", "Wallaceburg", "Sarnia", "Strathroy",
+        "London", "St. Thomas", "Woodstock", "Ingersoll", "Brantford",
+        "Kitchener", "Waterloo", "Cambridge", "Hamilton", "Toronto"
+      ];
+      const unique = new Map<string, ReturnType<typeof format>>();
+      const add = (items: any[]) => {
+        for (const n of items.map(format)) {
+          if (province && !codeMatches(n.region)) continue;
+          if (normalize(n.isoCountry) !== country.toLowerCase()) continue;
+          unique.set(n.phoneNumber, n);
         }
-        formatted = regional.slice(0, 20);
+      };
+      const find = async (params: any) => {
+        try {
+          add(await client.availablePhoneNumbers(country).local.list(params));
+        } catch (err) {
+          req.log.warn({ err, params }, "Twilio locality inventory request failed");
+        }
+      };
+      const base: any = { limit: 100 };
+      if (province) base.inRegion = province;
+      if (contains) base.contains = contains;
+      if (targetCity) {
+        await find({ ...base, inLocality: targetCity, ...(!isWindsor && areaCode ? { areaCode } : {}) });
+      } else {
+        await find({ ...base, ...(areaCode ? { areaCode } : {}) });
+      }
+      const exact = [...unique.values()].filter(n => targetCity && normalize(n.locality) === normalize(targetCity));
+      if (targetCity && exact.length === 0) {
+        if (isWindsor) {
+          // Search Essex County, the Chatham/Sarnia corridor, London, then farther out.
+          // Per-locality searches prevent provider result limits hiding nearby inventory.
+          for (const place of nearby.slice(1)) {
+            await find({ ...base, inLocality: place });
+          }
+          for (const prefix of ["519", "226", "548"]) await find({ ...base, areaCode: prefix });
+        }
+        // Province/state inventory is the final fallback, without the original area code.
+        await find(base);
+      }
+      const matches = [...unique.values()];
+      if (exact.length) {
+        formatted = exact.slice(0, 20);
+      } else if (isWindsor) {
+        const rank = (n: ReturnType<typeof format>) => {
+          const i = nearby.findIndex(p => normalize(p) === normalize(n.locality));
+          return i < 0 ? nearby.length : i;
+        };
+        formatted = matches.sort((a, b) => rank(a) - rank(b) || a.phoneNumber.localeCompare(b.phoneNumber)).slice(0, 20);
+      } else if (targetCity) {
+        formatted = matches.filter(n => normalize(n.locality) !== normalize(targetCity)).slice(0, 20);
+      } else {
+        formatted = matches.slice(0, 20);
       }
     }
 
