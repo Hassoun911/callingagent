@@ -401,7 +401,7 @@ export default function Numbers() {
                           {companies.map(company => <SelectItem key={company.id} value={String(company.id)}>{company.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                    )>
+                    )}
                   </div>
                 )}
                 {/* Search controls */}
