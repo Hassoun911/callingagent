@@ -57,8 +57,73 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
   }
 
   try {
-    const client = getTwilioClient();
     const { areaCode, contains, country = "CA", tollFree, city } = query.data as any;
+    const provider = req.query.provider === "twilio" ? "twilio" : req.query.provider === "telnyx" || !req.query.provider ? "telnyx" : "";
+    if (!provider) { res.status(400).json({ error: "Unknown number provider." }); return; }
+
+    if (provider === "telnyx") {
+      const apiKey = process.env.TELNYX_API_KEY;
+      if (!apiKey) {
+        res.status(503).json({ error: "Telnyx is not configured. Set TELNYX_API_KEY in the server's environment, or select Twilio." });
+        return;
+      }
+      const province = typeof req.query.province === "string" ? req.query.province.trim().toUpperCase() : "";
+      const base = new URLSearchParams();
+      base.set("filter[country_code]", country);
+      base.set("filter[phone_number_type]", tollFree ? "toll_free" : "local");
+      base.set("filter[limit]", "50");
+      if (contains) base.set("filter[contains]", contains);
+      if (!tollFree && province) base.set("filter[administrative_area]", province);
+      const searches: URLSearchParams[] = [];
+      const add = (extra: Record<string,string>) => {
+        const q = new URLSearchParams(base);
+        for (const [key, value] of Object.entries(extra)) q.set(key,value);
+        searches.push(q);
+      };
+      if (tollFree) {
+        for (const prefix of ["800","833","844","855","866","877","888"]) add({"filter[national_destination_code]":prefix});
+      } else {
+        if (city) add({"filter[locality]":city, ...(areaCode ? {"filter[national_destination_code]":areaCode} : {})});
+        if (areaCode) add({"filter[national_destination_code]":areaCode});
+        if (city) add({"filter[locality]":city});
+        add({});
+      }
+      const responses = await Promise.all(searches.map(async q => {
+        const response = await fetch("https://api.telnyx.com/v2/available_phone_numbers?" + q.toString(), {
+          headers: { Authorization: "Bearer " + apiKey, Accept: "application/json" },
+          signal: AbortSignal.timeout(12000),
+        });
+        if (!response.ok) throw new Error("Telnyx search failed (" + response.status + ")");
+        const json: any = await response.json();
+        return Array.isArray(json.data) ? json.data : [];
+      }));
+      const unique = new Map<string, any>();
+      for (const item of responses.flat()) {
+        const number = item.phone_number;
+        if (typeof number !== "string") continue;
+        const place = item.locality || item.region_information?.[0]?.region_name || null;
+        unique.set(number, {
+          phoneNumber: number, friendlyName: number, locality: place,
+          region: province || item.administrative_area || null, postalCode: null,
+          isoCountry: item.country_code || country,
+          capabilities: {
+            voice: Array.isArray(item.features) && item.features.includes("voice"),
+            sms: Array.isArray(item.features) && item.features.includes("sms"),
+            mms: Array.isArray(item.features) && item.features.includes("mms")
+          }
+        });
+      }
+      const list = [...unique.values()];
+      list.sort((a,b) => {
+        const ca = city && a.locality?.toLowerCase() === String(city).toLowerCase() ? 0 : 1;
+        const cb = city && b.locality?.toLowerCase() === String(city).toLowerCase() ? 0 : 1;
+        return ca-cb || a.phoneNumber.localeCompare(b.phoneNumber);
+      });
+      res.json(SearchAvailableNumbersResponse.parse(list));
+      return;
+    }
+
+    const client = getTwilioClient();
 
     // Enforce the administrative region, not just the locality name.
     const province = typeof req.query.province === "string" ? req.query.province.trim().toUpperCase() : "";
