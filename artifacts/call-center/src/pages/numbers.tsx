@@ -37,6 +37,7 @@ export default function Numbers() {
   const [province, setProvince] = useState("ON");
   const [availableNumbers, setAvailableNumbers] = useState<any[]>([]);
   const [selectedResultCity, setSelectedResultCity] = useState<string | null>(null);
+  const [selectedFoundAreaCode, setSelectedFoundAreaCode] = useState("all");
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<Error | null>(null);
   const [showRegionalAlternatives, setShowRegionalAlternatives] = useState(false);
@@ -65,10 +66,23 @@ export default function Numbers() {
   const unknownCityCount = availableNumbers.filter(n => !n.locality?.trim()).length;
   const showCoverage = !tollFree && Boolean(city.trim() || areaCode || searched);
 
+  const foundAreaCodes = Object.entries(availableNumbers.reduce((counts: Record<string, number>, n: any) => {
+    const digits = String(n.phoneNumber || "").replace(/\D/g, "");
+    const code = digits.length === 11 && digits.startsWith("1") ? digits.slice(1, 4) : digits.length === 10 ? digits.slice(0, 3) : "";
+    if (code) counts[code] = (counts[code] || 0) + 1;
+    return counts;
+  }, {} as Record<string, number>)).sort((a, b) => a[0].localeCompare(b[0]));
+
   const cityCount = (place: string) => availableNumbers.filter(n => n.locality?.trim().toLowerCase() === place.toLowerCase()).length;
-  const visibleNumbers = selectedResultCity
-    ? availableNumbers.filter(n => n.locality?.trim().toLowerCase() === selectedResultCity.toLowerCase())
-    : availableNumbers;
+  const visibleNumbers = availableNumbers.filter(n => {
+    if (selectedResultCity && n.locality?.trim().toLowerCase() !== selectedResultCity.toLowerCase()) return false;
+    if (selectedFoundAreaCode !== "all") {
+      const digits = String(n.phoneNumber || "").replace(/\D/g, "");
+      const code = digits.length === 11 && digits.startsWith("1") ? digits.slice(1, 4) : digits.slice(0, 3);
+      if (code !== selectedFoundAreaCode) return false;
+    }
+    return true;
+  });
 
   const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -112,6 +126,7 @@ export default function Numbers() {
     setSearchError(null);
     setAvailableNumbers([]);
     setSelectedResultCity(null);
+    setSelectedFoundAreaCode("all");
     try {
       const params = new URLSearchParams({ country });
       if (!tollFree && city.trim()) params.set("city", city.trim());
@@ -342,7 +357,7 @@ export default function Numbers() {
                       type="button"
                       role="checkbox"
                       aria-checked={tollFree}
-                      onClick={() => { setTollFree(!tollFree); setSearched(false); setAvailableNumbers([]); setSelectedResultCity(null); setShowRegionalAlternatives(false); setSearchError(null); }}
+                      onClick={() => { setTollFree(!tollFree); setSearched(false); setAvailableNumbers([]); setSelectedResultCity(null); setSelectedFoundAreaCode("all"); setShowRegionalAlternatives(false); setSearchError(null); }}
                       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${tollFree ? "bg-primary" : "bg-muted"}`}
                     >
                       <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${tollFree ? "translate-x-4" : "translate-x-0"}`} />
@@ -363,6 +378,21 @@ export default function Numbers() {
 
                 {searched && showRegionalAlternatives && !searchLoading && (
                   <p className="text-xs text-amber-600">No exact city match for {city}, {province}. Showing numbers elsewhere in {REGION_OPTIONS[country]?.find(r => r.code === province)?.name ?? province}, with nearby areas listed first where supported.</p>
+                )}
+
+                {searched && !searchLoading && !searchError && availableNumbers.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <Label htmlFor="found-area-code" className="font-semibold whitespace-nowrap">Found area codes</Label>
+                    <select id="found-area-code" aria-label="Filter found phone numbers by area code"
+                      className="h-9 rounded-md border border-border bg-background px-3 text-foreground"
+                      value={selectedFoundAreaCode} onChange={e => setSelectedFoundAreaCode(e.target.value)}>
+                      <option value="all">All area codes ({availableNumbers.length})</option>
+                      {foundAreaCodes.map(([code, count]) => (
+                        <option key={code} value={code}>{code} ({count})</option>
+                      ))}
+                    </select>
+                    <span className="text-muted-foreground">Showing {visibleNumbers.length} matching number(s)</span>
+                  </div>
                 )}
 
                 {selectedResultCity && (
