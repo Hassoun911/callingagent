@@ -244,7 +244,17 @@ export function Layout({ children }: { children: ReactNode }) {
     return (
       <>
         <div className={`${compact ? "h-14 px-3" : "h-16 px-4"} flex flex-shrink-0 items-center justify-between border-b border-border`}>
-          <img src="/logo.png" alt="CallingAgent" className={`${compact ? "h-7 max-w-[175px]" : "h-8 max-w-[190px]"} w-auto object-contain`} />
+          <Link href="/" onClick={onNav} aria-label="CallingAgent admin dashboard" className="flex min-w-0 items-center gap-2.5 rounded-lg outline-offset-2 focus-visible:outline-2 focus-visible:outline-primary">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-primary">
+              <PhoneCall className="h-5 w-5" strokeWidth={2.6} />
+            </span>
+            <span className="min-w-0 leading-tight">
+              <span className="flex items-baseline whitespace-nowrap text-[15px] font-extrabold tracking-[-0.04em] sm:text-[16px]">
+                <span className="text-foreground">CALLING</span><span className="text-blue-600 dark:text-sky-400">AGENT</span>
+              </span>
+              <span className="block text-[10px] font-medium tracking-wide text-muted-foreground">AI calling platform</span>
+            </span>
+          </Link>
           {onClose && (
             <button onClick={onClose} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary/50 hover:text-foreground" aria-label="Close navigation">
               <X className="h-5 w-5" />
