@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
-import { db, phoneNumbersTable } from "@workspace/db";
+import { db, phoneNumbersTable, companiesTable } from "@workspace/db";
 import { getCompanyScope } from "../lib/scope";
 import {
   ListPhoneNumbersResponse,
@@ -271,6 +271,12 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
 // An accepted order may still be pending; do not call it an active line.
 router.post("/phone-numbers/telnyx-order", async (req, res): Promise<void> => {
   if (getCompanyScope(req) !== null) { res.status(403).json({ error: "Admin access required for Telnyx purchases." }); return; }
+  const companyId = Number(req.body?.companyId);
+  if (!Number.isSafeInteger(companyId) || companyId <= 0) {
+    res.status(400).json({ error: "Select a company before purchasing a phone number." }); return;
+  }
+  const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId));
+  if (!company) { res.status(404).json({ error: "Selected company was not found." }); return; }
   const number = req.body?.phoneNumber;
   if (typeof number !== "string" || !/^\+[1-9]\d{7,14}$/.test(number) || req.body?.confirmPurchase !== true) {
     res.status(400).json({ error: "Valid E.164 phone number and explicit confirmation required." });
@@ -290,7 +296,7 @@ router.post("/phone-numbers/telnyx-order", async (req, res): Promise<void> => {
         Accept: "application/json",
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ phone_numbers: [{ phone_number: number }], customer_reference: "CallingAgent " + number }),
+      body: JSON.stringify({ phone_numbers: [{ phone_number: number }], customer_reference: "CallingAgent company:" + companyId + " " + number }),
       signal: AbortSignal.timeout(15000)
     });
     const body: any = await reply.json();
@@ -299,7 +305,7 @@ router.post("/phone-numbers/telnyx-order", async (req, res): Promise<void> => {
       res.status(reply.status >= 500 ? 502 : 400).json({ error: body.errors?.[0]?.detail || "Telnyx rejected the order." });
       return;
     }
-    res.status(202).json({ orderId: body.data?.id ?? null, status: body.data?.status ?? "pending", phoneNumber: number,
+    res.status(202).json({ orderId: body.data?.id ?? null, status: body.data?.status ?? "pending", phoneNumber: number, companyId,
       message: "Order submitted. Check Telnyx Portal for activation and routing; the number is not yet connected to CallingAgent calling features." });
   } catch (error: any) {
     req.log.error({ error: error?.message }, "Telnyx number order failed");
