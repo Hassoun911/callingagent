@@ -60,24 +60,19 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
     const client = getTwilioClient();
     const { areaCode, contains, country = "US", tollFree, city } = query.data as any;
 
-    let numbers: any[] = [];
-
-    if (tollFree) {
-      const searchParams: any = { limit: 20 };
-      if (city) searchParams.inLocality = city;
-      const result = await client.availablePhoneNumbers(country).tollFree.list(searchParams);
-      numbers = result;
-    } else {
-      const searchParams: any = { limit: 20 };
-      if (areaCode) searchParams.areaCode = areaCode;
-      if (contains) searchParams.contains = contains;
-      if (city) searchParams.inLocality = city;
-
-      const result = await client.availablePhoneNumbers(country).local.list(searchParams);
-      numbers = result;
+    // Enforce the administrative region, not just the locality name.
+    const province = typeof req.query.province === "string" ? req.query.province.trim().toUpperCase() : "";
+    const provinceCodes: Record<string, string[]> = {
+      CA: ["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"],
+      US: ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"]
+    };
+    if (!tollFree && city && (!province || !provinceCodes[country]?.includes(province))) {
+      res.status(400).json({ error: "Select a valid province/state when searching by city." });
+      return;
     }
-
-    let formatted = numbers.map((n: any) => ({
+    const normalize = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
+    const codeMatches = (region: string | null | undefined) => normalize(region) === province.toLowerCase();
+    const format = (n: any) => ({
       phoneNumber: n.phoneNumber,
       friendlyName: n.friendlyName,
       locality: n.locality || null,
@@ -89,34 +84,42 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
         sms: n.capabilities?.SMS ?? false,
         mms: n.capabilities?.MMS ?? false,
       },
-    }));
-
-    // Twilio's inLocality filter is unreliable (especially for Canada) — enforce it client-side
-    if (city) {
-      const cityLower = city.toLowerCase().trim();
-      formatted = formatted.filter(n =>
-        n.locality?.toLowerCase().includes(cityLower)
-      );
-      // If strict filter yields nothing, widen: fetch more numbers without limit and retry filter
-      if (formatted.length === 0 && !tollFree) {
-        const wider: any = { limit: 50 };
-        if (areaCode) wider.areaCode = areaCode;
-        const widerResult = await client.availablePhoneNumbers(country).local.list(wider);
-        formatted = widerResult
-          .filter((n: any) => n.locality?.toLowerCase().includes(cityLower))
-          .map((n: any) => ({
-            phoneNumber: n.phoneNumber,
-            friendlyName: n.friendlyName,
-            locality: n.locality || null,
-            region: n.region || null,
-            postalCode: n.postalCode || null,
-            isoCountry: n.isoCountry,
-            capabilities: {
-              voice: n.capabilities?.voice ?? false,
-              sms: n.capabilities?.SMS ?? false,
-              mms: n.capabilities?.MMS ?? false,
-            },
-          }));
+    });
+    let formatted: ReturnType<typeof format>[] = [];
+    if (tollFree) {
+      const params: any = { limit: 20 };
+      if (contains) params.contains = contains;
+      formatted = (await client.availablePhoneNumbers(country).tollFree.list(params)).map(format);
+    } else {
+      const params: any = { limit: 100 };
+      if (areaCode) params.areaCode = areaCode;
+      if (contains) params.contains = contains;
+      if (province) params.inRegion = province;
+      if (city) params.inLocality = city;
+      const exact = (await client.availablePhoneNumbers(country).local.list(params)).map(format)
+        .filter(n => !province || codeMatches(n.region))
+        .filter(n => !city || normalize(n.locality) === normalize(city));
+      formatted = exact.slice(0, 20);
+      if (formatted.length === 0 && city) {
+        // Exact locality unavailable: ask Twilio for inventory within this SAME province/state.
+        const fallback: any = { limit: 100, inRegion: province };
+        if (areaCode) fallback.areaCode = areaCode;
+        if (contains) fallback.contains = contains;
+        const regional = (await client.availablePhoneNumbers(country).local.list(fallback)).map(format)
+          .filter(n => codeMatches(n.region) && normalize(n.locality) !== normalize(city));
+        // Geographic proximity ordering for Windsor, ON; other regions are explicitly labelled
+        // as same-province alternatives, not advertised as distance-ranked.
+        const essexRank = ["lasalle", "tecumseh", "amherstburg", "lakeshore", "maidstone", "essex", "kingsville", "leamington", "harrow", "cottam", "comber"];
+        if (country === "CA" && province === "ON" && normalize(city) === "windsor") {
+          regional.sort((a,b) => {
+            const rank = (n: typeof a) => {
+              const i = essexRank.indexOf(normalize(n.locality));
+              return i < 0 ? 999 : i;
+            };
+            return rank(a) - rank(b);
+          });
+        }
+        formatted = regional.slice(0, 20);
       }
     }
 
