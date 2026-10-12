@@ -153,7 +153,7 @@ function QuickLink({
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(true);
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: recentCalls, isLoading: callsLoading } = useGetRecentCalls({ limit: 6 });
 
@@ -177,6 +177,17 @@ export default function Dashboard() {
     refetchInterval: 30000,
   });
 
+  const { data: providerCosts } = useQuery<any>({
+    queryKey: ["main-admin-provider-costs"],
+    queryFn: async () => {
+      const response = await fetch(`${BASE}/api/costs`, { credentials: "include" });
+      if (!response.ok) throw new Error("Cost data unavailable");
+      return response.json();
+    },
+    staleTime: 120000,
+    retry: false,
+  });
+
   const activeCampaigns = campaigns.filter(campaign => campaign.status === "active").length;
   const totalHotLeads = calendarEvents.filter(event => event.eventType === "hot_lead").length;
   const callbacksDue = calendarEvents.filter(event => event.eventType === "callback").length;
@@ -190,16 +201,16 @@ export default function Dashboard() {
     .slice(0, 5);
 
   return (
-    <div className="space-y-4 pb-24 sm:space-y-5 sm:pb-6">
+    <div className="admin-overview space-y-5 pb-24 sm:space-y-6 sm:pb-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Command Center</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Real-time system overview and activity.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Admin Overview</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Your calling system at a glance. All companies and providers.</p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
           <Link href="/numbers" className="block">
             <button className="min-h-11 w-full rounded-lg border border-border bg-background px-3 text-xs font-medium transition-colors hover:bg-secondary sm:min-h-9 sm:w-auto">
-              Manage Numbers
+              Buy / Manage Numbers
             </button>
           </Link>
           <Link href="/campaigns" className="block">
@@ -235,6 +246,33 @@ export default function Dashboard() {
       ) : (
         <div className="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">Dashboard statistics are temporarily unavailable.</div>
       )}
+
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,1fr)]">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h2 className="font-semibold text-sm">Call activity snapshot</h2>
+            <Link href="/calls" className="text-xs text-primary hover:underline">Explore calls →</Link>
+          </div>
+          <div className="grid grid-cols-3 gap-4 divide-x divide-border">
+            <div><p className="text-xs text-muted-foreground">Inbound</p><p className="mt-2 text-2xl font-semibold">{stats?.inboundCalls ?? "—"}</p></div>
+            <div className="pl-4"><p className="text-xs text-muted-foreground">Outbound</p><p className="mt-2 text-2xl font-semibold">{stats?.outboundCalls ?? "—"}</p></div>
+            <div className="pl-4"><p className="text-xs text-muted-foreground">Avg. duration</p><p className="mt-2 text-2xl font-semibold">{stats ? formatDuration(stats.avgDuration) : "—"}</p></div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-5">Live totals from the CallingAgent call statistics API.</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h2 className="font-semibold text-sm">Provider costs</h2>
+            <Link href="/billing" className="text-xs text-primary hover:underline">Full breakdown →</Link>
+          </div>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between gap-3"><span>Twilio</span><span className="font-semibold">{providerCosts?.twilio?.available ? `${providerCosts.twilio.currency || "USD"} ${Number(providerCosts.twilio.totalCost).toFixed(2)}` : "Unavailable"}</span></div>
+            <div className="border-t border-border pt-3 flex justify-between gap-3"><span>Telnyx</span><span className="text-muted-foreground">Awaiting verified billing</span></div>
+            <div className="border-t border-border pt-3 flex justify-between gap-3"><span className="font-semibold">Combined total</span><span className="text-muted-foreground">Pending</span></div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">No estimated provider charges are included.</p>
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <section className="overflow-hidden rounded-xl border border-border bg-card">
