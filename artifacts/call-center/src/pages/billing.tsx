@@ -14,6 +14,8 @@ type TwilioPerNumber = {
 
 type CostData = {
   period: string;
+  telnyx?: { available: boolean; totalCost: number | null; error: string; perNumber: {phoneNumber:string;friendlyName:string;cost:null;status:string}[] };
+  providerTotals?: { twilio: {totalCost:number;currency:string}|null; telnyx:{totalCost:null;currency:string}; combined:null;note:string };
   twilio:
     | { available: true; totalCost: number; currency: string; breakdown: { category: string; label: string; cost: number; usage: string; usageUnit: string }[]; perNumber: TwilioPerNumber[] }
     | { available: false; error: string }
@@ -118,6 +120,38 @@ export default function Billing() {
         </p>
       )}
 
+      {!isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs font-semibold text-muted-foreground">Twilio · reported usage</p>
+            <p className="text-xl font-semibold mt-2">{costs?.twilio?.available ? fmtMoney(costs.twilio.totalCost) : "Unavailable"}</p>
+            <p className="text-xs text-muted-foreground mt-1">Provider-account usage; per-number detail below.</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs font-semibold text-muted-foreground">Telnyx · billing</p>
+            <p className="text-xl font-semibold mt-2">Not yet verified</p>
+            <p className="text-xs text-muted-foreground mt-1">{costs?.telnyx?.error ?? "Billing API not connected."}</p>
+            <a href="https://portal.telnyx.com/" target="_blank" rel="noreferrer" className="text-xs underline text-primary mt-2 inline-block">Open Telnyx monthly charges</a>
+          </div>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="text-xs font-semibold text-muted-foreground">Combined provider total</p>
+            <p className="text-xl font-semibold mt-2">Pending</p>
+            <p className="text-xs text-muted-foreground mt-1">Requires verified charges from both providers in the same currency.</p>
+          </div>
+        </div>
+      )}
+      {!isLoading && (costs?.telnyx?.perNumber?.length ?? 0) > 0 && (
+        <section className="rounded-lg border border-border bg-card/30 p-4">
+          <h2 className="font-semibold mb-2">Numbers pending provider and cost verification</h2>
+          <p className="text-xs text-muted-foreground mb-3">These saved numbers have no Twilio SID; this alone does not prove they are Telnyx numbers.</p>
+          {costs!.telnyx!.perNumber.map(n => (
+            <div key={n.phoneNumber} className="flex items-center justify-between border-t border-border py-2 text-sm gap-3">
+              <span className="font-mono">{fmt(n.phoneNumber)}</span>
+              <span className="text-xs text-amber-500">Cost unavailable · provider unverified</span>
+            </div>
+          ))}
+        </section>
+      )}
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : !costs?.twilio?.available ? (
