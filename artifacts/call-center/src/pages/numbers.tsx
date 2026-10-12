@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link } from "wouter";
 import {
   useListPhoneNumbers,
-  useSearchAvailableNumbers,
   useProvisionPhoneNumber,
   getListPhoneNumbersQueryKey,
 } from "@workspace/api-client-react";
@@ -20,6 +19,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useWatches, useCreateWatch, useDeleteWatch, useDismissWatch } from "@/hooks/use-watches";
 
+const REGION_OPTIONS: Record<string, { code: string; name: string }[]> = {
+  CA: [["AB","Alberta"],["BC","British Columbia"],["MB","Manitoba"],["NB","New Brunswick"],["NL","Newfoundland and Labrador"],["NS","Nova Scotia"],["NT","Northwest Territories"],["NU","Nunavut"],["ON","Ontario"],["PE","Prince Edward Island"],["QC","Quebec"],["SK","Saskatchewan"],["YT","Yukon"]].map(([code,name]) => ({code,name})),
+  US: [["AL","Alabama"],["AK","Alaska"],["AZ","Arizona"],["AR","Arkansas"],["CA","California"],["CO","Colorado"],["CT","Connecticut"],["DE","Delaware"],["FL","Florida"],["GA","Georgia"],["HI","Hawaii"],["ID","Idaho"],["IL","Illinois"],["IN","Indiana"],["IA","Iowa"],["KS","Kansas"],["KY","Kentucky"],["LA","Louisiana"],["ME","Maine"],["MD","Maryland"],["MA","Massachusetts"],["MI","Michigan"],["MN","Minnesota"],["MS","Mississippi"],["MO","Missouri"],["MT","Montana"],["NE","Nebraska"],["NV","Nevada"],["NH","New Hampshire"],["NJ","New Jersey"],["NM","New Mexico"],["NY","New York"],["NC","North Carolina"],["ND","North Dakota"],["OH","Ohio"],["OK","Oklahoma"],["OR","Oregon"],["PA","Pennsylvania"],["RI","Rhode Island"],["SC","South Carolina"],["SD","South Dakota"],["TN","Tennessee"],["TX","Texas"],["UT","Utah"],["VT","Vermont"],["VA","Virginia"],["WA","Washington"],["WV","West Virginia"],["WI","Wisconsin"],["WY","Wyoming"],["DC","District of Columbia"]].map(([code,name]) => ({code,name})),
+};
+
 export default function Numbers() {
   const { data: numbers, isLoading } = useListPhoneNumbers();
   const { data: watches, isLoading: watchesLoading } = useWatches();
@@ -30,6 +34,11 @@ export default function Numbers() {
   const [areaCode, setAreaCode] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("US");
+  const [province, setProvince] = useState("");
+  const [availableNumbers, setAvailableNumbers] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<Error | null>(null);
+  const [showRegionalAlternatives, setShowRegionalAlternatives] = useState(false);
   const [tollFree, setTollFree] = useState(false);
   const [searched, setSearched] = useState(false);
   const [watchesOpen, setWatchesOpen] = useState(false);
@@ -70,19 +79,31 @@ export default function Numbers() {
     }
   };
 
-  const { data: availableNumbers, isLoading: searchLoading, refetch: search, error: searchError } = useSearchAvailableNumbers(
-    {
-      areaCode: tollFree || city ? undefined : areaCode || undefined,
-      country,
-      tollFree: tollFree || undefined,
-      city: city || undefined,
-    } as any,
-    { query: { enabled: false } }
-  );
-
   const handleSearch = async () => {
+    if (!tollFree && city.trim() && !province) {
+      toast({ title: "Select a province or state", description: "City searches require a province/state to avoid incorrect locations.", variant: "destructive" });
+      return;
+    }
     setSearched(true);
-    await search();
+    setSearchLoading(true);
+    setSearchError(null);
+    setAvailableNumbers([]);
+    try {
+      const params = new URLSearchParams({ country });
+      if (!tollFree && city.trim()) params.set("city", city.trim());
+      if (!tollFree && province) params.set("province", province);
+      if (!tollFree && areaCode) params.set("areaCode", areaCode);
+      if (tollFree) params.set("tollFree", "true");
+      const response = await fetch(`${BASE}/api/phone-numbers/search?${params.toString()}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Number search failed");
+      setAvailableNumbers(data);
+      setShowRegionalAlternatives(Boolean(city.trim() && data.length && !data.some((n: any) => n.locality?.trim().toLowerCase() === city.trim().toLowerCase())));
+    } catch (error: any) {
+      setSearchError(error);
+    } finally {
+      setSearchLoading(false);
+    }
   };
 
   const createWatch = useCreateWatch();
@@ -168,7 +189,7 @@ export default function Numbers() {
           {/* Provision dialog */}
           <Dialog open={searchOpen} onOpenChange={(open) => {
             setSearchOpen(open);
-            if (!open) { setAreaCode(""); setCity(""); setSearched(false); setTollFree(false); setCountry("US"); setProvisionTab("provision"); }
+            if (!open) { setAreaCode(""); setCity(""); setSearched(false); setTollFree(false); setCountry("US"); setProvince(""); setAvailableNumbers([]); setShowRegionalAlternatives(false); setProvisionTab("provision"); }
           }}>
             <DialogTrigger asChild>
               <Button className="gap-2"><Plus className="h-4 w-4" />Provision Number</Button>
@@ -264,7 +285,7 @@ export default function Numbers() {
 
                 <div className="flex items-center gap-3">
                   <div className="flex-1">
-                    <Select value={country} onValueChange={(v) => { setCountry(v); setSearched(false); }}>
+                    <Select value={country} onValueChange={(v) => { setCountry(v); setProvince(""); setAvailableNumbers([]); setSearched(false); }}>
                       <SelectTrigger className="bg-background">
                         <SelectValue />
                       </SelectTrigger>
@@ -274,6 +295,21 @@ export default function Numbers() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {!tollFree && (
+                    <div className="flex-1">
+                      <Select value={province} onValueChange={(v) => { setProvince(v); setSearched(false); }}>
+                        <SelectTrigger className="bg-background">
+                          <SelectValue placeholder={country === "CA" ? "Select province" : "Select state"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {REGION_OPTIONS[country].map((region) => (
+                            <SelectItem key={region.code} value={region.code}>{region.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   {/* Toll-free toggle */}
                   <div className="flex items-center gap-2 text-sm">
@@ -293,6 +329,10 @@ export default function Numbers() {
                     {searchLoading ? "Searching…" : "Search"}
                   </Button>
                 </div>
+
+                {searched && showRegionalAlternatives && !searchLoading && (
+                  <p className="text-xs text-amber-600">No numbers found in {city}, {province}. Showing available numbers elsewhere in {REGION_OPTIONS[country]?.find(r => r.code === province)?.name ?? province}, with nearby areas listed first where supported.</p>
+                )}
 
                 {/* Results */}
                 <div className="border border-border rounded-md bg-background/50 overflow-hidden max-h-64 overflow-y-auto">
