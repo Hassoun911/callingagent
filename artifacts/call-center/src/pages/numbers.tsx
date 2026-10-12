@@ -146,6 +146,24 @@ export default function Numbers() {
     }
   };
 
+  const [orderingTelnyx, setOrderingTelnyx] = useState<string | null>(null);
+  const purchaseTelnyx = async (number: string) => {
+    if (!window.confirm(`Submit a BILLABLE Telnyx purchase order for ${number}? Recurring fees and activation requirements may apply. This will NOT automatically configure calling or SMS.`)) return;
+    setOrderingTelnyx(number);
+    try {
+      const response = await fetch(`${BASE}/api/phone-numbers/telnyx-order`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: number, confirmPurchase: true })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Could not place Telnyx order");
+      toast({ title: "Telnyx order submitted", description: `Order ${body.orderId ?? "pending"} · ${body.status}. Check Telnyx for activation and routing.` });
+      setAvailableNumbers(previous => previous.filter(n => n.phoneNumber !== number));
+    } catch (error: any) {
+      toast({ title: "Telnyx order not confirmed", description: error?.message ?? "Check Telnyx Portal before retrying.", variant: "destructive" });
+    } finally { setOrderingTelnyx(null); }
+  };
+
   const createWatch = useCreateWatch();
   const deleteWatch = useDeleteWatch();
   const dismissWatch = useDismissWatch();
@@ -309,7 +327,7 @@ export default function Numbers() {
                       <SelectItem value="twilio">Twilio</SelectItem>
                     </SelectContent>
                   </Select>
-                  {numberProvider === "telnyx" && <p className="text-xs text-amber-500">Telnyx inventory search only. Buying and routing Telnyx numbers are not yet connected; no purchase will be made.</p>}
+                  {numberProvider === "telnyx" && <p className="text-xs text-amber-500">Telnyx purchases require confirmation and may incur recurring charges. Calls and SMS are not configured automatically.</p>}
                 </div>
                 {/* Search controls */}
                 <div className="grid grid-cols-2 gap-3">
@@ -496,12 +514,14 @@ export default function Numbers() {
                             <Button
                               variant="secondary"
                               size="sm"
-                              disabled={provisionMutation.isPending || numberProvider === "telnyx"}
-                              onClick={() => provisionMutation.mutate({
-                                data: { number: n.phoneNumber, friendlyName: n.friendlyName, callerIdName: "New Number", answerMode: "forward" }
-                              })}
+                              disabled={provisionMutation.isPending || Boolean(orderingTelnyx)}
+                              onClick={() => numberProvider === "telnyx"
+                                ? purchaseTelnyx(n.phoneNumber)
+                                : provisionMutation.mutate({
+                                    data: { number: n.phoneNumber, friendlyName: n.friendlyName, callerIdName: "New Number", answerMode: "forward" }
+                                  })}
                             >
-                              {numberProvider === "telnyx" ? "Purchase setup pending" : provisionMutation.isPending ? "Provisioning…" : "Provision"}
+                              {numberProvider === "telnyx" ? (orderingTelnyx === n.phoneNumber ? "Ordering…" : "Buy via Telnyx") : provisionMutation.isPending ? "Provisioning…" : "Provision"}
                             </Button>
                           </TableCell>
                         </TableRow>
