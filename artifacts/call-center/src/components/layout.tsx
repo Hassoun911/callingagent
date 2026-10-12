@@ -18,6 +18,8 @@ import {
   Bot,
   CalendarCog,
   ClipboardCheck,
+  Sun,
+  Moon,
   PhoneCall as PhoneSetup,
 } from "lucide-react";
 import { useWatches } from "@/hooks/use-watches";
@@ -67,6 +69,16 @@ function ActionBadge({ count, severity = "warning" }: { count: number; severity?
 export function Layout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [adminTheme, setAdminTheme] = useState<"light" | "dark">(() => {
+    try { return window.localStorage.getItem("callingagent-admin-theme") === "dark" ? "dark" : "light"; }
+    catch { return "light"; }
+  });
+  const mainAdminDashboard = location === "/";
+  const toggleAdminTheme = () => setAdminTheme(previous => {
+    const next = previous === "light" ? "dark" : "light";
+    try { window.localStorage.setItem("callingagent-admin-theme", next); } catch { /* storage unavailable */ }
+    return next;
+  });
   const { data: companies } = useListCompanies();
   const { data: allNumbers } = useListPhoneNumbers();
   const { data: allMessages = [] } = useListSmsMessages({ limit: 500 });
@@ -329,7 +341,7 @@ export function Layout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className={`flex h-[100dvh] w-full overflow-hidden bg-background ${callLogsRoute ? "call-logs-no-flash" : ""}`}>
+    <div className={`flex h-[100dvh] w-full overflow-hidden bg-background ${callLogsRoute ? "call-logs-no-flash" : ""} ${mainAdminDashboard ? (adminTheme === "light" ? "admin-dashboard-light" : "admin-dashboard-dark") : ""}`}>
       {callLogsRoute && <style>{`.call-logs-no-flash .animate-pulse{animation:none!important}.call-logs-no-flash tr,.call-logs-no-flash [class*="transition-"]{transition:none!important}`}</style>}
       <aside className="hidden w-64 flex-shrink-0 flex-col border-r border-border bg-card md:flex"><NavContent /></aside>
 
@@ -357,6 +369,12 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            {mainAdminDashboard && (
+              <button type="button" onClick={toggleAdminTheme} aria-label={`Switch to ${adminTheme === "light" ? "dark" : "light"} mode`} title={`Switch to ${adminTheme === "light" ? "dark" : "light"} mode`} className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground hover:bg-secondary">
+                {adminTheme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                <span className="hidden sm:inline">{adminTheme === "light" ? "Dark mode" : "Light mode"}</span>
+              </button>
+            )}
             <NotificationBell />
             <div className="hidden font-mono text-xs text-muted-foreground sm:block">
               {new Date().toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })} ET
