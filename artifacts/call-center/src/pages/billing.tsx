@@ -14,6 +14,7 @@ type TwilioPerNumber = {
 
 type CostData = {
   period: string;
+  openai?: {available:boolean;totalCost?:number;currency?:string;error?:string;breakdown?:{model:string;cost:number}[]};
   telnyx?: { available: boolean; totalCost: number | null; error: string; perNumber: {phoneNumber:string;friendlyName:string;cost:null;status:string}[] };
   providerTotals?: { twilio: {totalCost:number;currency:string}|null; telnyx:{totalCost:null;currency:string}; combined:null;note:string };
   twilio:
@@ -79,19 +80,20 @@ export default function Billing() {
     return raw;
   };
 
+  const moneyLabel = (value: number) => fmtMoney(value);
   const groups = costs?.twilio?.available ? groupByCompany(costs.twilio.perNumber) : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 overflow-x-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Billing</h1>
           <p className="text-muted-foreground mt-1">
             Usage and costs for the current billing period: {costs?.period ?? "loading..."}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center rounded-md border border-border overflow-hidden text-xs font-semibold">
             <button
               onClick={() => setCurrency("USD")}
@@ -121,7 +123,7 @@ export default function Billing() {
       )}
 
       {!isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-xs font-semibold text-muted-foreground">Twilio · reported usage</p>
             <p className="text-xl font-semibold mt-2">{costs?.twilio?.available ? fmtMoney(costs.twilio.totalCost) : "Unavailable"}</p>
@@ -133,12 +135,43 @@ export default function Billing() {
             <p className="text-xs text-muted-foreground mt-1">{costs?.telnyx?.error ?? "Billing API not connected."}</p>
             <a href="https://portal.telnyx.com/" target="_blank" rel="noreferrer" className="text-xs underline text-primary mt-2 inline-block">Open Telnyx monthly charges</a>
           </div>
+          <div className="rounded-lg border border-border bg-card p-4 min-w-0">
+            <p className="text-xs font-semibold text-muted-foreground">OpenAI · AI usage</p>
+            <p className="text-xl font-semibold mt-2">{costs?.openai?.available && typeof costs.openai.totalCost === "number" ? fmtMoney(costs.openai.totalCost) : "Unavailable"}</p>
+            <p className="text-xs text-muted-foreground mt-1">{costs?.openai?.available ? "Reported OpenAI organization costs for this period." : (costs?.openai?.error ?? "OpenAI organization billing is not connected.")}</p>
+            <a href="https://platform.openai.com/settings/organization/billing" target="_blank" rel="noreferrer" className="text-xs underline text-primary mt-2 inline-block">Open OpenAI billing</a>
+          </div>
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-xs font-semibold text-muted-foreground">Combined provider total</p>
             <p className="text-xl font-semibold mt-2">Pending</p>
             <p className="text-xs text-muted-foreground mt-1">Requires verified charges from both providers in the same currency.</p>
           </div>
         </div>
+      )}
+      {!isLoading && (
+        <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
+          <h2 className="text-base font-bold text-foreground mb-3">API provider breakdown</h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-border p-3">
+              <p className="font-bold text-foreground">Twilio</p>
+              <p className="text-sm text-muted-foreground mt-1">{costs?.twilio?.available ? moneyLabel(costs.twilio.totalCost) : (costs?.twilio as any)?.error ?? "Unavailable"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Voice, SMS, phone numbers and account usage; per-number detail below.</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="font-bold text-foreground">Telnyx</p>
+              <p className="text-sm text-muted-foreground mt-1">Actual charges not yet connected</p>
+              <p className="mt-1 text-xs text-muted-foreground">Phone orders and carrier billing are separate from the search API.</p>
+            </div>
+            <div className="rounded-lg border border-border p-3">
+              <p className="font-bold text-foreground">OpenAI</p>
+              <p className="text-sm text-muted-foreground mt-1">{costs?.openai?.available && typeof costs.openai.totalCost === "number" ? moneyLabel(costs.openai.totalCost) : (costs?.openai?.error ?? "Unavailable")}</p>
+              {costs?.openai?.available && (costs.openai.breakdown?.length ?? 0) > 0 && (
+                <div className="mt-2 space-y-1">{costs.openai.breakdown!.map((entry,i) => <div key={i} className="flex justify-between gap-2 text-xs"><span className="break-all text-muted-foreground">{entry.model}</span><strong>{moneyLabel(entry.cost)}</strong></div>)}</div>
+              )}
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">Provider totals are not combined unless all charges and currencies are verified. Details can be incomplete where a billing API does not support number-level attribution.</p>
+        </section>
       )}
       {!isLoading && (costs?.telnyx?.perNumber?.length ?? 0) > 0 && (
         <section className="rounded-lg border border-border bg-card/30 p-4">
@@ -168,13 +201,13 @@ export default function Billing() {
       ) : (
         <div className="space-y-4">
           {/* Twilio header card */}
-          <div className="rounded-lg border border-border bg-card/30 p-4 flex items-center justify-between">
+          <div className="rounded-lg border border-border bg-card/30 p-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-red-400" />
               <span className="text-sm font-semibold text-foreground">Twilio</span>
               <span className="text-[11px] text-muted-foreground uppercase tracking-widest">Total this month</span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <span className="text-2xl font-bold font-mono text-foreground">{fmtMoney(costs.twilio.totalCost)}</span>
               <a
                 href="https://console.twilio.com/us1/billing/billing-history"
