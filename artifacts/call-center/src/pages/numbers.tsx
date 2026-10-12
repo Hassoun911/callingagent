@@ -300,6 +300,7 @@ export default function Numbers() {
                     <Input
                       placeholder="e.g. Windsor"
                       value={city}
+                      disabled={tollFree}
                       onChange={(e) => { setCity(e.target.value); setSearched(false); }}
                       onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                       className="bg-background"
@@ -309,7 +310,7 @@ export default function Numbers() {
 
                 <div className="flex items-center gap-3">
                   <div className="flex-1">
-                    <Select value={country} onValueChange={(v) => { setCountry(v); setProvince(v === "CA" ? "ON" : ""); setAvailableNumbers([]); setSearched(false); }}>
+                    <Select value={country} onValueChange={(v) => { setCountry(v); setProvince(v === "CA" ? "ON" : ""); setAvailableNumbers([]); setSelectedResultCity(null); setSearched(false); }}>
                       <SelectTrigger className="bg-background">
                         <SelectValue />
                       </SelectTrigger>
@@ -341,7 +342,7 @@ export default function Numbers() {
                       type="button"
                       role="checkbox"
                       aria-checked={tollFree}
-                      onClick={() => { setTollFree(!tollFree); setSearched(false); }}
+                      onClick={() => { setTollFree(!tollFree); setSearched(false); setAvailableNumbers([]); setSelectedResultCity(null); setShowRegionalAlternatives(false); setSearchError(null); }}
                       className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${tollFree ? "bg-primary" : "bg-muted"}`}
                     >
                       <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform ${tollFree ? "translate-x-4" : "translate-x-0"}`} />
@@ -353,6 +354,12 @@ export default function Numbers() {
                     {searchLoading ? "Searching…" : "Search"}
                   </Button>
                 </div>
+
+                {tollFree && (
+                  <p className="text-xs text-muted-foreground">
+                    Toll-free searches ignore city, province, and area code. Switch Toll-free off to search local Canadian numbers such as 519.
+                  </p>
+                )}
 
                 {searched && showRegionalAlternatives && !searchLoading && (
                   <p className="text-xs text-amber-600">No exact city match for {city}, {province}. Showing numbers elsewhere in {REGION_OPTIONS[country]?.find(r => r.code === province)?.name ?? province}, with nearby areas listed first where supported.</p>
