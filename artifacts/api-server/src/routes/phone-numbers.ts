@@ -270,6 +270,7 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
 // Submit Telnyx orders only after an explicit browser confirmation.
 // An accepted order may still be pending; do not call it an active line.
 router.post("/phone-numbers/telnyx-order", async (req, res): Promise<void> => {
+  if (getCompanyScope(req) !== null) { res.status(403).json({ error: "Admin access required for Telnyx purchases." }); return; }
   const number = req.body?.phoneNumber;
   if (typeof number !== "string" || !/^\\+[1-9]\\d{7,14}$/.test(number) || req.body?.confirmPurchase !== true) {
     res.status(400).json({ error: "Valid E.164 phone number and explicit confirmation required." });
