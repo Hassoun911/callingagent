@@ -98,7 +98,7 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
       const selected = requestedPrefix ? [requestedPrefix] : prefixes;
       const batches = await Promise.all(selected.map(async prefix => {
         try {
-          const params: any = { areaCode: Number(prefix), limit: 100 };
+          const params: any = { areaCode: Number(prefix), limit: 1000, pageSize: 100 };
           if (contains) params.contains = contains;
           return (await client.availablePhoneNumbers(country).tollFree.list(params)).map(format)
             .filter(n => n.phoneNumber?.replace(/^\\+1/, "").startsWith(prefix));
