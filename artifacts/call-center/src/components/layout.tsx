@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
@@ -75,6 +75,17 @@ export function Layout({ children }: { children: ReactNode }) {
     try { return window.localStorage.getItem("callingagent-admin-theme") === "dark" ? "dark" : "light"; }
     catch { return "light"; }
   });
+
+  // Radix dialogs, dropdowns and select menus render into document.body.
+  // Mirror the selected admin theme on the root so portalled UI inherits it.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("admin-dashboard-light", adminTheme === "light");
+    root.classList.toggle("admin-dashboard-dark", adminTheme === "dark");
+    return () => {
+      root.classList.remove("admin-dashboard-light", "admin-dashboard-dark");
+    };
+  }, [adminTheme]);
 
   const toggleAdminTheme = () => setAdminTheme(previous => {
     const next = previous === "light" ? "dark" : "light";
