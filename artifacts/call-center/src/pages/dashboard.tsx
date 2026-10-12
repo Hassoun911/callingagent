@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useGetDashboardStats, useGetRecentCalls, useListPhoneNumbers } from "@workspace/api-client-react";
+import { useGetDashboardStats, useGetRecentCalls, useListPhoneNumbers, useListCompanies } from "@workspace/api-client-react";
 import { Activity, ArrowDownLeft, ArrowUpRight, Building2, ChevronRight, Clock, CreditCard, MessageSquare, Phone, Plus, Users, Zap } from "lucide-react";
 import { Link } from "wouter";
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
@@ -27,6 +27,8 @@ export default function Dashboard() {
   const { data: stats, isLoading } = useGetDashboardStats();
   const { data: calls = [] } = useGetRecentCalls({ limit: 100 });
   const { data: numbers = [] } = useListPhoneNumbers();
+  const { data: companies = [] } = useListCompanies();
+  const companyNames = new Map(companies.map(company => [company.id, company.name]));
   const { data: costs } = useQuery<any>({
     queryKey: ["main-admin-costs"],
     queryFn: async () => { const r = await fetch(`${BASE}/api/costs`, {credentials:"include"}); if (!r.ok) throw Error("Costs unavailable"); return r.json(); },
@@ -116,7 +118,7 @@ export default function Dashboard() {
       </Panel>
     <Panel title="Active Numbers" href="/numbers" link="Manage all">
       <div className="w-full overflow-x-auto"><table className="w-full min-w-[380px] text-left text-xs sm:text-sm"><thead className="border-b border-border text-muted-foreground"><tr><th className="py-2.5 font-medium">Number</th><th className="py-2.5 font-medium">Company</th><th className="py-2.5 font-medium">Provider</th><th className="py-2.5 font-medium">Status</th></tr></thead>
-      <tbody>{numbers.filter((n:any)=>n.isActive).slice(0,8).map((n:any)=><tr key={n.id} className="border-b border-border/60 last:border-0 hover:bg-secondary/35 transition-colors"><td className="py-3 font-medium text-foreground">{displayNumber(n.number)}</td><td className="py-3 text-muted-foreground">{n.companyId ? `Company #${n.companyId}`:"Unassigned"}</td><td className="py-3 text-muted-foreground">{n.twilioSid?"Twilio":"Unverified"}</td><td className="py-3"><span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600">Active</span></td></tr>)}</tbody></table>
+      <tbody>{numbers.filter((n:any)=>n.isActive).slice(0,8).map((n:any)=><tr key={n.id} className="border-b border-border/60 last:border-0 hover:bg-secondary/35 transition-colors"><td className="py-3 font-medium text-foreground">{displayNumber(n.number)}</td><td className="py-3 text-muted-foreground">{n.companyId ? companyNames.get(n.companyId) || `Company #${n.companyId}`:"Unassigned"}</td><td className="py-3 text-muted-foreground">{n.twilioSid?"Twilio":"Unverified"}</td><td className="py-3"><span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600">Active</span></td></tr>)}</tbody></table>
       {!numbers.length&&<p className="py-7 text-center text-sm text-muted-foreground">No provisioned numbers</p>}</div>
     </Panel>
       <Panel title="Quick Actions">
