@@ -361,3 +361,21 @@
 .admin-dashboard-light .bg-primary .text-primary-foreground,
 .admin-dashboard-light main .bg-primary.text-primary-foreground { color: white; }
 .admin-dashboard-light [role="dialog"] { color: #172b46; }
+
+/* Contrast and readability for legacy dark-only labels inside admin light theme */
+.admin-dashboard-light main .text-blue-300,
+.admin-dashboard-light main .text-blue-300\/70 { color: #145cad; }
+.admin-dashboard-light main .text-cyan-300,
+.admin-dashboard-light main .text-cyan-300\/70 { color: #087a97; }
+.admin-dashboard-light main .text-green-300,
+.admin-dashboard-light main .text-emerald-300 { color: #08744f; }
+.admin-dashboard-light main .text-amber-300,
+.admin-dashboard-light main .text-yellow-300 { color: #966006; }
+.admin-dashboard-light main .text-purple-300 { color: #7242ae; }
+.admin-dashboard-light main .text-slate-500,
+.admin-dashboard-light main .text-gray-500 { color: #52647e; }
+.admin-dashboard-light main .opacity-25 { opacity: .65; }
+.admin-dashboard-light main .opacity-30 { opacity: .65; }
+.admin-dashboard-light main .companies-admin-page th,
+.admin-dashboard-light main .companies-admin-page td,
+.admin-dashboard-light main .companies-admin-page button { font-size: max(0.875rem, 1em); }
