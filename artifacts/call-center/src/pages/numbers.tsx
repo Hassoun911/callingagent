@@ -480,7 +480,7 @@ export default function Numbers() {
                 {/* Search results with a visible coverage sidebar. */}
                 <div className={showCoverage ? "grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_230px] gap-3 items-start" : ""}>
                 <div className="border border-border rounded-md bg-background/50 overflow-hidden max-h-72 overflow-y-auto">
-                  <Table>
+                  <Table className="text-sm sm:text-base">
                     <TableHeader>
                       <TableRow className="border-border hover:bg-transparent sticky top-0 bg-background">
                         <TableHead>Number</TableHead>
@@ -539,8 +539,8 @@ export default function Numbers() {
                       )}
                       {!searchLoading && visibleNumbers?.map((n) => (
                         <TableRow key={n.phoneNumber} className="border-border">
-                          <TableCell className="font-mono text-sm font-medium">{n.friendlyName}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
+                          <TableCell className="font-mono text-base font-bold text-foreground">{n.friendlyName}</TableCell>
+                          <TableCell className="text-sm sm:text-base font-semibold text-foreground">
                             {n.locality ? (
                               <span className="inline-flex flex-col gap-0.5">
                                 <span className="font-semibold text-foreground">{n.locality}</span>
@@ -668,7 +668,7 @@ export default function Numbers() {
 
       {/* Numbers table */}
       <Card className="border-border">
-        <Table>
+        <Table className="min-w-[690px] text-sm sm:text-base">
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead className="w-[200px]">Number</TableHead>
@@ -700,21 +700,21 @@ export default function Numbers() {
               </TableRow>
             ) : numbers?.map((num) => (
               <TableRow key={num.id} className="border-border group cursor-pointer" onClick={() => window.location.href = `/numbers/${num.id}`}>
-                <TableCell className="font-mono font-medium">
+                <TableCell className="font-mono text-base sm:text-lg font-bold text-foreground">
                   <div className="flex items-center gap-2">
                     <Phone className="h-3 w-3 text-muted-foreground" />
                     {num.friendlyName}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="font-medium">{num.callerIdName}</div>
+                  <div className="text-sm sm:text-base font-semibold text-foreground">{num.callerIdName}</div>
                 </TableCell>
                 <TableCell>{getModeBadge(num.answerMode)}</TableCell>
                 <TableCell>
                   {num.answerMode === 'forward' && (
-                    <span className="font-mono text-sm text-muted-foreground">→ {num.forwardTo || 'Unassigned'}</span>
+                    <span className="font-mono text-sm sm:text-base font-medium text-foreground">→ {num.forwardTo || 'Unassigned'}</span>
                   )}
-                  {num.answerMode === 'ai_voice' && <span className="text-sm text-muted-foreground">AI Agent</span>}
+                  {num.answerMode === 'ai_voice' && <span className="text-sm sm:text-base font-semibold text-foreground">AI Agent</span>}
                 </TableCell>
                 <TableCell className="text-right">
                   <Link href={`/numbers/${num.id}`} className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground h-8 w-8">
