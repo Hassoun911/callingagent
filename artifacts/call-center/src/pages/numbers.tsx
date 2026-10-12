@@ -36,6 +36,7 @@ export default function Numbers() {
   const [country, setCountry] = useState("US");
   const [province, setProvince] = useState("");
   const [availableNumbers, setAvailableNumbers] = useState<any[]>([]);
+  const [selectedResultCity, setSelectedResultCity] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<Error | null>(null);
   const [showRegionalAlternatives, setShowRegionalAlternatives] = useState(false);
@@ -55,6 +56,11 @@ export default function Numbers() {
     { title: "3 · Southwestern Ontario", places: ["Tilbury", "Chatham", "Blenheim", "Wallaceburg", "Sarnia", "Strathroy", "London", "St. Thomas"] },
     { title: "4 · Farther Ontario", places: ["Woodstock", "Ingersoll", "Brantford", "Kitchener", "Waterloo", "Cambridge", "Hamilton", "Toronto"] }
   ];
+
+  const cityCount = (place: string) => availableNumbers.filter(n => n.locality?.trim().toLowerCase() === place.toLowerCase()).length;
+  const visibleNumbers = selectedResultCity
+    ? availableNumbers.filter(n => n.locality?.trim().toLowerCase() === selectedResultCity.toLowerCase())
+    : availableNumbers;
 
   const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -97,6 +103,7 @@ export default function Numbers() {
     setSearchLoading(true);
     setSearchError(null);
     setAvailableNumbers([]);
+    setSelectedResultCity(null);
     try {
       const params = new URLSearchParams({ country });
       if (!tollFree && city.trim()) params.set("city", city.trim());
@@ -343,6 +350,12 @@ export default function Numbers() {
                   <p className="text-xs text-amber-600">No numbers found in {city}, {province}. Showing available numbers elsewhere in {REGION_OPTIONS[country]?.find(r => r.code === province)?.name ?? province}, with nearby areas listed first where supported.</p>
                 )}
 
+                {selectedResultCity && (
+                  <div className="flex items-center justify-between rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-xs">
+                    <span>Showing {visibleNumbers.length} number(s) in <strong>{selectedResultCity}</strong></span>
+                    <button type="button" className="font-semibold underline" onClick={() => setSelectedResultCity(null)}>Show all numbers</button>
+                  </div>
+                )}
                 {/* Search results with a visible coverage sidebar. */}
                 <div className={windsorSearch && !tollFree ? "grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_230px] gap-3 items-start" : ""}>
                 <div className="border border-border rounded-md bg-background/50 overflow-hidden max-h-72 overflow-y-auto">
@@ -403,11 +416,21 @@ export default function Numbers() {
                           </TableCell>
                         </TableRow>
                       )}
-                      {!searchLoading && availableNumbers?.map((n) => (
+                      {!searchLoading && visibleNumbers?.map((n) => (
                         <TableRow key={n.phoneNumber} className="border-border">
                           <TableCell className="font-mono text-sm font-medium">{n.friendlyName}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {[n.locality, n.region, n.isoCountry].filter(Boolean).join(", ")}
+                            {n.locality ? (
+                              <span className="inline-flex flex-col gap-0.5">
+                                <span className="font-semibold text-foreground">{n.locality}</span>
+                                <span className="text-xs">{[n.region, n.isoCountry].filter(Boolean).join(", ")}</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex flex-col gap-0.5">
+                                <span className="text-amber-500 font-medium">City not provided</span>
+                                <span className="text-xs">{[n.region, n.isoCountry].filter(Boolean).join(", ")} · Verify before purchase</span>
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button
@@ -439,16 +462,22 @@ export default function Numbers() {
                         <div key={group.title}>
                           <p className="text-xs font-semibold text-foreground mb-1">{group.title}</p>
                           <div className="flex flex-wrap gap-1">
-                            {group.places.map(place => (
-                              <span key={place} className={`text-[11px] px-1.5 py-0.5 rounded border ${availableNumbers.some((n: any) => n.locality?.trim().toLowerCase() === place.toLowerCase()) ? "border-primary text-primary bg-primary/10" : "border-border text-muted-foreground"}`}>
-                                {place}
-                              </span>
-                            ))}
+                            {group.places.map(place => {
+                              const count = cityCount(place);
+                              return (
+                                <button type="button" key={place} disabled={!count}
+                                  onClick={() => setSelectedResultCity(selectedResultCity === place ? null : place)}
+                                  title={count ? `Show ${count} available number(s) in ${place}` : `No listed numbers in ${place}`}
+                                  className={`text-[11px] px-1.5 py-0.5 rounded border transition-colors ${count ? "border-primary text-primary bg-primary/10 hover:bg-primary/20 cursor-pointer" : "border-border text-muted-foreground cursor-default"} ${selectedResultCity === place ? "ring-2 ring-primary font-bold" : ""}`}>
+                                  {place}{count > 0 ? ` (${count})` : ""}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       ))}
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-3">Highlighted cities have available results in the list. Other cities are search targets.</p>
+                    <p className="text-[11px] text-muted-foreground mt-3">Click a highlighted city to show only its numbers. Counts reflect listed results; unknown-city numbers are marked separately.</p>
                   </aside>
                 )}
                 </div>
