@@ -47,6 +47,15 @@ export default function Numbers() {
   const [importFriendlyName, setImportFriendlyName] = useState("");
   const [importing, setImporting] = useState(false);
 
+  const windsorSearch = country === "CA" && province === "ON" &&
+    (city.trim().toLowerCase() === "windsor" || (!city.trim() && ["226", "519", "548"].includes(areaCode)));
+  const targetGroups = [
+    { title: "1 · Windsor", places: ["Windsor"] },
+    { title: "2 · Essex County", places: ["LaSalle", "Tecumseh", "Amherstburg", "Lakeshore", "Essex", "Harrow", "Kingsville", "Leamington"] },
+    { title: "3 · Southwestern Ontario", places: ["Tilbury", "Chatham", "Blenheim", "Wallaceburg", "Sarnia", "Strathroy", "London", "St. Thomas"] },
+    { title: "4 · Farther Ontario", places: ["Woodstock", "Ingersoll", "Brantford", "Kitchener", "Waterloo", "Cambridge", "Hamilton", "Toronto"] }
+  ];
+
   const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
   const handleImport = async () => {
@@ -194,7 +203,7 @@ export default function Numbers() {
             <DialogTrigger asChild>
               <Button className="gap-2"><Plus className="h-4 w-4" />Provision Number</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-2xl bg-card border-border">
+            <DialogContent className="sm:max-w-4xl bg-card border-border">
               <DialogHeader>
                 <DialogTitle>{provisionTab === "import" ? "Import Existing Number" : "Provision New Number"}</DialogTitle>
                 <DialogDescription>
@@ -334,8 +343,9 @@ export default function Numbers() {
                   <p className="text-xs text-amber-600">No numbers found in {city}, {province}. Showing available numbers elsewhere in {REGION_OPTIONS[country]?.find(r => r.code === province)?.name ?? province}, with nearby areas listed first where supported.</p>
                 )}
 
-                {/* Results */}
-                <div className="border border-border rounded-md bg-background/50 overflow-hidden max-h-64 overflow-y-auto">
+                {/* Search results with a visible coverage sidebar. */}
+                <div className={windsorSearch && !tollFree ? "grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_230px] gap-3 items-start" : ""}>
+                <div className="border border-border rounded-md bg-background/50 overflow-hidden max-h-72 overflow-y-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="border-border hover:bg-transparent sticky top-0 bg-background">
@@ -415,6 +425,32 @@ export default function Numbers() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+
+                {windsorSearch && !tollFree && (
+                  <aside className="border border-border rounded-md bg-background/50 p-3 max-h-72 overflow-y-auto">
+                    <h3 className="text-sm font-semibold">Search coverage</h3>
+                    <p className="text-xs text-muted-foreground mt-1 mb-3">
+                      Windsor, Ontario first; then expanding outward.
+                      {searchLoading ? " Searching inventory…" : searched ? " The locations below are search targets, not confirmed availability." : " Planned search targets."}
+                    </p>
+                    <div className="space-y-3">
+                      {targetGroups.map(group => (
+                        <div key={group.title}>
+                          <p className="text-xs font-semibold text-foreground mb-1">{group.title}</p>
+                          <div className="flex flex-wrap gap-1">
+                            {group.places.map(place => (
+                              <span key={place} className={`text-[11px] px-1.5 py-0.5 rounded border ${availableNumbers.some((n: any) => n.locality?.trim().toLowerCase() === place.toLowerCase()) ? "border-primary text-primary bg-primary/10" : "border-border text-muted-foreground"}`}>
+                                {place}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-3">Highlighted cities have available results in the list. Other cities are search targets.</p>
+                  </aside>
+                )}
                 </div>
 
                 {/* Quick watch button when results exist but user might also want to watch */}
