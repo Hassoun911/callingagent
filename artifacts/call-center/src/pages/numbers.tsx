@@ -357,7 +357,7 @@ export default function Numbers() {
 
                 {tollFree && (
                   <p className="text-xs text-muted-foreground">
-                    Toll-free searches ignore city, province, and area code. Switch Toll-free off to search local Canadian numbers such as 519.
+                    US and Canada share toll-free numbering. Twilio may label available toll-free numbers as US even when Canada is selected. City, province, and area code do not apply to toll-free searches.
                   </p>
                 )}
 
