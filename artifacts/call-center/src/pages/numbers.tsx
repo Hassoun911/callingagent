@@ -33,8 +33,8 @@ export default function Numbers() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [areaCode, setAreaCode] = useState("");
   const [city, setCity] = useState("");
-  const [country, setCountry] = useState("US");
-  const [province, setProvince] = useState("");
+  const [country, setCountry] = useState("CA");
+  const [province, setProvince] = useState("ON");
   const [availableNumbers, setAvailableNumbers] = useState<any[]>([]);
   const [selectedResultCity, setSelectedResultCity] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -48,14 +48,22 @@ export default function Numbers() {
   const [importFriendlyName, setImportFriendlyName] = useState("");
   const [importing, setImporting] = useState(false);
 
-  const windsorSearch = country === "CA" && province === "ON" &&
-    (city.trim().toLowerCase() === "windsor" || (!city.trim() && ["226", "519", "548"].includes(areaCode)));
-  const targetGroups = [
-    { title: "1 · Windsor", places: ["Windsor"] },
-    { title: "2 · Essex County", places: ["LaSalle", "Tecumseh", "Amherstburg", "Lakeshore", "Essex", "Harrow", "Kingsville", "Leamington"] },
-    { title: "3 · Southwestern Ontario", places: ["Tilbury", "Chatham", "Blenheim", "Wallaceburg", "Sarnia", "Strathroy", "London", "St. Thomas"] },
-    { title: "4 · Farther Ontario", places: ["Woodstock", "Ingersoll", "Brantford", "Kitchener", "Waterloo", "Cambridge", "Hamilton", "Toronto"] }
-  ];
+  // Search coverage reflects actual inventory returned for ANY city or area-code query.
+  // Never imply that a locality has inventory unless the provider returned a matching number.
+  const searchedLocation = city.trim() || (areaCode ? `Area code ${areaCode}` : "Selected region");
+  const cityEntries = Object.entries(
+    availableNumbers.reduce((counts: Record<string, number>, n: any) => {
+      const place = n.locality?.trim();
+      if (place) counts[place] = (counts[place] || 0) + 1;
+      return counts;
+    }, {} as Record<string, number>)
+  ).sort((a, b) => {
+    const exactA = a[0].toLowerCase() === city.trim().toLowerCase() ? -1 : 0;
+    const exactB = b[0].toLowerCase() === city.trim().toLowerCase() ? -1 : 0;
+    return exactA - exactB || b[1] - a[1] || a[0].localeCompare(b[0]);
+  });
+  const unknownCityCount = availableNumbers.filter(n => !n.locality?.trim()).length;
+  const showCoverage = !tollFree && Boolean(city.trim() || areaCode || searched);
 
   const cityCount = (place: string) => availableNumbers.filter(n => n.locality?.trim().toLowerCase() === place.toLowerCase()).length;
   const visibleNumbers = selectedResultCity
@@ -95,8 +103,8 @@ export default function Numbers() {
   };
 
   const handleSearch = async () => {
-    if (!tollFree && city.trim() && !province) {
-      toast({ title: "Select a province or state", description: "City searches require a province/state to avoid incorrect locations.", variant: "destructive" });
+    if (!tollFree && (city.trim() || areaCode) && !province) {
+      toast({ title: "Select a province or state", description: "City and area-code searches require a province/state to avoid incorrect locations.", variant: "destructive" });
       return;
     }
     setSearched(true);
@@ -205,7 +213,7 @@ export default function Numbers() {
           {/* Provision dialog */}
           <Dialog open={searchOpen} onOpenChange={(open) => {
             setSearchOpen(open);
-            if (!open) { setAreaCode(""); setCity(""); setSearched(false); setTollFree(false); setCountry("US"); setProvince(""); setAvailableNumbers([]); setShowRegionalAlternatives(false); setProvisionTab("provision"); }
+            if (!open) { setAreaCode(""); setCity(""); setSearched(false); setTollFree(false); setCountry("CA"); setProvince("ON"); setAvailableNumbers([]); setShowRegionalAlternatives(false); setProvisionTab("provision"); }
           }}>
             <DialogTrigger asChild>
               <Button className="gap-2"><Plus className="h-4 w-4" />Provision Number</Button>
@@ -301,7 +309,7 @@ export default function Numbers() {
 
                 <div className="flex items-center gap-3">
                   <div className="flex-1">
-                    <Select value={country} onValueChange={(v) => { setCountry(v); setProvince(""); setAvailableNumbers([]); setSearched(false); }}>
+                    <Select value={country} onValueChange={(v) => { setCountry(v); setProvince(v === "CA" ? "ON" : ""); setAvailableNumbers([]); setSearched(false); }}>
                       <SelectTrigger className="bg-background">
                         <SelectValue />
                       </SelectTrigger>
@@ -347,7 +355,7 @@ export default function Numbers() {
                 </div>
 
                 {searched && showRegionalAlternatives && !searchLoading && (
-                  <p className="text-xs text-amber-600">No numbers found in {city}, {province}. Showing available numbers elsewhere in {REGION_OPTIONS[country]?.find(r => r.code === province)?.name ?? province}, with nearby areas listed first where supported.</p>
+                  <p className="text-xs text-amber-600">No exact city match for {city}, {province}. Showing numbers elsewhere in {REGION_OPTIONS[country]?.find(r => r.code === province)?.name ?? province}, with nearby areas listed first where supported.</p>
                 )}
 
                 {selectedResultCity && (
@@ -357,7 +365,7 @@ export default function Numbers() {
                   </div>
                 )}
                 {/* Search results with a visible coverage sidebar. */}
-                <div className={windsorSearch && !tollFree ? "grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_230px] gap-3 items-start" : ""}>
+                <div className={showCoverage ? "grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_230px] gap-3 items-start" : ""}>
                 <div className="border border-border rounded-md bg-background/50 overflow-hidden max-h-72 overflow-y-auto">
                   <Table>
                     <TableHeader>
@@ -450,34 +458,36 @@ export default function Numbers() {
                   </Table>
                 </div>
 
-                {windsorSearch && !tollFree && (
+                {showCoverage && (
                   <aside className="border border-border rounded-md bg-background/50 p-3 max-h-72 overflow-y-auto">
                     <h3 className="text-sm font-semibold">Search coverage</h3>
                     <p className="text-xs text-muted-foreground mt-1 mb-3">
-                      Windsor, Ontario first; then expanding outward.
-                      {searchLoading ? " Searching inventory…" : searched ? " The locations below are search targets, not confirmed availability." : " Planned search targets."}
+                      Target: <strong className="text-foreground">{searchedLocation}</strong>
+                      {province ? `, ${REGION_OPTIONS[country]?.find(r => r.code === province)?.name ?? province}` : ""}.
+                      {searchLoading ? " Looking for numbers…" : " Cities below have actual results; select one to see its phone numbers."}
                     </p>
-                    <div className="space-y-3">
-                      {targetGroups.map(group => (
-                        <div key={group.title}>
-                          <p className="text-xs font-semibold text-foreground mb-1">{group.title}</p>
-                          <div className="flex flex-wrap gap-1">
-                            {group.places.map(place => {
-                              const count = cityCount(place);
-                              return (
-                                <button type="button" key={place} disabled={!count}
-                                  onClick={() => setSelectedResultCity(selectedResultCity === place ? null : place)}
-                                  title={count ? `Show ${count} available number(s) in ${place}` : `No listed numbers in ${place}`}
-                                  className={`text-[11px] px-1.5 py-0.5 rounded border transition-colors ${count ? "border-primary text-primary bg-primary/10 hover:bg-primary/20 cursor-pointer" : "border-border text-muted-foreground cursor-default"} ${selectedResultCity === place ? "ring-2 ring-primary font-bold" : ""}`}>
-                                  {place}{count > 0 ? ` (${count})` : ""}
-                                </button>
-                              );
-                            })}
-                          </div>
+                    {searched && !searchLoading && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold">{availableNumbers.length} number(s) returned</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {cityEntries.map(([place, count]) => (
+                            <button type="button" key={place}
+                              onClick={() => setSelectedResultCity(selectedResultCity === place ? null : place)}
+                              className={`text-xs px-2 py-1 rounded border text-left transition-colors border-primary text-primary bg-primary/10 hover:bg-primary/20 ${selectedResultCity === place ? "ring-2 ring-primary font-bold" : ""}`}>
+                              {place} <strong>({count})</strong>
+                            </button>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground mt-3">Click a highlighted city to show only its numbers. Counts reflect listed results; unknown-city numbers are marked separately.</p>
+                        {unknownCityCount > 0 && (
+                          <p className="text-xs text-amber-500">{unknownCityCount} number(s) have no city supplied by the provider.</p>
+                        )}
+                        {selectedResultCity && (
+                          <button type="button" onClick={() => setSelectedResultCity(null)}
+                            className="text-xs underline text-primary">Show all numbers</button>
+                        )}
+                      </div>
+                    )}
+                    {!searched && <p className="text-xs text-muted-foreground">Press Search to see actual city matches.</p>}
                   </aside>
                 )}
                 </div>
