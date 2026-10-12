@@ -400,8 +400,8 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
         </div>
-        <div className="flex-1 overflow-auto bg-background p-3 sm:p-4 md:p-6">
-          <div className={`mx-auto w-full ${location === "/" ? "max-w-[1600px]" : "max-w-6xl"}`}>{children}</div>
+        <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background p-3 sm:p-4 md:p-6">
+          <div className={`mx-auto min-w-0 w-full ${location === "/" || location === "/billing" ? "max-w-[1600px]" : "max-w-6xl"}`}>{children}</div>
         </div>
       </main>
     </div>
