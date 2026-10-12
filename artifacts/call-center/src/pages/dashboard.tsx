@@ -105,7 +105,7 @@ export default function Dashboard() {
         </div>
       </Panel>
     </div>
-    <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
+    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1.1fr)_minmax(275px,0.9fr)]">
       <Panel title="Recent Calls" href="/calls">
         <div className="space-y-1">{recent.length ? recent.slice(0,5).map((call:any)=><Link key={call.id} href="/calls" className="flex items-center gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-secondary/60">
           <span className={`rounded-lg p-2 ${call.direction==="inbound"?"bg-emerald-500/10 text-emerald-600":"bg-blue-500/10 text-blue-600"}`}>{call.direction==="inbound"?<ArrowDownLeft className="h-4 w-4"/>:<ArrowUpRight className="h-4 w-4"/>}</span>
@@ -114,6 +114,11 @@ export default function Dashboard() {
           <div className="shrink-0 text-right text-xs text-muted-foreground">{new Date(call.createdAt).toLocaleDateString("en-CA",{month:"short",day:"numeric"})}<div>{call.duration ? `${Math.floor(call.duration/60)}:${String(call.duration%60).padStart(2,"0")}`:"—"}</div></div>
         </Link>) : <p className="py-10 text-center text-sm text-muted-foreground">No recent calls</p>}</div>
       </Panel>
+    <Panel title="Active Numbers" href="/numbers" link="Manage all">
+      <div className="w-full overflow-x-auto"><table className="w-full min-w-[380px] text-left text-xs sm:text-sm"><thead className="border-b border-border text-muted-foreground"><tr><th className="py-2.5 font-medium">Number</th><th className="py-2.5 font-medium">Company</th><th className="py-2.5 font-medium">Provider</th><th className="py-2.5 font-medium">Status</th></tr></thead>
+      <tbody>{numbers.filter((n:any)=>n.isActive).slice(0,8).map((n:any)=><tr key={n.id} className="border-b border-border/60 last:border-0 hover:bg-secondary/35 transition-colors"><td className="py-3 font-medium text-foreground">{displayNumber(n.number)}</td><td className="py-3 text-muted-foreground">{n.companyId ? `Company #${n.companyId}`:"Unassigned"}</td><td className="py-3 text-muted-foreground">{n.twilioSid?"Twilio":"Unverified"}</td><td className="py-3"><span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600">Active</span></td></tr>)}</tbody></table>
+      {!numbers.length&&<p className="py-7 text-center text-sm text-muted-foreground">No provisioned numbers</p>}</div>
+    </Panel>
       <Panel title="Quick Actions">
         <div className="grid grid-cols-1 gap-2">
           {[
@@ -127,10 +132,6 @@ export default function Dashboard() {
         </div>
       </Panel>
     </div>
-    <Panel title="Active Numbers" href="/numbers" link="Manage all">
-      <div className="w-full overflow-x-auto"><table className="w-full min-w-[520px] text-left text-xs sm:text-sm"><thead className="border-b border-border text-muted-foreground"><tr><th className="py-2.5 font-medium">Number</th><th className="py-2.5 font-medium">Company</th><th className="py-2.5 font-medium">Provider</th><th className="py-2.5 font-medium">Status</th></tr></thead>
-      <tbody>{numbers.filter((n:any)=>n.isActive).slice(0,8).map((n:any)=><tr key={n.id} className="border-b border-border/60 last:border-0 hover:bg-secondary/35 transition-colors"><td className="py-3 font-medium text-foreground">{displayNumber(n.number)}</td><td className="py-3 text-muted-foreground">{n.companyId ? `Company #${n.companyId}`:"Unassigned"}</td><td className="py-3 text-muted-foreground">{n.twilioSid?"Twilio":"Unverified"}</td><td className="py-3"><span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600">Active</span></td></tr>)}</tbody></table>
-      {!numbers.length&&<p className="py-7 text-center text-sm text-muted-foreground">No provisioned numbers</p>}</div>
-    </Panel>
+
   </div>;
 }
