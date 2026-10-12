@@ -173,7 +173,7 @@ export default function Companies() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="companies-admin-page space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Companies</h1>
@@ -206,7 +206,7 @@ export default function Companies() {
 
       <Card className="border-border">
         <div className="overflow-x-auto">
-        <Table className="min-w-[560px]">
+        <Table className="min-w-[700px] text-sm sm:text-base">
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
               <TableHead>Company Name</TableHead>
@@ -237,19 +237,19 @@ export default function Companies() {
                 </TableCell>
               </TableRow>
             ) : filteredCompanies.map((company) => (
-              <TableRow key={company.id} className="border-border cursor-pointer hover:bg-secondary/30" onClick={() => navigate(`/companies/${company.id}`)}>
+              <TableRow key={company.id} className="border-border cursor-pointer hover:bg-secondary/30 text-sm sm:text-base" onClick={() => navigate(`/companies/${company.id}`)}>
                 <TableCell>
-                  <div className="font-medium text-foreground">{company.name}</div>
+                  <div className="text-base sm:text-lg font-bold leading-snug text-foreground">{company.name}</div>
                   {(company as any).ownerName && (
-                    <div className="text-xs text-muted-foreground mt-0.5">{(company as any).ownerName}</div>
+                    <div className="text-sm font-medium text-muted-foreground mt-1">{(company as any).ownerName}</div>
                   )}
                 </TableCell>
-                <TableCell className="text-muted-foreground text-sm">
+                <TableCell className="text-foreground text-sm sm:text-base font-semibold">
                   {company.industry || '--'}
                 </TableCell>
                 <TableCell>
                   {company.website ? (
-                    <a href={`https://${company.website.replace(/^https?:\/\//, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm text-primary hover:underline">
+                    <a href={`https://${company.website.replace(/^https?:\/\//, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm sm:text-base font-semibold text-primary hover:underline">
                       <Globe className="h-3 w-3" />
                       {company.website}
                     </a>
@@ -259,7 +259,7 @@ export default function Companies() {
                   {(() => {
                     if (company.phone) {
                       return (
-                        <div className="flex items-center gap-1.5 text-sm font-mono text-muted-foreground">
+                        <div className="flex items-center gap-1.5 text-sm sm:text-base font-medium text-foreground">
                           <Phone className="h-3 w-3" />
                           {company.phone}
                         </div>
@@ -270,7 +270,7 @@ export default function Companies() {
                       return (
                         <div className="space-y-0.5">
                           {linked.map(n => (
-                            <div key={n.id} className="flex items-center gap-1.5 text-sm font-mono text-muted-foreground">
+                            <div key={n.id} className="flex items-center gap-1.5 text-sm sm:text-base font-medium text-foreground">
                               <Phone className="h-3 w-3 flex-shrink-0" />
                               {n.number}
                             </div>
