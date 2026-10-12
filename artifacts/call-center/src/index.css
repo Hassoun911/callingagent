@@ -264,3 +264,49 @@
     max-width: 100%;
   }
 }
+
+/* Main admin overview only. Does not change company portals or other screens. */
+.admin-dashboard-light {
+  --background: 215 35% 97%;
+  --foreground: 222 42% 16%;
+  --border: 215 25% 88%;
+  --input: 215 25% 88%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 42% 16%;
+  --card-border: 215 25% 88%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 42% 16%;
+  --popover-border: 215 25% 88%;
+  --secondary: 213 30% 94%;
+  --secondary-foreground: 222 42% 16%;
+  --muted: 213 30% 94%;
+  --muted-foreground: 215 15% 42%;
+  --accent: 213 30% 94%;
+  --accent-foreground: 222 42% 16%;
+  --primary: 208 90% 43%;
+  --primary-foreground: 0 0% 100%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 222 42% 16%;
+  --sidebar-border: 215 25% 88%;
+  --sidebar-primary: 208 90% 43%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 213 30% 94%;
+  --sidebar-accent-foreground: 222 42% 16%;
+  --button-outline: rgba(25,45,70,.14);
+}
+.admin-dashboard-light .text-green-400 { color: #058669; }
+.admin-dashboard-light .text-blue-400 { color: #126fce; }
+.admin-dashboard-light .text-orange-400 { color: #c16b12; }
+.admin-dashboard-light .text-purple-400 { color: #7945c9; }
+.admin-dashboard-light .text-muted-foreground\/30 { color: #64748b; }
+.admin-dashboard-light .text-foreground\/55 { color: #475569; }
+.admin-dashboard-light .border-border\/50 { border-color: #e2e8f0; }
+.admin-dashboard-light .bg-green-500\/10 { background-color: #e7f8ef; }
+.admin-dashboard-light .bg-blue-500\/10 { background-color: #e7f2ff; }
+.admin-dashboard-light .bg-card { box-shadow: 0 1px 8px rgba(27,52,80,.035); }
+.admin-dashboard-light .shadow-2xl { box-shadow: 0 12px 32px rgba(27,52,80,.14); }
+.admin-dashboard-light .bg-black\/70 { background-color: rgba(15,23,42,.5); }
+.admin-dashboard-light .admin-overview a:hover { color: hsl(var(--primary)); }
+.admin-dashboard-light .admin-overview .rounded-xl { border-radius: 14px; }
+.admin-dashboard-light .admin-overview { letter-spacing: -.005em; }
+.admin-dashboard-dark .admin-overview .rounded-xl { border-radius: 14px; }
