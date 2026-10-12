@@ -235,7 +235,7 @@ export default function Numbers() {
       if (body.orderId) setTelnyxOrder({ orderId: String(body.orderId), phoneNumber: number, companyId: Number(purchaseCompanyId), status: body.status ?? "pending" });
       setTelnyxSetupResult("Order submitted. Track it below, then configure when Telnyx confirms the number is active.");
       toast({ title: "Telnyx order submitted", description: `Order ${body.orderId ?? "pending"} · ${body.status}. Track setup in this portal.` });
-      setAvailableNumbers(previous => previous.filter(n => n.phoneNumber !== number));
+      // Retain the ordered number in results so its status remains visible and repeat purchases are blocked.
     } catch (error: any) {
       toast({ title: "Telnyx order not confirmed", description: error?.message ?? "Check Telnyx Portal before retrying.", variant: "destructive" });
     } finally { setOrderingTelnyx(null); }
@@ -637,14 +637,14 @@ export default function Numbers() {
                             <Button
                               variant="secondary"
                               size="sm"
-                              disabled={provisionMutation.isPending || Boolean(orderingTelnyx)}
+                              disabled={provisionMutation.isPending || Boolean(orderingTelnyx) || (numberProvider === "telnyx" && telnyxOrder?.phoneNumber === n.phoneNumber)}
                               onClick={() => numberProvider === "telnyx"
                                 ? purchaseTelnyx(n.phoneNumber)
                                 : provisionMutation.mutate({
                                     data: { number: n.phoneNumber, friendlyName: n.friendlyName, callerIdName: "New Number", answerMode: "forward" }
                                   })}
                             >
-                              {numberProvider === "telnyx" ? (orderingTelnyx === n.phoneNumber ? "Ordering…" : "Buy via Telnyx") : provisionMutation.isPending ? "Provisioning…" : "Provision"}
+                              {numberProvider === "telnyx" ? (orderingTelnyx === n.phoneNumber ? "Ordering…" : telnyxOrder?.phoneNumber === n.phoneNumber ? (orderPurchased ? "Purchased" : orderFailed ? "Failed — review" : "Pending") : "Buy via Telnyx") : provisionMutation.isPending ? "Provisioning…" : "Provision"}
                             </Button>
                           </TableCell>
                         </TableRow>
