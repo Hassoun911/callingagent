@@ -154,7 +154,9 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
           req.log.warn({ err, params }, "Twilio locality inventory request failed");
         }
       };
-      const base: any = { limit: 100 };
+      // Allow Twilio auto-pagination instead of restricting each locality to 100 results.
+      // The provider controls the maximum results and request duration.
+      const base: any = { limit: 1000, pageSize: 100 };
       if (province) base.inRegion = province;
       if (contains) base.contains = contains;
 
@@ -173,11 +175,9 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
         if (origin) {
           const near = Object.entries(ontarioPlaces)
             .filter(([place]) => normalize(place) !== normalize(targetCity))
-            .sort((a,b) => distance(origin,a[1])-distance(origin,b[1]))
-            .slice(0, 25);
+            .sort((a,b) => distance(origin,a[1])-distance(origin,b[1]));
           for (const [place] of near) {
             await find({ ...base, inLocality: place });
-            if (unique.size >= 45) break;
           }
         }
         await find(base);
@@ -191,7 +191,7 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
       };
       formatted = matches.sort((a,b) =>
         byPreference(a) - byPreference(b) || a.phoneNumber.localeCompare(b.phoneNumber)
-      ).slice(0,20);
+      );
     }
 
     res.json(SearchAvailableNumbersResponse.parse(formatted));
