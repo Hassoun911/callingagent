@@ -151,7 +151,7 @@ export default function Numbers() {
   };
 
   const [orderingTelnyx, setOrderingTelnyx] = useState<string | null>(null);
-  const [telnyxOrder, setTelnyxOrder] = useState<{ orderId: string; phoneNumber: string; status: string } | null>(null);
+  const [telnyxOrder, setTelnyxOrder] = useState<{ orderId: string; phoneNumber: string; companyId: number; status: string } | null>(null);
   const [telnyxSetupBusy, setTelnyxSetupBusy] = useState(false);
   const [telnyxSetupResult, setTelnyxSetupResult] = useState("");
   const refreshTelnyxOrder = async () => {
@@ -172,11 +172,12 @@ export default function Numbers() {
     try {
       const response = await fetch(`${BASE}/api/phone-numbers/telnyx-setup`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber: telnyxOrder.phoneNumber }),
+        body: JSON.stringify({ phoneNumber: telnyxOrder.phoneNumber, companyId: telnyxOrder.companyId }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Setup not completed");
       setTelnyxSetupResult(`${Object.entries(data.results || {}).map(([key, value]) => `${key}: ${value}`).join(" · ")}. ${data.warning || ""}`);
+      queryClient.invalidateQueries({ queryKey: getListPhoneNumbersQueryKey() });
     } catch (error: any) { setTelnyxSetupResult(error.message); }
     finally { setTelnyxSetupBusy(false); }
   };
@@ -192,7 +193,7 @@ export default function Numbers() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not place Telnyx order");
-      if (body.orderId) setTelnyxOrder({ orderId: String(body.orderId), phoneNumber: number, status: body.status ?? "pending" });
+      if (body.orderId) setTelnyxOrder({ orderId: String(body.orderId), phoneNumber: number, companyId: Number(purchaseCompanyId), status: body.status ?? "pending" });
       setTelnyxSetupResult("Order submitted. Track it below, then configure when Telnyx confirms the number is active.");
       toast({ title: "Telnyx order submitted", description: `Order ${body.orderId ?? "pending"} · ${body.status}. Track setup in this portal.` });
       setAvailableNumbers(previous => previous.filter(n => n.phoneNumber !== number));
