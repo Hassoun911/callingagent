@@ -160,6 +160,32 @@ export default function Numbers() {
   const [orderingTelnyx, setOrderingTelnyx] = useState<string | null>(null);
   const [telnyxOrder, setTelnyxOrder] = useState<{ orderId: string; phoneNumber: string; companyId: number; status: string } | null>(null);
   const [telnyxSetupBusy, setTelnyxSetupBusy] = useState(false);
+  const [orderLastChecked, setOrderLastChecked] = useState<string | null>(null);
+  const [orderStatusError, setOrderStatusError] = useState(false);
+  const [routingConfigured, setRoutingConfigured] = useState(false);
+  const orderStatus = (telnyxOrder?.status || "pending").toLowerCase();
+  const orderPurchased = ["success", "completed", "complete", "purchased"].includes(orderStatus);
+  const orderFailed = ["failed", "failure", "canceled", "cancelled", "rejected"].includes(orderStatus);
+  const orderBadgeClass = orderFailed
+    ? "bg-red-100 text-red-900 border-red-300 dark:bg-red-950 dark:text-red-200 dark:border-red-700"
+    : routingConfigured ? "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-700"
+    : orderPurchased ? "bg-green-100 text-green-900 border-green-300 dark:bg-green-950 dark:text-green-200 dark:border-green-700"
+    : "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-700";
+  const orderLabel = orderFailed ? "Order failed" : routingConfigured ? "Routing configured · testing needed" : orderPurchased ? "Purchased · setup required" : orderStatus === "pending" ? "Purchase pending" : "Processing";
+  useEffect(() => {
+    if (!telnyxOrder?.orderId || orderPurchased || orderFailed || !searchOpen) return;
+    const timer = setInterval(() => {
+      fetch(`${BASE}/api/phone-numbers/telnyx-orders/${encodeURIComponent(telnyxOrder.orderId)}`, { cache: "no-store" })
+        .then(async response => { const data = await response.json(); if (!response.ok) throw new Error(data.error || "Status unavailable"); return data; })
+        .then(data => {
+          setTelnyxOrder(current => current?.orderId === telnyxOrder.orderId ? { ...current, status: data.status } : current);
+          setOrderStatusError(false);
+          setOrderLastChecked(new Date().toLocaleTimeString());
+        })
+        .catch(() => setOrderStatusError(true));
+    }, 12000);
+    return () => clearInterval(timer);
+  }, [telnyxOrder?.orderId, orderPurchased, orderFailed, searchOpen, BASE]);
   const [telnyxSetupResult, setTelnyxSetupResult] = useState("");
   const refreshTelnyxOrder = async () => {
     if (!telnyxOrder?.orderId) return;
@@ -169,8 +195,10 @@ export default function Numbers() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Status unavailable");
       setTelnyxOrder(previous => previous ? { ...previous, status: data.status } : previous);
+      setOrderLastChecked(new Date().toLocaleTimeString());
+      setOrderStatusError(false);
       setTelnyxSetupResult(`Live order status: ${data.status}. Requirements met: ${data.requirementsMet === null ? "not reported" : String(data.requirementsMet)}.`);
-    } catch (error: any) { setTelnyxSetupResult(error.message); }
+    } catch (error: any) { setOrderStatusError(true); setTelnyxSetupResult(error.message); }
     finally { setTelnyxSetupBusy(false); }
   };
   const configureTelnyxNumber = async () => {
@@ -184,6 +212,7 @@ export default function Numbers() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Setup not completed");
       setTelnyxSetupResult(`${Object.entries(data.results || {}).map(([key, value]) => `${key}: ${value}`).join(" · ")}. ${data.warning || ""}`);
+      setRoutingConfigured(true);
       queryClient.invalidateQueries({ queryKey: getListPhoneNumbersQueryKey() });
     } catch (error: any) { setTelnyxSetupResult(error.message); }
     finally { setTelnyxSetupBusy(false); }
@@ -193,6 +222,9 @@ export default function Numbers() {
     if (!company) { toast({ title: "Choose a company", description: "Select the company that will own this number before buying.", variant: "destructive" }); return; }
     if (!window.confirm(`Submit a BILLABLE Telnyx order for ${number}, assigned to ${company.name}? Provider charges and regulatory requirements may apply. CallingAgent will track activation; the number is NOT ready until verified.`)) return;
     setOrderingTelnyx(number);
+    setRoutingConfigured(false);
+    setOrderLastChecked(null);
+    setOrderStatusError(false);
     try {
       const response = await fetch(`${BASE}/api/phone-numbers/telnyx-order`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -308,15 +340,31 @@ export default function Numbers() {
               </DialogHeader>
 
               {telnyxOrder && (
-                <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2 text-sm">
-                  <div className="font-semibold">Telnyx purchase and setup · {telnyxOrder.phoneNumber}</div>
-                  <div>Order: {telnyxOrder.orderId} · Last known status: {telnyxOrder.status}</div>
-                  <p className="text-xs text-muted-foreground">A submitted order is not an activated line. Check live status and assign the server-configured Telnyx connection/profile when ready.</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" size="sm" variant="outline" disabled={telnyxSetupBusy} onClick={refreshTelnyxOrder}>Refresh order status</Button>
-                    <Button type="button" size="sm" disabled={telnyxSetupBusy} onClick={configureTelnyxNumber}>Configure Telnyx routing</Button>
+                <div className="rounded-xl border-2 border-border bg-card shadow-md overflow-hidden" role="status" aria-live="polite">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/50 px-4 py-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Telnyx transaction · Live order tracking</p>
+                      <p className="mt-1 text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">{telnyxOrder.phoneNumber}</p>
+                      <p className="text-sm font-semibold text-foreground">{companies.find(c => c.id === telnyxOrder.companyId)?.name || "Assigned company"}</p>
+                    </div>
+                    <span className={`rounded-full border-2 px-4 py-2 text-sm font-extrabold ${orderBadgeClass}`}>{orderLabel}</span>
                   </div>
-                  {telnyxSetupResult && <p className="text-xs text-muted-foreground">{telnyxSetupResult}</p>}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 px-4 pt-4">
+                    <div className="rounded-lg border border-border bg-background p-3"><p className="text-xs text-muted-foreground font-semibold">Purchase</p><p className="text-base font-extrabold text-foreground">{orderFailed ? "Failed" : orderPurchased ? "Confirmed" : "In progress"}</p></div>
+                    <div className="rounded-lg border border-border bg-background p-3"><p className="text-xs text-muted-foreground font-semibold">Voice & SMS routing</p><p className="text-base font-extrabold text-foreground">{routingConfigured ? "Assigned" : "Not confirmed"}</p></div>
+                    <div className="rounded-lg border border-border bg-background p-3"><p className="text-xs text-muted-foreground font-semibold">Service readiness</p><p className="text-base font-extrabold text-foreground">Not tested</p></div>
+                  </div>
+                  <div className="space-y-2 px-4 py-3">
+                    <p className="text-xs font-medium text-muted-foreground">Order ID: <span className="font-mono break-all">{telnyxOrder.orderId}</span></p>
+                    <p className="text-sm font-semibold text-foreground">{orderPurchased ? "Telnyx confirmed the purchase. Continue with routing setup inside CallingAgent." : orderFailed ? "The carrier reported an unsuccessful order. Check the details before attempting another purchase." : "Checking the carrier automatically every 12 seconds while this window is open."}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="button" size="sm" variant="outline" disabled={telnyxSetupBusy} onClick={refreshTelnyxOrder}>Refresh now</Button>
+                      <Button type="button" size="sm" disabled={telnyxSetupBusy || !orderPurchased || routingConfigured} onClick={configureTelnyxNumber}>{routingConfigured ? "Routing assigned" : "Configure voice & SMS"}</Button>
+                      <span className="text-xs font-semibold text-muted-foreground">{orderStatusError ? "Status check failed — retry" : orderLastChecked ? `Updated ${orderLastChecked}` : "Awaiting live refresh"}</span>
+                    </div>
+                    {telnyxSetupResult && <p className="text-sm font-semibold text-foreground rounded-md bg-secondary/60 p-2">{telnyxSetupResult}</p>}
+                    <p className="text-xs text-muted-foreground">Purchased does not mean voice or SMS is verified. Carrier activation and compliance requirements may still apply.</p>
+                  </div>
                 </div>
               )}
               {/* Tab switcher */}
@@ -571,7 +619,7 @@ export default function Numbers() {
                       )}
                       {!searchLoading && visibleNumbers?.map((n) => (
                         <TableRow key={n.phoneNumber} className="border-border">
-                          <TableCell className="font-mono text-base font-bold text-foreground">{n.friendlyName}</TableCell>
+                          <TableCell className="font-mono text-base font-bold text-foreground"><div className="flex flex-wrap items-center gap-2"><span>{n.friendlyName}</span>{telnyxOrder?.phoneNumber === n.phoneNumber && <span className={`rounded-md border px-2 py-0.5 text-xs font-extrabold ${orderBadgeClass}`}>{orderLabel}</span>}</div></TableCell>
                           <TableCell className="text-sm sm:text-base font-semibold text-foreground">
                             {n.locality ? (
                               <span className="inline-flex flex-col gap-0.5">
