@@ -267,6 +267,45 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
   }
 });
 
+// Submit Telnyx orders only after an explicit browser confirmation.
+// An accepted order may still be pending; do not call it an active line.
+router.post("/phone-numbers/telnyx-order", async (req, res): Promise<void> => {
+  const number = req.body?.phoneNumber;
+  if (typeof number !== "string" || !/^\\+[1-9]\\d{7,14}$/.test(number) || req.body?.confirmPurchase !== true) {
+    res.status(400).json({ error: "Valid E.164 phone number and explicit confirmation required." });
+    return;
+  }
+  if (!process.env.TELNYX_API_KEY) {
+    res.status(503).json({ error: "Telnyx API key missing." }); return;
+  }
+  if ((await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, number))).length) {
+    res.status(409).json({ error: "This number is already registered in CallingAgent." }); return;
+  }
+  try {
+    const reply = await fetch("https://api.telnyx.com/v2/number_orders", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + process.env.TELNYX_API_KEY,
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ phone_numbers: [{ phone_number: number }], customer_reference: "CallingAgent " + number }),
+      signal: AbortSignal.timeout(15000)
+    });
+    const body: any = await reply.json();
+    if (!reply.ok) {
+      req.log.warn({ status: reply.status, number }, "Telnyx order refused");
+      res.status(reply.status >= 500 ? 502 : 400).json({ error: body.errors?.[0]?.detail || "Telnyx rejected the order." });
+      return;
+    }
+    res.status(202).json({ orderId: body.data?.id ?? null, status: body.data?.status ?? "pending", phoneNumber: number,
+      message: "Order submitted. Check Telnyx Portal for activation and routing; the number is not yet connected to CallingAgent calling features." });
+  } catch (error: any) {
+    req.log.error({ error: error?.message }, "Telnyx number order failed");
+    res.status(502).json({ error: "Telnyx order status unknown. Check Telnyx Portal before retrying to avoid duplicate charges." });
+  }
+});
+
 // Import an existing Twilio number into CallingAgent
 router.post("/phone-numbers/import", async (req, res): Promise<void> => {
   const { number, friendlyName } = req.body ?? {};
