@@ -91,22 +91,40 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
       if (contains) params.contains = contains;
       formatted = (await client.availablePhoneNumbers(country).tollFree.list(params)).map(format);
     } else {
-      // A Southwestern Ontario area code is a preference, not a fallback restriction.
-      const isWindsor = country === "CA" && province === "ON" &&
-        (normalize(city) === "windsor" || (!city && ["226", "519", "548"].includes(areaCode)));
-      const targetCity = city || (isWindsor ? "Windsor" : "");
-      const nearby = [
-        "Windsor", "LaSalle", "Tecumseh", "Amherstburg", "Lakeshore",
-        "Essex", "Harrow", "Kingsville", "Leamington", "Tilbury",
-        "Chatham", "Blenheim", "Wallaceburg", "Sarnia", "Strathroy",
-        "London", "St. Thomas", "Woodstock", "Ingersoll", "Brantford",
-        "Kitchener", "Waterloo", "Cambridge", "Hamilton", "Toronto"
-      ];
+      // Apply the same exact-match → nearby → region fallback to any locality or area code.
+      const targetCity = (city || "").trim();
+      const ontarioPlaces: Record<string, [number, number]> = {
+        Windsor:[42.3149,-83.0364], LaSalle:[42.2167,-83.0667], Tecumseh:[42.3128,-82.8869],
+        Amherstburg:[42.1014,-83.1131], Lakeshore:[42.2967,-82.7150], Essex:[42.1731,-82.8198],
+        Harrow:[42.0378,-82.9167], Kingsville:[42.0363,-82.7394], Leamington:[42.0532,-82.5998],
+        Tilbury:[42.2620,-82.4320], Chatham:[42.4048,-82.1910], Blenheim:[42.3350,-81.9971],
+        Wallaceburg:[42.5930,-82.3890], Sarnia:[42.9745,-82.4066], Strathroy:[42.9551,-81.6223],
+        London:[42.9849,-81.2453], "St. Thomas":[42.7792,-81.1927], Woodstock:[43.1315,-80.7466],
+        Ingersoll:[43.0397,-80.8820], Brantford:[43.1394,-80.2644], Kitchener:[43.4516,-80.4925],
+        Waterloo:[43.4643,-80.5204], Cambridge:[43.3616,-80.3144], Hamilton:[43.2557,-79.8711],
+        Toronto:[43.6532,-79.3832], Barrie:[44.3894,-79.6903], Orillia:[44.6087,-79.4207],
+        Midland:[44.7495,-79.8922], Guelph:[43.5448,-80.2482], Niagara:[43.0896,-79.0849],
+        "Niagara Falls":[43.0896,-79.0849], "St. Catharines":[43.1594,-79.2469], Oakville:[43.4675,-79.6877],
+        Mississauga:[43.5890,-79.6441], Burlington:[43.3255,-79.7990], Oshawa:[43.8971,-78.8658],
+        Kingston:[44.2312,-76.4860], Ottawa:[45.4215,-75.6972], Peterborough:[44.3091,-78.3197],
+        Belleville:[44.1628,-77.3832], Sudbury:[46.4917,-80.9930], NorthBay:[46.3091,-79.4608],
+        "North Bay":[46.3091,-79.4608], "Sault Ste. Marie":[46.5219,-84.3461]
+      };
+      const coordinate = (name: string | null | undefined) =>
+        Object.entries(ontarioPlaces).find(([key]) => normalize(key) === normalize(name))?.[1];
+      const origin = country === "CA" && province === "ON" ? coordinate(targetCity) : undefined;
+      const distance = (a: number[], b: number[]) => {
+        const radians = (v: number) => v * Math.PI / 180;
+        const dLat = radians(b[0] - a[0]), dLon = radians(b[1] - a[1]);
+        const v = Math.sin(dLat / 2) ** 2 + Math.cos(radians(a[0])) *
+          Math.cos(radians(b[0])) * Math.sin(dLon / 2) ** 2;
+        return 6371 * 2 * Math.atan2(Math.sqrt(v), Math.sqrt(1 - v));
+      };
       const unique = new Map<string, ReturnType<typeof format>>();
       const add = (items: any[]) => {
         for (const n of items.map(format)) {
           if (province && !codeMatches(n.region)) continue;
-          if (normalize(n.isoCountry) !== country.toLowerCase()) continue;
+          if (normalize(n.isoCountry) !== normalize(country)) continue;
           unique.set(n.phoneNumber, n);
         }
       };
@@ -120,38 +138,41 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
       const base: any = { limit: 100 };
       if (province) base.inRegion = province;
       if (contains) base.contains = contains;
-      if (targetCity) {
-        await find({ ...base, inLocality: targetCity, ...(!isWindsor && areaCode ? { areaCode } : {}) });
-      } else {
-        await find({ ...base, ...(areaCode ? { areaCode } : {}) });
-      }
-      const exact = [...unique.values()].filter(n => targetCity && normalize(n.locality) === normalize(targetCity));
-      if (targetCity && exact.length === 0) {
-        if (isWindsor) {
-          // Search Essex County, the Chatham/Sarnia corridor, London, then farther out.
-          // Per-locality searches prevent provider result limits hiding nearby inventory.
-          for (const place of nearby.slice(1)) {
+
+      // Both fields are independent preferences; if both are provided, try their intersection first.
+      if (targetCity) await find({ ...base, inLocality: targetCity, ...(areaCode ? { areaCode } : {}) });
+      if (areaCode && (!targetCity || ![...unique.values()].length))
+        await find({ ...base, areaCode });
+      if (targetCity && ![...unique.values()].some(n => normalize(n.locality) === normalize(targetCity)))
+        await find({ ...base, inLocality: targetCity });
+
+      const exactCity = targetCity && [...unique.values()].some(n => normalize(n.locality) === normalize(targetCity));
+      const exactCode = areaCode && [...unique.values()].some(n => n.phoneNumber?.replace(/^\\+1/, "").startsWith(areaCode));
+      if (!exactCity && !exactCode) {
+        // Search nearby named cities in order if known, avoiding the provider's 100-item
+        // province-wide cap obscuring closer localities.
+        if (origin) {
+          const near = Object.entries(ontarioPlaces)
+            .filter(([place]) => normalize(place) !== normalize(targetCity))
+            .sort((a,b) => distance(origin,a[1])-distance(origin,b[1]))
+            .slice(0, 25);
+          for (const [place] of near) {
             await find({ ...base, inLocality: place });
+            if (unique.size >= 45) break;
           }
-          for (const prefix of ["519", "226", "548"]) await find({ ...base, areaCode: prefix });
         }
-        // Province/state inventory is the final fallback, without the original area code.
         await find(base);
       }
       const matches = [...unique.values()];
-      if (exact.length) {
-        formatted = exact.slice(0, 20);
-      } else if (isWindsor) {
-        const rank = (n: ReturnType<typeof format>) => {
-          const i = nearby.findIndex(p => normalize(p) === normalize(n.locality));
-          return i < 0 ? nearby.length : i;
-        };
-        formatted = matches.sort((a, b) => rank(a) - rank(b) || a.phoneNumber.localeCompare(b.phoneNumber)).slice(0, 20);
-      } else if (targetCity) {
-        formatted = matches.filter(n => normalize(n.locality) !== normalize(targetCity)).slice(0, 20);
-      } else {
-        formatted = matches.slice(0, 20);
-      }
+      const byPreference = (n: ReturnType<typeof format>) => {
+        if (targetCity && normalize(n.locality) === normalize(targetCity)) return -2;
+        if (areaCode && n.phoneNumber?.replace(/^\\+1/, "").startsWith(areaCode)) return -1;
+        const pos = origin && coordinate(n.locality);
+        return pos && origin ? distance(origin, pos) : Number.POSITIVE_INFINITY;
+      };
+      formatted = matches.sort((a,b) =>
+        byPreference(a) - byPreference(b) || a.phoneNumber.localeCompare(b.phoneNumber)
+      ).slice(0,20);
     }
 
     res.json(SearchAvailableNumbersResponse.parse(formatted));
