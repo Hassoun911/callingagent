@@ -58,7 +58,7 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
 
   try {
     const client = getTwilioClient();
-    const { areaCode, contains, country = "US", tollFree, city } = query.data as any;
+    const { areaCode, contains, country = "CA", tollFree, city } = query.data as any;
 
     // Enforce the administrative region, not just the locality name.
     const province = typeof req.query.province === "string" ? req.query.province.trim().toUpperCase() : "";
@@ -89,7 +89,9 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
     if (tollFree) {
       const params: any = { limit: 20 };
       if (contains) params.contains = contains;
-      formatted = (await client.availablePhoneNumbers(country).tollFree.list(params)).map(format);
+      // Do not label US-assigned toll-free inventory as Canadian.
+      formatted = (await client.availablePhoneNumbers(country).tollFree.list(params)).map(format)
+        .filter(n => normalize(n.isoCountry) === normalize(country));
     } else {
       // Apply the same exact-match → nearby → region fallback to any locality or area code.
       const targetCity = (city || "").trim();
