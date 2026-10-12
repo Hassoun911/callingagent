@@ -14,11 +14,11 @@ const displayNumber = (value: string) => {
 function Sparkline({ values, color }: { values: number[]; color: string }) {
   const max = Math.max(1, ...values);
   const points = values.map((v, i) => `${i * 15},${35 - v / max * 29}`).join(" ");
-  return <svg viewBox="0 0 105 40" preserveAspectRatio="none" className="h-9 w-20 sm:w-24" aria-hidden="true"><polyline points={points} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+  return <svg viewBox="0 0 105 40" preserveAspectRatio="none" className="h-14 w-24 sm:w-32" aria-hidden="true"><polyline points={points} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
 }
 function Panel({ title, href, link, children }: { title: string; href?: string; link?: string; children: React.ReactNode }) {
-  return <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm min-w-0">
-    <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-sm sm:text-base font-semibold text-foreground">{title}</h2>
+  return <section className="rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-sm min-w-0">
+    <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base sm:text-lg font-bold text-foreground">{title}</h2>
       {href && <Link href={href} className="text-xs font-medium text-primary hover:underline whitespace-nowrap">{link || "View all"} →</Link>}</div>
     {children}
   </section>;
@@ -53,7 +53,7 @@ export default function Dashboard() {
     {title:"CRM contacts", value:stats?.totalContacts, sub:`${stats?.totalCompanies ?? "—"} companies`, Icon:Users, tone:"text-violet-600 bg-violet-500/10", href:"/contacts"},
     {title:"Campaigns", value:campaigns.length, sub:`${campaigns.filter(c=>c.status==="active").length} active`, Icon:Zap, tone:"text-amber-600 bg-amber-500/10", href:"/campaigns"}
   ];
-  return <div className="admin-overview w-full min-w-0 space-y-5 pb-12 sm:space-y-6">
+  return <div className="admin-overview w-full min-w-0 space-y-5 pb-12 sm:space-y-6 text-[15px]">
     <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div><h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Admin Dashboard</h1>
         <p className="mt-1 text-sm text-muted-foreground">All companies · live system overview</p></div>
@@ -63,9 +63,9 @@ export default function Dashboard() {
       </div>
     </header>
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-      {kpis.map(({title,value,sub,Icon,tone,href},idx)=><Link key={title} href={href} className="admin-kpi min-w-0 rounded-2xl border border-border bg-card p-3.5 sm:p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
-        <div className="flex items-center justify-between gap-2"><span className="text-xs sm:text-sm font-medium text-muted-foreground">{title}</span><span className={`rounded-lg p-2 ${tone}`}><Icon className="h-4 w-4"/></span></div>
-        <div className="mt-2 text-2xl sm:text-3xl font-bold text-foreground">{isLoading ? "…" : value ?? "—"}</div>
+      {kpis.map(({title,value,sub,Icon,tone,href},idx)=><Link key={title} href={href} className="admin-kpi min-w-0 rounded-2xl border border-border bg-card p-4 sm:p-6 min-h-[160px] sm:min-h-[188px] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+        <div className="flex items-center justify-between gap-2"><span className="text-sm sm:text-base font-semibold text-muted-foreground">{title}</span><span className={`rounded-lg p-2 ${tone}`}><Icon className="h-6 w-6"/></span></div>
+        <div className="mt-2 text-3xl sm:text-4xl font-extrabold text-foreground">{isLoading ? "…" : value ?? "—"}</div>
         <div className="mt-2 flex items-end justify-between gap-1"><p className="text-xs text-muted-foreground">{sub}</p>{idx===0 ? <Sparkline values={points.slice(-7).map(p=>p.inbound+p.outbound)} color="#10b981"/> : <span className={`h-1.5 w-16 rounded-full ${idx===1?"bg-blue-500/40":idx===2?"bg-violet-500/40":"bg-amber-500/40"}`} aria-hidden="true"/>}</div>
       </Link>)}
     </div>
@@ -75,7 +75,7 @@ export default function Dashboard() {
           <div className="flex gap-4 text-xs text-muted-foreground"><span><i className="mr-1.5 inline-block h-2 w-2 rounded-full bg-blue-500"/>Inbound</span><span><i className="mr-1.5 inline-block h-2 w-2 rounded-full bg-emerald-500"/>Outbound</span></div>
           <div className="flex rounded-lg bg-secondary p-1 text-xs">{([7,30] as const).map(n=><button key={n} onClick={()=>setPeriod(n)} className={`rounded-md px-3 py-1.5 ${period===n?"bg-card text-foreground shadow-sm":"text-muted-foreground"}`}>{n} days</button>)}</div>
         </div>
-        <div className="h-[230px] w-full sm:h-[255px]">
+        <div className="h-[300px] w-full sm:h-[360px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 14, right: 6, left: -25, bottom: 0 }}>
               <defs>
@@ -97,11 +97,11 @@ export default function Dashboard() {
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3 border-b border-border pb-4"><div><div className="text-sm font-semibold text-foreground">Twilio</div><div className="text-xs text-muted-foreground">Current billing period</div></div>
           <div className="text-right font-semibold text-foreground">{twilioPrice !== null ? money(twilioPrice,costs.twilio.currency||"USD") : "Unavailable"}</div></div>
-          <div className="h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-gradient-to-r from-rose-500 to-pink-400" style={{width:twilioPrice!==null?"100%":"0%"}}/></div>
+          <div className="h-3 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-gradient-to-r from-rose-500 to-pink-400" style={{width:twilioPrice!==null?"100%":"0%"}}/></div>
           <div className="flex items-center justify-between gap-3 border-b border-border pb-4"><div><div className="text-sm font-semibold text-foreground">Telnyx</div><div className="text-xs text-muted-foreground">Billing integration pending</div></div><div className="text-sm text-muted-foreground">Unverified</div></div>
           <div className="h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full w-0 rounded-full bg-emerald-500"/></div>
           <div className="flex items-center justify-between gap-3"><span className="font-semibold text-foreground">Combined total</span><span className="font-semibold text-muted-foreground">Pending</span></div>
-          <p className="text-xs text-muted-foreground">Only provider-verified charges are displayed; no fabricated costs.</p>
+          <p className="text-sm text-muted-foreground">Only provider-verified charges are displayed; no fabricated costs.</p>
         </div>
       </Panel>
     </div>
@@ -109,8 +109,8 @@ export default function Dashboard() {
       <Panel title="Recent Calls" href="/calls">
         <div className="space-y-1">{recent.length ? recent.slice(0,5).map((call:any)=><Link key={call.id} href="/calls" className="flex items-center gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-secondary/60">
           <span className={`rounded-lg p-2 ${call.direction==="inbound"?"bg-emerald-500/10 text-emerald-600":"bg-blue-500/10 text-blue-600"}`}>{call.direction==="inbound"?<ArrowDownLeft className="h-4 w-4"/>:<ArrowUpRight className="h-4 w-4"/>}</span>
-          <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-foreground">{call.campaignContactName || call.callerName || call.contactName || displayNumber(call.direction==="inbound"?call.fromNumber||"":call.toNumber||"")}</p>
-          <p className="truncate text-xs text-muted-foreground">{displayNumber(call.direction==="inbound"?call.fromNumber||"":call.toNumber||"")}</p></div>
+          <div className="min-w-0 flex-1"><p className="truncate text-base font-semibold text-foreground">{call.campaignContactName || call.callerName || call.contactName || displayNumber(call.direction==="inbound"?call.fromNumber||"":call.toNumber||"")}</p>
+          <p className="truncate text-sm text-muted-foreground">{displayNumber(call.direction==="inbound"?call.fromNumber||"":call.toNumber||"")}</p></div>
           <div className="shrink-0 text-right text-xs text-muted-foreground">{new Date(call.createdAt).toLocaleDateString("en-CA",{month:"short",day:"numeric"})}<div>{call.duration ? `${Math.floor(call.duration/60)}:${String(call.duration%60).padStart(2,"0")}`:"—"}</div></div>
         </Link>) : <p className="py-10 text-center text-sm text-muted-foreground">No recent calls</p>}</div>
       </Panel>
@@ -123,7 +123,7 @@ export default function Dashboard() {
             {href:"/companies",name:"All Companies",Icon:Building2},
             {href:"/messages",name:"SMS Inbox",Icon:MessageSquare},
             {href:"/billing",name:"Billing & Costs",Icon:CreditCard},
-          ].map(({href,name,Icon})=><Link key={href} href={href} className="admin-quick flex items-center gap-3 rounded-xl border border-border bg-secondary/20 px-3 py-3 transition-all hover:border-primary/30 hover:bg-secondary/60"><Icon className="h-4 w-4 text-primary"/><span className="flex-1 text-sm font-medium text-foreground">{name}</span><ChevronRight className="h-4 w-4 text-muted-foreground"/></Link>)}
+          ].map(({href,name,Icon})=><Link key={href} href={href} className="admin-quick flex items-center gap-3 rounded-xl border border-border bg-secondary/20 px-3 py-3 transition-all hover:border-primary/30 hover:bg-secondary/60"><Icon className="h-5 w-5 text-primary"/><span className="flex-1 text-base font-semibold text-foreground">{name}</span><ChevronRight className="h-4 w-4 text-muted-foreground"/></Link>)}
         </div>
       </Panel>
     </div>
