@@ -10,6 +10,7 @@ import aiVoiceRouter from "./ai-voice";
 import dashboardRouter from "./dashboard";
 import costsRouter from "./costs";
 import twilioWebhooksRouter from "./twilio-webhooks";
+import telnyxVoiceWebhooksRouter from "./telnyx-voice-webhooks";
 import phoneRecBridgeRouter from "./phone-rec-bridge";
 import watchesRouter from "./watches";
 import smsRouter from "./sms";
