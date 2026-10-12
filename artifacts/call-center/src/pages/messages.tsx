@@ -193,14 +193,14 @@ export default function Messages() {
       </header>
 
       {noCompanyLines && (
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-300">
-          <div className="font-semibold">No phone line is connected to {scopedCompany?.name}.</div>
-          <div className="mt-1 text-xs text-amber-300/75">Connect a phone line before this company can send or receive SMS messages.</div>
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-foreground">
+          <div className="font-bold text-amber-700">No phone line is connected to {scopedCompany?.name}.</div>
+          <div className="mt-1 text-sm font-medium text-foreground">Connect a phone line before this company can send or receive SMS messages.</div>
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 gap-4">
-        <Card className={`${selected ? "hidden md:flex md:w-[320px] lg:w-[360px]" : "flex w-full"} min-h-[480px] flex-col overflow-hidden border-border md:min-h-0 md:flex-shrink-0`}>
+      <div className="flex min-h-0 min-w-0 flex-1 gap-4">
+        <Card className={`${selected ? "hidden md:flex md:w-[320px] lg:w-[360px]" : conversations.length === 0 ? "flex w-full" : "flex w-full md:w-[320px] lg:w-[360px]"} min-w-0 min-h-[480px] flex-col overflow-hidden border-border md:min-h-0 md:flex-shrink-0`}>
           <div className="flex-shrink-0 space-y-2 border-b border-border p-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -220,9 +220,9 @@ export default function Messages() {
               <div className="divide-y divide-border">{Array.from({ length: 5 }).map((_, index) => <div key={index} className="flex gap-3 p-4"><Skeleton className="h-10 w-10 flex-shrink-0 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-full" /></div></div>)}</div>
             ) : conversations.length === 0 ? (
               <div className="flex h-full min-h-[360px] flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground">
-                <MessageSquare className="h-10 w-10 opacity-30" />
+                <MessageSquare className="h-10 w-10 opacity-60" />
                 <p className="text-sm font-medium">No conversations found</p>
-                <p className="text-xs opacity-70">{search ? "Try a different search." : noCompanyLines ? "Connect a phone line first." : "Incoming and outgoing SMS conversations will appear here."}</p>
+                <p className="text-sm text-muted-foreground">{search ? "Try a different search." : noCompanyLines ? "Connect a phone line first." : "Incoming and outgoing SMS conversations will appear here."}</p>
               </div>
             ) : (
               <div className="divide-y divide-border">
@@ -279,9 +279,9 @@ export default function Messages() {
               <Button onClick={handleSend} disabled={!replyText.trim() || sending || noCompanyLines} size="icon" className="h-11 w-11 flex-shrink-0" aria-label="Send message"><Send className="h-4 w-4" /></Button>
             </div>
           </Card>
-        ) : (
+        ) : conversations.length > 0 ? (
           <Card className="hidden min-w-0 flex-1 items-center justify-center border-border text-muted-foreground md:flex"><div className="flex flex-col items-center gap-3 text-center"><MessageSquare className="h-10 w-10 opacity-30" /><p className="text-sm font-medium">Select a conversation</p><p className="text-xs opacity-70">Choose a customer from the inbox to view and reply.</p></div></Card>
-        )}
+        ) : null}
       </div>
     </div>
   );
