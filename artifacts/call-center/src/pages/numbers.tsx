@@ -38,6 +38,7 @@ export default function Numbers() {
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("CA");
   const [numberProvider, setNumberProvider] = useState<"telnyx" | "twilio">("telnyx");
+  const [purchaseCompanyId, setPurchaseCompanyId] = useState("");
   const [province, setProvince] = useState("ON");
   const [availableNumbers, setAvailableNumbers] = useState<any[]>([]);
   const [selectedResultCity, setSelectedResultCity] = useState<string | null>(null);
@@ -180,12 +181,14 @@ export default function Numbers() {
     finally { setTelnyxSetupBusy(false); }
   };
   const purchaseTelnyx = async (number: string) => {
-    if (!window.confirm(`Submit a BILLABLE Telnyx purchase order for ${number}? Recurring fees and activation requirements may apply. This will NOT automatically configure calling or SMS.`)) return;
+    const company = companies.find(c => String(c.id) === purchaseCompanyId);
+    if (!company) { toast({ title: "Choose a company", description: "Select the company that will own this number before buying.", variant: "destructive" }); return; }
+    if (!window.confirm(`Submit a BILLABLE Telnyx order for ${number}, assigned to ${company.name}? Provider charges and regulatory requirements may apply. CallingAgent will track activation; the number is NOT ready until verified.`)) return;
     setOrderingTelnyx(number);
     try {
       const response = await fetch(`${BASE}/api/phone-numbers/telnyx-order`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phoneNumber: number, confirmPurchase: true })
+        body: JSON.stringify({ phoneNumber: number, companyId: Number(purchaseCompanyId), confirmPurchase: true })
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not place Telnyx order");
@@ -373,8 +376,19 @@ export default function Numbers() {
                       <SelectItem value="twilio">Twilio</SelectItem>
                     </SelectContent>
                   </Select>
-                  {numberProvider === "telnyx" && <p className="text-xs text-amber-500">Telnyx purchases require confirmation and may incur recurring charges. Calls and SMS are not configured automatically.</p>}
+                  {numberProvider === "telnyx" && <p className="text-xs text-amber-500">Purchase requires confirmation. Company assignment is required. Track Telnyx voice and SMS activation in this portal; never assume a pending line is active.</p>}
                 </div>
+                {numberProvider === "telnyx" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Assign purchased number to company</Label>
+                    <Select value={purchaseCompanyId} onValueChange={setPurchaseCompanyId}>
+                      <SelectTrigger className="bg-background"><SelectValue placeholder="Select company before purchasing" /></SelectTrigger>
+                      <SelectContent>
+                        {companies.map(company => <SelectItem key={company.id} value={String(company.id)}>{company.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 {/* Search controls */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
