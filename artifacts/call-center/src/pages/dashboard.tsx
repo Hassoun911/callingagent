@@ -66,7 +66,7 @@ export default function Dashboard() {
       {kpis.map(({title,value,sub,Icon,tone,href},idx)=><Link key={title} href={href} className="admin-kpi min-w-0 rounded-2xl border border-border bg-card p-3.5 sm:p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
         <div className="flex items-center justify-between gap-2"><span className="text-xs sm:text-sm font-medium text-muted-foreground">{title}</span><span className={`rounded-lg p-2 ${tone}`}><Icon className="h-4 w-4"/></span></div>
         <div className="mt-2 text-2xl sm:text-3xl font-bold text-foreground">{isLoading ? "…" : value ?? "—"}</div>
-        <div className="mt-2 flex items-end justify-between gap-1"><p className="text-xs text-muted-foreground">{sub}</p><Sparkline values={idx===0 ? points.slice(-7).map(p=>p.inbound+p.outbound) : idx===1 ? [0,1,1,2,2,2,Number(value)||0] : idx===2 ? [0,0,1,1,2,3,Number(value)||0] : [0,0,0,1,1,1,Number(value)||0]} color={["#10b981","#3b82f6","#a855f7","#f59e0b"][idx]}/></div>
+        <div className="mt-2 flex items-end justify-between gap-1"><p className="text-xs text-muted-foreground">{sub}</p>{idx===0 ? <Sparkline values={points.slice(-7).map(p=>p.inbound+p.outbound)} color="#10b981"/> : <span className={`h-1.5 w-16 rounded-full ${idx===1?"bg-blue-500/40":idx===2?"bg-violet-500/40":"bg-amber-500/40"}`} aria-hidden="true"/>}</div>
       </Link>)}
     </div>
     <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,1fr)]">
