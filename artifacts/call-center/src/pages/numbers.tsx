@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import {
   useListPhoneNumbers,
@@ -38,7 +38,14 @@ export default function Numbers() {
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("CA");
   const [numberProvider, setNumberProvider] = useState<"telnyx" | "twilio">("telnyx");
-  const [purchaseCompanyId, setPurchaseCompanyId] = useState("");
+  // Preserve the company already selected in the admin navigation.
+  const requestedCompanyId = new URLSearchParams(window.location.search).get("companyId") || "";
+  const [purchaseCompanyId, setPurchaseCompanyId] = useState(requestedCompanyId);
+  useEffect(() => {
+    if (requestedCompanyId && companies.some(c => String(c.id) === requestedCompanyId)) {
+      setPurchaseCompanyId(requestedCompanyId);
+    }
+  }, [requestedCompanyId, companies]);
   const [province, setProvince] = useState("ON");
   const [availableNumbers, setAvailableNumbers] = useState<any[]>([]);
   const [selectedResultCity, setSelectedResultCity] = useState<string | null>(null);
@@ -381,13 +388,20 @@ export default function Numbers() {
                 </div>
                 {numberProvider === "telnyx" && (
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Assign purchased number to company</Label>
-                    <Select value={purchaseCompanyId} onValueChange={setPurchaseCompanyId}>
-                      <SelectTrigger className="bg-background"><SelectValue placeholder="Select company before purchasing" /></SelectTrigger>
-                      <SelectContent>
-                        {companies.map(company => <SelectItem key={company.id} value={String(company.id)}>{company.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-xs font-semibold">Company receiving this number</Label>
+                    {requestedCompanyId && companies.some(c => String(c.id) === requestedCompanyId) ? (
+                      <div className="rounded-md border border-primary/25 bg-primary/5 px-3 py-2 text-sm font-semibold text-foreground">
+                        {companies.find(c => String(c.id) === requestedCompanyId)?.name}
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">Already selected · Confirmed</span>
+                      </div>
+                    ) : (
+                      <Select value={purchaseCompanyId} onValueChange={setPurchaseCompanyId}>
+                        <SelectTrigger className="bg-background"><SelectValue placeholder="Select a company" /></SelectTrigger>
+                        <SelectContent>
+                          {companies.map(company => <SelectItem key={company.id} value={String(company.id)}>{company.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )>
                   </div>
                 )}
                 {/* Search controls */}
