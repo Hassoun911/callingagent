@@ -547,11 +547,11 @@ export default function CompanyDetail() {
             <Plus className="h-3.5 w-3.5" /> Add User
           </Button>
         </div>
-        <div className="px-4 py-2 bg-blue-500/5 border-b border-blue-500/10 text-xs text-blue-300/70 flex items-center justify-between gap-3">
+        <div className="px-4 py-2 bg-blue-500/10 border-b border-blue-500/20 text-xs text-foreground flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
             <Shield className="h-3.5 w-3.5 flex-shrink-0" />
             <span>Share this login link with company admins:</span>
-            <span className="font-mono text-blue-300 truncate">{window.location.origin}/?company={companyId}</span>
+            <span className="font-mono font-semibold text-primary truncate">{window.location.origin}/?company={companyId}</span>
           </div>
           <button
             onClick={() => {
@@ -560,7 +560,7 @@ export default function CompanyDetail() {
                 setTimeout(() => setCopiedUrl(false), 2000);
               });
             }}
-            className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border border-blue-500/20 hover:bg-blue-500/10 transition-colors flex-shrink-0"
+            className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium border border-blue-500/30 bg-card text-primary hover:bg-blue-500/10 transition-colors flex-shrink-0"
           >
             {copiedUrl ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
             {copiedUrl ? "Copied" : "Copy"}
@@ -570,7 +570,7 @@ export default function CompanyDetail() {
           <div className="p-4 space-y-2">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
         ) : portalUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-20 text-muted-foreground gap-1">
-            <Users className="h-5 w-5 opacity-25" />
+            <Users className="h-5 w-5 opacity-60" />
             <span className="text-xs">No portal users yet.</span>
           </div>
         ) : (
