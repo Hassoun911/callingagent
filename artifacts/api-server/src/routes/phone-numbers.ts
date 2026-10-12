@@ -89,9 +89,10 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
     if (tollFree) {
       const params: any = { limit: 20 };
       if (contains) params.contains = contains;
-      // Do not label US-assigned toll-free inventory as Canadian.
-      formatted = (await client.availablePhoneNumbers(country).tollFree.list(params)).map(format)
-        .filter(n => normalize(n.isoCountry) === normalize(country));
+      // NANP toll-free numbers are shared across the US and Canada. Twilio may
+      // return country metadata as US even for a Canada-selected search.
+      // Keep the inventory and expose the provider's actual country label.
+      formatted = (await client.availablePhoneNumbers(country).tollFree.list(params)).map(format);
     } else {
       // Apply the same exact-match → nearby → region fallback to any locality or area code.
       const targetCity = (city || "").trim();
