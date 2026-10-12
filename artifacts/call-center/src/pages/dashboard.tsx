@@ -248,25 +248,31 @@ export default function Dashboard() {
       )}
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(300px,1fr)]">
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <h2 className="font-semibold text-sm">Call activity snapshot</h2>
             <Link href="/calls" className="text-xs text-primary hover:underline">Explore calls →</Link>
           </div>
-          <div className="grid grid-cols-3 gap-4 divide-x divide-border">
-            <div><p className="text-xs text-muted-foreground">Inbound</p><p className="mt-2 text-2xl font-semibold">{stats?.inboundCalls ?? "—"}</p></div>
-            <div className="pl-4"><p className="text-xs text-muted-foreground">Outbound</p><p className="mt-2 text-2xl font-semibold">{stats?.outboundCalls ?? "—"}</p></div>
-            <div className="pl-4"><p className="text-xs text-muted-foreground">Avg. duration</p><p className="mt-2 text-2xl font-semibold">{stats ? formatDuration(stats.avgDuration) : "—"}</p></div>
+          <div className="grid grid-cols-1 gap-3 min-[390px]:grid-cols-3 min-[390px]:gap-4">
+            <div className="rounded-lg bg-secondary/35 p-3 min-[390px]:bg-transparent min-[390px]:p-0">
+              <p className="text-xs text-muted-foreground">Inbound</p><p className="mt-1 text-xl font-semibold sm:mt-2 sm:text-2xl">{stats?.inboundCalls ?? "—"}</p>
+            </div>
+            <div className="rounded-lg bg-secondary/35 p-3 min-[390px]:bg-transparent min-[390px]:p-0">
+              <p className="text-xs text-muted-foreground">Outbound</p><p className="mt-1 text-xl font-semibold sm:mt-2 sm:text-2xl">{stats?.outboundCalls ?? "—"}</p>
+            </div>
+            <div className="rounded-lg bg-secondary/35 p-3 min-[390px]:bg-transparent min-[390px]:p-0">
+              <p className="text-xs text-muted-foreground">Avg. duration</p><p className="mt-1 text-xl font-semibold sm:mt-2 sm:text-2xl">{stats ? formatDuration(stats.avgDuration) : "—"}</p>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground mt-5">Live totals from the CallingAgent call statistics API.</p>
         </div>
-        <div className="rounded-xl border border-border bg-card p-5">
+        <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3 mb-4">
             <h2 className="font-semibold text-sm">Provider costs</h2>
             <Link href="/billing" className="text-xs text-primary hover:underline">Full breakdown →</Link>
           </div>
           <div className="space-y-3 text-sm">
-            <div className="flex justify-between gap-3"><span>Twilio</span><span className="font-semibold">{providerCosts?.twilio?.available ? `${providerCosts.twilio.currency || "USD"} ${Number(providerCosts.twilio.totalCost).toFixed(2)}` : "Unavailable"}</span></div>
+            <div className="flex flex-wrap justify-between gap-2"><span>Twilio</span><span className="font-semibold">{providerCosts?.twilio?.available ? `${providerCosts.twilio.currency || "USD"} ${Number(providerCosts.twilio.totalCost).toFixed(2)}` : "Unavailable"}</span></div>
             <div className="border-t border-border pt-3 flex justify-between gap-3"><span>Telnyx</span><span className="text-muted-foreground">Awaiting verified billing</span></div>
             <div className="border-t border-border pt-3 flex justify-between gap-3"><span className="font-semibold">Combined total</span><span className="text-muted-foreground">Pending</span></div>
           </div>
