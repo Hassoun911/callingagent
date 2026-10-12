@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import {
   useListPhoneNumbers,
+  useListCompanies,
   useProvisionPhoneNumber,
   getListPhoneNumbersQueryKey,
 } from "@workspace/api-client-react";
@@ -26,6 +27,8 @@ const REGION_OPTIONS: Record<string, { code: string; name: string }[]> = {
 
 export default function Numbers() {
   const { data: numbers, isLoading } = useListPhoneNumbers();
+  const { data: companies = [] } = useListCompanies();
+  const companyNames = new Map(companies.map(company => [company.id, company.name]));
   const { data: watches, isLoading: watchesLoading } = useWatches();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -668,10 +671,12 @@ export default function Numbers() {
 
       {/* Numbers table */}
       <Card className="border-border">
-        <Table className="min-w-[690px] text-sm sm:text-base">
+        <Table className="min-w-[900px] text-sm sm:text-base">
           <TableHeader>
             <TableRow className="border-border hover:bg-transparent">
-              <TableHead className="w-[200px]">Number</TableHead>
+              <TableHead className="min-w-[170px]">Phone Number</TableHead>
+              <TableHead>Company</TableHead>
+              <TableHead>API Provider</TableHead>
               <TableHead>Name / Caller ID</TableHead>
               <TableHead>Mode</TableHead>
               <TableHead>Routing</TableHead>
@@ -691,7 +696,7 @@ export default function Numbers() {
               ))
             ) : numbers?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-12">
+                <TableCell colSpan={7} className="text-center py-12">
                   <div className="flex flex-col items-center justify-center text-muted-foreground">
                     <Hash className="h-8 w-8 mb-4 opacity-50" />
                     <p>No numbers provisioned yet.</p>
@@ -703,9 +708,12 @@ export default function Numbers() {
                 <TableCell className="font-mono text-base sm:text-lg font-bold text-foreground">
                   <div className="flex items-center gap-2">
                     <Phone className="h-3 w-3 text-muted-foreground" />
-                    {num.friendlyName}
+                    {num.number}
                   </div>
+                  <div className="mt-1 text-xs font-normal text-muted-foreground">{num.friendlyName}</div>
                 </TableCell>
+                <TableCell className="font-semibold text-foreground">{num.companyId ? companyNames.get(num.companyId) || `Company #${num.companyId}` : "Unassigned"}</TableCell>
+                <TableCell><span className={`rounded-md px-2 py-1 text-xs font-bold ${num.twilioSid ? "bg-rose-500/10 text-rose-600" : "bg-amber-500/10 text-amber-700"}`}>{num.twilioSid ? "Twilio" : "Unverified"}</span></TableCell>
                 <TableCell>
                   <div className="text-sm sm:text-base font-semibold text-foreground">{num.callerIdName}</div>
                 </TableCell>
