@@ -310,3 +310,18 @@
 .admin-dashboard-light .admin-overview .rounded-xl { border-radius: 14px; }
 .admin-dashboard-light .admin-overview { letter-spacing: -.005em; }
 .admin-dashboard-dark .admin-overview .rounded-xl { border-radius: 14px; }
+
+/* Explicit contrast for the main-admin light palette (legacy utilities are dark-first). */
+.admin-dashboard-light .admin-overview { color: #15243b; }
+.admin-dashboard-light .admin-overview .text-foreground { color: #15243b !important; }
+.admin-dashboard-light .admin-overview .text-muted-foreground { color: #56677e !important; }
+.admin-dashboard-light .admin-overview .text-primary { color: #086ac8 !important; }
+.admin-dashboard-light .admin-overview .text-primary-foreground { color: #ffffff !important; }
+.admin-dashboard-light .admin-overview .bg-card { background-color: #ffffff !important; }
+.admin-dashboard-light .admin-overview .bg-primary { background-color: #086ac8 !important; }
+.admin-dashboard-light .admin-overview .bg-secondary { background-color: #edf3fa !important; }
+.admin-dashboard-light .admin-overview .border-border { border-color: #dae4f0 !important; }
+.admin-dashboard-light .admin-overview .text-emerald-600 { color: #047857 !important; }
+.admin-dashboard-light .admin-overview .text-blue-600 { color: #125ac0 !important; }
+.admin-dashboard-light .admin-overview .text-violet-600 { color: #703eb5 !important; }
+.admin-dashboard-light .admin-overview .text-amber-600 { color: #aa6208 !important; }
