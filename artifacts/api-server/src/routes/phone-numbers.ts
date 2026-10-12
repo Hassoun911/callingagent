@@ -306,6 +306,81 @@ router.post("/phone-numbers/telnyx-order", async (req, res): Promise<void> => {
   }
 });
 
+// Telnyx order and number status are queried live; submitting an order is not activation.
+router.get("/phone-numbers/telnyx-orders/:orderId", async (req, res): Promise<void> => {
+  if (getCompanyScope(req) !== null) { res.status(403).json({ error: "Admin access required." }); return; }
+  if (!process.env.TELNYX_API_KEY) { res.status(503).json({ error: "Telnyx API key missing." }); return; }
+  const orderId = req.params.orderId;
+  if (!/^[a-zA-Z0-9-]{1,100}$/.test(orderId)) { res.status(400).json({ error: "Invalid order ID." }); return; }
+  try {
+    const response = await fetch("https://api.telnyx.com/v2/number_orders/" + encodeURIComponent(orderId), {
+      headers: { Authorization: "Bearer " + process.env.TELNYX_API_KEY, Accept: "application/json" },
+      signal: AbortSignal.timeout(12000),
+    });
+    const payload: any = await response.json();
+    if (!response.ok) { res.status(502).json({ error: payload.errors?.[0]?.detail || "Could not verify Telnyx order." }); return; }
+    const order = payload.data ?? {};
+    res.json({
+      orderId: order.id ?? orderId,
+      status: order.status ?? "unknown",
+      requirementsMet: order.requirements_met ?? null,
+      phoneNumbers: (Array.isArray(order.phone_numbers) ? order.phone_numbers : []).map((n: any) => ({
+        number: n.phone_number ?? null, status: n.status ?? null,
+      })),
+    });
+  } catch (error: any) {
+    req.log.error({ error: error?.message }, "Telnyx order status request failed");
+    res.status(502).json({ error: "Could not fetch live Telnyx order status." });
+  }
+});
+
+// Apply routing to an owned Telnyx number, only using server-approved connection/profile IDs.
+// Voice webhook delivery must separately be supported by the chosen Telnyx connection.
+router.post("/phone-numbers/telnyx-setup", async (req, res): Promise<void> => {
+  if (getCompanyScope(req) !== null) { res.status(403).json({ error: "Admin access required." }); return; }
+  const number = req.body?.phoneNumber;
+  if (typeof number !== "string" || !/^\\+[1-9]\\d{7,14}$/.test(number)) {
+    res.status(400).json({ error: "A valid phone number is required." }); return;
+  }
+  const apiKey = process.env.TELNYX_API_KEY;
+  const connectionId = process.env.TELNYX_CONNECTION_ID;
+  const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;
+  if (!apiKey || (!connectionId && !messagingProfileId)) {
+    res.status(409).json({ error: "Set TELNYX_CONNECTION_ID and/or TELNYX_MESSAGING_PROFILE_ID on the CallingAgent server before setup." }); return;
+  }
+  try {
+    const headers = { Authorization: "Bearer " + apiKey, Accept: "application/json", "Content-Type": "application/json" };
+    const lookup = await fetch("https://api.telnyx.com/v2/phone_numbers?filter[phone_number]=" + encodeURIComponent(number), {
+      headers, signal: AbortSignal.timeout(12000),
+    });
+    const found: any = await lookup.json();
+    if (!lookup.ok) { res.status(502).json({ error: found.errors?.[0]?.detail || "Telnyx number lookup failed." }); return; }
+    const owned = (Array.isArray(found.data) ? found.data : []).find((n: any) => n.phone_number === number);
+    if (!owned?.id) { res.status(404).json({ error: "Number is not yet active in this Telnyx account. Check its order status and requirements." }); return; }
+    const results: Record<string, string> = {};
+    if (connectionId) {
+      const reply = await fetch("https://api.telnyx.com/v2/phone_numbers/" + encodeURIComponent(owned.id), {
+        method: "PATCH", headers, body: JSON.stringify({ connection_id: connectionId }), signal: AbortSignal.timeout(12000),
+      });
+      const data: any = await reply.json();
+      if (!reply.ok) { res.status(502).json({ error: data.errors?.[0]?.detail || "Telnyx voice connection assignment failed.", results }); return; }
+      results.voice = "connection assigned";
+    }
+    if (messagingProfileId) {
+      const reply = await fetch("https://api.telnyx.com/v2/phone_numbers/" + encodeURIComponent(owned.id) + "/messaging", {
+        method: "PATCH", headers, body: JSON.stringify({ messaging_profile_id: messagingProfileId }), signal: AbortSignal.timeout(12000),
+      });
+      const data: any = await reply.json();
+      if (!reply.ok) { res.status(502).json({ error: data.errors?.[0]?.detail || "Telnyx messaging profile assignment failed.", results }); return; }
+      results.sms = "messaging profile assigned";
+    }
+    res.json({ phoneNumber: number, results, warning: "Assignments completed. Test inbound/outbound calling and messaging; carrier registration and application webhooks may still be required." });
+  } catch (error: any) {
+    req.log.error({ error: error?.message }, "Telnyx number setup failed");
+    res.status(502).json({ error: "Telnyx configuration status is uncertain. Verify before retrying." });
+  }
+});
+
 // Import an existing Twilio number into CallingAgent
 router.post("/phone-numbers/import", async (req, res): Promise<void> => {
   const { number, friendlyName } = req.body ?? {};
