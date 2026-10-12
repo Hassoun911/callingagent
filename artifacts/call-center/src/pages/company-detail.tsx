@@ -766,7 +766,7 @@ export default function CompanyDetail() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Need a new number? <button className="text-primary underline" onClick={() => { setLinkDialog(false); navigate("/numbers"); }}>Provision one here.</button>
+              Need a new number? <button className="text-primary underline" onClick={() => { setLinkDialog(false); navigate(`/numbers?companyId=${companyId}&provision=1`); }}>Provision one here.</button>
             </p>
           </div>
           <div className="flex justify-end gap-2 pt-2">
