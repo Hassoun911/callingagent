@@ -87,12 +87,28 @@ router.get("/phone-numbers/search", async (req, res): Promise<void> => {
     });
     let formatted: ReturnType<typeof format>[] = [];
     if (tollFree) {
-      const params: any = { limit: 20 };
-      if (contains) params.contains = contains;
-      // NANP toll-free numbers are shared across the US and Canada. Twilio may
-      // return country metadata as US even for a Canada-selected search.
-      // Keep the inventory and expose the provider's actual country label.
-      formatted = (await client.availablePhoneNumbers(country).tollFree.list(params)).map(format);
+      // Query all seven NANP toll-free prefixes independently. Twilio's default
+      // 20-result sample cannot represent complete prefix coverage.
+      const prefixes = ["800", "833", "844", "855", "866", "877", "888"];
+      const requestedPrefix = typeof req.query.tollFreePrefix === "string" ? req.query.tollFreePrefix : "";
+      if (requestedPrefix && !prefixes.includes(requestedPrefix)) {
+        res.status(400).json({ error: "Invalid toll-free prefix." });
+        return;
+      }
+      const selected = requestedPrefix ? [requestedPrefix] : prefixes;
+      const batches = await Promise.all(selected.map(async prefix => {
+        try {
+          const params: any = { areaCode: Number(prefix), limit: 100 };
+          if (contains) params.contains = contains;
+          return (await client.availablePhoneNumbers(country).tollFree.list(params)).map(format)
+            .filter(n => n.phoneNumber?.replace(/^\\+1/, "").startsWith(prefix));
+        } catch (err) {
+          req.log.warn({ err, prefix, country }, "Toll-free prefix search failed");
+          return [];
+        }
+      }));
+      formatted = [...new Map(batches.flat().map(n => [n.phoneNumber, n])).values()]
+        .sort((a, b) => a.phoneNumber.localeCompare(b.phoneNumber));
     } else {
       // Apply the same exact-match → nearby → region fallback to any locality or area code.
       const targetCity = (city || "").trim();
