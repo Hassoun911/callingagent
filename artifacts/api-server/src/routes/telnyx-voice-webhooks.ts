@@ -12,7 +12,7 @@ function isSigned(req: any): boolean {
   const raw: Buffer | undefined = req.rawBody;
   const stamp = req.get("telnyx-timestamp");
   const sig = req.get("telnyx-signature-ed25519");
-  if (!key || !raw || !stamp || !sig || !/^\\d+$/.test(stamp)) return false;
+  if (!key || !raw || !stamp || !sig || !/^\d+$/.test(stamp)) return false;
   if (Math.abs(Date.now() / 1000 - Number(stamp)) > keepSeconds) return false;
   try {
     const bytes = Buffer.from(key, "base64");
@@ -60,7 +60,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
         ? await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, destination))
         : [];
       const forwardTo = line?.forwardTo;
-      if (forwardTo && /^\\+[1-9]\\d{7,14}$/.test(forwardTo)) {
+      if (forwardTo && /^\+[1-9]\d{7,14}$/.test(forwardTo)) {
         await action(id, "transfer", { to: forwardTo });
       } else {
         await action(id, "speak", {
