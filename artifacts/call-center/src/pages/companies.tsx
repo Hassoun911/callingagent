@@ -403,7 +403,7 @@ export default function Companies() {
                     <span className="text-border/60">|</span>
                     <button type="button" disabled={createMutation.isPending} className="font-semibold text-primary hover:underline disabled:opacity-50" onClick={createCompanyAndProvision}>
                       {createMutation.isPending ? "Saving company…" : "Save company & provision new"}
-                    </button>             </Link>
+                    </button>
                   </div>
                 )}
 
