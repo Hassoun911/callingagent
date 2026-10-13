@@ -694,7 +694,7 @@ export default function CompanyDetail() {
             <div className="border-t border-border pt-3 space-y-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">AI Booking Notifications</p>
               <div><Label className="text-xs">Admin Notification Email</Label><Input className="mt-1 bg-background text-xs" placeholder="admin@company.com" value={companyForm.adminNotificationEmail} onChange={e => setCompanyForm(f => ({ ...f, adminNotificationEmail: e.target.value }))} /></div>
-              <div><Label className="text-xs">Admin WhatsApp Number</Label><Input className="mt-1 bg-background text-xs font-mono" placeholder="+1 555 000 0000" value={companyForm.adminWhatsapp} onChange={e => setCompanyForm(f => ({ ...f, adminWhatsapp: e.target.value }))} /></div>
+              <div><Label className="text-xs">Admin Notification Phone (SMS/MMS; WhatsApp where supported)</Label><Input className="mt-1 bg-background text-xs font-mono" placeholder="+1 555 000 0000" value={companyForm.adminWhatsapp} onChange={e => setCompanyForm(f => ({ ...f, adminWhatsapp: e.target.value }))} /></div>
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
