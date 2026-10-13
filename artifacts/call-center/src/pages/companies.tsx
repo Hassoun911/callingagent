@@ -133,6 +133,23 @@ export default function Companies() {
     setDialogOpen(true);
   };
 
+  // A phone number purchase must belong to an existing company. Save this form
+  // before leaving, instead of losing the draft and reaching an unassigned checkout.
+  const createCompanyAndProvision = async () => {
+    if (!formData.name.trim()) {
+      toast({ title: "Company name required", description: "Enter a company name before provisioning its number.", variant: "destructive" });
+      return;
+    }
+    if (createMutation.isPending) return;
+    try {
+      const company = await createMutation.mutateAsync({ data: formData });
+      if (!company?.id) throw new Error("Company was saved but no ID was returned. Check the Companies list before retrying.");
+      navigate(`/numbers?provision=1&companyId=${company.id}`);
+    } catch (error: any) {
+      toast({ title: "Could not continue to provisioning", description: error?.message || "Please review the company information and try again.", variant: "destructive" });
+    }
+  };
+
   const handleInlineImport = async () => {
     const num = inlineImportNumber.trim();
     if (!num) return;
@@ -384,13 +401,9 @@ export default function Companies() {
                       Import existing
                     </button>
                     <span className="text-border/60">|</span>
-                    <Link
-                      href="/numbers"
-                      className="text-primary hover:underline"
-                      onClick={() => setDialogOpen(false)}
-                    >
-                      Provision new
-                    </Link>
+                    <button type="button" disabled={createMutation.isPending} className="font-semibold text-primary hover:underline disabled:opacity-50" onClick={createCompanyAndProvision}>
+                      {createMutation.isPending ? "Saving company…" : "Save company & provision new"}
+                    </button>             </Link>
                   </div>
                 )}
 
