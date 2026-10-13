@@ -71,7 +71,7 @@ async function notifyAdminOfVoicemail(logSid: string, recordingUrl: string) {
 
 // Outbound leg ownership is encoded in signed carrier-returned client_state and kept
 // in memory for webhook sequencing. A deployment restart may interrupt an active transfer.
-const outboundToInbound = new Map<string, { inbound: string; lineId: number; bridged: boolean; pressOne: boolean }>();
+const outboundToInbound = new Map<string, { inbound: string; lineId: number; bridged: boolean; pressOne: boolean; displayName: string }>();
 const incomingToOutbound = new Map<string, string>();
 
 async function startControlledForward(inbound: string, line: typeof phoneNumbersTable.$inferSelect) {
@@ -98,7 +98,7 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
   const result: any = await response.json();
   const outbound = result?.data?.call_control_id;
   if (typeof outbound !== "string") throw new Error("Telnyx dial did not return an outbound leg");
-  outboundToInbound.set(outbound, { inbound, lineId: line.id, bridged: false, pressOne: Boolean(line.callScreen) });
+  outboundToInbound.set(outbound, { inbound, lineId: line.id, bridged: false, pressOne: Boolean(line.callScreen), displayName: (line.callerIdName?.trim() || line.friendlyName?.trim() || "your business").slice(0, 50) });
   // Carrier accepted the dial command; this does not mean the destination handset rang.
 
   incomingToOutbound.set(inbound, outbound);
@@ -147,7 +147,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       if (state.pressOne) {
         // Immediate DTMF verification, rather than waiting on ambiguous machine detection.
         await action(id, "gather_using_speak", {
-          payload: "You have a forwarded business call. Press 1 now to accept.",
+          payload: "Incoming forwarded call for " + (state.displayName || "your business") + ". Press 1 now to accept.",
           voice: "female", language: "en-US", valid_digits: "1",
           maximum_digits: 1, minimum_digits: 1,
           initial_timeout_millis: 9000, timeout_millis: 9000,
