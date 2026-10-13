@@ -186,6 +186,11 @@ export default function NumberDetail() {
   const [promptHelperOpen, setPromptHelperOpen] = useState(false);
   const [helperDetails, setHelperDetails] = useState({ business: "", description: "", address: "", hours: "", services: "", instructions: "", tone: "friendly", length: "standard", language: "English" });
   const [helperDraft, setHelperDraft] = useState("");
+  const [helperGreeting, setHelperGreeting] = useState("");
+  const [helperGenerating, setHelperGenerating] = useState(false);
+  const [helperQuestions, setHelperQuestions] = useState<string[]>([]);
+  const [helperRecommendations, setHelperRecommendations] = useState<string[]>([]);
+  const [helperError, setHelperError] = useState("");
   const [helperListening, setHelperListening] = useState(false);
   const helperSpeechRef = useRef<any>(null);
 
@@ -215,6 +220,24 @@ export default function NumberDetail() {
     setHelperDraft(draft);
   };
 
+  const generateSmartDraft = async () => {
+    setHelperGenerating(true);
+    setHelperError("");
+    try {
+      const response = await fetch(`${BASE}/api/ai-voice/numbers/${numId}/studio-draft`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(helperDetails),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to generate receptionist");
+      if (data.numberId !== numId || data.companyId !== number?.companyId) throw new Error("Number ownership mismatch");
+      setHelperDraft(data.systemPrompt || "");
+      setHelperGreeting(data.greeting || "");
+      setHelperQuestions(data.missingQuestions || []);
+      setHelperRecommendations(data.recommendations || []);
+    } catch (error: any) { setHelperError(error.message || "Please retry"); }
+    finally { setHelperGenerating(false); }
+  };
   const dictatePromptDetails = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -750,11 +773,11 @@ export default function NumberDetail() {
                 <div className="rounded-xl border-2 border-primary/25 bg-primary/5 p-4 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-base font-extrabold text-foreground">AI Prompt Helper</p>
+                      <p className="text-base font-extrabold text-foreground">AI Receptionist Studio</p>
                       <p className="text-xs text-muted-foreground">Create a receptionist prompt for this number only. Nothing is saved until you approve and save changes.</p>
                     </div>
                     <Button size="sm" variant="outline" onClick={() => setPromptHelperOpen(open => !open)} type="button">
-                      {promptHelperOpen ? "Hide helper" : "Build my AI prompt"}
+                      {promptHelperOpen ? "Hide helper" : "Launch studio"}
                     </Button>
                   </div>
                   {promptHelperOpen && (
@@ -775,12 +798,18 @@ export default function NumberDetail() {
                         <div className="flex items-center justify-between gap-2"><Label>Other instructions (type or speak)</Label><Button type="button" size="sm" variant="outline" onClick={dictatePromptDetails}><Mic className="h-3.5 w-3.5 mr-1" />{helperListening ? "Stop recording" : "Speak instructions"}</Button></div>
                         <Textarea value={helperDetails.instructions} placeholder="Tell us what the AI should do, how to greet callers, what questions to ask, and when to refer to a person." onChange={e => setHelperDetails(p => ({...p,instructions:e.target.value}))}/>
                       </div>
-                      <Button type="button" onClick={generateNumberPrompt} className="w-full sm:w-auto">Generate suggested prompt</Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" disabled={helperGenerating} onClick={generateSmartDraft}>{helperGenerating ? "AI is preparing your draft…" : "Generate with AI"}</Button>
+                        <Button type="button" variant="outline" onClick={generateNumberPrompt}>Quick offline template</Button>
+                      </div>
+                      {helperError && <p role="alert" className="text-sm text-destructive">{helperError}</p>}
+                      {helperQuestions.length > 0 && <div className="rounded-md border p-3 space-y-1"><p className="font-semibold text-sm">Questions that will make your receptionist smarter</p>{helperQuestions.map((q,i)=><p key={i} className="text-sm">{i+1}. {q}</p>)}<p className="text-xs text-muted-foreground">Answer these in Other instructions, then regenerate.</p></div>}
+                      {helperRecommendations.length > 0 && <div className="rounded-md border p-3 space-y-1"><p className="font-semibold text-sm">Recommended improvements</p>{helperRecommendations.map((item,i)=><p key={i} className="text-sm">• {item}</p>)}</div>}
                       {helperDraft && (
                         <div className="space-y-2">
-                          <Label>Review and edit before applying</Label>
+                          <Label>Review and edit before applying</Label><Label>Proposed greeting</Label><Input value={helperGreeting} onChange={e=>setHelperGreeting(e.target.value)} placeholder="Write the first greeting for this number" />
                           <Textarea className="min-h-64 bg-background text-sm" value={helperDraft} onChange={e => setHelperDraft(e.target.value)}/>
-                          <Button type="button" onClick={() => { setFormData((p:any)=>({...p,aiSystemPrompt:helperDraft,aiGreeting:p.aiGreeting || `Thank you for calling ${helperDetails.business}. How can I help you today?`})); setPromptHelperOpen(false); toast({title:"Draft applied to this number",description:"Review the fields below, then click Save Changes to store your settings."}); }}>Apply to this number (not saved yet)</Button>
+                          <Button type="button" onClick={() => { setFormData((p:any)=>({...p,aiSystemPrompt:helperDraft,aiGreeting:helperGreeting || p.aiGreeting || `Thank you for calling ${helperDetails.business}. How can I help you today?`})); setPromptHelperOpen(false); toast({title:"Draft applied to this number",description:"Review the fields below, then click Save Changes to store your settings."}); }}>Apply to this number (not saved yet)</Button>
                         </div>
                       )}
                     </div>
