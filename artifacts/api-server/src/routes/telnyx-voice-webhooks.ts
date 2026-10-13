@@ -346,10 +346,31 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       if (!state.bridged) {
         const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, state.lineId));
         if (line && line.isActive) {
-          try { await startSystemVoicemail(state.inbound, line, "unknown"); }
-          catch (error: any) { req.log.error({ message: error?.message }, "Failed to return unanswered forward to system voicemail"); }
+          let retryStarted = false;
+          if (state.team) {
+            while (state.team.remaining.length > 0) {
+              const nextPhone = state.team.remaining.shift()!;
+              try {
+                await startControlledForward(state.inbound, line, {
+                  phone: nextPhone, display: state.team.extension,
+                  ringCount: line.ringCount, team: state.team,
+                });
+                req.log.info({ lineId: line.id, department: state.team.extension }, "Ringing next extension member");
+                retryStarted = true;
+                break;
+              } catch (error: any) {
+                req.log.error({ department: state.team.extension, message: error?.message }, "Extension member dial failed; trying next");
+              }
+            }
+          }
+          if (!retryStarted) {
+            try { await startSystemVoicemail(state.inbound, line, "unknown", state.team?.extension); }
+            catch (error: any) { req.log.error({ message: error?.message }, "Failed to return unanswered forward to system voicemail"); }
+          }
         }
       }
+    } else if (type === "call.hangup" && ivrMenus.has(id)) {
+      ivrMenus.delete(id);
     } else if (type === "call.hangup" && incomingToOutbound.has(id)) {
       const outbound = incomingToOutbound.get(id)!;
       incomingToOutbound.delete(id);
