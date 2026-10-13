@@ -8,9 +8,6 @@ import {
   useTestCall,
   useGetPhoneNumberTwilioStatus,
   useListElevenLabsVoices,
-  useGetAiVoiceConfig,
-  useUpdateAiVoiceConfig,
-  getGetAiVoiceConfigQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,7 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { GlobalAiSettingsDialog, GLOBAL_AI_LANGUAGES } from "@/components/GlobalAiSettingsDialog";
+import { GLOBAL_AI_LANGUAGES } from "@/components/GlobalAiSettingsDialog";
 
 const PRESET_HOLD = "Connecting your call, please hold.";
 
@@ -155,8 +152,8 @@ export default function NumberDetail() {
     enabled: !isNaN(numId),
   });
 
-  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
-  const { data: globalAiConfig } = useGetAiVoiceConfig();
+
+
 
   const [newCampaignDialog, setNewCampaignDialog] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState("");
@@ -549,49 +546,16 @@ export default function NumberDetail() {
             <CardContent className="space-y-5 border-t border-border animate-in fade-in duration-200">
 
                 {/* Global Defaults summary */}
-                {globalAiConfig && (
-                  <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Global Defaults</span>
-                      <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground" onClick={() => setAiSettingsOpen(true)}>
-                        <Settings2 className="h-3.5 w-3.5" />
-                        Configure AI Defaults
-                      </Button>
-                    </div>
-                    <div className="flex flex-wrap gap-x-5 gap-y-1">
-                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <span className="text-foreground/60 uppercase tracking-wide font-mono text-[10px]">Engine</span>
-                        <span className="text-foreground">{(globalAiConfig as any).aiVoiceEngine === "elevenlabs" ? "ElevenLabs" : "OpenAI TTS"}</span>
-                      </span>
-                      {globalAiConfig.voice && (
-                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <span className="text-foreground/60 uppercase tracking-wide font-mono text-[10px]">Voice</span>
-                          <span className="text-foreground capitalize">{globalAiConfig.voice}</span>
-                        </span>
-                      )}
-                      {globalAiConfig.language && (
-                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Globe className="h-3 w-3" />
-                          <span className="text-foreground">{GLOBAL_AI_LANGUAGES.find(l => l.id === globalAiConfig.language)?.label ?? globalAiConfig.language}</span>
-                        </span>
-                      )}
-                      {globalAiConfig.greeting && (
-                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
-                          <span className="text-foreground/60 uppercase tracking-wide font-mono text-[10px] shrink-0">Greeting</span>
-                          <span className="text-foreground truncate max-w-[260px]">{globalAiConfig.greeting}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-                <GlobalAiSettingsDialog open={aiSettingsOpen} onOpenChange={setAiSettingsOpen} />
-
+                <div className="rounded-lg border border-primary/25 bg-primary/5 p-3">
+                  <p className="text-sm font-bold">Private AI settings for this phone number</p>
+                  <p className="text-xs text-muted-foreground mt-1">Changes here apply only to {number.number}. They do not modify other companies or phone numbers. Blank fields will not import another company's greeting or prompt.</p>
+                </div>
                 {/* Voice Engine */}
                 <div className="space-y-2 pt-2 border-t border-border">
                   <Label className="text-green-400">Voice Engine</Label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { value: "",           label: "Global default" },
+                      { value: "",           label: "Use number default" },
                       { value: "openai",     label: "OpenAI TTS"    },
                       { value: "elevenlabs", label: "ElevenLabs"    },
                     ].map(opt => (
@@ -709,7 +673,7 @@ export default function NumberDetail() {
                 <div className="space-y-2">
                   <Label className="text-green-400">Speaking Style</Label>
                   <Textarea
-                    placeholder="e.g. Speak warmly and naturally, use brief pauses, sound professional but approachable. (Leave blank to use global default)"
+                    placeholder="e.g. Speak warmly and naturally, use brief pauses, sound professional but approachable. (Leave blank to use number default)"
                     value={formData.aiSpeakingStyle}
                     onChange={(e) => setFormData({...formData, aiSpeakingStyle: e.target.value})}
                     className="h-16 bg-background text-sm resize-none"
