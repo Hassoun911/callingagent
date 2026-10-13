@@ -177,6 +177,34 @@ export default function Numbers() {
     await queryClient.invalidateQueries({ queryKey: getListPhoneNumbersQueryKey() });
     return data;
   };
+  const autoSetupRef = useRef<string | null>(null);
+  const finishTelnyxSetup = async (orderId: string, phoneNumber: string, companyId: number) => {
+    if (autoSetupRef.current === orderId) return;
+    autoSetupRef.current = orderId;
+    setTelnyxSetupBusy(true);
+    setTelnyxSetupResult("Purchase confirmed. Automatically registering the number and configuring Telnyx voice and SMS…");
+    try {
+      await registerPurchasedOrder(orderId, phoneNumber, companyId);
+      const response = await fetch(`${BASE}/api/phone-numbers/telnyx-setup`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber, companyId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Automatic setup was not completed");
+      setRoutingConfigured(Boolean(data.inboundEnabled));
+      setTelnyxSetupResult(data.inboundEnabled
+        ? "Automatic voice setup succeeded and incoming calls are enabled. Test inbound/outbound voice and SMS before customer use."
+        : "The number was registered, but voice activation needs attention. Run Configure voice & SMS again.");
+      await queryClient.invalidateQueries({ queryKey: getListPhoneNumbersQueryKey() });
+      toast({ title: data.inboundEnabled ? "Number activated — testing required" : "Setup requires attention", description: data.warning || "Review voice and SMS configuration." });
+    } catch (error: any) {
+      setTelnyxSetupResult(`Automatic setup needs attention: ${error?.message || "Unknown error"}. Your purchase remains saved. Use Configure voice & SMS to retry.`);
+      toast({ title: "Automatic activation incomplete", description: error?.message || "Check setup status.", variant: "destructive" });
+    } finally {
+      autoSetupRef.current = null;
+      setTelnyxSetupBusy(false);
+    }
+  };
   const recoverPurchasedNumber = async () => {
     const companyId = Number(purchaseCompanyId);
     if (!companyId) { setRecoverError("Select a company first."); return; }
@@ -209,7 +237,7 @@ export default function Numbers() {
           setOrderStatusError(false);
           setOrderLastChecked(new Date().toLocaleTimeString());
           if (["success", "completed", "complete"].includes(String(data.status).toLowerCase())) {
-            registerPurchasedOrder(telnyxOrder.orderId, telnyxOrder.phoneNumber, telnyxOrder.companyId).catch(() => setOrderStatusError(true));
+            finishTelnyxSetup(telnyxOrder.orderId, telnyxOrder.phoneNumber, telnyxOrder.companyId).catch(() => setOrderStatusError(true));
           }
         })
         .catch(() => setOrderStatusError(true));
@@ -267,7 +295,12 @@ export default function Numbers() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not place Telnyx order");
-      if (body.orderId) setTelnyxOrder({ orderId: String(body.orderId), phoneNumber: number, companyId: Number(purchaseCompanyId), status: body.status ?? "pending" });
+      if (body.orderId) {
+        setTelnyxOrder({ orderId: String(body.orderId), phoneNumber: number, companyId: Number(purchaseCompanyId), status: body.status ?? "pending" });
+        if (["success", "completed", "complete", "purchased"].includes(String(body.status).toLowerCase())) {
+          void finishTelnyxSetup(String(body.orderId), number, Number(purchaseCompanyId));
+        }
+      }
       setTelnyxSetupResult("Order submitted. Track it below, then configure when Telnyx confirms the number is active.");
       toast({ title: "Telnyx order submitted", description: `Order ${body.orderId ?? "pending"} · ${body.status}. Track setup in this portal.` });
       // Retain the ordered number in results so its status remains visible and repeat purchases are blocked.
