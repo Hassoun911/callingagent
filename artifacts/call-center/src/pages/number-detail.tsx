@@ -894,6 +894,15 @@ export default function NumberDetail() {
             </CardContent>
           </Card>
 
+          {!number.twilioSid ? (
+            <Card className="border-border">
+              <CardHeader><CardTitle className="text-green-400">Line Status — Telnyx</CardTitle><CardDescription>Provider routing status</CardDescription></CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Number {number.isActive ? "enabled in CallingAgent" : "disabled in CallingAgent"}</div>
+                <p className="text-xs text-muted-foreground">Telnyx calls use the Telnyx voice connection, not Twilio. Successful call forwarding and carrier health must be checked using Telnyx call events.</p>
+              </CardContent>
+            </Card>
+          ) : (
           <Card className="border-border">
             <CardHeader>
               <CardTitle className="text-green-400">Line Status</CardTitle>
@@ -946,6 +955,7 @@ export default function NumberDetail() {
               )}
             </CardContent>
           </Card>
+          )}
 
           <Card className="border-destructive/20 bg-destructive/5">
             <CardHeader>
