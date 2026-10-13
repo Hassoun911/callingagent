@@ -135,7 +135,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
         req.log.warn({ hasCall: Boolean(call), status: call?.status }, "Voicemail recording skipped: no pending greeting");
       } else {
         await action(id, "record_start", {
-          format: "mp3", recording_track: "inbound",
+          format: "mp3", channels: "single", recording_track: "inbound",
           play_beep: true, max_length: 120, timeout_secs: 8,
           transcription: true, transcription_language: "en-US",
           command_id: id + "-voicemail-start",
