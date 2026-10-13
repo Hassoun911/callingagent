@@ -63,6 +63,7 @@ export function routeAccessControl(req: Request, res: Response, next: NextFuncti
   }
 
   let permission = SAFE_METHODS.has(req.method) ? rule.read : (rule.write ?? rule.read);
+  if (rule.prefix === "/companies" && /^\/companies\/\d+\/call-out$/.test(req.path) && req.method === "POST") permission = "calls.manage";
   if (rule.prefix === "/call-logs" && req.path.includes("/recording")) permission = "calls.listen";
   if (!hasPermission(req.user.role, permission)) {
     res.status(403).json({ error: "You do not have permission to perform this action", requiredPermission: permission });
