@@ -857,7 +857,7 @@ export default function NumberDetail() {
                   className="bg-background"
                   maxLength={15}
                 />
-                <p className="text-xs text-muted-foreground">Used in the call screen announcement — "Incoming call for <em>{formData.callerIdName || "Solutions"}</em>." Max 15 characters.</p>
+                <p className="text-xs text-muted-foreground">Spoken to the forwarded recipient when answering: "Incoming forwarded call for <em>{formData.callerIdName || formData.friendlyName || "your business"}</em>. Press 1 to accept." Examples: Sales Team, Front Desk. Max 15 characters. To show a name on the phone screen, the number also needs carrier-supported CNAM registration; mobile display is not guaranteed.</p>
               </div>
               <div className="rounded-md border border-border bg-muted/30 p-3 space-y-1.5">
                 <p className="text-xs font-medium text-foreground">About caller name on your phone</p>
