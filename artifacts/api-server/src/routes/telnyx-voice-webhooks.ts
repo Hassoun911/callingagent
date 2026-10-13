@@ -85,9 +85,9 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
     body: JSON.stringify({
       connection_id: connection,
       to: line.forwardTo,
-      from: line.number,
-      link_to: inbound,
-      bridge_intent: true,
+      from: line.number, // Always present the verified CallingAgent business number
+      // Independent outbound leg: bridge only after acceptance. Linking at dial time
+      // can propagate the original caller identity and bypass screening.
       ...(line.callScreen ? {} : { answering_machine_detection: "detect" }),
       timeout_secs: Math.max(5, Math.min(60, (line.ringCount || 4) * 6)),
       client_state: Buffer.from(JSON.stringify({ inbound, lineId: line.id })).toString("base64"),
@@ -170,7 +170,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
           });
           req.log.info({ lineId: state.lineId }, "Waiting for forwarding recipient to press 1");
         } else {
-          await action(state.inbound, "bridge", { call_control_id_to_bridge_with: id, park_after_unbridge: "self" });
+          await action(state.inbound, "bridge", { call_control_id: id, park_after_unbridge: "self" });
           state.bridged = true;
           req.log.info({ lineId: state.lineId }, "Forwarded Telnyx call bridged automatically");
         }
@@ -212,7 +212,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
     } else if (type === "call.gather.ended" && outboundToInbound.has(id)) {
       const state = outboundToInbound.get(id)!;
       if (state.pressOne && String(payload?.digits || "") === "1") {
-        await action(state.inbound, "bridge", { call_control_id_to_bridge_with: id, park_after_unbridge: "self" });
+        await action(state.inbound, "bridge", { call_control_id: id, park_after_unbridge: "self" });
         state.bridged = true;
         req.log.info({ lineId: state.lineId }, "Forwarded call accepted with key 1");
       } else {
