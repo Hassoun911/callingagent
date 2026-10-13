@@ -26,6 +26,14 @@ function Panel({ title, href, link, children }: { title: string; href?: string; 
 export default function Dashboard() {
   const { data: stats, isLoading } = useGetDashboardStats();
   const { data: calls = [] } = useGetRecentCalls({ limit: 100 });
+  const { data: voicemailCalls = [] } = useQuery<any[]>({
+    queryKey: ["dashboard-voicemail-calls"],
+    queryFn: async () => {
+      const result = await fetch(`${BASE}/api/call-logs?limit=50`, { credentials: "include" });
+      if (!result.ok) throw new Error("Unable to load voicemails");
+      return result.json();
+    }, refetchInterval: 30000,
+  });
   const { data: numbers = [] } = useListPhoneNumbers();
   const { data: companies = [] } = useListCompanies();
   const companyNames = new Map(companies.map(company => [company.id, company.name]));
@@ -107,6 +115,20 @@ export default function Dashboard() {
         </div>
       </Panel>
     </div>
+    <Panel title="Recent Voicemails" href="/calls" link="All recordings">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {voicemailCalls.filter((call:any)=>call.recordingUrl && call.status === "voicemail_saved").slice(0,4).map((call:any)=>(
+          <div key={call.id} className="min-w-0 rounded-lg border border-border p-3 space-y-2">
+            <p className="font-semibold truncate">{companyNames.get(numbers.find((n:any)=>n.id === call.phoneNumberId)?.companyId || -1) || "Company"} · {displayNumber(call.toNumber || "")}</p>
+            <p className="text-sm text-muted-foreground">Caller: {displayNumber(call.fromNumber || "Unknown")} · {new Date(call.createdAt).toLocaleString()}</p>
+            <audio controls preload="none" className="w-full max-w-full" src={`${BASE}/api/call-logs/${call.id}/recording`} aria-label="Listen to voicemail"/>
+            {call.transcription && <p className="text-sm text-muted-foreground">{call.transcription}</p>}
+          </div>
+        ))}
+        {!voicemailCalls.some((call:any)=>call.recordingUrl && call.status === "voicemail_saved") &&
+          <p className="py-5 text-sm text-muted-foreground">No saved voicemail recordings yet.</p>}
+      </div>
+    </Panel>
     <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1.1fr)_minmax(275px,0.9fr)]">
       <Panel title="Recent Calls" href="/calls">
         <div className="space-y-1">{recent.length ? recent.slice(0,5).map((call:any)=><Link key={call.id} href="/calls" className="flex items-center gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-secondary/60">
