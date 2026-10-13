@@ -11,6 +11,7 @@ export type PhoneNumberAnswerMode = typeof PhoneNumberAnswerMode[keyof typeof Ph
 
 export const PhoneNumberAnswerMode = {
   forward: 'forward',
+  ivr: 'ivr',
   ai_voice: 'ai_voice',
   voicemail: 'voicemail',
   reject: 'reject',
