@@ -42,7 +42,7 @@ async function notifyAdminOfVoicemail(logSid: string, recordingUrl: string) {
   const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, line.companyId));
   // The administrator contact belongs to this company only; never use a global phone.
   const recipient = company?.adminWhatsapp?.trim().replace(/[\\s().-]/g, "");
-  if (!recipient || !/^\\+[1-9]\\d{7,14}$/.test(recipient)) {
+  if (!recipient || !/^\+[1-9]\d{7,14}$/.test(recipient)) {
     return;
   }
   const key = process.env.TELNYX_API_KEY;
@@ -75,7 +75,7 @@ const outboundToInbound = new Map<string, { inbound: string; lineId: number; bri
 const incomingToOutbound = new Map<string, string>();
 
 async function startControlledForward(inbound: string, line: typeof phoneNumbersTable.$inferSelect) {
-  if (!line.forwardTo || !/^\\+[1-9]\\d{7,14}$/.test(line.forwardTo)) throw new Error("Invalid forwarding destination");
+  if (!line.forwardTo || !/^\+[1-9]\d{7,14}$/.test(line.forwardTo)) throw new Error("Invalid forwarding destination");
   const key = process.env.TELNYX_API_KEY;
   const connection = process.env.TELNYX_CONNECTION_ID;
   if (!key || !connection) throw new Error("Telnyx forwarding credentials unavailable");
