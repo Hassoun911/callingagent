@@ -540,61 +540,25 @@ export default function NumberDetail() {
                         </div>
                       </button>
                     </div>
-                    {formData.callScreen && (
-                      <div className="space-y-2 pt-1 animate-in fade-in duration-200">
-                        <Label className="text-xs text-muted-foreground uppercase tracking-wider">If you don't answer, send to</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button type="button" onClick={() => setFormData({...formData, callScreenFallback: "ai_voice"})} className={`flex items-center gap-2 p-3 rounded-md border text-left transition-colors ${formData.callScreenFallback === "ai_voice" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}>
-                            <Bot className="h-4 w-4 shrink-0" />
-                            <div>
-                              <div className="text-sm font-medium">AI Agent</div>
-                              <div className="text-xs opacity-70">AI answers for you</div>
-                            </div>
-                          </button>
-                          <button type="button" onClick={() => setFormData({...formData, callScreenFallback: "voicemail"})} className={`flex items-center gap-2 p-3 rounded-md border text-left transition-colors ${formData.callScreenFallback === "voicemail" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}>
-                            <Voicemail className="h-4 w-4 shrink-0" />
-                            <div>
-                              <div className="text-sm font-medium">Voicemail</div>
-                              <div className="text-xs opacity-70">Caller leaves a message</div>
-                            </div>
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    <p className="text-xs text-muted-foreground">No key press: a human answer connects automatically. Require key press: the recipient must press 1 before being connected.</p>
                   </div>
 
-                  {/* When No One Answers */}
-                  {!formData.callScreen && (
-                    <div className="space-y-3 py-6 border-t border-border animate-in fade-in duration-200">
-                      <div>
-                        <Label className="text-green-400">When No One Answers</Label>
-                        <p className="text-xs text-muted-foreground mt-0.5">What happens if the call goes unanswered after {formData.ringCount} rings?</p>
-                      </div>
-                      <div className="space-y-2">
-                        <button type="button" onClick={() => setFormData({...formData, forwardNoAnswerAction: "personal_voicemail"})} className={`${radioBase} ${formData.forwardNoAnswerAction === "personal_voicemail" || !formData.forwardNoAnswerAction ? radioOn : radioOff}`}>
-                          <Radio on={formData.forwardNoAnswerAction === "personal_voicemail" || !formData.forwardNoAnswerAction} />
-                          <div>
-                            <div className="flex items-center gap-2 text-sm font-medium"><PhoneCall className="h-3.5 w-3.5" /> CallingAgent system voicemail</div>
-                            <div className="text-xs opacity-70 mt-0.5">Calls should return to the company's CallingAgent voicemail, not a personal mailbox</div>
-                          </div>
-                        </button>
-                        <button type="button" onClick={() => setFormData({...formData, forwardNoAnswerAction: "voicemail"})} className={`${radioBase} ${formData.forwardNoAnswerAction === "voicemail" ? radioOn : radioOff}`}>
-                          <Radio on={formData.forwardNoAnswerAction === "voicemail"} />
-                          <div>
-                            <div className="flex items-center gap-2 text-sm font-medium"><Voicemail className="h-3.5 w-3.5" /> Our voicemail</div>
-                            <div className="text-xs opacity-70 mt-0.5">Caller is prompted to leave a voicemail recorded in this system</div>
-                          </div>
-                        </button>
-                        <button type="button" onClick={() => setFormData({...formData, forwardNoAnswerAction: "ai_voice"})} className={`${radioBase} ${formData.forwardNoAnswerAction === "ai_voice" ? radioOn : radioOff}`}>
-                          <Radio on={formData.forwardNoAnswerAction === "ai_voice"} />
-                          <div>
-                            <div className="flex items-center gap-2 text-sm font-medium"><Bot className="h-3.5 w-3.5" /> AI Agent</div>
-                            <div className="text-xs opacity-70 mt-0.5">AI takes over and can answer questions or collect info</div>
-                          </div>
-                        </button>
-                      </div>
+                  <div className="space-y-3 py-6 border-t border-border">
+                    <div>
+                      <Label className="text-green-400">If You Don't Answer</Label>
+                      <p className="text-xs text-muted-foreground mt-1">Choose the fallback independently of how you answer. The forwarded phone's personal voicemail should not receive this call.</p>
                     </div>
-                  )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button type="button" onClick={() => setFormData({...formData, forwardNoAnswerAction: "voicemail", callScreenFallback: "voicemail"})} className={`${radioBase} ${formData.forwardNoAnswerAction !== "ai_voice" ? radioOn : radioOff}`}>
+                        <Radio on={formData.forwardNoAnswerAction !== "ai_voice"}/>
+                        <div><div className="font-medium text-sm">CallingAgent Voicemail</div><div className="text-xs opacity-70 mt-1">Professional greeting, beep, and saved voice message.</div></div>
+                      </button>
+                      <button type="button" onClick={() => setFormData({...formData, forwardNoAnswerAction: "ai_voice", callScreenFallback: "ai_voice"})} className={`${radioBase} ${formData.forwardNoAnswerAction === "ai_voice" ? radioOn : radioOff}`}>
+                        <Radio on={formData.forwardNoAnswerAction === "ai_voice"}/>
+                        <div><div className="font-medium text-sm">AI Agent</div><div className="text-xs opacity-70 mt-1">When live Telnyx AI is unavailable, use CallingAgent voicemail.</div></div>
+                      </button>
+                    </div>
+                  </div>
 
                   {/* Caller ID Shown to You */}
                   <div className="space-y-3 py-6 border-t border-border">
