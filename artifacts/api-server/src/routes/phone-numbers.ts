@@ -341,6 +341,56 @@ router.get("/phone-numbers/telnyx-orders/:orderId", async (req, res): Promise<vo
   }
 });
 
+// Restore purchased numbers to company inventory without declaring the phone services ready.
+router.post("/phone-numbers/telnyx-register-order", async (req, res): Promise<void> => {
+  if (getCompanyScope(req) !== null) { res.status(403).json({ error: "Admin access required." }); return; }
+  const { orderId, phoneNumber } = req.body ?? {};
+  const companyId = Number(req.body?.companyId);
+  if (typeof orderId !== "string" || !/^[a-zA-Z0-9-]{1,100}$/.test(orderId) ||
+      typeof phoneNumber !== "string" || !/^\\+[1-9]\\d{7,14}$/.test(phoneNumber) ||
+      !Number.isSafeInteger(companyId) || companyId <= 0) {
+    res.status(400).json({ error: "Valid order, number and company are required." }); return;
+  }
+  const key = process.env.TELNYX_API_KEY;
+  if (!key) { res.status(503).json({ error: "Telnyx API key is missing." }); return; }
+  try {
+    const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId));
+    if (!company) { res.status(404).json({ error: "Company not found." }); return; }
+    const reply = await fetch("https://api.telnyx.com/v2/number_orders/" + encodeURIComponent(orderId), {
+      headers: { Authorization: "Bearer " + key, Accept: "application/json" }, signal: AbortSignal.timeout(12000),
+    });
+    const data: any = await reply.json();
+    if (!reply.ok) { res.status(502).json({ error: data.errors?.[0]?.detail || "Unable to verify order." }); return; }
+    const order = data.data ?? {};
+    if (!["success", "completed", "complete"].includes(String(order.status).toLowerCase())) {
+      res.status(409).json({ error: "The order has not completed yet.", status: order.status }); return;
+    }
+    // Validate account ownership of the exact number, rather than trusting browser state.
+    const numbersResponse = await fetch("https://api.telnyx.com/v2/phone_numbers?filter[phone_number]=" + encodeURIComponent(phoneNumber), {
+      headers: { Authorization: "Bearer " + key, Accept: "application/json" }, signal: AbortSignal.timeout(12000),
+    });
+    const numbersPayload: any = await numbersResponse.json();
+    if (!numbersResponse.ok) { res.status(502).json({ error: "Unable to confirm number ownership." }); return; }
+    const owned = (Array.isArray(numbersPayload.data) ? numbersPayload.data : []).some((n: any) => n.phone_number === phoneNumber);
+    if (!owned) { res.status(409).json({ error: "This number is not yet present in the Telnyx account." }); return; }
+    const [existing] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, phoneNumber));
+    if (existing && existing.companyId !== companyId) {
+      res.status(409).json({ error: "This phone number is already assigned to another company." }); return;
+    }
+    if (!existing) {
+      await db.insert(phoneNumbersTable).values({
+        number: phoneNumber, twilioSid: null, companyId, friendlyName: phoneNumber,
+        callerIdName: company.name, answerMode: "forward", isActive: false,
+      }).onConflictDoNothing();
+    }
+    res.json({ registered: true, phoneNumber, companyId, status: "setup_required",
+      message: "Purchased number added to company inventory. Configure and test voice/SMS before enabling." });
+  } catch (error: any) {
+    req.log.error({ message: error?.message }, "Could not register Telnyx purchase");
+    res.status(502).json({ error: "Carrier verification unavailable; try again from the portal." });
+  }
+});
+
 // Apply routing to an owned Telnyx number, only using server-approved connection/profile IDs.
 // Voice webhook delivery must separately be supported by the chosen Telnyx connection.
 router.post("/phone-numbers/telnyx-setup", async (req, res): Promise<void> => {
