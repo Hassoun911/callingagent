@@ -183,6 +183,60 @@ export default function NumberDetail() {
   }
 
   const [formData, setFormData] = useState<any>({});
+  const [promptHelperOpen, setPromptHelperOpen] = useState(false);
+  const [helperDetails, setHelperDetails] = useState({ business: "", description: "", address: "", hours: "", services: "", instructions: "", tone: "friendly", length: "standard", language: "English" });
+  const [helperDraft, setHelperDraft] = useState("");
+  const [helperListening, setHelperListening] = useState(false);
+  const helperSpeechRef = useRef<any>(null);
+
+  const generateNumberPrompt = () => {
+    const d = helperDetails;
+    const business = d.business.trim();
+    if (!business || !d.description.trim()) {
+      toast({ title: "Tell us about the business", description: "Enter the business name and what it does.", variant: "destructive" });
+      return;
+    }
+    const short = d.length === "short";
+    const detailed = d.length === "detailed";
+    const draft = [
+      `You are the telephone receptionist for ${business}. You represent only this business and this phone number. Never use information, names, greetings, or instructions belonging to any other company.`,
+      `Business description: ${d.description.trim()}.`,
+      d.address.trim() ? `Location and address: ${d.address.trim()}.` : "",
+      d.hours.trim() ? `Business hours: ${d.hours.trim()}.` : "",
+      d.services.trim() ? `Services and products: ${d.services.trim()}.` : "",
+      `Speak in ${d.language}. Your manner is ${d.tone === "professional" ? "professional, clear and confident" : d.tone === "warm" ? "warm, welcoming and patient" : "friendly, helpful and natural"}.`,
+      `Keep replies ${short ? "short: usually one or two sentences" : detailed ? "thorough but conversational, giving practical details where known" : "concise, usually two or three sentences"}.`,
+      "Answer questions using only verified business details given here or provided explicitly during the call. Never invent prices, hours, services, availability, policies or appointments. If you do not know, offer to take a message or connect the caller to the business.",
+      "Ask one question at a time. Confirm important details, such as names and callback numbers. Do not promise a booking or transfer unless the system confirms it was completed.",
+      "Respect caller privacy. Do not request payment card details, passwords or sensitive credentials. If a caller needs a person, offer escalation according to the configured routing.",
+      d.instructions.trim() ? `Additional business-specific instructions: ${d.instructions.trim()}.` : "",
+      detailed ? "When needed, clarify the caller's request, summarize next steps and verify contact information before finishing the conversation." : "",
+    ].filter(Boolean).join("\n\n");
+    setHelperDraft(draft);
+  };
+
+  const dictatePromptDetails = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast({ title: "Voice input unavailable", description: "This browser does not support speech recognition. You can type your instructions instead.", variant: "destructive" });
+      return;
+    }
+    if (helperListening) { helperSpeechRef.current?.stop(); setHelperListening(false); return; }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-CA";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results).map((result: any) => result[0]?.transcript || "").join(" ");
+      setHelperDetails(previous => ({ ...previous, instructions: [previous.instructions, transcript].filter(Boolean).join(" ") }));
+    };
+    recognition.onerror = () => setHelperListening(false);
+    recognition.onend = () => setHelperListening(false);
+    helperSpeechRef.current = recognition;
+    setHelperListening(true);
+    recognition.start();
+  };
+
   const [testCallTo, setTestCallTo] = useState("");
   const initRef = useRef(false);
 
@@ -691,6 +745,46 @@ export default function NumberDetail() {
                     className="bg-background text-sm"
                   />
                   <p className="text-xs text-muted-foreground">First sentence spoken when this number answers.</p>
+                </div>
+
+                <div className="rounded-xl border-2 border-primary/25 bg-primary/5 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-base font-extrabold text-foreground">AI Prompt Helper</p>
+                      <p className="text-xs text-muted-foreground">Create a receptionist prompt for this number only. Nothing is saved until you approve and save changes.</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => setPromptHelperOpen(open => !open)} type="button">
+                      {promptHelperOpen ? "Hide helper" : "Build my AI prompt"}
+                    </Button>
+                  </div>
+                  {promptHelperOpen && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1"><Label>Business name</Label><Input value={helperDetails.business} placeholder="e.g. Java Solutions" onChange={e => setHelperDetails(p => ({...p,business:e.target.value}))}/></div>
+                        <div className="space-y-1"><Label>Address / service area (optional)</Label><Input value={helperDetails.address} placeholder="e.g. Windsor, Ontario" onChange={e => setHelperDetails(p => ({...p,address:e.target.value}))}/></div>
+                        <div className="space-y-1"><Label>Hours (optional)</Label><Input value={helperDetails.hours} placeholder="e.g. Mon-Fri 9 AM-5 PM" onChange={e => setHelperDetails(p => ({...p,hours:e.target.value}))}/></div>
+                        <div className="space-y-1"><Label>Services (optional)</Label><Input value={helperDetails.services} placeholder="e.g. Software development, support" onChange={e => setHelperDetails(p => ({...p,services:e.target.value}))}/></div>
+                      </div>
+                      <div className="space-y-1"><Label>What does the company do?</Label><Textarea value={helperDetails.description} placeholder="Describe your business and the kinds of calls you receive." onChange={e => setHelperDetails(p => ({...p,description:e.target.value}))}/></div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="space-y-1"><Label>Answer style</Label><Select value={helperDetails.tone} onValueChange={v => setHelperDetails(p => ({...p,tone:v}))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="friendly">Friendly</SelectItem><SelectItem value="professional">Professional</SelectItem><SelectItem value="warm">Warm</SelectItem></SelectContent></Select></div>
+                        <div className="space-y-1"><Label>Response length</Label><Select value={helperDetails.length} onValueChange={v => setHelperDetails(p => ({...p,length:v}))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="short">Short</SelectItem><SelectItem value="standard">Balanced</SelectItem><SelectItem value="detailed">Detailed</SelectItem></SelectContent></Select></div>
+                        <div className="space-y-1"><Label>Language</Label><Select value={helperDetails.language} onValueChange={v => setHelperDetails(p => ({...p,language:v}))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="English">English</SelectItem><SelectItem value="Arabic">Arabic</SelectItem><SelectItem value="English and Arabic, following the caller's language">English + Arabic</SelectItem><SelectItem value="French">French</SelectItem></SelectContent></Select></div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-2"><Label>Other instructions (type or speak)</Label><Button type="button" size="sm" variant="outline" onClick={dictatePromptDetails}><Mic className="h-3.5 w-3.5 mr-1" />{helperListening ? "Stop recording" : "Speak instructions"}</Button></div>
+                        <Textarea value={helperDetails.instructions} placeholder="Tell us what the AI should do, how to greet callers, what questions to ask, and when to refer to a person." onChange={e => setHelperDetails(p => ({...p,instructions:e.target.value}))}/>
+                      </div>
+                      <Button type="button" onClick={generateNumberPrompt} className="w-full sm:w-auto">Generate suggested prompt</Button>
+                      {helperDraft && (
+                        <div className="space-y-2">
+                          <Label>Review and edit before applying</Label>
+                          <Textarea className="min-h-64 bg-background text-sm" value={helperDraft} onChange={e => setHelperDraft(e.target.value)}/>
+                          <Button type="button" onClick={() => { setFormData((p:any)=>({...p,aiSystemPrompt:helperDraft,aiGreeting:p.aiGreeting || `Thank you for calling ${helperDetails.business}. How can I help you today?`})); setPromptHelperOpen(false); toast({title:"Draft applied to this number",description:"Review the fields below, then click Save Changes to store your settings."}); }}>Apply to this number (not saved yet)</Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* System Prompt */}
