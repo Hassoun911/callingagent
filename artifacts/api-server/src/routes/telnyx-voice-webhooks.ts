@@ -73,6 +73,34 @@ async function notifyAdminOfVoicemail(logSid: string, recordingUrl: string) {
 // in memory for webhook sequencing. A deployment restart may interrupt an active transfer.
 const outboundToInbound = new Map<string, { inbound: string; lineId: number; bridged: boolean; pressOne: boolean; displayName: string }>();
 const incomingToOutbound = new Map<string, string>();
+type ClickToCall = { agent: string; target: string; from: string; companyId: number; stage: "calling_agent" | "calling_target" | "connected"; targetLeg?: string };
+const clickToCallByLeg = new Map<string, ClickToCall>();
+
+async function dialClickToCallLeg(to: string, from: string, label: string): Promise<string> {
+  const key = process.env.TELNYX_API_KEY;
+  const connection = process.env.TELNYX_CONNECTION_ID;
+  if (!key || !connection) throw new Error("Telnyx outbound credentials are missing");
+  const result = await fetch("https://api.telnyx.com/v2/calls", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+    body: JSON.stringify({ connection_id: connection, to, from, timeout_secs: 35,
+      client_state: Buffer.from(JSON.stringify({ clickToCall: label })).toString("base64") }),
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!result.ok) throw new Error("Telnyx outbound dial failed (" + result.status + "): " + (await result.text()).slice(0, 400));
+  const json: any = await result.json();
+  if (typeof json?.data?.call_control_id !== "string") throw new Error("Telnyx returned no call control ID");
+  return json.data.call_control_id;
+}
+
+// Creates an outbound call from the selected company's verified Telnyx line.
+// The agent receives a call first and must press 1 before the customer is dialed.
+export async function initiateCompanyClickToCall(companyId: number, agent: string, target: string, from: string): Promise<string> {
+  const agentLeg = await dialClickToCallLeg(agent, from, "agent");
+  clickToCallByLeg.set(agentLeg, { agent: agentLeg, target, from, companyId, stage: "calling_agent" });
+  return agentLeg;
+}
+
 
 async function startControlledForward(inbound: string, line: typeof phoneNumbersTable.$inferSelect) {
   if (!line.forwardTo || !/^\+[1-9]\d{7,14}$/.test(line.forwardTo)) throw new Error("Invalid forwarding destination");
@@ -140,7 +168,49 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
   // Fast acknowledgment prevents carrier retries while Call Control runs.
   res.status(200).json({ received: true });
   try {
-    if (type === "call.initiated" && payload?.direction === "incoming") {
+    if (type === "call.answered" && clickToCallByLeg.has(id)) {
+      const call = clickToCallByLeg.get(id)!;
+      if (id === call.agent && call.stage === "calling_agent") {
+        await action(id, "gather_using_speak", {
+          payload: "CallingAgent outbound call for your company. Press 1 to call the customer.",
+          voice: "female", language: "en-US", valid_digits: "1",
+          maximum_digits: 1, minimum_digits: 1, initial_timeout_millis: 12000, timeout_millis: 12000,
+        });
+        req.log.info({ companyId: call.companyId }, "Click-to-call agent answered; waiting for confirmation");
+      } else if (id === call.targetLeg && call.stage === "calling_target") {
+        await action(call.agent, "bridge", { call_control_id: id, park_after_unbridge: "self" });
+        call.stage = "connected";
+        req.log.info({ companyId: call.companyId }, "Click-to-call legs connected");
+      }
+    } else if (type === "call.gather.ended" && clickToCallByLeg.has(id)) {
+      const call = clickToCallByLeg.get(id)!;
+      if (id === call.agent && call.stage === "calling_agent") {
+        if (String(payload?.digits || "") !== "1") {
+          clickToCallByLeg.delete(id);
+          await action(id, "hangup");
+        } else {
+          // Only dial the destination after an explicit keypress from the agent.
+          call.stage = "calling_target";
+          try {
+            const destId = await dialClickToCallLeg(call.target, call.from, "customer");
+            call.targetLeg = destId;
+            clickToCallByLeg.set(destId, call);
+            await action(call.agent, "speak", { payload: "Connecting your outbound call now. Please hold.", voice: "female", language: "en-US" });
+            req.log.info({ companyId: call.companyId }, "Click-to-call destination dial initiated");
+          } catch (error) {
+            clickToCallByLeg.delete(id);
+            await action(id, "hangup");
+            throw error;
+          }
+        }
+      }
+    } else if (type === "call.hangup" && clickToCallByLeg.has(id)) {
+      const call = clickToCallByLeg.get(id)!;
+      clickToCallByLeg.delete(call.agent);
+      if (call.targetLeg) clickToCallByLeg.delete(call.targetLeg);
+      const other = id === call.agent ? call.targetLeg : call.agent;
+      if (other) await action(other, "hangup").catch(() => {});
+    } else if (type === "call.initiated" && payload?.direction === "incoming") {
       await action(id, "answer");
     } else if (type === "call.answered" && outboundToInbound.has(id)) {
       const state = outboundToInbound.get(id)!;
