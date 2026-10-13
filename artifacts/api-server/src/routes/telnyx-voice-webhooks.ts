@@ -69,6 +69,55 @@ async function notifyAdminOfVoicemail(logSid: string, recordingUrl: string) {
   } else if (!result.ok) throw new Error("Telnyx voicemail delivery failed: " + result.status);
 }
 
+// Outbound leg ownership is encoded in signed carrier-returned client_state and kept
+// in memory for webhook sequencing. A deployment restart may interrupt an active transfer.
+const outboundToInbound = new Map<string, { inbound: string; lineId: number; bridged: boolean }>();
+const incomingToOutbound = new Map<string, string>();
+
+async function startControlledForward(inbound: string, line: typeof phoneNumbersTable.$inferSelect) {
+  if (!line.forwardTo || !/^\\+[1-9]\\d{7,14}$/.test(line.forwardTo)) throw new Error("Invalid forwarding destination");
+  const key = process.env.TELNYX_API_KEY;
+  const connection = process.env.TELNYX_CONNECTION_ID;
+  if (!key || !connection) throw new Error("Telnyx forwarding credentials unavailable");
+  const response = await fetch("https://api.telnyx.com/v2/calls", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      connection_id: connection,
+      to: line.forwardTo,
+      from: line.number,
+      link_to: inbound,
+      bridge_intent: true,
+      timeout_secs: Math.max(5, Math.min(60, (line.ringCount || 4) * 6)),
+      client_state: Buffer.from(JSON.stringify({ inbound, lineId: line.id })).toString("base64"),
+    }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error("Telnyx dial failed (" + response.status + "): " + (await response.text()).slice(0, 400));
+  const result: any = await response.json();
+  const outbound = result?.data?.call_control_id;
+  if (typeof outbound !== "string") throw new Error("Telnyx dial did not return an outbound leg");
+  outboundToInbound.set(outbound, { inbound, lineId: line.id, bridged: false });
+  incomingToOutbound.set(inbound, outbound);
+}
+
+async function startSystemVoicemail(inbound: string, line: typeof phoneNumbersTable.$inferSelect, from: string) {
+  const [company] = line.companyId
+    ? await db.select().from(companiesTable).where(eq(companiesTable.id, line.companyId))
+    : [];
+  const name = company?.name?.trim() || line.callerIdName?.trim() || "our business";
+  const greeting = line.voicemailGreeting?.trim() || "Thank you for calling " + name +
+    ". We're sorry we missed your call. Please leave your name, phone number, and a brief message after the tone, and someone from our team will contact you as soon as possible.";
+  const logSid = "telnyx:" + inbound;
+  const [prior] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, logSid));
+  if (!prior) await db.insert(callLogsTable).values({
+    twilioCallSid: logSid, phoneNumberId: line.id, direction: "inbound",
+    status: "voicemail_greeting", fromNumber: from, toNumber: line.number, answerMode: "voicemail",
+  });
+  else await db.update(callLogsTable).set({ status: "voicemail_greeting" }).where(eq(callLogsTable.twilioCallSid, logSid));
+  await action(inbound, "speak", { payload: greeting, voice: "female", language: "en-US" });
+}
+
 // This is a Call Control API v2 webhook, not a Twilio TwiML endpoint.
 router.post("/telnyx/voice", async (req, res): Promise<void> => {
   if (!process.env.TELNYX_PUBLIC_KEY) { res.status(503).json({ error: "Telnyx webhook signing key not configured" }); return; }
@@ -110,23 +159,36 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
         const name = company?.name?.trim() || line.callerIdName?.trim() || "our business";
         const defaultVoicemail = "Thank you for calling " + name +
           ". We're sorry we missed your call. Please leave your name, phone number, and a brief message after the tone, and someone from our team will contact you as soon as possible.";
-        if (line.answerMode === "forward" && line.forwardTo && /^\\+[1-9]\\d{7,14}$/.test(line.forwardTo)) {
-          await action(id, "transfer", { to: line.forwardTo });
+        if (line.answerMode === "forward" && line.forwardTo) {
+          try { await startControlledForward(id, line); }
+          catch (error: any) {
+            req.log.error({ error: error?.message, lineId: line.id }, "Forward setup failed, using system voicemail");
+            await startSystemVoicemail(id, line, typeof payload?.from === "string" ? payload.from : "unknown");
+          }
         } else {
-          // Used for voicemail and as the safe fallback until conversational AI is connected.
-          // Do not use the AI conversation opening as a voicemail instruction.
-          const greeting = line.voicemailGreeting?.trim() || defaultVoicemail;
-          req.log.info({ lineId: line.id, mode: line.answerMode, customVoicemail: Boolean(line.voicemailGreeting?.trim()) }, "Telnyx voicemail greeting selected");
-          const logSid = "telnyx:" + id;
-          const [prior] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, logSid));
-          if (!prior) await db.insert(callLogsTable).values({
-            twilioCallSid: logSid, phoneNumberId: line.id, direction: "inbound",
-            status: "voicemail_greeting", fromNumber: typeof payload?.from === "string" ? payload.from : "unknown",
-            toNumber: line.number, answerMode: "voicemail",
-          });
-          await action(id, "speak", { payload: greeting, voice: "female", language: "en-US" });
+          await startSystemVoicemail(id, line, typeof payload?.from === "string" ? payload.from : "unknown");
         }
       }
+    } else if (type === "call.answered" && outboundToInbound.has(id)) {
+      const state = outboundToInbound.get(id)!;
+      await action(id, "bridge", { call_control_id_to_bridge_with: state.inbound, park_after_unbridge: "self" });
+      state.bridged = true;
+      req.log.info({ lineId: state.lineId }, "Forwarded Telnyx call bridged");
+    } else if (type === "call.hangup" && outboundToInbound.has(id)) {
+      const state = outboundToInbound.get(id)!;
+      outboundToInbound.delete(id);
+      incomingToOutbound.delete(state.inbound);
+      if (!state.bridged) {
+        const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, state.lineId));
+        if (line && line.isActive) {
+          try { await startSystemVoicemail(state.inbound, line, "unknown"); }
+          catch (error: any) { req.log.error({ message: error?.message }, "Failed to return unanswered forward to system voicemail"); }
+        }
+      }
+    } else if (type === "call.hangup" && incomingToOutbound.has(id)) {
+      const outbound = incomingToOutbound.get(id)!;
+      incomingToOutbound.delete(id);
+      outboundToInbound.delete(outbound);
     } else if (type === "call.speak.ended") {
       // speak.ended omits "to": recover the exact line from the call log created at answer time.
       const logSid = "telnyx:" + id;
