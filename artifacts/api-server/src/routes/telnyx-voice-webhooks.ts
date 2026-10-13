@@ -31,7 +31,7 @@ async function action(id: string, name: string, payload: Record<string, unknown>
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
     body: JSON.stringify(payload), signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error("Telnyx call command " + name + " failed (" + response.status + ")");
+  if (!response.ok) { const detail = (await response.text()).slice(0, 600); throw new Error("Telnyx call command " + name + " failed (" + response.status + "): " + detail); }
 }
 
 // This is a Call Control API v2 webhook, not a Twilio TwiML endpoint.
@@ -49,16 +49,18 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
   for (const [k, time] of seen) if (now - time > keepSeconds * 1000) seen.delete(k);
   if (typeof eventId === "string" && seen.has(eventId)) { res.status(200).json({ received: true, duplicate: true }); return; }
   if (typeof eventId === "string") seen.set(eventId, now);
+  req.log.info({ eventType: type, direction: payload?.direction, hasDestination: Boolean(payload?.to) }, "Telnyx voice webhook received");
   // Fast acknowledgment prevents carrier retries while Call Control runs.
   res.status(200).json({ received: true });
   try {
     if (type === "call.initiated" && payload?.direction === "incoming") {
       await action(id, "answer");
-    } else if (type === "call.answered" && payload?.direction === "incoming") {
+    } else if (type === "call.answered" && payload?.direction !== "outgoing") {
       const destination = payload?.to;
       const [line] = typeof destination === "string"
         ? await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, destination))
         : [];
+      req.log.info({ foundLine: Boolean(line), active: Boolean(line?.isActive), mode: line?.answerMode }, "Telnyx inbound routing decision");
       if (!line?.isActive) {
         await action(id, "speak", {
           payload: "This number is not currently accepting calls. Please try again later.",
