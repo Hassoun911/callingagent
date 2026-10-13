@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { createPublicKey, verify } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db, phoneNumbersTable, companiesTable, callLogsTable } from "@workspace/db";
+import { db, phoneNumbersTable, companiesTable, callLogsTable, extensionsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 const seen = new Map<string, number>();
@@ -71,8 +71,9 @@ async function notifyAdminOfVoicemail(logSid: string, recordingUrl: string) {
 
 // Outbound leg ownership is encoded in signed carrier-returned client_state and kept
 // in memory for webhook sequencing. A deployment restart may interrupt an active transfer.
-const outboundToInbound = new Map<string, { inbound: string; lineId: number; bridged: boolean; pressOne: boolean; displayName: string }>();
+const outboundToInbound = new Map<string, { inbound: string; lineId: number; bridged: boolean; pressOne: boolean; displayName: string; team?: { remaining: string[]; extension: string; fallback: string; ringCount: number } }>();
 const incomingToOutbound = new Map<string, string>();
+const ivrMenus = new Map<string, { lineId: number; caller: string; options: Array<{ digit: string; name: string; id: number; agents: Array<{ userId: number; phone: string }>; forwardTo: string; ringCount: number; fallbackAction: string }> }>();
 type ClickToCall = { agent: string; target: string; from: string; companyId: number; stage: "calling_agent" | "calling_target" | "connected"; targetLeg?: string };
 const clickToCallByLeg = new Map<string, ClickToCall>();
 
@@ -102,8 +103,8 @@ export async function initiateCompanyClickToCall(companyId: number, agent: strin
 }
 
 
-async function startControlledForward(inbound: string, line: typeof phoneNumbersTable.$inferSelect) {
-  if (!line.forwardTo || !/^\+[1-9]\d{7,14}$/.test(line.forwardTo)) throw new Error("Invalid forwarding destination");
+async function startControlledForward(inbound: string, line: typeof phoneNumbersTable.$inferSelect, route?: { phone: string; display: string; ringCount: number; team: { remaining: string[]; extension: string; fallback: string; ringCount: number } }): Promise<string> {
+  if (!(route?.phone || line.forwardTo) || !/^\+[1-9]\d{7,14}$/.test(route?.phone || line.forwardTo || "")) throw new Error("Invalid forwarding destination");
   const key = process.env.TELNYX_API_KEY;
   const connection = process.env.TELNYX_CONNECTION_ID;
   if (!key || !connection) throw new Error("Telnyx forwarding credentials unavailable");
@@ -112,12 +113,12 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
     body: JSON.stringify({
       connection_id: connection,
-      to: line.forwardTo,
+      to: route?.phone || line.forwardTo,
       from: line.number, // Always present the verified CallingAgent business number
       // Independent outbound leg: bridge only after acceptance. Linking at dial time
       // can propagate the original caller identity and bypass screening.
-      ...(line.callScreen ? {} : { answering_machine_detection: "detect" }),
-      timeout_secs: Math.max(5, Math.min(60, (line.ringCount || 4) * 6)),
+      ...((route || line.callScreen) ? {} : { answering_machine_detection: "detect" }),
+      timeout_secs: Math.max(5, Math.min(60, (route?.ringCount || line.ringCount || 4) * 6)),
       client_state: Buffer.from(JSON.stringify({ inbound, lineId: line.id })).toString("base64"),
     }),
     signal: AbortSignal.timeout(10000),
@@ -126,19 +127,22 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
   const result: any = await response.json();
   const outbound = result?.data?.call_control_id;
   if (typeof outbound !== "string") throw new Error("Telnyx dial did not return an outbound leg");
-  outboundToInbound.set(outbound, { inbound, lineId: line.id, bridged: false, pressOne: Boolean(line.callScreen), displayName: (line.callerIdName?.trim() || line.friendlyName?.trim() || "your business").slice(0, 50) });
+  outboundToInbound.set(outbound, { inbound, lineId: line.id, bridged: false, pressOne: route ? true : Boolean(line.callScreen), displayName: (route?.display || line.callerIdName?.trim() || line.friendlyName?.trim() || "your business").slice(0, 50), team: route?.team });
   // Carrier accepted the dial command; this does not mean the destination handset rang.
 
   incomingToOutbound.set(inbound, outbound);
+  return outbound;
 }
 
-async function startSystemVoicemail(inbound: string, line: typeof phoneNumbersTable.$inferSelect, from: string) {
+async function startSystemVoicemail(inbound: string, line: typeof phoneNumbersTable.$inferSelect, from: string, department?: string) {
   const [company] = line.companyId
     ? await db.select().from(companiesTable).where(eq(companiesTable.id, line.companyId))
     : [];
   const name = company?.name?.trim() || line.callerIdName?.trim() || "our business";
-  const greeting = line.voicemailGreeting?.trim() || "Thank you for calling " + name +
-    ". We're sorry we missed your call. Please leave your name, phone number, and a brief message after the tone, and someone from our team will contact you as soon as possible.";
+  const greeting = department
+    ? "You've reached " + department + " at " + name + ". Our team is unavailable. Please leave your name, number and message after the tone, and we'll contact you as soon as possible."
+    : (line.voicemailGreeting?.trim() || "Thank you for calling " + name +
+    ". We're sorry we missed your call. Please leave your name, phone number, and a brief message after the tone, and someone from our team will contact you as soon as possible.");
   const logSid = "telnyx:" + inbound;
   const [prior] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, logSid));
   if (!prior) await db.insert(callLogsTable).values({
@@ -269,7 +273,27 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
         const name = company?.name?.trim() || line.callerIdName?.trim() || "our business";
         const defaultVoicemail = "Thank you for calling " + name +
           ". We're sorry we missed your call. Please leave your name, phone number, and a brief message after the tone, and someone from our team will contact you as soon as possible.";
-        if (line.answerMode === "forward" && line.forwardTo) {
+        if (line.answerMode === "ivr" && line.companyId) {
+          const all = await db.select().from(extensionsTable).where(eq(extensionsTable.companyId, line.companyId));
+          const options = all.filter(e => e.enabled && /^[1-9]$/.test(e.digit)).map(e => ({
+            digit: e.digit, name: e.name, id: e.id, agents: e.agents || [],
+            forwardTo: e.forwardTo, ringCount: e.ringCount, fallbackAction: e.fallbackAction,
+          }));
+          if (!options.length) {
+            await startSystemVoicemail(id, line, typeof payload?.from === "string" ? payload.from : "unknown");
+          } else {
+            ivrMenus.set(id, { lineId: line.id, caller: typeof payload?.from === "string" ? payload.from : "unknown", options });
+            const choices = options.sort((a,b) => a.digit.localeCompare(b.digit))
+              .map(e => "Press " + e.digit + " for " + e.name + ".").join(" ");
+            await action(id, "gather_using_speak", {
+              payload: "Thank you for calling " + name + ". " + choices,
+              voice: "female", language: "en-US",
+              valid_digits: options.map(x => x.digit).join(""), maximum_digits: 1, minimum_digits: 1,
+              initial_timeout_millis: 12000, timeout_millis: 12000,
+            });
+            req.log.info({ lineId: line.id, extensionCount: options.length }, "Extension menu presented");
+          }
+        } else if (line.answerMode === "forward" && line.forwardTo) {
           try { await startControlledForward(id, line); }
           catch (error: any) {
             req.log.error({ error: error?.message, lineId: line.id }, "Forward setup failed, using system voicemail");
@@ -277,6 +301,34 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
           }
         } else {
           await startSystemVoicemail(id, line, typeof payload?.from === "string" ? payload.from : "unknown");
+        }
+      }
+    } else if (type === "call.gather.ended" && ivrMenus.has(id)) {
+      const menu = ivrMenus.get(id)!;
+      ivrMenus.delete(id);
+      const selected = menu.options.find(option => option.digit === String(payload?.digits || ""));
+      const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, menu.lineId));
+      if (!line || !line.isActive) {
+        await action(id, "hangup");
+      } else if (!selected) {
+        await startSystemVoicemail(id, line, menu.caller);
+      } else {
+        const phones = (selected.agents.length ? selected.agents.map(a => a.phone) : [selected.forwardTo])
+          .filter(phone => /^\+[1-9]\d{7,14}$/.test(phone));
+        const team = { remaining: phones.slice(1), extension: selected.name, fallback: selected.fallbackAction, ringCount: selected.ringCount };
+        if (!phones.length) {
+          await startSystemVoicemail(id, line, menu.caller, selected.name);
+        } else {
+          try {
+            await startControlledForward(id, line, {
+              phone: phones[0], display: selected.name,
+              ringCount: selected.ringCount, team,
+            });
+            req.log.info({ lineId: line.id, extension: selected.name, memberCount: phones.length }, "Sequential extension routing started");
+          } catch (error: any) {
+            req.log.error({ extension: selected.name, error: error?.message }, "First extension member dial failed");
+            await startSystemVoicemail(id, line, menu.caller, selected.name);
+          }
         }
       }
     } else if (type === "call.gather.ended" && outboundToInbound.has(id)) {
@@ -296,10 +348,31 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       if (!state.bridged) {
         const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, state.lineId));
         if (line && line.isActive) {
-          try { await startSystemVoicemail(state.inbound, line, "unknown"); }
-          catch (error: any) { req.log.error({ message: error?.message }, "Failed to return unanswered forward to system voicemail"); }
+          let retryStarted = false;
+          if (state.team) {
+            while (state.team.remaining.length > 0) {
+              const nextPhone = state.team.remaining.shift()!;
+              try {
+                await startControlledForward(state.inbound, line, {
+                  phone: nextPhone, display: state.team.extension,
+                  ringCount: state.team.ringCount, team: state.team,
+                });
+                req.log.info({ lineId: line.id, department: state.team.extension }, "Ringing next extension member");
+                retryStarted = true;
+                break;
+              } catch (error: any) {
+                req.log.error({ department: state.team.extension, message: error?.message }, "Extension member dial failed; trying next");
+              }
+            }
+          }
+          if (!retryStarted) {
+            try { await startSystemVoicemail(state.inbound, line, "unknown", state.team?.extension); }
+            catch (error: any) { req.log.error({ message: error?.message }, "Failed to return unanswered forward to system voicemail"); }
+          }
         }
       }
+    } else if (type === "call.hangup" && ivrMenus.has(id)) {
+      ivrMenus.delete(id);
     } else if (type === "call.hangup" && incomingToOutbound.has(id)) {
       const outbound = incomingToOutbound.get(id)!;
       incomingToOutbound.delete(id);

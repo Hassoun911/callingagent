@@ -1417,7 +1417,7 @@ components:
           type: integer
         answerMode:
           type: string
-          enum: [forward, ai_voice, voicemail, reject]
+          enum: [forward, ivr, ai_voice, voicemail, reject]
         forwardCallerId:
           type: string
           enum: [caller, line]
@@ -1479,7 +1479,7 @@ components:
           default: 4
         answerMode:
           type: string
-          enum: [forward, ai_voice, voicemail, reject]
+          enum: [forward, ivr, ai_voice, voicemail, reject]
         forwardCallerId:
           type: string
           enum: [caller, line]
@@ -1531,7 +1531,7 @@ components:
           type: ["integer", "null"]
         answerMode:
           type: ["string", "null"]
-          enum: [forward, ai_voice, voicemail, reject, null]
+          enum: [forward, ivr, ai_voice, voicemail, reject, null]
         forwardCallerId:
           type: ["string", "null"]
           enum: [caller, line, null]

@@ -36,6 +36,9 @@ interface Extension {
   name: string;
   digit: string;
   forwardTo: string;
+  agents: Array<{ userId: number; phone: string }>;
+  ringCount: number;
+  fallbackAction: string;
   description: string | null;
   enabled: boolean;
   createdAt: string;
@@ -102,13 +105,33 @@ export default function CompanyDetail() {
 
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [extsLoading, setExtsLoading] = useState(true);
+  const [menuChanging, setMenuChanging] = useState<number | null>(null);
+  async function toggleMenu(lineId: number, currentlyEnabled: boolean) {
+    setMenuChanging(lineId);
+    try {
+      const response = await fetch(BASE + "/api/companies/" + companyId + "/extensions/menu", {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumberId: lineId, enabled: !currentlyEnabled }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || "Could not change extension menu");
+      }
+      await qc.invalidateQueries();
+      toast({ title: currentlyEnabled ? "Extension menu disabled" : "Extension menu enabled",
+        description: currentlyEnabled ? "Line returns to regular forwarding." : "Incoming callers can now choose an extension." });
+    } catch (error: any) {
+      toast({ title: "Extension menu error", description: error.message, variant: "destructive" });
+    } finally { setMenuChanging(null); }
+  }
+
 
   const [editingCompany, setEditingCompany] = useState(false);
   const [companyForm, setCompanyForm] = useState({ name: "", industry: "", phone: "", email: "", website: "", notes: "", adminNotificationEmail: "", adminWhatsapp: "" });
 
   const [extDialog, setExtDialog] = useState(false);
   const [editingExt, setEditingExt] = useState<Extension | null>(null);
-  const [extForm, setExtForm] = useState({ name: "", digit: "1", forwardTo: "", description: "" });
+  const [extForm, setExtForm] = useState({ name: "", digit: "1", forwardTo: "", description: "", agents: [] as Array<{ userId: number; phone: string }>, ringCount: 4, fallbackAction: "voicemail" });
 
   const [linkDialog, setLinkDialog] = useState(false);
   const [selectedNumberId, setSelectedNumberId] = useState<string>("");
@@ -237,19 +260,19 @@ export default function CompanyDetail() {
 
   function openNewExt() {
     setEditingExt(null);
-    setExtForm({ name: "", digit: "1", forwardTo: "", description: "" });
+    setExtForm({ name: "", digit: "1", forwardTo: "", description: "", agents: [], ringCount: 4, fallbackAction: "voicemail" });
     setExtDialog(true);
   }
 
   function openEditExt(ext: Extension) {
     setEditingExt(ext);
-    setExtForm({ name: ext.name, digit: ext.digit, forwardTo: ext.forwardTo, description: ext.description ?? "" });
+    setExtForm({ name: ext.name, digit: ext.digit, forwardTo: ext.forwardTo, description: ext.description ?? "", agents: ext.agents || [], ringCount: ext.ringCount || 4, fallbackAction: ext.fallbackAction || "voicemail" });
     setExtDialog(true);
   }
 
   async function saveExt() {
-    if (!extForm.name || !extForm.digit || !extForm.forwardTo) {
-      toast({ title: "Name, digit, and forward-to number are required", variant: "destructive" });
+    if (!extForm.name || !extForm.digit || (!extForm.forwardTo && !extForm.agents.length)) {
+      toast({ title: "Name, digit, and at least one agent or forwarding number are required", variant: "destructive" });
       return;
     }
     setSaving(true);
@@ -437,6 +460,11 @@ export default function CompanyDetail() {
                 }`}>
                   {(ln.answerMode as string) === "ivr" ? "IVR" : ln.answerMode?.replace("_", " ")}
                 </Badge>
+                <Button size="sm" variant="outline" className="h-7 text-xs flex-shrink-0"
+                  disabled={menuChanging === ln.id || (!((ln.answerMode as string) === "ivr") && extensions.filter(e=>e.enabled).length === 0)}
+                  onClick={() => toggleMenu(ln.id, (ln.answerMode as string) === "ivr")}>
+                  {(ln.answerMode as string) === "ivr" ? "Disable Menu" : "Enable Menu"}
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -489,7 +517,7 @@ export default function CompanyDetail() {
         {linkedNumbers.length === 0 && (
           <div className="px-4 py-3 bg-yellow-500/5 border-b border-yellow-500/10 text-xs text-yellow-400 flex items-center gap-2">
             <Phone className="h-3.5 w-3.5 flex-shrink-0" />
-            Link a phone number above and set it to IVR mode for extensions to activate.
+            Link an active Telnyx phone number above, add extensions, then select Enable Menu.
           </div>
         )}
 
@@ -761,6 +789,38 @@ export default function CompanyDetail() {
               <Label>Forward To (Phone Number)</Label>
               <Input className="mt-1 bg-background font-mono" placeholder="+1 555 000 0000" value={extForm.forwardTo} onChange={e => setExtForm(f => ({ ...f, forwardTo: e.target.value }))} />
               <p className="text-xs text-muted-foreground mt-1">Calls pressing this digit will be forwarded to this number.</p>
+            </div>
+            <div className="space-y-2 rounded-md border border-border p-3">
+              <div className="flex justify-between items-center">
+                <Label>Assigned users — ring one by one</Label>
+                <Button type="button" variant="outline" size="sm" disabled={extForm.agents.length >= 15} onClick={() => setExtForm(f => ({ ...f, agents: [...f.agents, { userId: 0, phone: "" }] }))}>+ Add user</Button>
+              </div>
+              {extForm.agents.map((member, index) => (
+                <div key={index} className="rounded-md bg-secondary/20 p-2 space-y-2">
+                  <div className="flex justify-between text-xs text-muted-foreground"><span>Ring #{index + 1}</span>
+                    <button type="button" onClick={() => setExtForm(f => ({ ...f, agents: f.agents.filter((_, i) => i !== index) }))}>Remove</button></div>
+                  <Select value={member.userId ? String(member.userId) : ""} onValueChange={v => setExtForm(f => ({ ...f, agents: f.agents.map((a,i) => i === index ? { ...a, userId: Number(v) } : a) }))}>
+                    <SelectTrigger><SelectValue placeholder="Select company user" /></SelectTrigger>
+                    <SelectContent>{portalUsers.filter(u => u.isActive).map(u => <SelectItem key={u.id} value={String(u.id)}>{u.username}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Input type="tel" placeholder="+1 226 347 3180" value={member.phone}
+                    onChange={e => setExtForm(f => ({ ...f, agents: f.agents.map((a,i) => i === index ? { ...a, phone: e.target.value } : a) }))} />
+                  <div className="flex gap-2 text-xs">
+                    <button type="button" disabled={index === 0} onClick={() => setExtForm(f => { const a=[...f.agents];[a[index-1],a[index]]=[a[index],a[index-1]];return {...f,agents:a}; })}>Move up</button>
+                    <button type="button" disabled={index === extForm.agents.length - 1} onClick={() => setExtForm(f => { const a=[...f.agents];[a[index+1],a[index]]=[a[index],a[index+1]];return {...f,agents:a}; })}>Move down</button>
+                  </div>
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">The first user is called first. If they do not press 1, the next user rings. If no users are assigned, the single Forward To number is used.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Rings per user</Label><Input type="number" min={1} max={10} value={extForm.ringCount} onChange={e => setExtForm(f => ({...f, ringCount: Number(e.target.value)}))} /></div>
+              <div><Label>No-answer fallback</Label>
+                <Select value={extForm.fallbackAction} onValueChange={v => setExtForm(f => ({...f, fallbackAction:v}))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="voicemail">Department voicemail</SelectItem><SelectItem value="ai_voice">AI (uses voicemail until supported)</SelectItem></SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
               <Label>Description <span className="text-muted-foreground text-xs">(optional)</span></Label>

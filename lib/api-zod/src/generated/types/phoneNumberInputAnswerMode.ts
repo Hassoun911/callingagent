@@ -11,6 +11,7 @@ export type PhoneNumberInputAnswerMode = typeof PhoneNumberInputAnswerMode[keyof
 
 export const PhoneNumberInputAnswerMode = {
   forward: 'forward',
+  ivr: 'ivr',
   ai_voice: 'ai_voice',
   voicemail: 'voicemail',
   reject: 'reject',

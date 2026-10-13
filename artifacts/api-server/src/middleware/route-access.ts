@@ -62,6 +62,12 @@ export function routeAccessControl(req: Request, res: Response, next: NextFuncti
     return;
   }
 
+  // A company admin may manage extensions only for their own assigned company.
+  const extensionPath = req.path.match(/^\/companies\/(\d+)\/extensions(?:\/.*)?$/);
+  if (extensionPath && req.user?.role === "company_admin" && Number(extensionPath[1]) === Number(req.user.companyId)) {
+    next(); return;
+  }
+
   let permission = SAFE_METHODS.has(req.method) ? rule.read : (rule.write ?? rule.read);
   if (rule.prefix === "/companies" && /^\/companies\/\d+\/call-out$/.test(req.path) && req.method === "POST") permission = "calls.manage";
   if (rule.prefix === "/call-logs" && req.path.includes("/recording")) permission = "calls.listen";

@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { startWatchPoller } from "./lib/watch-poller";
 import { startReminderPoller } from "./lib/reminders";
 import { ensureBookingSchema } from "./lib/booking-schema";
+import { ensureExtensionSchema } from "./lib/extension-schema";
 import { ensureAiBookingBehavior } from "./lib/ai-booking-behavior";
 import { warmTtsCache } from "./routes/twilio-webhooks";
 import { recoverConfirmedTelnyxOrder } from "./lib/recover-telnyx-order";
@@ -25,6 +26,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function start(): Promise<void> {
   await ensureBookingSchema();
+  await ensureExtensionSchema();
   await ensureAiBookingBehavior();
   await recoverConfirmedTelnyxOrder();
   app.listen(port, (err) => {
