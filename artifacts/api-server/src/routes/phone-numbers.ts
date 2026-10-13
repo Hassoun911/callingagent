@@ -22,6 +22,27 @@ import twilio from "twilio";
 
 const router: IRouter = Router();
 
+function companyAiDefaults(company: { name: string; industry?: string | null; website?: string | null; notes?: string | null }) {
+  const name = company.name.trim();
+  const context = [
+    company.industry?.trim() ? `Industry: ${company.industry.trim()}.` : "",
+    company.website?.trim() ? `Website: ${company.website.trim()}.` : "",
+    company.notes?.trim() ? `Company information: ${company.notes.trim()}.` : "",
+  ].filter(Boolean).join("\n");
+  return {
+    aiGreeting: `Thank you for calling ${name}. How can I help you today?`,
+    aiSystemPrompt: [
+      `You are the professional, friendly AI receptionist for ${name}.`,
+      context,
+      "Answer calls politely, understand the reason for the call, and help using only verified company information.",
+      "If an answer is unavailable, say so rather than inventing facts.",
+      "Ask for the caller's name, callback number, and a short message when a follow-up is needed.",
+      "Offer transfer to a representative only when a working transfer route is configured.",
+      "Never ask for passwords or payment card details.",
+    ].filter(Boolean).join("\n"),
+  };
+}
+
 function getTwilioClient() {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -381,6 +402,7 @@ router.post("/phone-numbers/telnyx-register-order", async (req, res): Promise<vo
       await db.insert(phoneNumbersTable).values({
         number: phoneNumber, twilioSid: null, companyId, friendlyName: phoneNumber,
         callerIdName: company.name, answerMode: "forward", isActive: false,
+        ...companyAiDefaults(company),
       }).onConflictDoNothing();
     }
     res.json({ registered: true, phoneNumber, companyId, status: "setup_required",
@@ -446,6 +468,7 @@ router.post("/phone-numbers/telnyx-setup", async (req, res): Promise<void> => {
       await db.insert(phoneNumbersTable).values({
         number, twilioSid: null, companyId, friendlyName: number,
         callerIdName: company.name, answerMode: "forward",
+        ...companyAiDefaults(company),
       }).onConflictDoNothing();
     }
     res.json({ phoneNumber: number, companyId, registered: true, results,
