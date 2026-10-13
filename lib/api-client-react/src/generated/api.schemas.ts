@@ -125,6 +125,7 @@ export type PhoneNumberAnswerMode = typeof PhoneNumberAnswerMode[keyof typeof Ph
 
 export const PhoneNumberAnswerMode = {
   forward: 'forward',
+  ivr: 'ivr',
   ai_voice: 'ai_voice',
   voicemail: 'voicemail',
   reject: 'reject',
@@ -224,6 +225,7 @@ export type PhoneNumberInputAnswerMode = typeof PhoneNumberInputAnswerMode[keyof
 
 export const PhoneNumberInputAnswerMode = {
   forward: 'forward',
+  ivr: 'ivr',
   ai_voice: 'ai_voice',
   voicemail: 'voicemail',
   reject: 'reject',
@@ -323,6 +325,7 @@ export type PhoneNumberUpdateAnswerMode = typeof PhoneNumberUpdateAnswerMode[key
 
 export const PhoneNumberUpdateAnswerMode = {
   forward: 'forward',
+  ivr: 'ivr',
   ai_voice: 'ai_voice',
   voicemail: 'voicemail',
   reject: 'reject',
