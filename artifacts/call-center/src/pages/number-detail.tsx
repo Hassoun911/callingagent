@@ -314,7 +314,7 @@ export default function NumberDetail() {
       company?.industry ? `Industry: ${company.industry}.` : "",
       company?.website ? `Website: ${company.website}.` : "",
       company?.notes ? `Company information: ${company.notes}.` : "",
-    ].filter(Boolean).join("\\n");
+    ].filter(Boolean).join("\n");
     setFormData(previous => ({
       ...previous,
       aiGreeting: previous.aiGreeting || `Thank you for calling ${companyName}. How can I help you today?`,
@@ -326,7 +326,7 @@ export default function NumberDetail() {
         "Collect the caller's name, callback number and message for follow-up when needed.",
         "Transfer to a representative only if the line has a working transfer option configured.",
         "Never request payment card details or passwords.",
-      ].filter(Boolean).join("\\n"),
+      ].filter(Boolean).join("\n"),
     }));
   }, [companyName, company?.industry, company?.website, company?.notes, number?.id]);
 
