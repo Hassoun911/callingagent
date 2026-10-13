@@ -34,6 +34,41 @@ async function action(id: string, name: string, payload: Record<string, unknown>
   if (!response.ok) { const detail = (await response.text()).slice(0, 600); throw new Error("Telnyx call command " + name + " failed (" + response.status + "): " + detail); }
 }
 
+async function notifyAdminOfVoicemail(logSid: string, recordingUrl: string) {
+  const [log] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, logSid));
+  if (!log?.phoneNumberId) return;
+  const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, log.phoneNumberId));
+  if (!line?.companyId) return;
+  const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, line.companyId));
+  // The administrator contact belongs to this company only; never use a global phone.
+  const recipient = company?.adminWhatsapp?.trim();
+  if (!recipient || !/^\\+[1-9]\\d{7,14}$/.test(recipient)) {
+    return;
+  }
+  const key = process.env.TELNYX_API_KEY;
+  const profile = process.env.TELNYX_MESSAGING_PROFILE_ID;
+  if (!key || !profile) throw new Error("Telnyx messaging credentials unavailable");
+  const message = `New voicemail for ${company.name} (${line.number}). Caller: ${log.fromNumber}. Listen in CallingAgent: https://callingagent.ca/calls?companyId=${line.companyId}`;
+  const payload: Record<string, unknown> = {
+    from: line.number, to: recipient, text: message, messaging_profile_id: profile,
+  };
+  // An HTTPS recording URL can be delivered as MMS audio if the carrier accepts its media type.
+  if (/^https:\/\//i.test(recordingUrl)) payload.media_urls = [recordingUrl];
+  const result = await fetch("https://api.telnyx.com/v2/messages", {
+    method: "POST", headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+    body: JSON.stringify(payload), signal: AbortSignal.timeout(12000),
+  });
+  if (!result.ok && payload.media_urls) {
+    // MMS delivery may fail for inaccessible/unsupported carrier recording URLs. At least send a text alert.
+    delete payload.media_urls;
+    const fallback = await fetch("https://api.telnyx.com/v2/messages", {
+      method: "POST", headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+      body: JSON.stringify(payload), signal: AbortSignal.timeout(12000),
+    });
+    if (!fallback.ok) throw new Error("Telnyx voicemail SMS failed: " + fallback.status);
+  } else if (!result.ok) throw new Error("Telnyx voicemail delivery failed: " + result.status);
+}
+
 // This is a Call Control API v2 webhook, not a Twilio TwiML endpoint.
 router.post("/telnyx/voice", async (req, res): Promise<void> => {
   if (!process.env.TELNYX_PUBLIC_KEY) { res.status(503).json({ error: "Telnyx webhook signing key not configured" }); return; }
@@ -119,6 +154,10 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
         recordingSid: typeof payload?.recording_id === "string" ? payload.recording_id : null,
       }).where(eq(callLogsTable.twilioCallSid, logSid));
       req.log.info({ recordingSaved: true, hasUrl: Boolean(url) }, "Telnyx voicemail saved");
+      if (typeof url === "string") {
+        try { await notifyAdminOfVoicemail(logSid, url); }
+        catch (error: any) { req.log.error({ message: error?.message }, "Telnyx voicemail admin delivery failed"); }
+      }
     } else if (type === "call.recording.transcription.saved") {
       const transcript = payload?.transcription_data?.transcript || payload?.transcription;
       if (typeof transcript === "string") {
