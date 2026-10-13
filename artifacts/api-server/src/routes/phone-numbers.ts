@@ -463,16 +463,26 @@ router.post("/phone-numbers/telnyx-setup", async (req, res): Promise<void> => {
       if (!reply.ok) { res.status(502).json({ error: data.errors?.[0]?.detail || "Telnyx messaging profile assignment failed.", results }); return; }
       results.sms = "messaging profile assigned";
     }
-    // Register only after provider configurations succeed. This does not declare service active.
+    // Voice connection assignment enables CallingAgent to handle inbound calls.
+    // isActive is a local call admission switch, not evidence of an end-to-end test.
     if (!registered) {
       await db.insert(phoneNumbersTable).values({
         number, twilioSid: null, companyId, friendlyName: number,
-        callerIdName: company.name, answerMode: "forward",
+        callerIdName: company.name, answerMode: "voicemail",
+        isActive: Boolean(results.voice),
         ...companyAiDefaults(company),
       }).onConflictDoNothing();
+    } else if (results.voice && !registered.isActive) {
+      await db.update(phoneNumbersTable)
+        .set({ isActive: true })
+        .where(eq(phoneNumbersTable.id, registered.id));
     }
     res.json({ phoneNumber: number, companyId, registered: true, results,
-      warning: "Number registered with its company. Test calling and SMS before marking the line ready; carrier approvals may still be required." });
+      inboundEnabled: Boolean(results.voice),
+      readiness: "testing_required",
+      warning: results.voice
+        ? "Incoming calls are enabled in CallingAgent. Test voice and SMS before relying on this number; carrier approvals may still be required."
+        : "Voice connection is not configured. The line remains unavailable for incoming calls until voice setup is completed." });
   } catch (error: any) {
     req.log.error({ error: error?.message }, "Telnyx number setup failed");
     res.status(502).json({ error: "Telnyx configuration status is uncertain. Verify before retrying." });
