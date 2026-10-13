@@ -163,11 +163,32 @@ router.get("/call-logs/:id/recording", async (req, res): Promise<void> => {
   // be fetched with Twilio credentials.
   if (log.twilioCallSid?.startsWith("telnyx:")) {
     if (!log.recordingUrl) { res.status(404).send("Recording URL not available"); return; }
+    // Telnyx webhook download links are signed S3 URLs that expire in ~10 minutes.
+    // Refresh the URL using the trusted recording ID on every playback.
+    const telnyxKey = process.env.TELNYX_API_KEY;
+    let sourceUrl = log.recordingUrl;
+    if (telnyxKey && log.recordingSid && /^[0-9a-f-]{36}$/i.test(log.recordingSid)) {
+      try {
+        const metadata = await fetch("https://api.telnyx.com/v2/recordings/" + encodeURIComponent(log.recordingSid), {
+          headers: { Authorization: "Bearer " + telnyxKey },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (metadata.ok) {
+          const body: any = await metadata.json();
+          const data = body.data || body;
+          sourceUrl = data.recording_urls?.mp3 || data.recording_urls?.wav || sourceUrl;
+        }
+      } catch (error) {
+        req.log.warn({ recordingId: log.recordingSid }, "Unable to refresh Telnyx recording URL");
+      }
+    }
     let recording: URL;
-    try { recording = new URL(log.recordingUrl); }
+    try { recording = new URL(sourceUrl); }
     catch { res.status(502).send("Invalid recording URL"); return; }
     const host = recording.hostname.toLowerCase();
-    if (recording.protocol !== "https:" || !(host === "telnyx.com" || host.endsWith(".telnyx.com") || host.endsWith(".telnyxcloudstorage.com"))) {
+    const permitted = host === "s3.amazonaws.com" && recording.pathname.startsWith("/telephony-recorder-prod/")
+      || host === "telnyx.com" || host.endsWith(".telnyx.com") || host.endsWith(".telnyxcloudstorage.com");
+    if (recording.protocol !== "https:" || !permitted) {
       res.status(502).send("Untrusted recording host"); return;
     }
     const headers: Record<string, string> = {};
