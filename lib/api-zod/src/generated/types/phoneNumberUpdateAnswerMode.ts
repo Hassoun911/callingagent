@@ -14,6 +14,7 @@ export type PhoneNumberUpdateAnswerMode = typeof PhoneNumberUpdateAnswerMode[key
 
 export const PhoneNumberUpdateAnswerMode = {
   forward: 'forward',
+  ivr: 'ivr',
   ai_voice: 'ai_voice',
   voicemail: 'voicemail',
   reject: 'reject',
