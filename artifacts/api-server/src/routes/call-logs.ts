@@ -159,6 +159,39 @@ router.get("/call-logs/:id/recording", async (req, res): Promise<void> => {
     return;
   }
 
+  // Telnyx recordings are saved against the same call-log schema but must never
+  // be fetched with Twilio credentials.
+  if (log.twilioCallSid?.startsWith("telnyx:")) {
+    if (!log.recordingUrl) { res.status(404).send("Recording URL not available"); return; }
+    let recording: URL;
+    try { recording = new URL(log.recordingUrl); }
+    catch { res.status(502).send("Invalid recording URL"); return; }
+    const host = recording.hostname.toLowerCase();
+    if (recording.protocol !== "https:" || !(host === "telnyx.com" || host.endsWith(".telnyx.com") || host.endsWith(".telnyxcloudstorage.com"))) {
+      res.status(502).send("Untrusted recording host"); return;
+    }
+    const headers: Record<string, string> = {};
+    if (req.headers.range) headers["Range"] = String(req.headers.range);
+    const upstream = await fetch(recording.toString(), { headers, redirect: "error", signal: AbortSignal.timeout(15000) });
+    if (!upstream.ok || !upstream.body) { res.status(502).send("Recording unavailable at Telnyx"); return; }
+    res.status(upstream.status);
+    res.set("Content-Type", upstream.headers.get("content-type") || "audio/mpeg");
+    res.set("Cache-Control", "private, no-store");
+    res.set("Accept-Ranges", "bytes");
+    const contentRange = upstream.headers.get("content-range");
+    if (contentRange) res.set("Content-Range", contentRange);
+    const length = upstream.headers.get("content-length");
+    if (length) res.set("Content-Length", length);
+    const reader = upstream.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!res.write(Buffer.from(value))) await new Promise<void>(resolve => res.once("drain", resolve));
+    }
+    res.end();
+    return;
+  }
+
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   if (!accountSid || !authToken) {
