@@ -176,7 +176,7 @@ router.get("/call-logs/:id/recording", async (req, res): Promise<void> => {
         if (metadata.ok) {
           const body: any = await metadata.json();
           const data = body.data || body;
-          sourceUrl = data.recording_urls?.mp3 || data.recording_urls?.wav || sourceUrl;
+          sourceUrl = data.download_urls?.mp3 || data.download_urls?.wav || data.recording_urls?.mp3 || data.recording_urls?.wav || sourceUrl;
         }
       } catch (error) {
         req.log.warn({ recordingId: log.recordingSid }, "Unable to refresh Telnyx recording URL");
