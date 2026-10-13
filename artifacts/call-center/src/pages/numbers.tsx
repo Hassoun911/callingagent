@@ -163,6 +163,33 @@ export default function Numbers() {
   const [orderLastChecked, setOrderLastChecked] = useState<string | null>(null);
   const [orderStatusError, setOrderStatusError] = useState(false);
   const [routingConfigured, setRoutingConfigured] = useState(false);
+  const [recoveryOrderId, setRecoveryOrderId] = useState("");
+  const [recoveryPhone, setRecoveryPhone] = useState("");
+  const [recoveringOrder, setRecoveringOrder] = useState(false);
+  const [recoverError, setRecoverError] = useState("");
+  const registerPurchasedOrder = async (orderId: string, phoneNumber: string, companyId: number) => {
+    const response = await fetch(`${BASE}/api/phone-numbers/telnyx-register-order`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId, phoneNumber, companyId }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not register purchased number");
+    await queryClient.invalidateQueries({ queryKey: getListPhoneNumbersQueryKey() });
+    return data;
+  };
+  const recoverPurchasedNumber = async () => {
+    const companyId = Number(purchaseCompanyId);
+    if (!companyId) { setRecoverError("Select a company first."); return; }
+    setRecoveringOrder(true);
+    setRecoverError("");
+    try {
+      await registerPurchasedOrder(recoveryOrderId.trim(), recoveryPhone.trim(), companyId);
+      setTelnyxOrder({ orderId: recoveryOrderId.trim(), phoneNumber: recoveryPhone.trim(), companyId, status: "success" });
+      setTelnyxSetupResult("Purchased number restored to company inventory. Configure voice and SMS next.");
+      toast({ title: "Purchased number found", description: "Added to the company as Setup Required." });
+    } catch (error: any) { setRecoverError(error.message); }
+    finally { setRecoveringOrder(false); }
+  };
   const orderStatus = (telnyxOrder?.status || "pending").toLowerCase();
   const orderPurchased = ["success", "completed", "complete", "purchased"].includes(orderStatus);
   const orderFailed = ["failed", "failure", "canceled", "cancelled", "rejected"].includes(orderStatus);
@@ -181,6 +208,9 @@ export default function Numbers() {
           setTelnyxOrder(current => current?.orderId === telnyxOrder.orderId ? { ...current, status: data.status } : current);
           setOrderStatusError(false);
           setOrderLastChecked(new Date().toLocaleTimeString());
+          if (["success", "completed", "complete"].includes(String(data.status).toLowerCase())) {
+            registerPurchasedOrder(telnyxOrder.orderId, telnyxOrder.phoneNumber, telnyxOrder.companyId).catch(() => setOrderStatusError(true));
+          }
         })
         .catch(() => setOrderStatusError(true));
     }, 12000);
@@ -365,6 +395,18 @@ export default function Numbers() {
                     {telnyxSetupResult && <p className="text-sm font-semibold text-foreground rounded-md bg-secondary/60 p-2">{telnyxSetupResult}</p>}
                     <p className="text-xs text-muted-foreground">Purchased does not mean voice or SMS is verified. Carrier activation and compliance requirements may still apply.</p>
                   </div>
+                </div>
+              )}
+              {!telnyxOrder && numberProvider === "telnyx" && (
+                <div className="rounded-lg border border-border p-3 space-y-2 bg-secondary/20">
+                  <p className="text-sm font-bold text-foreground">Already purchased a Telnyx number? Restore it here</p>
+                  <p className="text-xs text-muted-foreground">If the browser was refreshed after purchase, verify your Telnyx order and add the number to its company without paying twice.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Input placeholder="Telnyx order ID" aria-label="Existing Telnyx order ID" value={recoveryOrderId} onChange={e => setRecoveryOrderId(e.target.value)} />
+                    <Input placeholder="Phone number, e.g. +15198006738" aria-label="Purchased phone number" value={recoveryPhone} onChange={e => setRecoveryPhone(e.target.value)} />
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={recoverPurchasedNumber} disabled={recoveringOrder || !recoveryOrderId.trim() || !recoveryPhone.trim() || !purchaseCompanyId}>{recoveringOrder ? "Verifying purchase…" : "Verify and add to company"}</Button>
+                  {recoverError && <p className="text-sm font-semibold text-destructive">{recoverError}</p>}
                 </div>
               )}
               {/* Tab switcher */}
