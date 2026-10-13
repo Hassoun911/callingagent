@@ -35,18 +35,38 @@ export async function recoverConfirmedTelnyxOrder(): Promise<void> {
     if (!(Array.isArray(numbers.data) && numbers.data.some((n: any) => n.phone_number === phoneNumber))) {
       logger.warn("Telnyx recovery ownership not confirmed"); return;
     }
+    const ownedNumber = numbers.data.find((n: any) => n.phone_number === phoneNumber);
+    const connectionId = process.env.TELNYX_CONNECTION_ID;
+    const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;
     const [existing] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, phoneNumber));
-    if (existing) {
-      if (existing.companyId !== companyId) logger.error("Telnyx recovery number assigned to a different company");
-      else logger.info({ phoneNumber, companyId }, "Telnyx recovery already registered");
-      return;
+    if (existing && existing.companyId !== companyId) {
+      logger.error("Telnyx recovery number belongs to another company"); return;
     }
-    await db.insert(phoneNumbersTable).values({
-      number: phoneNumber, companyId, twilioSid: null,
-      friendlyName: phoneNumber, callerIdName: company.name,
-      answerMode: "forward", isActive: false,
-    }).onConflictDoNothing();
-    logger.info({ phoneNumber, companyId }, "Telnyx purchased number safely restored as Setup Required");
+    // Configure carrier services before enabling the purchased line in CallingAgent.
+    if (!connectionId || !messagingProfileId) {
+      logger.warn("Telnyx voice connection or SMS profile is missing; leaving setup pending"); return;
+    }
+    const configHeaders = { ...headers, "Content-Type": "application/json" };
+    const voiceResult = await fetch("https://api.telnyx.com/v2/phone_numbers/" + encodeURIComponent(ownedNumber.id), {
+      method: "PATCH", headers: configHeaders, body: JSON.stringify({ connection_id: connectionId }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!voiceResult.ok) { logger.error({ status: voiceResult.status }, "Voice connection assignment failed"); return; }
+    const smsResult = await fetch("https://api.telnyx.com/v2/phone_numbers/" + encodeURIComponent(ownedNumber.id) + "/messaging", {
+      method: "PATCH", headers: configHeaders, body: JSON.stringify({ messaging_profile_id: messagingProfileId }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!smsResult.ok) { logger.error({ status: smsResult.status }, "SMS messaging profile assignment failed"); return; }
+    if (!existing) {
+      await db.insert(phoneNumbersTable).values({
+        number: phoneNumber, companyId, twilioSid: null,
+        friendlyName: phoneNumber, callerIdName: company.name,
+        answerMode: "forward", isActive: true,
+      }).onConflictDoNothing();
+    } else if (!existing.isActive) {
+      await db.update(phoneNumbersTable).set({ isActive: true }).where(eq(phoneNumbersTable.id, existing.id));
+    }
+    logger.info({ phoneNumber, companyId }, "Telnyx number enabled in CallingAgent after voice/SMS profile assignment; calls and texts still require live testing");
   } catch (err: any) {
     logger.error({ message: err?.message }, "Telnyx one-time recovery failed");
   }
