@@ -118,7 +118,7 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
       // Independent outbound leg: bridge only after acceptance. Linking at dial time
       // can propagate the original caller identity and bypass screening.
       ...((route || line.callScreen) ? {} : { answering_machine_detection: "detect" }),
-      timeout_secs: Math.max(5, Math.min(60, (line.ringCount || 4) * 6)),
+      timeout_secs: Math.max(5, Math.min(60, (route?.ringCount || line.ringCount || 4) * 6)),
       client_state: Buffer.from(JSON.stringify({ inbound, lineId: line.id })).toString("base64"),
     }),
     signal: AbortSignal.timeout(10000),
@@ -271,7 +271,27 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
         const name = company?.name?.trim() || line.callerIdName?.trim() || "our business";
         const defaultVoicemail = "Thank you for calling " + name +
           ". We're sorry we missed your call. Please leave your name, phone number, and a brief message after the tone, and someone from our team will contact you as soon as possible.";
-        if (line.answerMode === "forward" && line.forwardTo) {
+        if (line.answerMode === "ivr" && line.companyId) {
+          const all = await db.select().from(extensionsTable).where(eq(extensionsTable.companyId, line.companyId));
+          const options = all.filter(e => e.enabled && /^[1-9]$/.test(e.digit)).map(e => ({
+            digit: e.digit, name: e.name, id: e.id, agents: e.agents || [],
+            forwardTo: e.forwardTo, ringCount: e.ringCount, fallbackAction: e.fallbackAction,
+          }));
+          if (!options.length) {
+            await startSystemVoicemail(id, line, typeof payload?.from === "string" ? payload.from : "unknown");
+          } else {
+            ivrMenus.set(id, { lineId: line.id, caller: typeof payload?.from === "string" ? payload.from : "unknown", options });
+            const choices = options.sort((a,b) => a.digit.localeCompare(b.digit))
+              .map(e => "Press " + e.digit + " for " + e.name + ".").join(" ");
+            await action(id, "gather_using_speak", {
+              payload: "Thank you for calling " + name + ". " + choices,
+              voice: "female", language: "en-US",
+              valid_digits: options.map(x => x.digit).join(""), maximum_digits: 1, minimum_digits: 1,
+              initial_timeout_millis: 12000, timeout_millis: 12000,
+            });
+            req.log.info({ lineId: line.id, extensionCount: options.length }, "Extension menu presented");
+          }
+        } else if (line.answerMode === "forward" && line.forwardTo) {
           try { await startControlledForward(id, line); }
           catch (error: any) {
             req.log.error({ error: error?.message, lineId: line.id }, "Forward setup failed, using system voicemail");
@@ -279,6 +299,34 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
           }
         } else {
           await startSystemVoicemail(id, line, typeof payload?.from === "string" ? payload.from : "unknown");
+        }
+      }
+    } else if (type === "call.gather.ended" && ivrMenus.has(id)) {
+      const menu = ivrMenus.get(id)!;
+      ivrMenus.delete(id);
+      const selected = menu.options.find(option => option.digit === String(payload?.digits || ""));
+      const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, menu.lineId));
+      if (!line || !line.isActive) {
+        await action(id, "hangup");
+      } else if (!selected) {
+        await startSystemVoicemail(id, line, menu.caller);
+      } else {
+        const phones = (selected.agents.length ? selected.agents.map(a => a.phone) : [selected.forwardTo])
+          .filter(phone => /^\+[1-9]\d{7,14}$/.test(phone));
+        const team = { remaining: phones.slice(1), extension: selected.name, fallback: selected.fallbackAction };
+        if (!phones.length) {
+          await startSystemVoicemail(id, line, menu.caller, selected.name);
+        } else {
+          try {
+            await startControlledForward(id, line, {
+              phone: phones[0], display: selected.name,
+              ringCount: selected.ringCount, team,
+            });
+            req.log.info({ lineId: line.id, extension: selected.name, memberCount: phones.length }, "Sequential extension routing started");
+          } catch (error: any) {
+            req.log.error({ extension: selected.name, error: error?.message }, "First extension member dial failed");
+            await startSystemVoicemail(id, line, menu.caller, selected.name);
+          }
         }
       }
     } else if (type === "call.gather.ended" && outboundToInbound.has(id)) {
