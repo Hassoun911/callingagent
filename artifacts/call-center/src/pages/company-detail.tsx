@@ -113,6 +113,27 @@ export default function CompanyDetail() {
   const [linkDialog, setLinkDialog] = useState(false);
   const [selectedNumberId, setSelectedNumberId] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [callOutOpen, setCallOutOpen] = useState(false);
+  const [callOutBusy, setCallOutBusy] = useState(false);
+  const [callOutLine, setCallOutLine] = useState("");
+  const [callOutAgent, setCallOutAgent] = useState("");
+  const [callOutDestination, setCallOutDestination] = useState("");
+  async function placeCompanyCallOut() {
+    setCallOutBusy(true);
+    try {
+      const response = await fetch(BASE + "/api/companies/" + companyId + "/call-out", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumberId: Number(callOutLine), agentPhone: callOutAgent, destination: callOutDestination }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not start call");
+      setCallOutOpen(false);
+      toast({ title: "Your phone is being called", description: "Answer and press 1. Then CallingAgent dials the destination using the company's number." });
+    } catch (error: any) {
+      toast({ title: "Call Out failed", description: error.message, variant: "destructive" });
+    } finally { setCallOutBusy(false); }
+  }
+
 
   type PortalUser = { id: number; username: string; email: string | null; role: string; isActive: boolean };
   const [portalUsers, setPortalUsers] = useState<PortalUser[]>([]);
@@ -328,7 +349,13 @@ export default function CompanyDetail() {
             <span className="text-xs px-2 py-0.5 rounded bg-secondary text-muted-foreground">{company.industry}</span>
           )}
         </div>
-        <Button variant="ghost" size="icon" className="ml-auto flex-shrink-0" onClick={() => setEditingCompany(true)}>
+        <Button variant="outline" className="ml-auto gap-2" onClick={() => {
+          setCallOutLine(String(linkedNumbers.find(n => !n.twilioSid && n.isActive)?.id || ""));
+          setCallOutOpen(true);
+        }} disabled={!linkedNumbers.some(n => !n.twilioSid && n.isActive)}>
+          <Phone className="h-4 w-4" /> Call Out
+        </Button>
+        <Button variant="ghost" size="icon" className="flex-shrink-0" onClick={() => setEditingCompany(true)}>
           <Edit className="h-4 w-4" />
         </Button>
       </div>
@@ -747,6 +774,30 @@ export default function CompanyDetail() {
         </DialogContent>
       </Dialog>
 
+
+      <Dialog open={callOutOpen} onOpenChange={setCallOutOpen}>
+        <DialogContent className="bg-card border-border sm:max-w-md">
+          <DialogHeader><DialogTitle>Call Out — {company.name}</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">CallingAgent calls your phone first. Answer and press 1 to dial the destination. The recipient sees the company's number.</p>
+          <div className="space-y-3">
+            <div><Label>Company Caller ID</Label>
+              <Select value={callOutLine} onValueChange={setCallOutLine}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Choose the company number" /></SelectTrigger>
+                <SelectContent>{linkedNumbers.filter(n => !n.twilioSid && n.isActive).map(n =>
+                  <SelectItem key={n.id} value={String(n.id)}>{formatPhone(n.number)} — {n.friendlyName}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div><Label>Call my phone first</Label><Input className="mt-1" type="tel" placeholder="+1 226 347 3180" value={callOutAgent} onChange={e => setCallOutAgent(e.target.value)} /></div>
+            <div><Label>Then connect me to</Label><Input className="mt-1" type="tel" placeholder="Destination phone number" value={callOutDestination} onChange={e => setCallOutDestination(e.target.value)} /></div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setCallOutOpen(false)}>Cancel</Button>
+            <Button disabled={callOutBusy || !callOutAgent.trim() || !callOutDestination.trim() || !callOutLine} onClick={placeCompanyCallOut}>
+              {callOutBusy ? "Starting call..." : "Call My Phone"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Link number dialog */}
       <Dialog open={linkDialog} onOpenChange={setLinkDialog}>
         <DialogContent className="sm:max-w-sm bg-card border-border">
