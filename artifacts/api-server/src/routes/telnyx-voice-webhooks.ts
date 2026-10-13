@@ -74,17 +74,17 @@ async function notifyAdminOfVoicemail(logSid: string, recordingUrl: string) {
 const outboundToInbound = new Map<string, { inbound: string; lineId: number; bridged: boolean; pressOne: boolean; displayName: string; team?: { remaining: string[]; extension: string; fallback: string; ringCount: number } }>();
 const incomingToOutbound = new Map<string, string>();
 const ivrMenus = new Map<string, { lineId: number; caller: string; options: Array<{ digit: string; name: string; id: number; agents: Array<{ userId: number; phone: string }>; forwardTo: string; ringCount: number; fallbackAction: string }> }>();
-type ClickToCall = { agent: string; target: string; from: string; companyId: number; stage: "calling_agent" | "calling_target" | "connected"; targetLeg?: string };
+type ClickToCall = { agent: string; target: string; from: string; companyId: number; stage: "calling_agent" | "calling_target" | "connected"; targetLeg?: string; ringSeconds: number };
 const clickToCallByLeg = new Map<string, ClickToCall>();
 
-async function dialClickToCallLeg(to: string, from: string, label: string): Promise<string> {
+async function dialClickToCallLeg(to: string, from: string, label: string, timeoutSeconds = 35): Promise<string> {
   const key = process.env.TELNYX_API_KEY;
   const connection = process.env.TELNYX_CONNECTION_ID;
   if (!key || !connection) throw new Error("Telnyx outbound credentials are missing");
   const result = await fetch("https://api.telnyx.com/v2/calls", {
     method: "POST",
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
-    body: JSON.stringify({ connection_id: connection, to, from, timeout_secs: 35,
+    body: JSON.stringify({ connection_id: connection, to, from, timeout_secs: timeoutSeconds,
       client_state: Buffer.from(JSON.stringify({ clickToCall: label })).toString("base64") }),
     signal: AbortSignal.timeout(12000),
   });
@@ -96,9 +96,9 @@ async function dialClickToCallLeg(to: string, from: string, label: string): Prom
 
 // Creates an outbound call from the selected company's verified Telnyx line.
 // The agent receives a call first and must press 1 before the customer is dialed.
-export async function initiateCompanyClickToCall(companyId: number, agent: string, target: string, from: string): Promise<string> {
+export async function initiateCompanyClickToCall(companyId: number, agent: string, target: string, from: string, ringCount = 4): Promise<string> {
   const agentLeg = await dialClickToCallLeg(agent, from, "agent");
-  clickToCallByLeg.set(agentLeg, { agent: agentLeg, target, from, companyId, stage: "calling_agent" });
+  clickToCallByLeg.set(agentLeg, { agent: agentLeg, target, from, companyId, stage: "calling_agent", ringSeconds: Math.max(6, Math.min(60, ringCount * 6)) });
   return agentLeg;
 }
 
@@ -196,10 +196,10 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
           // Only dial the destination after an explicit keypress from the agent.
           call.stage = "calling_target";
           try {
-            const destId = await dialClickToCallLeg(call.target, call.from, "customer");
+            const destId = await dialClickToCallLeg(call.target, call.from, "customer", call.ringSeconds);
             call.targetLeg = destId;
             clickToCallByLeg.set(destId, call);
-            await action(call.agent, "speak", { payload: "Connecting your outbound call now. Please hold.", voice: "female", language: "en-US" });
+            await action(call.agent, "speak", { payload: "Dialing the destination now. Please stay on the line while it rings.", voice: "female", language: "en-US" });
             req.log.info({ companyId: call.companyId }, "Click-to-call destination dial initiated");
           } catch (error) {
             clickToCallByLeg.delete(id);
@@ -213,7 +213,14 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       clickToCallByLeg.delete(call.agent);
       if (call.targetLeg) clickToCallByLeg.delete(call.targetLeg);
       const other = id === call.agent ? call.targetLeg : call.agent;
-      if (other) await action(other, "hangup").catch(() => {});
+      if (id === call.targetLeg && call.stage === "calling_target") {
+        // Inform the agent why the outbound leg ended instead of silently disconnecting.
+        const reason = payload?.hangup_cause === "timeout" ? "The destination did not answer within the selected ring time." : "The destination was unavailable or the call ended.";
+        try { await action(call.agent, "speak", { payload: reason + " Your call is finished.", voice: "female", language: "en-US" }); }
+        catch (e: any) { req.log.warn({ error: e?.message }, "Unable to announce outbound call result"); }
+      } else if (other) {
+        await action(other, "hangup").catch(() => {});
+      }
     } else if (type === "call.initiated" && payload?.direction === "incoming") {
       await action(id, "answer");
     } else if (type === "call.answered" && outboundToInbound.has(id)) {
