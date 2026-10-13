@@ -5,6 +5,7 @@ import { startReminderPoller } from "./lib/reminders";
 import { ensureBookingSchema } from "./lib/booking-schema";
 import { ensureAiBookingBehavior } from "./lib/ai-booking-behavior";
 import { warmTtsCache } from "./routes/twilio-webhooks";
+import { recoverConfirmedTelnyxOrder } from "./lib/recover-telnyx-order";
 
 // All server-side date formatting defaults to Eastern Time unless a
 // phone-number-specific timezone is supplied by the notification workflow.
@@ -25,6 +26,7 @@ if (Number.isNaN(port) || port <= 0) {
 async function start(): Promise<void> {
   await ensureBookingSchema();
   await ensureAiBookingBehavior();
+  await recoverConfirmedTelnyxOrder();
   app.listen(port, (err) => {
     if (err) {
       logger.error({ err }, "Error listening on port");
