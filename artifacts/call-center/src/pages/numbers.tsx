@@ -242,7 +242,12 @@ export default function Numbers() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Setup not completed");
       setTelnyxSetupResult(`${Object.entries(data.results || {}).map(([key, value]) => `${key}: ${value}`).join(" · ")}. ${data.warning || ""}`);
-      setRoutingConfigured(true);
+      setRoutingConfigured(Boolean(data.inboundEnabled));
+      if (data.inboundEnabled) {
+        toast({ title: "Incoming calls enabled", description: "The line can now receive inbound calls in CallingAgent. Run real inbound, outbound and SMS tests before marking it ready." });
+      } else {
+        toast({ title: "Voice setup still required", description: "The messaging profile may be assigned, but incoming calls remain unavailable until Telnyx voice setup succeeds.", variant: "destructive" });
+      }
       queryClient.invalidateQueries({ queryKey: getListPhoneNumbersQueryKey() });
     } catch (error: any) { setTelnyxSetupResult(error.message); }
     finally { setTelnyxSetupBusy(false); }
