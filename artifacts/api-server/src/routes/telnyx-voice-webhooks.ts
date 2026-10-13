@@ -99,6 +99,8 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
   const outbound = result?.data?.call_control_id;
   if (typeof outbound !== "string") throw new Error("Telnyx dial did not return an outbound leg");
   outboundToInbound.set(outbound, { inbound, lineId: line.id, bridged: false, pressOne: Boolean(line.callScreen) });
+  // Carrier accepted the dial command; this does not mean the destination handset rang.
+
   incomingToOutbound.set(inbound, outbound);
 }
 
@@ -134,7 +136,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
   for (const [k, time] of seen) if (now - time > keepSeconds * 1000) seen.delete(k);
   if (typeof eventId === "string" && seen.has(eventId)) { res.status(200).json({ received: true, duplicate: true }); return; }
   if (typeof eventId === "string") seen.set(eventId, now);
-  req.log.info({ eventType: type, direction: payload?.direction, hasDestination: Boolean(payload?.to) }, "Telnyx voice webhook received");
+  req.log.info({ eventType: type, direction: payload?.direction, hasDestination: Boolean(payload?.to), hangupCause: type === "call.hangup" ? payload?.hangup_cause : undefined, hangupSource: type === "call.hangup" ? payload?.hangup_source : undefined, detection: type === "call.machine.detection.ended" ? payload?.result : undefined, gatheredDigits: type === "call.gather.ended" ? (payload?.digits ? "[provided]" : "[none]") : undefined }, "Telnyx voice webhook received");
   // Fast acknowledgment prevents carrier retries while Call Control runs.
   res.status(200).json({ received: true });
   try {
