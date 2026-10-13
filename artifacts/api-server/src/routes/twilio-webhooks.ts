@@ -684,16 +684,16 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
   } else if (answerMode === "ai_voice") {
     const [aiConfig] = await db.select().from(aiVoiceConfigTable);
     // Per-number settings take priority over global defaults
-    const language = phoneNumber?.aiLanguage || aiConfig?.language || "en-US";
-    const ttsVoice = phoneNumber?.aiVoice || aiConfig?.voice || "nova";
-    const voiceStyle = phoneNumber?.aiSpeakingStyle || aiConfig?.voiceStyle || "";
-    const voiceEngine = phoneNumber?.aiVoiceEngine || aiConfig?.aiVoiceEngine || "openai";
-    const elevenLabsVoiceId = phoneNumber?.aiElevenLabsVoiceId || aiConfig?.elevenLabsVoiceId || null;
+    const language = phoneNumber?.aiLanguage || "en-US";
+    const ttsVoice = phoneNumber?.aiVoice || "nova";
+    const voiceStyle = phoneNumber?.aiSpeakingStyle || "";
+    const voiceEngine = phoneNumber?.aiVoiceEngine || "openai";
+    const elevenLabsVoiceId = phoneNumber?.aiElevenLabsVoiceId || null;
     const engineOpts: TtsEngineOpts = { engine: voiceEngine, elevenLabsVoiceId };
     const maxDuration = aiConfig?.maxCallDuration ?? 300;
     const speechTimeout = aiConfig?.speechTimeout ?? 1.0;
     const maxTokens = aiConfig?.maxTokens ?? 100;
-    const greetingText = phoneNumber?.aiGreeting?.trim() || aiConfig?.greeting?.trim() || "Hello, thank you for calling. How can I help you today?";
+    const greetingText = phoneNumber?.aiGreeting?.trim() || "Hello, thank you for calling. How can I help you today?";
 
     // Resolve company name for template substitution
     let companyName: string | null = null;
@@ -704,7 +704,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     companyName = companyName ?? phoneNumber?.callerIdName ?? null;
 
     // Build base prompt, adding a language directive if not English
-    const rawPrompt = phoneNumber?.aiSystemPrompt || aiConfig?.systemPrompt
+    const rawPrompt = phoneNumber?.aiSystemPrompt
       || "You are a professional phone agent. Speak naturally and conversationally. Keep responses to 1-3 sentences. Ask one question at a time.";
     const basePrompt = resolvePromptTemplate(rawPrompt, { companyName, phoneNumber: To, callerNumber: From });
     const langDirective = language.startsWith("ar-")
@@ -714,7 +714,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
 
     // Pre-seed the greeting as the first assistant message so the AI knows it
     // already introduced itself and won't repeat the greeting on the first reply.
-    const greetingForHistory = aiConfig?.greeting?.trim() || DEFAULT_GREETING;
+    const greetingForHistory = greetingText;
 
     conversations.set(CallSid, {
       systemPrompt,
