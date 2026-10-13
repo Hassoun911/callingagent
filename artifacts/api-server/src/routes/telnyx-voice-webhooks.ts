@@ -139,6 +139,11 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
   try {
     if (type === "call.initiated" && payload?.direction === "incoming") {
       await action(id, "answer");
+    } else if (type === "call.answered" && outboundToInbound.has(id)) {
+      const state = outboundToInbound.get(id)!;
+      await action(id, "bridge", { call_control_id_to_bridge_with: state.inbound, park_after_unbridge: "self" });
+      state.bridged = true;
+      req.log.info({ lineId: state.lineId }, "Forwarded Telnyx call bridged");
     } else if (type === "call.answered" && payload?.direction !== "outgoing") {
       const destination = payload?.to;
       const [line] = typeof destination === "string"
@@ -169,11 +174,6 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
           await startSystemVoicemail(id, line, typeof payload?.from === "string" ? payload.from : "unknown");
         }
       }
-    } else if (type === "call.answered" && outboundToInbound.has(id)) {
-      const state = outboundToInbound.get(id)!;
-      await action(id, "bridge", { call_control_id_to_bridge_with: state.inbound, park_after_unbridge: "self" });
-      state.bridged = true;
-      req.log.info({ lineId: state.lineId }, "Forwarded Telnyx call bridged");
     } else if (type === "call.hangup" && outboundToInbound.has(id)) {
       const state = outboundToInbound.get(id)!;
       outboundToInbound.delete(id);
