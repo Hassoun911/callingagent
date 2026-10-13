@@ -403,6 +403,36 @@ export default function Numbers() {
                   </div>
                 </div>
               )}
+              {telnyxOrder && (
+                <section className="rounded-xl border-2 border-blue-300 bg-blue-50 p-4 text-slate-900 dark:border-blue-700 dark:bg-slate-900 dark:text-slate-100" aria-label="Next steps after purchase">
+                  <h3 className="text-base font-extrabold">What happens next?</h3>
+                  <p className="mt-1 text-sm font-medium">
+                    {routingConfigured
+                      ? "Your number is purchased and assigned to the company. Voice and SMS profiles are configured, but calls and messages have NOT been tested."
+                      : orderPurchased
+                        ? "The purchase is recorded. Configure voice and SMS routing before using the number."
+                        : "Your order is being processed. Check its status before assuming the number is ready."}
+                  </p>
+                  <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm">
+                    <li>{orderPurchased ? "Purchase confirmed" : "Wait for Telnyx to confirm the purchase"}.</li>
+                    <li>{routingConfigured ? "Voice and SMS profiles assigned" : "Select Configure voice & SMS after purchase confirmation"}.</li>
+                    <li>From another phone, test an inbound call and an inbound SMS.</li>
+                    <li>Test an outbound call and SMS, and verify the correct company caller ID.</li>
+                    <li>Check carrier approval requirements before relying on this line.</li>
+                  </ol>
+                  <div className="mt-4 rounded-lg border border-blue-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-800">
+                    <strong>Can I close this window?</strong> Yes. Closing it does not cancel or undo a confirmed Telnyx purchase or the routing assignments already saved on the server. The search results and the live tracking panel may disappear from this window, but the number remains with the company. Keep the order ID above for reference.
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <Link href={`/companies/${telnyxOrder.companyId}`} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
+                      Return to company details →
+                    </Link>
+                    <Button type="button" variant="outline" className="min-h-11 bg-white text-slate-900 dark:bg-slate-800 dark:text-white" onClick={() => setSearchOpen(false)}>
+                      Close window — purchase stays saved
+                    </Button>
+                  </div>
+                </section>
+              )}
               {!telnyxOrder && numberProvider === "telnyx" && (
                 <div className="rounded-lg border border-border p-3 space-y-2 bg-secondary/20">
                   <p className="text-sm font-bold text-foreground">Already purchased a Telnyx number? Restore it here</p>
