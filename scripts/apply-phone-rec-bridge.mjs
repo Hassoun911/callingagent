@@ -56,21 +56,15 @@ replaceOnce(
 );
 
 replaceOnce(
-  '    const greetingText = phoneNumber?.aiGreeting?.trim() || aiConfig?.greeting?.trim() || "Hello, thank you for calling. How can I help you today?";\n',
-  '    const greetingText = phoneRecGreeting || phoneNumber?.aiGreeting?.trim() || aiConfig?.greeting?.trim() || "Hello, thank you for calling. How can I help you today?";\n',
+  '    const greetingText = phoneNumber?.aiGreeting?.trim() || "Hello, thank you for calling. How can I help you today?";\n',
+  '    const greetingText = phoneRecGreeting || phoneNumber?.aiGreeting?.trim() || "Hello, thank you for calling. How can I help you today?";\n',
   "Phone Rec AI greeting",
 );
 
 replaceOnce(
-  `    const rawPrompt = phoneNumber?.aiSystemPrompt || aiConfig?.systemPrompt\n      || "You are a professional phone agent. Speak naturally and conversationally. Keep responses to 1-3 sentences. Ask one question at a time.";\n    const basePrompt = resolvePromptTemplate(rawPrompt, { companyName, phoneNumber: To, callerNumber: From });\n`,
-  `    const rawPrompt = phoneNumber?.aiSystemPrompt || aiConfig?.systemPrompt\n      || "You are a professional phone agent. Speak naturally and conversationally. Keep responses to 1-3 sentences. Ask one question at a time.";\n    const resolvedBasePrompt = resolvePromptTemplate(rawPrompt, { companyName, phoneNumber: To, callerNumber: From });\n    const basePrompt = phoneRecPayload\n      ? buildPhoneRecSystemPrompt(phoneRecPayload, resolvedBasePrompt)\n      : resolvedBasePrompt;\n`,
+  `    const rawPrompt = phoneNumber?.aiSystemPrompt\n      || "You are a professional phone agent. Speak naturally and conversationally. Keep responses to 1-3 sentences. Ask one question at a time.";\n    const basePrompt = resolvePromptTemplate(rawPrompt, { companyName, phoneNumber: To, callerNumber: From });\n`,
+  `    const rawPrompt = phoneNumber?.aiSystemPrompt\n      || "You are a professional phone agent. Speak naturally and conversationally. Keep responses to 1-3 sentences. Ask one question at a time.";\n    const resolvedBasePrompt = resolvePromptTemplate(rawPrompt, { companyName, phoneNumber: To, callerNumber: From });\n    const basePrompt = phoneRecPayload\n      ? buildPhoneRecSystemPrompt(phoneRecPayload, resolvedBasePrompt)\n      : resolvedBasePrompt;\n`,
   "Phone Rec system prompt",
-);
-
-replaceOnce(
-  '    const greetingForHistory = aiConfig?.greeting?.trim() || DEFAULT_GREETING;\n',
-  '    const greetingForHistory = greetingText;\n',
-  "greeting history",
 );
 
 replaceOnce(
