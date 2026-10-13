@@ -126,6 +126,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       }
     } else if (type === "call.recording.error") {
       req.log.error({ callControlId: id }, "Telnyx voicemail recording failed");
+    }
   } catch (error: any) {
     req.log.error({ type, message: error?.message }, "Telnyx voice event processing failed");
   }
