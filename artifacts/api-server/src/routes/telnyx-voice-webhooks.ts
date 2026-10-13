@@ -71,7 +71,7 @@ async function notifyAdminOfVoicemail(logSid: string, recordingUrl: string) {
 
 // Outbound leg ownership is encoded in signed carrier-returned client_state and kept
 // in memory for webhook sequencing. A deployment restart may interrupt an active transfer.
-const outboundToInbound = new Map<string, { inbound: string; lineId: number; bridged: boolean }>();
+const outboundToInbound = new Map<string, { inbound: string; lineId: number; bridged: boolean; pressOne: boolean }>();
 const incomingToOutbound = new Map<string, string>();
 
 async function startControlledForward(inbound: string, line: typeof phoneNumbersTable.$inferSelect) {
@@ -98,7 +98,7 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
   const result: any = await response.json();
   const outbound = result?.data?.call_control_id;
   if (typeof outbound !== "string") throw new Error("Telnyx dial did not return an outbound leg");
-  outboundToInbound.set(outbound, { inbound, lineId: line.id, bridged: false });
+  outboundToInbound.set(outbound, { inbound, lineId: line.id, bridged: false, pressOne: Boolean(line.callScreen) });
   incomingToOutbound.set(inbound, outbound);
 }
 
@@ -148,9 +148,19 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       const state = outboundToInbound.get(id)!;
       const result = String(payload?.result || "").toLowerCase();
       if (result === "human") {
-        await action(state.inbound, "bridge", { call_control_id_to_bridge_with: id, park_after_unbridge: "self" });
-        state.bridged = true;
-        req.log.info({ lineId: state.lineId }, "Forwarded Telnyx call bridged to human");
+        if (state.pressOne) {
+          await action(id, "gather_using_speak", {
+            payload: "You have a forwarded business call. Press 1 to accept this call.",
+            voice: "female", language: "en-US",
+            valid_digits: "1", maximum_digits: 1, minimum_digits: 1,
+            initial_timeout_millis: 8000, timeout_millis: 12000,
+          });
+          req.log.info({ lineId: state.lineId }, "Waiting for forwarding recipient to press 1");
+        } else {
+          await action(state.inbound, "bridge", { call_control_id_to_bridge_with: id, park_after_unbridge: "self" });
+          state.bridged = true;
+          req.log.info({ lineId: state.lineId }, "Forwarded Telnyx call bridged automatically");
+        }
       } else {
         req.log.info({ result, lineId: state.lineId }, "Forwarded destination not confirmed human; using system voicemail");
         await action(id, "hangup");
@@ -185,6 +195,16 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
         } else {
           await startSystemVoicemail(id, line, typeof payload?.from === "string" ? payload.from : "unknown");
         }
+      }
+    } else if (type === "call.gather.ended" && outboundToInbound.has(id)) {
+      const state = outboundToInbound.get(id)!;
+      if (state.pressOne && String(payload?.digits || "") === "1") {
+        await action(state.inbound, "bridge", { call_control_id_to_bridge_with: id, park_after_unbridge: "self" });
+        state.bridged = true;
+        req.log.info({ lineId: state.lineId }, "Forwarded call accepted with key 1");
+      } else {
+        req.log.info({ lineId: state.lineId }, "Forwarded call not accepted; system voicemail fallback");
+        await action(id, "hangup");
       }
     } else if (type === "call.hangup" && outboundToInbound.has(id)) {
       const state = outboundToInbound.get(id)!;
