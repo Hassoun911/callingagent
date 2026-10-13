@@ -926,7 +926,24 @@ export default function NumberDetail() {
             <Card className="border-border">
               <CardHeader><CardTitle className="text-green-400">Line Status — Telnyx</CardTitle><CardDescription>Provider routing status</CardDescription></CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Number {number.isActive ? "enabled in CallingAgent" : "disabled in CallingAgent"}</div>
+                <div className="flex items-center gap-2">
+                  {number.isActive ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <AlertCircle className="h-4 w-4 text-amber-600" />}
+                  <strong className={number.isActive ? "text-emerald-600" : "text-amber-700"}>Number {number.isActive ? "enabled for inbound calls" : "DISABLED — incoming callers hear an unavailable message"}</strong>
+                </div>
+                {!number.isActive && (
+                  <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3 space-y-2">
+                    <p className="text-sm font-medium text-foreground">This is why callers hear “This number is not currently accepting calls.” The phone line was registered inactive during Telnyx setup.</p>
+                    <Button type="button" disabled={updateMutation.isPending} className="min-h-11 bg-emerald-600 font-bold text-white hover:bg-emerald-700" onClick={() => {
+                      updateMutation.mutate({ id: numId, data: { isActive: true } }, {
+                        onSuccess: () => {
+                          queryClient.invalidateQueries({ queryKey: getGetPhoneNumberQueryKey(numId) });
+                          toast({ title: "Number enabled", description: "Now place an inbound test call. Voice and SMS service still need testing." });
+                        },
+                        onError: (error: any) => toast({ title: "Could not enable number", description: error?.message ?? "Please retry.", variant: "destructive" }),
+                      });
+                    }}>{updateMutation.isPending ? "Enabling…" : "Enable Incoming Calls for This Number"}</Button>
+                  </div>
+                )
                 <p className="text-xs text-muted-foreground">Telnyx calls use the Telnyx voice connection, not Twilio. Successful call forwarding and carrier health must be checked using Telnyx call events.</p>
               </CardContent>
             </Card>
