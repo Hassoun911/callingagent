@@ -286,7 +286,7 @@ export default function NumberDetail() {
         })(),
         callScreen: number.callScreen ?? false,
         callScreenFallback: number.callScreenFallback || "voicemail",
-        forwardNoAnswerAction: number.forwardNoAnswerAction || "personal_voicemail",
+        forwardNoAnswerAction: number.forwardNoAnswerAction === "personal_voicemail" ? "voicemail" : (number.forwardNoAnswerAction || "voicemail"),
         holdMessage: number.holdMessage ?? "",
         aiSystemPrompt: number.aiSystemPrompt || "",
         aiVoice: number.aiVoice || "",
@@ -390,21 +390,21 @@ export default function NumberDetail() {
                 type="single"
                 value={formData.answerMode ?? "forward"}
                 onValueChange={(val) => val && setFormData({ ...formData, answerMode: val })}
-                className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full h-auto bg-secondary/50 p-2 rounded-lg border border-border mt-2"
+                className="!grid !grid-cols-2 sm:!grid-cols-4 !gap-2 !w-full !h-auto bg-secondary/50 p-2 rounded-lg border border-border mt-2"
               >
-                <ToggleGroupItem value="forward" className="min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="forward" className="!m-0 min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
                   <PhoneForwarded className="h-4 w-4" />
                   <div className="font-semibold text-sm leading-tight">Forward</div>
                 </ToggleGroupItem>
-                <ToggleGroupItem value="ai_voice" className="min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="ai_voice" className="!m-0 min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
                   <Bot className="h-4 w-4" />
                   <div className="font-semibold text-sm leading-tight">AI Agent</div>
                 </ToggleGroupItem>
-                <ToggleGroupItem value="voicemail" className="min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="voicemail" className="!m-0 min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
                   <Voicemail className="h-4 w-4" />
                   <div className="font-semibold text-sm leading-tight">Voicemail</div>
                 </ToggleGroupItem>
-                <ToggleGroupItem value="reject" className="min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="reject" className="!m-0 min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
                   <Ban className="h-4 w-4" />
                   <div className="font-semibold text-sm leading-tight">Reject</div>
                 </ToggleGroupItem>
@@ -431,7 +431,7 @@ export default function NumberDetail() {
               <CardContent className="space-y-0 border-t border-border animate-in fade-in duration-200">
 
                   {/* Destination + Ring Count */}
-                  <div className="grid grid-cols-2 gap-6 pb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-6">
                     <div className="space-y-2">
                       <Label className="text-green-400">Destination Number</Label>
                       <Input
@@ -574,8 +574,8 @@ export default function NumberDetail() {
                         <button type="button" onClick={() => setFormData({...formData, forwardNoAnswerAction: "personal_voicemail"})} className={`${radioBase} ${formData.forwardNoAnswerAction === "personal_voicemail" || !formData.forwardNoAnswerAction ? radioOn : radioOff}`}>
                           <Radio on={formData.forwardNoAnswerAction === "personal_voicemail" || !formData.forwardNoAnswerAction} />
                           <div>
-                            <div className="flex items-center gap-2 text-sm font-medium"><PhoneCall className="h-3.5 w-3.5" /> Personal voicemail</div>
-                            <div className="text-xs opacity-70 mt-0.5">Caller goes to the forwarded line's own voicemail if the carrier picks up</div>
+                            <div className="flex items-center gap-2 text-sm font-medium"><PhoneCall className="h-3.5 w-3.5" /> CallingAgent system voicemail</div>
+                            <div className="text-xs opacity-70 mt-0.5">Calls should return to the company's CallingAgent voicemail, not a personal mailbox</div>
                           </div>
                         </button>
                         <button type="button" onClick={() => setFormData({...formData, forwardNoAnswerAction: "voicemail"})} className={`${radioBase} ${formData.forwardNoAnswerAction === "voicemail" ? radioOn : radioOff}`}>
@@ -609,7 +609,7 @@ export default function NumberDetail() {
                       </button>
                       <button type="button" onClick={() => setFormData({...formData, forwardCallerId: "line"})} className={`flex flex-col items-start gap-1 p-3 rounded-md border text-left transition-colors ${formData.forwardCallerId === "line" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}>
                         <span className="text-sm font-medium">This Line's Number</span>
-                        <span className="text-xs opacity-70">Always shows your Twilio number</span>
+                        <span className="text-xs opacity-70">Shows this CallingAgent line number</span>
                       </button>
                     </div>
                   </div>
@@ -888,10 +888,10 @@ export default function NumberDetail() {
               <div className="rounded-md border border-border bg-muted/30 p-3 space-y-1.5">
                 <p className="text-xs font-medium text-foreground">About caller name on your phone</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  When a call is forwarded, your phone displays the caller's name via <strong className="text-foreground">CNAM</strong> — a carrier database separate from Twilio's friendly name. To make your phone show <em>{formData.callerIdName || "your line name"}</em>, you need CNAM registration for this Twilio number.
+                  When a call is forwarded, your phone displays the caller's name via <strong className="text-foreground">CNAM</strong> — a carrier database separate from Twilio's friendly name. To make your phone show <em>{formData.callerIdName || "your line name"}</em>, you need CNAM registration for this provider number.
                 </p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  In Twilio console: <strong className="text-foreground/80">Phone Numbers → Manage → select this number → Properties → Caller Name (CNAM)</strong>. Alternatively, enable "Require key press to accept" — the call screen verbally announces the line name before you pick up.
+                  In your provider console: <strong className="text-foreground/80">Phone Numbers → Manage → select this number → Properties → Caller Name (CNAM)</strong>. Alternatively, enable "Require key press to accept" — the call screen verbally announces the line name before you pick up.
                 </p>
               </div>
             </CardContent>
