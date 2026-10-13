@@ -501,6 +501,15 @@ export default function NumberDetail() {
                         </div>
                       </button>
                     </div>
+                    <button type="button"
+                      onClick={() => setFormData({...formData, callerExperience: "ring_once_voicemail", holdMessage: "", ringCount: 1, callScreen: true, callScreenFallback: "voicemail", forwardNoAnswerAction: "voicemail"})}
+                      className={`${radioBase} ${callerExp === "ring_once_voicemail" ? radioOn : radioOff}`}>
+                      <Radio on={callerExp === "ring_once_voicemail"} />
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-medium"><Keyboard className="h-3.5 w-3.5" /> Ring once — press 1 or system voicemail</div>
+                        <div className="text-xs opacity-70 mt-0.5">Your forwarded phone rings once. Press 1 to accept; otherwise the caller goes to CallingAgent's professional voicemail greeting and recording. No AI pickup.</div>
+                      </div>
+                    </button>
                     {(callerExp === "greeting_name" || callerExp === "greeting" || callerExp === "hold_message") && (
                       <div className="space-y-1.5">
                         <input
