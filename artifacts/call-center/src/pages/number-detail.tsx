@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { 
   useGetPhoneNumber, 
+  useListCompanies,
   useUpdatePhoneNumber, 
   useReleasePhoneNumber, 
   getGetPhoneNumberQueryKey,
@@ -67,6 +68,7 @@ export default function NumberDetail() {
   const queryClient = useQueryClient();
 
   const { data: number, isLoading } = useGetPhoneNumber(numId);
+  const { data: companies = [] } = useListCompanies();
   const { data: twilioStatus, isLoading: twilioLoading, isError: twilioError } = useGetPhoneNumberTwilioStatus(numId);
   const { data: elevenLabsVoices } = useListElevenLabsVoices();
   const [previewingVoice, setPreviewingVoice] = useState<string | null>(null);
@@ -301,6 +303,32 @@ export default function NumberDetail() {
       initRef.current = true;
     }
   }, [number]);
+
+  // Populate blank, legacy per-line fields from the actual company profile.
+  // Never replace an existing saved greeting/prompt or a user's edits.
+  const company = companies.find(item => item.id === number?.companyId);
+  const companyName = company?.name?.trim() || "";
+  useEffect(() => {
+    if (!companyName || !number || !initRef.current) return;
+    const context = [
+      company?.industry ? `Industry: ${company.industry}.` : "",
+      company?.website ? `Website: ${company.website}.` : "",
+      company?.notes ? `Company information: ${company.notes}.` : "",
+    ].filter(Boolean).join("\\n");
+    setFormData(previous => ({
+      ...previous,
+      aiGreeting: previous.aiGreeting || `Thank you for calling ${companyName}. How can I help you today?`,
+      aiSystemPrompt: previous.aiSystemPrompt || [
+        `You are the professional, friendly AI receptionist for ${companyName}.`,
+        context,
+        "Answer calls politely and use only verified company information.",
+        "If information is missing, say so rather than inventing facts.",
+        "Collect the caller's name, callback number and message for follow-up when needed.",
+        "Transfer to a representative only if the line has a working transfer option configured.",
+        "Never request payment card details or passwords.",
+      ].filter(Boolean).join("\\n"),
+    }));
+  }, [companyName, company?.industry, company?.website, company?.notes, number?.id]);
 
   const handleSave = () => {
     updateMutation.mutate({
