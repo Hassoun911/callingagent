@@ -88,6 +88,7 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
       from: line.number,
       link_to: inbound,
       bridge_intent: true,
+      answering_machine_detection: "detect",
       timeout_secs: Math.max(5, Math.min(60, (line.ringCount || 4) * 6)),
       client_state: Buffer.from(JSON.stringify({ inbound, lineId: line.id })).toString("base64"),
     }),
@@ -140,10 +141,21 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
     if (type === "call.initiated" && payload?.direction === "incoming") {
       await action(id, "answer");
     } else if (type === "call.answered" && outboundToInbound.has(id)) {
+      // Wait for answering-machine detection before bridging; otherwise the
+      // destination's personal voicemail could answer the forwarded call.
+      req.log.info({ lineId: outboundToInbound.get(id)!.lineId }, "Forwarded call answered; awaiting human detection");
+    } else if (type === "call.machine.detection.ended" && outboundToInbound.has(id)) {
       const state = outboundToInbound.get(id)!;
-      await action(id, "bridge", { call_control_id_to_bridge_with: state.inbound, park_after_unbridge: "self" });
-      state.bridged = true;
-      req.log.info({ lineId: state.lineId }, "Forwarded Telnyx call bridged");
+      const result = String(payload?.result || "").toLowerCase();
+      if (result === "human") {
+        await action(state.inbound, "bridge", { call_control_id_to_bridge_with: id, park_after_unbridge: "self" });
+        state.bridged = true;
+        req.log.info({ lineId: state.lineId }, "Forwarded Telnyx call bridged to human");
+      } else {
+        req.log.info({ result, lineId: state.lineId }, "Forwarded destination not confirmed human; using system voicemail");
+        await action(id, "hangup");
+        // Outbound call.hangup triggers company voicemail on the parked inbound leg.
+      }
     } else if (type === "call.answered" && payload?.direction !== "outgoing") {
       const destination = payload?.to;
       const [line] = typeof destination === "string"
