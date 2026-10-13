@@ -71,7 +71,7 @@ async function notifyAdminOfVoicemail(logSid: string, recordingUrl: string) {
 
 // Outbound leg ownership is encoded in signed carrier-returned client_state and kept
 // in memory for webhook sequencing. A deployment restart may interrupt an active transfer.
-const outboundToInbound = new Map<string, { inbound: string; lineId: number; bridged: boolean; pressOne: boolean; displayName: string; team?: { remaining: string[]; extension: string; fallback: string } }>();
+const outboundToInbound = new Map<string, { inbound: string; lineId: number; bridged: boolean; pressOne: boolean; displayName: string; team?: { remaining: string[]; extension: string; fallback: string; ringCount: number } }>();
 const incomingToOutbound = new Map<string, string>();
 const ivrMenus = new Map<string, { lineId: number; caller: string; options: Array<{ digit: string; name: string; id: number; agents: Array<{ userId: number; phone: string }>; forwardTo: string; ringCount: number; fallbackAction: string }> }>();
 type ClickToCall = { agent: string; target: string; from: string; companyId: number; stage: "calling_agent" | "calling_target" | "connected"; targetLeg?: string };
@@ -103,7 +103,7 @@ export async function initiateCompanyClickToCall(companyId: number, agent: strin
 }
 
 
-async function startControlledForward(inbound: string, line: typeof phoneNumbersTable.$inferSelect, route?: { phone: string; display: string; ringCount: number; team: { remaining: string[]; extension: string; fallback: string } }): Promise<string> {
+async function startControlledForward(inbound: string, line: typeof phoneNumbersTable.$inferSelect, route?: { phone: string; display: string; ringCount: number; team: { remaining: string[]; extension: string; fallback: string; ringCount: number } }): Promise<string> {
   if (!(route?.phone || line.forwardTo) || !/^\+[1-9]\d{7,14}$/.test(route?.phone || line.forwardTo || "")) throw new Error("Invalid forwarding destination");
   const key = process.env.TELNYX_API_KEY;
   const connection = process.env.TELNYX_CONNECTION_ID;
@@ -139,7 +139,9 @@ async function startSystemVoicemail(inbound: string, line: typeof phoneNumbersTa
     ? await db.select().from(companiesTable).where(eq(companiesTable.id, line.companyId))
     : [];
   const name = company?.name?.trim() || line.callerIdName?.trim() || "our business";
-  const greeting = (department ? "Thank you for calling the " + department + " department at " + name + ". " : "") + (line.voicemailGreeting?.trim() || "Thank you for calling " + name +
+  const greeting = department
+    ? "You've reached " + department + " at " + name + ". Our team is unavailable. Please leave your name, number and message after the tone, and we'll contact you as soon as possible."
+    : (line.voicemailGreeting?.trim() || "Thank you for calling " + name +
     ". We're sorry we missed your call. Please leave your name, phone number, and a brief message after the tone, and someone from our team will contact you as soon as possible.");
   const logSid = "telnyx:" + inbound;
   const [prior] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, logSid));
@@ -313,7 +315,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       } else {
         const phones = (selected.agents.length ? selected.agents.map(a => a.phone) : [selected.forwardTo])
           .filter(phone => /^\+[1-9]\d{7,14}$/.test(phone));
-        const team = { remaining: phones.slice(1), extension: selected.name, fallback: selected.fallbackAction };
+        const team = { remaining: phones.slice(1), extension: selected.name, fallback: selected.fallbackAction, ringCount: selected.ringCount };
         if (!phones.length) {
           await startSystemVoicemail(id, line, menu.caller, selected.name);
         } else {
@@ -353,7 +355,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
               try {
                 await startControlledForward(state.inbound, line, {
                   phone: nextPhone, display: state.team.extension,
-                  ringCount: line.ringCount, team: state.team,
+                  ringCount: state.team.ringCount, team: state.team,
                 });
                 req.log.info({ lineId: line.id, department: state.team.extension }, "Ringing next extension member");
                 retryStarted = true;
