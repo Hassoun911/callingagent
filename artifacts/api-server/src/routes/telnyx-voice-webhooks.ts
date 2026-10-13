@@ -82,32 +82,33 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
           // Do not use the AI conversation opening as a voicemail instruction.
           const greeting = line.voicemailGreeting?.trim() || defaultVoicemail;
           req.log.info({ lineId: line.id, mode: line.answerMode, customVoicemail: Boolean(line.voicemailGreeting?.trim()) }, "Telnyx voicemail greeting selected");
+          const logSid = "telnyx:" + id;
+          const [prior] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, logSid));
+          if (!prior) await db.insert(callLogsTable).values({
+            twilioCallSid: logSid, phoneNumberId: line.id, direction: "inbound",
+            status: "voicemail_greeting", fromNumber: typeof payload?.from === "string" ? payload.from : "unknown",
+            toNumber: line.number, answerMode: "voicemail",
+          });
           await action(id, "speak", { payload: greeting, voice: "female", language: "en-US" });
         }
       }
     } else if (type === "call.speak.ended") {
-      const destination = payload?.to;
-      const [line] = typeof destination === "string"
-        ? await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, destination))
-        : [];
-      if (!line?.isActive || line.answerMode === "reject") return;
-      if (line.answerMode === "forward" && line.forwardTo) return;
-      // Each voicemail is associated with this specific line; the carrier records the caller after the beep.
+      // speak.ended omits "to": recover the exact line from the call log created at answer time.
       const logSid = "telnyx:" + id;
-      const [existing] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, logSid));
-      if (!existing && line) {
-        await db.insert(callLogsTable).values({
-          twilioCallSid: logSid, phoneNumberId: line.id, direction: "inbound",
-          status: "voicemail_recording", fromNumber: typeof payload?.from === "string" ? payload.from : "unknown",
-          toNumber: line.number, answerMode: "voicemail",
+      const [call] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, logSid));
+      if (!call || call.status !== "voicemail_greeting") {
+        req.log.warn({ hasCall: Boolean(call), status: call?.status }, "Voicemail recording skipped: no pending greeting");
+      } else {
+        await action(id, "record_start", {
+          format: "mp3", recording_track: "inbound",
+          play_beep: true, max_length: 120, timeout_secs: 8,
+          transcription: true, transcription_language: "en-US",
+          command_id: id + "-voicemail-start",
         });
+        await db.update(callLogsTable).set({ status: "voicemail_recording" })
+          .where(eq(callLogsTable.twilioCallSid, logSid));
+        req.log.info({ phoneNumberId: call.phoneNumberId }, "Telnyx voicemail recording started with beep");
       }
-      await action(id, "record_start", {
-        format: "mp3", channels: "single", recording_track: "inbound",
-        play_beep: true, max_length: 120, timeout_secs: 8,
-        transcription: true, transcription_language: "en-US",
-        command_id: id + "-voicemail-start",
-      });
     } else if (type === "call.recording.saved") {
       const logSid = "telnyx:" + id;
       const urls = payload?.recording_urls;
