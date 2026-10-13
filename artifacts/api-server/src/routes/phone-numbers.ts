@@ -347,7 +347,7 @@ router.post("/phone-numbers/telnyx-register-order", async (req, res): Promise<vo
   const { orderId, phoneNumber } = req.body ?? {};
   const companyId = Number(req.body?.companyId);
   if (typeof orderId !== "string" || !/^[a-zA-Z0-9-]{1,100}$/.test(orderId) ||
-      typeof phoneNumber !== "string" || !/^\\+[1-9]\\d{7,14}$/.test(phoneNumber) ||
+      typeof phoneNumber !== "string" || !/^\+[1-9]\d{7,14}$/.test(phoneNumber) ||
       !Number.isSafeInteger(companyId) || companyId <= 0) {
     res.status(400).json({ error: "Valid order, number and company are required." }); return;
   }
