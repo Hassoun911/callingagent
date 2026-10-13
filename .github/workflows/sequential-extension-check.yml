@@ -1,4 +1,4 @@
-name: Sequential Extension Typecheck
+name: Sequential Extension Build Check
 on:
   pull_request:
     branches: [main]
@@ -17,5 +17,5 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @workspace/api-server typecheck
-      - run: pnpm --filter @workspace/call-center typecheck
+      - run: pnpm --filter @workspace/api-server build
+      - run: pnpm --filter @workspace/call-center build
