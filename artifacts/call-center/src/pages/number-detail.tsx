@@ -493,8 +493,8 @@ export default function NumberDetail() {
                           <div className="text-xs opacity-70 mt-0.5">Plays "Connecting your call, please hold." then rings</div>
                         </div>
                       </button>
-                      <button type="button" onClick={() => setCallerExp("ringing", "")} className={`${radioBase} ${callerExp === "ringing" ? radioOn : radioOff}`}>
-                        <Radio on={callerExp === "ringing"} />
+                      <button type="button" onClick={() => setCallerExp("ringing", "")} className={`${radioBase} ${callerExp === "ringing" && !formData.callScreen ? radioOn : radioOff}`}>
+                        <Radio on={callerExp === "ringing" && !formData.callScreen} />
                         <div>
                           <div className="flex items-center gap-2 text-sm font-medium"><PhoneCall className="h-3.5 w-3.5" /> Ringing only</div>
                           <div className="text-xs opacity-70 mt-0.5">Caller hears standard ringing directly</div>
