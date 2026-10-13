@@ -373,7 +373,9 @@ export default function CompanyDetail() {
           )}
         </div>
         <Button variant="outline" className="ml-auto gap-2" onClick={() => {
-          setCallOutLine(String(linkedNumbers.find(n => !n.twilioSid && n.isActive)?.id || ""));
+          const preferredLine = linkedNumbers.find(n => !n.twilioSid && n.isActive);
+          setCallOutLine(String(preferredLine?.id || ""));
+          setCallOutAgent(preferredLine?.forwardTo || "");
           setCallOutOpen(true);
         }} disabled={!linkedNumbers.some(n => !n.twilioSid && n.isActive)}>
           <Phone className="h-4 w-4" /> Call Out
@@ -847,8 +849,8 @@ export default function CompanyDetail() {
                   <SelectItem key={n.id} value={String(n.id)}>{formatPhone(n.number)} — {n.friendlyName}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div><Label>Call my phone first</Label><Input className="mt-1" type="tel" placeholder="+1 226 347 3180" value={callOutAgent} onChange={e => setCallOutAgent(e.target.value)} /></div>
-            <div><Label>Then connect me to</Label><Input className="mt-1" type="tel" placeholder="Destination phone number" value={callOutDestination} onChange={e => setCallOutDestination(e.target.value)} /></div>
+            <div><Label>Call my phone first (required)</Label><Input className="mt-1" type="tel" placeholder="Enter the number that should ring first" value={callOutAgent} onChange={e => setCallOutAgent(e.target.value)} /></div>
+            <div><Label>Then connect me to (required)</Label><Input className="mt-1" type="tel" placeholder="Destination phone number" value={callOutDestination} onChange={e => setCallOutDestination(e.target.value)} /></div>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setCallOutOpen(false)}>Cancel</Button>
