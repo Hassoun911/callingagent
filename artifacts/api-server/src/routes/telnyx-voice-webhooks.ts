@@ -59,12 +59,26 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       const [line] = typeof destination === "string"
         ? await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, destination))
         : [];
-      const forwardTo = line?.forwardTo;
-      if (forwardTo && /^\+[1-9]\d{7,14}$/.test(forwardTo)) {
-        await action(id, "transfer", { to: forwardTo });
+      if (!line?.isActive) {
+        await action(id, "speak", {
+          payload: "This number is not currently accepting calls. Please try again later.",
+          voice: "female", language: "en-US",
+        });
+      } else if (line.answerMode === "reject") {
+        await action(id, "hangup");
+      } else if (line.answerMode === "ai_voice") {
+        // A greeting is not a conversational AI. Do not pretend to have answered intelligently.
+        await action(id, "speak", {
+          payload: line.aiGreeting?.trim() ||
+            "Thank you for calling. Our automated assistant is being connected. Please hold while we set up your call.",
+          voice: "female", language: "en-US",
+        });
+      } else if (line.answerMode === "forward" && line.forwardTo && /^\\+[1-9]\\d{7,14}$/.test(line.forwardTo)) {
+        await action(id, "transfer", { to: line.forwardTo });
       } else {
         await action(id, "speak", {
-          payload: "Thank you for calling. This line has not yet been configured for call forwarding. Please contact the administrator.",
+          payload: line.voicemailGreeting?.trim() ||
+            "Thank you for calling. Your call has connected, but no answering destination is configured yet. Please contact the business by another method.",
           voice: "female", language: "en-US",
         });
       }
@@ -74,7 +88,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       const [line] = typeof destination === "string"
         ? await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, destination))
         : [];
-      if (!line?.forwardTo) await action(id, "hangup");
+      if (!line || line.answerMode !== "forward" || !line.forwardTo) await action(id, "hangup");
     }
   } catch (error: any) {
     req.log.error({ type, message: error?.message }, "Telnyx voice event processing failed");
