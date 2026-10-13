@@ -17,6 +17,7 @@ import watchesRouter from "./watches";
 import smsRouter from "./sms";
 import campaignsRouter from "./campaigns";
 import extensionsRouter from "./extensions";
+import companyCallOutRouter from "./company-call-out";
 import platformUsersRouter from "./platform-users";
 import appointmentsRouter from "./appointments";
 import companyAppointmentsRouter from "./company-appointments";
@@ -59,6 +60,7 @@ router.use(watchesRouter);
 router.use(smsRouter);
 router.use(campaignsRouter);
 router.use(extensionsRouter);
+router.use(companyCallOutRouter);
 // Company users must be scoped before the shared appointments router can handle the request.
 router.use(companyAppointmentsRouter);
 router.use(appointmentsRouter);
