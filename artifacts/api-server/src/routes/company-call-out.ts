@@ -37,7 +37,7 @@ router.post("/companies/:id/call-out", async (req, res): Promise<void> => {
     if (agent === line.number || target === line.number) {
       res.status(400).json({ error: "Neither dialing leg can equal the company's own number" }); return;
     }
-    const id = await initiateCompanyClickToCall(companyId, agent, target, line.number);
+    const id = await initiateCompanyClickToCall(companyId, agent, target, line.number, line.ringCount || 4);
     res.status(202).json({ status: "agent_call_initiated", callControlId: id, displayedCallerId: line.number,
       message: "Answer your phone and press 1; CallingAgent will then dial the destination." });
   } catch (err: any) {
