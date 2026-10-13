@@ -147,7 +147,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
     } else if (type === "call.machine.detection.ended" && outboundToInbound.has(id)) {
       const state = outboundToInbound.get(id)!;
       const result = String(payload?.result || "").toLowerCase();
-      if (result === "human") {
+      if (result === "human" || (state.pressOne && result === "not_sure")) {
         if (state.pressOne) {
           await action(id, "gather_using_speak", {
             payload: "You have a forwarded business call. Press 1 to accept this call.",
