@@ -359,20 +359,20 @@ export default function CompanyDetail() {
   const availableDigits = ["1","2","3","4","5","6","7","8","9"].filter(d => !usedDigits.includes(d) || d === extForm.digit);
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-5 sm:space-y-6 w-full min-w-0 max-w-3xl">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <button onClick={() => navigate("/companies")} className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <Building2 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
           <h1 className="text-xl font-bold tracking-tight truncate">{company.name}</h1>
           {company.industry && (
-            <span className="text-xs px-2 py-0.5 rounded bg-secondary text-muted-foreground">{company.industry}</span>
+            <span className="hidden sm:inline-block text-xs px-2 py-0.5 rounded bg-secondary text-muted-foreground">{company.industry}</span>
           )}
         </div>
-        <Button variant="outline" className="ml-auto gap-2" onClick={() => {
+        <Button className="order-3 w-full sm:order-none sm:w-auto gap-2 bg-emerald-600 text-white border border-emerald-700 shadow-sm font-bold hover:bg-emerald-700 hover:text-white focus-visible:ring-emerald-400 disabled:opacity-60 disabled:bg-emerald-800 disabled:text-white min-h-11 px-5" onClick={() => {
           const preferredLine = linkedNumbers.find(n => !n.twilioSid && n.isActive);
           setCallOutLine(String(preferredLine?.id || ""));
           setCallOutAgent(preferredLine?.forwardTo || "");
@@ -380,7 +380,7 @@ export default function CompanyDetail() {
         }} disabled={!linkedNumbers.some(n => !n.twilioSid && n.isActive)}>
           <Phone className="h-4 w-4" /> Call Out
         </Button>
-        <Button variant="ghost" size="icon" className="flex-shrink-0" onClick={() => setEditingCompany(true)}>
+        <Button variant="ghost" size="icon" className="order-2 sm:order-none flex-shrink-0" onClick={() => setEditingCompany(true)}>
           <Edit className="h-4 w-4" />
         </Button>
       </div>
@@ -838,8 +838,8 @@ export default function CompanyDetail() {
 
 
       <Dialog open={callOutOpen} onOpenChange={setCallOutOpen}>
-        <DialogContent className="bg-card border-border sm:max-w-md">
-          <DialogHeader><DialogTitle>Call Out — {company.name}</DialogTitle></DialogHeader>
+        <DialogContent className="bg-card border-border w-[calc(100vw-1.5rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
+          <DialogHeader><DialogTitle className="pr-5 break-words">Call Out — {company.name}</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">CallingAgent calls your phone first. Answer and press 1 to dial the destination. The recipient sees the company's number.</p>
           <div className="space-y-3">
             <div><Label>Company Caller ID</Label>
@@ -852,9 +852,9 @@ export default function CompanyDetail() {
             <div><Label>Call my phone first (required)</Label><Input className="mt-1" type="tel" placeholder="Enter the number that should ring first" value={callOutAgent} onChange={e => setCallOutAgent(e.target.value)} /></div>
             <div><Label>Then connect me to (required)</Label><Input className="mt-1" type="tel" placeholder="Destination phone number" value={callOutDestination} onChange={e => setCallOutDestination(e.target.value)} /></div>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setCallOutOpen(false)}>Cancel</Button>
-            <Button disabled={callOutBusy || !callOutAgent.trim() || !callOutDestination.trim() || !callOutLine} onClick={placeCompanyCallOut}>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" className="min-h-11 w-full sm:w-auto" onClick={() => setCallOutOpen(false)}>Cancel</Button>
+            <Button className="min-h-11 w-full sm:w-auto bg-emerald-600 font-bold text-white hover:bg-emerald-700" disabled={callOutBusy || !callOutAgent.trim() || !callOutDestination.trim() || !callOutLine} onClick={placeCompanyCallOut}>
               {callOutBusy ? "Starting call..." : "Call My Phone"}
             </Button>
           </div>
