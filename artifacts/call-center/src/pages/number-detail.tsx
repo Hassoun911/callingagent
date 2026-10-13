@@ -316,23 +316,23 @@ export default function NumberDetail() {
                 type="single"
                 value={formData.answerMode ?? "forward"}
                 onValueChange={(val) => val && setFormData({ ...formData, answerMode: val })}
-                className="justify-start bg-secondary/50 p-1 rounded-lg border border-border mt-2"
+                className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full h-auto bg-secondary/50 p-2 rounded-lg border border-border mt-2"
               >
-                <ToggleGroupItem value="forward" className="data-[state=on]:bg-background data-[state=on]:shadow-sm px-6 py-2 h-auto gap-2">
+                <ToggleGroupItem value="forward" className="min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
                   <PhoneForwarded className="h-4 w-4" />
-                  <div className="font-medium text-sm">Forward</div>
+                  <div className="font-semibold text-sm leading-tight">Forward</div>
                 </ToggleGroupItem>
-                <ToggleGroupItem value="ai_voice" className="data-[state=on]:bg-background data-[state=on]:shadow-sm px-6 py-2 h-auto gap-2">
+                <ToggleGroupItem value="ai_voice" className="min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
                   <Bot className="h-4 w-4" />
-                  <div className="font-medium text-sm">AI Agent</div>
+                  <div className="font-semibold text-sm leading-tight">AI Agent</div>
                 </ToggleGroupItem>
-                <ToggleGroupItem value="voicemail" className="data-[state=on]:bg-background data-[state=on]:shadow-sm px-6 py-2 h-auto gap-2">
+                <ToggleGroupItem value="voicemail" className="min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
                   <Voicemail className="h-4 w-4" />
-                  <div className="font-medium text-sm">Voicemail</div>
+                  <div className="font-semibold text-sm leading-tight">Voicemail</div>
                 </ToggleGroupItem>
-                <ToggleGroupItem value="reject" className="data-[state=on]:bg-background data-[state=on]:shadow-sm px-6 py-2 h-auto gap-2">
+                <ToggleGroupItem value="reject" className="min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
                   <Ban className="h-4 w-4" />
-                  <div className="font-medium text-sm">Reject</div>
+                  <div className="font-semibold text-sm leading-tight">Reject</div>
                 </ToggleGroupItem>
               </ToggleGroup>
             </CardHeader>
