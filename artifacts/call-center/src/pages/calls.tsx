@@ -135,7 +135,7 @@ function AudioPlayer({ src }: { src: string }) {
     const loaded = () => setDuration(audio.duration);
     const changed = () => setCurrentTime(audio.currentTime);
     const ended = () => { setPlaying(false); setCurrentTime(0); };
-    const failed = () => { setError(true); setBuffering(false); };
+    const failed = () => { setError(true); setPlaying(false); setBuffering(false); };
     const waiting = () => setBuffering(true);
     const ready = () => setBuffering(false);
     audio.addEventListener("loadedmetadata", loaded);
@@ -165,7 +165,8 @@ function AudioPlayer({ src }: { src: string }) {
     }
     if (activeAudio.current && activeAudio.current !== audio) activeAudio.current.pause();
     activeAudio.current = audio;
-    audio.play().then(() => setPlaying(true)).catch(() => setError(true));
+    setError(false);
+    audio.play().then(() => setPlaying(true)).catch(() => { setError(true); setPlaying(false); });
   }, [playing]);
 
   const seek = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -176,12 +177,13 @@ function AudioPlayer({ src }: { src: string }) {
     audio.currentTime = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * duration;
   };
 
-  if (error) return <span className="text-xs italic text-muted-foreground">Recording unavailable</span>;
+
   const Icon = buffering ? Loader2 : playing ? Pause : Play;
+  const retry = () => { const audio = audioRef.current; if (!audio) return; setError(false); setPlaying(false); audio.pause(); audio.load(); };
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border bg-background p-3">
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background p-3">
       <button onClick={toggle} className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary hover:bg-primary/20" aria-label={playing ? "Pause recording" : "Play recording"}>
         <Icon className={`h-4 w-4 ${buffering ? "animate-spin" : ""}`} />
       </button>
@@ -192,6 +194,7 @@ function AudioPlayer({ src }: { src: string }) {
         <div className="flex justify-between font-mono text-[10px] text-muted-foreground"><span>{formatDuration(currentTime)}</span><span>{duration ? formatDuration(duration) : ""}</span></div>
       </div>
       <a href={src} download onClick={event => event.stopPropagation()} className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Download recording"><Download className="h-4 w-4" /></a>
+      {error && <div className="w-full flex flex-wrap items-center gap-3 text-xs text-destructive"><span>Could not load audio. The recording is still saved.</span><button type="button" onClick={retry} className="font-semibold underline">Retry playback</button><a href={src} download className="font-semibold underline">Download instead</a></div>}
     </div>
   );
 }
