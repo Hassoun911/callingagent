@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { createPublicKey, verify } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db, phoneNumbersTable, companiesTable } from "@workspace/db";
+import { db, phoneNumbersTable, companiesTable, callLogsTable } from "@workspace/db";
 
 const router: IRouter = Router();
 const seen = new Map<string, number>();
@@ -68,33 +68,64 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
         });
       } else if (line.answerMode === "reject") {
         await action(id, "hangup");
-      } else if (line.answerMode === "ai_voice") {
-        // Call Control TTS is only an audible greeting, not a conversational AI.
-        // Use this number's identity, never any shared AI configuration.
+      } else {
         const [company] = line.companyId
           ? await db.select().from(companiesTable).where(eq(companiesTable.id, line.companyId))
           : [];
         const name = company?.name?.trim() || line.callerIdName?.trim() || "our business";
-        const greeting = line.aiGreeting?.trim() || "Thank you for calling " + name + ". Our live assistant is not available yet. Please try again later.";
-        req.log.info({ lineId: line.id, hasCustomGreeting: Boolean(line.aiGreeting?.trim()), mode: "ai_voice" }, "Telnyx AI greeting selected");
-        await action(id, "speak", { payload: greeting, voice: "female", language: "en-US" });
-      } else if (line.answerMode === "forward" && line.forwardTo && /^\\+[1-9]\\d{7,14}$/.test(line.forwardTo)) {
-        await action(id, "transfer", { to: line.forwardTo });
-      } else {
-        await action(id, "speak", {
-          payload: line.voicemailGreeting?.trim() ||
-            "Thank you for calling. Your call has connected, but no answering destination is configured yet. Please contact the business by another method.",
-          voice: "female", language: "en-US",
-        });
+        const defaultVoicemail = "Thank you for calling " + name +
+          ". We're sorry we missed your call. Please leave your name, phone number, and a brief message after the tone, and someone from our team will contact you as soon as possible.";
+        if (line.answerMode === "forward" && line.forwardTo && /^\\+[1-9]\\d{7,14}$/.test(line.forwardTo)) {
+          await action(id, "transfer", { to: line.forwardTo });
+        } else {
+          // Used for voicemail and as the safe fallback until conversational AI is connected.
+          // Do not use the AI conversation opening as a voicemail instruction.
+          const greeting = line.voicemailGreeting?.trim() || defaultVoicemail;
+          req.log.info({ lineId: line.id, mode: line.answerMode, customVoicemail: Boolean(line.voicemailGreeting?.trim()) }, "Telnyx voicemail greeting selected");
+          await action(id, "speak", { payload: greeting, voice: "female", language: "en-US" });
+        }
       }
     } else if (type === "call.speak.ended") {
-      // Only terminate the unconfigured-number greeting, not transferred calls.
       const destination = payload?.to;
       const [line] = typeof destination === "string"
         ? await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, destination))
         : [];
-      if (!line || line.answerMode !== "forward" || !line.forwardTo) await action(id, "hangup");
-    }
+      if (!line?.isActive || line.answerMode === "reject") return;
+      if (line.answerMode === "forward" && line.forwardTo) return;
+      // Each voicemail is associated with this specific line; the carrier records the caller after the beep.
+      const logSid = "telnyx:" + id;
+      const [existing] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, logSid));
+      if (!existing && line) {
+        await db.insert(callLogsTable).values({
+          twilioCallSid: logSid, phoneNumberId: line.id, direction: "inbound",
+          status: "voicemail_recording", fromNumber: typeof payload?.from === "string" ? payload.from : "unknown",
+          toNumber: line.number, answerMode: "voicemail",
+        });
+      }
+      await action(id, "record_start", {
+        format: "mp3", channels: "single", recording_track: "inbound",
+        play_beep: true, max_length: 120, timeout_secs: 8,
+        transcription: true, transcription_language: "en-US",
+        command_id: id + "-voicemail-start",
+      });
+    } else if (type === "call.recording.saved") {
+      const logSid = "telnyx:" + id;
+      const urls = payload?.recording_urls;
+      const url = urls?.mp3 || urls?.wav || payload?.recording_url;
+      await db.update(callLogsTable).set({
+        status: "voicemail_saved",
+        recordingUrl: typeof url === "string" ? url : null,
+        recordingSid: typeof payload?.recording_id === "string" ? payload.recording_id : null,
+      }).where(eq(callLogsTable.twilioCallSid, logSid));
+      req.log.info({ recordingSaved: true, hasUrl: Boolean(url) }, "Telnyx voicemail saved");
+    } else if (type === "call.recording.transcription.saved") {
+      const transcript = payload?.transcription_data?.transcript || payload?.transcription;
+      if (typeof transcript === "string") {
+        await db.update(callLogsTable).set({ transcription: transcript })
+          .where(eq(callLogsTable.twilioCallSid, "telnyx:" + id));
+      }
+    } else if (type === "call.recording.error") {
+      req.log.error({ callControlId: id }, "Telnyx voicemail recording failed");
   } catch (error: any) {
     req.log.error({ type, message: error?.message }, "Telnyx voice event processing failed");
   }
