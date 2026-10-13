@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { createPublicKey, verify } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db, phoneNumbersTable } from "@workspace/db";
+import { db, phoneNumbersTable, companiesTable } from "@workspace/db";
 
 const router: IRouter = Router();
 const seen = new Map<string, number>();
@@ -69,12 +69,15 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       } else if (line.answerMode === "reject") {
         await action(id, "hangup");
       } else if (line.answerMode === "ai_voice") {
-        // A greeting is not a conversational AI. Do not pretend to have answered intelligently.
-        await action(id, "speak", {
-          payload: line.aiGreeting?.trim() ||
-            "Thank you for calling. Our automated assistant is being connected. Please hold while we set up your call.",
-          voice: "female", language: "en-US",
-        });
+        // Call Control TTS is only an audible greeting, not a conversational AI.
+        // Use this number's identity, never any shared AI configuration.
+        const [company] = line.companyId
+          ? await db.select().from(companiesTable).where(eq(companiesTable.id, line.companyId))
+          : [];
+        const name = company?.name?.trim() || line.callerIdName?.trim() || "our business";
+        const greeting = line.aiGreeting?.trim() || "Thank you for calling " + name + ". Our live assistant is not available yet. Please try again later.";
+        req.log.info({ lineId: line.id, hasCustomGreeting: Boolean(line.aiGreeting?.trim()), mode: "ai_voice" }, "Telnyx AI greeting selected");
+        await action(id, "speak", { payload: greeting, voice: "female", language: "en-US" });
       } else if (line.answerMode === "forward" && line.forwardTo && /^\\+[1-9]\\d{7,14}$/.test(line.forwardTo)) {
         await action(id, "transfer", { to: line.forwardTo });
       } else {
