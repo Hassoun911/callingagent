@@ -832,7 +832,10 @@ export default function Numbers() {
                   {num.friendlyName && num.friendlyName.trim().toLowerCase() !== (companyNames.get(num.companyId ?? -1) ?? "").trim().toLowerCase() && num.friendlyName.trim().toLowerCase() !== num.number.trim().toLowerCase() && <div className="mt-1 text-xs font-normal text-muted-foreground">{num.friendlyName}</div>}
                 </TableCell>
                 <TableCell className="font-semibold text-foreground">{num.companyId ? companyNames.get(num.companyId) || `Company #${num.companyId}` : "Unassigned"}</TableCell>
-                <TableCell><span className={`rounded-md px-2 py-1 text-xs font-bold ${num.twilioSid ? "bg-rose-500/10 text-rose-600" : "bg-amber-500/10 text-amber-700"}`}>{num.twilioSid ? "Twilio" : "Unverified"}</span></TableCell>
+                <TableCell><div className="flex flex-wrap items-center gap-1.5">
+                  <span className={`rounded-md px-2 py-1 text-xs font-extrabold ${num.twilioSid ? "bg-rose-500/10 text-rose-700 dark:text-rose-300" : "bg-blue-500/10 text-blue-700 dark:text-blue-300"}`}>{num.twilioSid ? "Twilio" : "Telnyx"}</span>
+                  {!num.isActive && <span className="rounded-md border border-amber-400 bg-amber-100 px-2 py-1 text-xs font-extrabold text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">Setup Required</span>}
+                </div></TableCell>
                 <TableCell>
                   <div className="text-sm sm:text-base font-semibold text-foreground">{num.callerIdName?.trim().toLowerCase() === (companyNames.get(num.companyId ?? -1) ?? "").trim().toLowerCase() ? "—" : (num.callerIdName || "—")}</div>
                 </TableCell>
