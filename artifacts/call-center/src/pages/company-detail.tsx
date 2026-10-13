@@ -105,6 +105,26 @@ export default function CompanyDetail() {
 
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [extsLoading, setExtsLoading] = useState(true);
+  const [menuChanging, setMenuChanging] = useState<number | null>(null);
+  async function toggleMenu(lineId: number, currentlyEnabled: boolean) {
+    setMenuChanging(lineId);
+    try {
+      const response = await fetch(BASE + "/api/companies/" + companyId + "/extensions/menu", {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumberId: lineId, enabled: !currentlyEnabled }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || "Could not change extension menu");
+      }
+      await qc.invalidateQueries();
+      toast({ title: currentlyEnabled ? "Extension menu disabled" : "Extension menu enabled",
+        description: currentlyEnabled ? "Line returns to regular forwarding." : "Incoming callers can now choose an extension." });
+    } catch (error: any) {
+      toast({ title: "Extension menu error", description: error.message, variant: "destructive" });
+    } finally { setMenuChanging(null); }
+  }
+
 
   const [editingCompany, setEditingCompany] = useState(false);
   const [companyForm, setCompanyForm] = useState({ name: "", industry: "", phone: "", email: "", website: "", notes: "", adminNotificationEmail: "", adminWhatsapp: "" });
@@ -440,6 +460,11 @@ export default function CompanyDetail() {
                 }`}>
                   {(ln.answerMode as string) === "ivr" ? "IVR" : ln.answerMode?.replace("_", " ")}
                 </Badge>
+                <Button size="sm" variant="outline" className="h-7 text-xs flex-shrink-0"
+                  disabled={menuChanging === ln.id || (!((ln.answerMode as string) === "ivr") && extensions.filter(e=>e.enabled).length === 0)}
+                  onClick={() => toggleMenu(ln.id, (ln.answerMode as string) === "ivr")}>
+                  {(ln.answerMode as string) === "ivr" ? "Disable Menu" : "Enable Menu"}
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -492,7 +517,7 @@ export default function CompanyDetail() {
         {linkedNumbers.length === 0 && (
           <div className="px-4 py-3 bg-yellow-500/5 border-b border-yellow-500/10 text-xs text-yellow-400 flex items-center gap-2">
             <Phone className="h-3.5 w-3.5 flex-shrink-0" />
-            Link a phone number above and set it to IVR mode for extensions to activate.
+            Link an active Telnyx phone number above, add extensions, then select Enable Menu.
           </div>
         )}
 
