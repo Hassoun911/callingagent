@@ -88,7 +88,7 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
       from: line.number,
       link_to: inbound,
       bridge_intent: true,
-      answering_machine_detection: "detect",
+      ...(line.callScreen ? {} : { answering_machine_detection: "detect" }),
       timeout_secs: Math.max(5, Math.min(60, (line.ringCount || 4) * 6)),
       client_state: Buffer.from(JSON.stringify({ inbound, lineId: line.id })).toString("base64"),
     }),
@@ -141,9 +141,20 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
     if (type === "call.initiated" && payload?.direction === "incoming") {
       await action(id, "answer");
     } else if (type === "call.answered" && outboundToInbound.has(id)) {
-      // Wait for answering-machine detection before bridging; otherwise the
-      // destination's personal voicemail could answer the forwarded call.
-      req.log.info({ lineId: outboundToInbound.get(id)!.lineId }, "Forwarded call answered; awaiting human detection");
+      const state = outboundToInbound.get(id)!;
+      if (state.pressOne) {
+        // Immediate DTMF verification, rather than waiting on ambiguous machine detection.
+        await action(id, "gather_using_speak", {
+          payload: "You have a forwarded business call. Press 1 now to accept.",
+          voice: "female", language: "en-US", valid_digits: "1",
+          maximum_digits: 1, minimum_digits: 1,
+          initial_timeout_millis: 9000, timeout_millis: 9000,
+        });
+        req.log.info({ lineId: state.lineId }, "Forwarded leg answered; press 1 request sent");
+      } else {
+        req.log.info({ lineId: state.lineId }, "Forwarded leg answered; awaiting machine detection");
+      }
+
     } else if (type === "call.machine.detection.ended" && outboundToInbound.has(id)) {
       const state = outboundToInbound.get(id)!;
       const result = String(payload?.result || "").toLowerCase();
