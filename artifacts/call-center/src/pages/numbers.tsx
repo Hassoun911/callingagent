@@ -337,6 +337,11 @@ export default function Numbers() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Phone Numbers</h1>
           <p className="text-muted-foreground mt-1">Manage active lines and routing rules.</p>
+          {requestedCompanyId && (
+            <Link href={`/companies/${requestedCompanyId}`} className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
+              ← Return to {companies.find(company => String(company.id) === requestedCompanyId)?.name ?? "company"}
+            </Link>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -360,6 +365,7 @@ export default function Numbers() {
               <Button className="gap-2"><Plus className="h-4 w-4" />Provision Number</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-4xl bg-card border-border">
+              {requestedCompanyId && <Link href={`/companies/${requestedCompanyId}`} className="pr-8 text-sm font-semibold text-primary hover:underline">← Company details</Link>}
               <DialogHeader>
                 <DialogTitle>{provisionTab === "import" ? "Import Existing Number" : "Provision New Number"}</DialogTitle>
                 <DialogDescription>
