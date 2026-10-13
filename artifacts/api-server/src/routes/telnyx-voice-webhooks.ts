@@ -41,7 +41,7 @@ async function notifyAdminOfVoicemail(logSid: string, recordingUrl: string) {
   if (!line?.companyId) return;
   const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, line.companyId));
   // The administrator contact belongs to this company only; never use a global phone.
-  const recipient = company?.adminWhatsapp?.trim();
+  const recipient = company?.adminWhatsapp?.trim().replace(/[\\s().-]/g, "");
   if (!recipient || !/^\\+[1-9]\\d{7,14}$/.test(recipient)) {
     return;
   }
