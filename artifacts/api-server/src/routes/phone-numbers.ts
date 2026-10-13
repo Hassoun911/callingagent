@@ -561,6 +561,10 @@ router.post("/phone-numbers", async (req, res): Promise<void> => {
 
   const data = parsed.data;
   let twilioSid = data.twilioSid || null;
+  const [companyForDefaults] = data.companyId
+    ? await db.select().from(companiesTable).where(eq(companiesTable.id, data.companyId))
+    : [];
+  const aiDefaults = companyForDefaults ? companyAiDefaults(companyForDefaults) : null;
 
   // If purchasing from Twilio
   if (!twilioSid && data.number) {
@@ -594,7 +598,8 @@ router.post("/phone-numbers", async (req, res): Promise<void> => {
     forwardTo: data.forwardTo ?? null,
     ringCount: data.ringCount ?? 4,
     answerMode: data.answerMode,
-    aiSystemPrompt: data.aiSystemPrompt ?? null,
+    aiSystemPrompt: data.aiSystemPrompt ?? aiDefaults?.aiSystemPrompt ?? null,
+    aiGreeting: aiDefaults?.aiGreeting ?? null,
     aiVoice: data.aiVoice ?? null,
     aiVoiceEngine: data.aiVoiceEngine ?? null,
     aiElevenLabsVoiceId: data.aiElevenLabsVoiceId ?? null,
