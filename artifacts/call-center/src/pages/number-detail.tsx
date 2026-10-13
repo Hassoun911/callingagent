@@ -601,6 +601,7 @@ export default function NumberDetail() {
                     <div>
                       <Label className="text-green-400">Caller ID Shown to You</Label>
                       <p className="text-xs text-muted-foreground mt-0.5">What number appears on your phone when a call is forwarded?</p>
+                      {!number.twilioSid && <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">Telnyx forwarding currently presents this CallingAgent line’s phone number. To display the company name alongside it, register the number’s outbound CNAM with Telnyx; display depends on the receiving carrier. The original caller’s number is saved in Call Logs.</p>}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <button type="button" onClick={() => setFormData({...formData, forwardCallerId: "caller"})} className={`flex flex-col items-start gap-1 p-3 rounded-md border text-left transition-colors ${formData.forwardCallerId === "caller" ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-muted-foreground"}`}>
