@@ -19,3 +19,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @workspace/api-server build
       - run: pnpm --filter @workspace/call-center build
+        env:
+          PORT: "3000"
