@@ -943,7 +943,7 @@ export default function NumberDetail() {
                       });
                     }}>{updateMutation.isPending ? "Enabling…" : "Enable Incoming Calls for This Number"}</Button>
                   </div>
-                )
+                )}
                 <p className="text-xs text-muted-foreground">Telnyx calls use the Telnyx voice connection, not Twilio. Successful call forwarding and carrier health must be checked using Telnyx call events.</p>
               </CardContent>
             </Card>
