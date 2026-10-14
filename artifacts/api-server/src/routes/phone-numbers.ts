@@ -447,6 +447,27 @@ router.post("/phone-numbers/telnyx-setup", async (req, res): Promise<void> => {
     const owned = (Array.isArray(found.data) ? found.data : []).find((n: any) => n.phone_number === number);
     if (!owned?.id) { res.status(404).json({ error: "Number is not yet active in this Telnyx account. Check its order status and requirements." }); return; }
     const results: Record<string, string> = {};
+    // Telnyx portal tags identify the company; this does not affect the voice/SMS connection.
+    // Outbound CNAM is separate and can be unavailable or ignored by Canadian carriers.
+    const label = (registered?.callerIdName?.trim() || company.name.trim()).slice(0, 15);
+    const existingTags = Array.isArray(owned.tags) ? owned.tags.filter((tag: unknown): tag is string => typeof tag === "string") : [];
+    const companyTag = "CallingAgent: " + company.name.trim();
+    const desiredTags = [...new Set([...existingTags.filter((tag: string) => !tag.startsWith("CallingAgent: ")), companyTag])];
+    try {
+      const tagResponse = await fetch("https://api.telnyx.com/v2/phone_numbers/" + encodeURIComponent(owned.id), {
+        method: "PATCH", headers, body: JSON.stringify({ tags: desiredTags }), signal: AbortSignal.timeout(12000),
+      });
+      if (tagResponse.ok) results.companyLabel = "Telnyx company tag saved";
+      else results.companyLabel = "Telnyx tag update unavailable";
+    } catch { results.companyLabel = "Telnyx tag update unavailable"; }
+    if (label && !/^\\+?1?8(?:00|33|44|55|66|77|88)/.test(number.replace(/^\\+1/, ""))) {
+      try {
+        const cnamResponse = await fetch("https://api.telnyx.com/v2/phone_numbers/" + encodeURIComponent(owned.id), {
+          method: "PATCH", headers, body: JSON.stringify({ cnam_listing: { cnam_listing_enabled: true, cnam_listing_details: label } }), signal: AbortSignal.timeout(12000),
+        });
+        results.callerName = cnamResponse.ok ? "CNAM submitted to Telnyx (carrier display not guaranteed)" : "CNAM not accepted; review number's Telnyx Voice settings";
+      } catch { results.callerName = "CNAM registration unavailable"; }
+    }
     if (connectionId) {
       const reply = await fetch("https://api.telnyx.com/v2/phone_numbers/" + encodeURIComponent(owned.id), {
         method: "PATCH", headers, body: JSON.stringify({ connection_id: connectionId }), signal: AbortSignal.timeout(12000),
