@@ -451,15 +451,27 @@ router.post("/phone-numbers/telnyx-setup", async (req, res): Promise<void> => {
     // Outbound CNAM is separate and can be unavailable or ignored by Canadian carriers.
     const label = (registered?.callerIdName?.trim() || company.name.trim()).slice(0, 15);
     const existingTags = Array.isArray(owned.tags) ? owned.tags.filter((tag: unknown): tag is string => typeof tag === "string") : [];
-    const companyTag = "CallingAgent: " + company.name.trim();
+    // Use a short plain-text tag; don't overwrite tags unrelated to CallingAgent.
+    const companyTag = company.name.trim().replace(/[^a-zA-Z0-9 _-]/g, "").slice(0, 40) || "Company " + company.id;
     const desiredTags = [...new Set([...existingTags.filter((tag: string) => !tag.startsWith("CallingAgent: ")), companyTag])];
     try {
       const tagResponse = await fetch("https://api.telnyx.com/v2/phone_numbers/" + encodeURIComponent(owned.id), {
         method: "PATCH", headers, body: JSON.stringify({ tags: desiredTags }), signal: AbortSignal.timeout(12000),
       });
-      if (tagResponse.ok) results.companyLabel = "Telnyx company tag saved";
-      else results.companyLabel = "Telnyx tag update unavailable";
-    } catch { results.companyLabel = "Telnyx tag update unavailable"; }
+      const tagData: any = await tagResponse.json().catch(() => ({}));
+      const savedTags: string[] = Array.isArray(tagData?.data?.tags) ? tagData.data.tags : [];
+      if (tagResponse.ok && savedTags.includes(companyTag)) {
+        results.companyLabel = "Verified Telnyx tag: " + companyTag;
+      } else if (tagResponse.ok) {
+        results.companyLabel = "Tag update accepted but not confirmed in Telnyx response";
+      } else {
+        const reason = String(tagData?.errors?.[0]?.detail || tagData?.errors?.[0]?.title || "Provider refused the tag").slice(0, 160);
+        results.companyLabel = "Telnyx tag rejected: " + reason;
+        req.log.warn({ number, status: tagResponse.status, reason }, "Telnyx company tag update rejected");
+      }
+    } catch (error: any) {
+      results.companyLabel = "Telnyx tag synchronization failed: " + String(error?.message || "Unknown error").slice(0, 100);
+    }
     if (label && !/^\\+?1?8(?:00|33|44|55|66|77|88)/.test(number.replace(/^\\+1/, ""))) {
       try {
         const cnamResponse = await fetch("https://api.telnyx.com/v2/phone_numbers/" + encodeURIComponent(owned.id), {
