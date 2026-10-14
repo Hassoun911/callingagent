@@ -402,7 +402,7 @@ export default function Numbers() {
             <DialogTrigger asChild>
               <Button className="gap-2"><Plus className="h-4 w-4" />Provision Number</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-4xl bg-card border-border">
+            <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-4xl max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain bg-card border-border" style={{ scrollbarGutter: "stable" }}>
               {requestedCompanyId && <Link href={`/companies/${requestedCompanyId}`} className="pr-8 text-sm font-semibold text-primary hover:underline">← Company details</Link>}
               <DialogHeader>
                 <DialogTitle>{provisionTab === "import" ? "Import Existing Number" : "Provision New Number"}</DialogTitle>
