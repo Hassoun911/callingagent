@@ -262,6 +262,25 @@ export default function NumberDetail() {
     recognition.start();
   };
 
+  const [syncNameBusy, setSyncNameBusy] = useState(false);
+  const [syncNameResult, setSyncNameResult] = useState("");
+  const syncTelnyxName = async () => {
+    if (!number?.companyId || number.twilioSid) return;
+    setSyncNameBusy(true);
+    try {
+      const response = await fetch("/api/phone-numbers/telnyx-setup", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber: number.number, companyId: number.companyId }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Telnyx name sync failed");
+      setSyncNameResult([result.results?.companyLabel, result.results?.callerName].filter(Boolean).join(" · "));
+      queryClient.invalidateQueries({ queryKey: getGetPhoneNumberQueryKey(numId) });
+      toast({ title: "Telnyx name synchronization checked", description: "Check the status below. Carrier caller-name display is not guaranteed." });
+    } catch (error: any) {
+      setSyncNameResult(error?.message || "Could not synchronize Telnyx name.");
+    } finally { setSyncNameBusy(false); }
+  };
   const [testCallTo, setTestCallTo] = useState("");
   const initRef = useRef(false);
 
@@ -944,6 +963,12 @@ export default function NumberDetail() {
                     }}>{updateMutation.isPending ? "Enabling…" : "Enable Incoming Calls for This Number"}</Button>
                   </div>
                 )}
+                <div className="space-y-2 rounded-lg border border-border p-3">
+                  <p className="text-sm font-semibold">Company name in Telnyx</p>
+                  <p className="text-xs text-muted-foreground">Synchronizes the company label and attempts outbound CNAM registration. Canadian caller ID name display depends on the receiving carrier.</p>
+                  <Button type="button" size="sm" variant="outline" disabled={syncNameBusy || !number.companyId} onClick={syncTelnyxName}>{syncNameBusy ? "Synchronizing…" : "Sync name to Telnyx"}</Button>
+                  {syncNameResult && <p role="status" className="text-xs text-foreground">{syncNameResult}</p>}
+                </div>
                 <p className="text-xs text-muted-foreground">Telnyx calls use the Telnyx voice connection, not Twilio. Successful call forwarding and carrier health must be checked using Telnyx call events.</p>
               </CardContent>
             </Card>
