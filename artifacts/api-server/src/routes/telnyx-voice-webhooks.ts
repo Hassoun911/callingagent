@@ -301,7 +301,14 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
             req.log.info({ lineId: line.id, extensionCount: options.length }, "Extension menu presented");
           }
         } else if (line.answerMode === "forward" && line.forwardTo) {
-          try { await startControlledForward(id, line); }
+          try {
+            // A separate parked inbound leg otherwise sounds silent after the initial carrier ring.
+            await action(id, "speak", {
+              payload: "Please hold while we connect your call. If no one is available, you can leave a message.",
+              voice: "female", language: "en-US",
+            });
+            await startControlledForward(id, line);
+          }
           catch (error: any) {
             req.log.error({ error: error?.message, lineId: line.id }, "Forward setup failed, using system voicemail");
             await startSystemVoicemail(id, line, typeof payload?.from === "string" ? payload.from : "unknown");
@@ -345,8 +352,18 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
         state.bridged = true;
         req.log.info({ lineId: state.lineId }, "Forwarded call accepted with key 1");
       } else {
-        req.log.info({ lineId: state.lineId }, "Forwarded call not accepted; system voicemail fallback");
-        await action(id, "hangup");
+        req.log.info({ lineId: state.lineId }, "Forwarded call not accepted; returning caller to CallingAgent voicemail immediately");
+        // Remove before requesting hangup so a delayed hangup event cannot start
+        // voicemail a second time or interrupt an already-playing greeting.
+        outboundToInbound.delete(id);
+        incomingToOutbound.delete(state.inbound);
+        try { await action(id, "hangup"); }
+        catch (error: any) { req.log.warn({ lineId: state.lineId, message: error?.message }, "Forwarded leg already ended"); }
+        const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, state.lineId));
+        if (line?.isActive) {
+          try { await startSystemVoicemail(state.inbound, line, "unknown", state.team?.extension); }
+          catch (error: any) { req.log.error({ lineId: state.lineId, message: error?.message }, "Immediate no-answer voicemail failed"); }
+        }
       }
     } else if (type === "call.hangup" && outboundToInbound.has(id)) {
       const state = outboundToInbound.get(id)!;
