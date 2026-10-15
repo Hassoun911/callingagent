@@ -319,6 +319,9 @@ export default function Calls() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [clearConfirm, setClearConfirm] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [localNotes, setLocalNotes] = useState<Record<number, string | null>>({});
 
@@ -330,7 +333,7 @@ export default function Calls() {
   const { data: phoneNumbers = [] } = useListPhoneNumbers();
   const scopedCompany = scopedCompanyId ? companies.find(company => company.id === scopedCompanyId) : null;
   const companyLinkedNumbers = scopedCompanyId ? phoneNumbers.filter(number => Number((number as any).companyId) === scopedCompanyId) : null;
-  const companyNumberSet = companyLinkedNumbers?.length ? new Set(companyLinkedNumbers.map(number => number.number)) : null;
+  const companyNumberSet = scopedCompanyId !== null ? new Set((companyLinkedNumbers ?? []).map(number => number.number)) : null;
   const companyHasNoLinkedNumbers = scopedCompanyId !== null && companyLinkedNumbers?.length === 0;
 
   const { data: calls, isLoading, refetch } = useListCallLogs({
@@ -340,11 +343,27 @@ export default function Calls() {
   });
 
   const filtered = calls?.filter(call => {
+    if (companyHasNoLinkedNumbers) return false;
     if (companyNumberSet && !companyNumberSet.has(call.toNumber) && !companyNumberSet.has(call.fromNumber)) return false;
     if (!search.trim()) return true;
     const query = search.toLowerCase();
     return [call.fromNumber, call.toNumber, call.contactName, call.callerIdName, call.callerName, call.callerEmail, call.callType].some(value => String(value ?? "").toLowerCase().includes(query));
   });
+
+  const visibleIds = (filtered ?? []).map(call => call.id);
+  const visibleSelected = visibleIds.filter(id => selectedIds.includes(id));
+  const toggleSelected = (id: number) => setSelectedIds(prev => prev.includes(id) ? prev.filter(value => value !== id) : [...prev, id]);
+  const deleteSelected = async () => {
+    if (!visibleSelected.length) return;
+    setBulkBusy(true);
+    try {
+      const response = await fetch("/api/call-logs/bulk-delete", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: visibleSelected, companyId: scopedCompanyId }) });
+      if (!response.ok) throw new Error("Unable to delete selected calls");
+      setSelectedIds([]); setSelectedCall(null);
+      await refetch();
+    } catch (error) { window.alert(error instanceof Error ? error.message : "Unable to delete selected calls"); }
+    finally { setBulkBusy(false); setBulkConfirm(false); }
+  };
 
   const deleteCall = async () => {
     if (confirmDeleteId === null) return;
@@ -361,7 +380,9 @@ export default function Calls() {
   const clearAll = async () => {
     setIsClearing(true);
     try {
-      await fetch("/api/call-logs", { method: "DELETE", credentials: "include" });
+      const response = await fetch(`/api/call-logs${scopedCompanyId ? `?companyId=${scopedCompanyId}` : ""}`, { method: "DELETE", credentials: "include" });
+      if (!response.ok) throw new Error("Could not clear company call logs");
+      setSelectedIds([]);
       setSelectedCall(null);
       await refetch();
     } finally { setIsClearing(false); setClearConfirm(false); }
@@ -377,10 +398,10 @@ export default function Calls() {
           <h1 className="break-words text-xl font-bold tracking-tight min-[390px]:text-2xl sm:text-3xl">{scopedCompany ? `${scopedCompany.name} — Call Logs` : "Call Logs"}</h1>
           <p className="mt-1 text-xs text-muted-foreground sm:text-sm">{scopedCompany ? `Calls on ${scopedCompany.name}'s phone numbers.` : "Audit log of all communications with AI-extracted summaries."}</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setClearConfirm(true)} disabled={!calls?.length || isClearing} className="hidden gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 sm:flex"><Trash2 className="h-4 w-4" />Clear all</Button>
+        <Button variant="outline" size="sm" onClick={() => setClearConfirm(true)} disabled={!filtered?.length || isClearing} className="hidden gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 sm:flex"><Trash2 className="h-4 w-4" />{scopedCompany ? "Delete all company logs" : "Clear all"}</Button>
       </header>
 
-      {companyHasNoLinkedNumbers && <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-400"><div className="font-medium">No phone numbers linked to {scopedCompany?.name}.</div><div className="mt-1 text-yellow-400/70">Showing all calls. Link a number to scope these results.</div></div>}
+      {companyHasNoLinkedNumbers && <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 text-sm text-yellow-400"><div className="font-medium">No phone numbers linked to {scopedCompany?.name}.</div><div className="mt-1 text-yellow-400/70">No calls from other companies are shown. Link a number to view company calls.</div></div>}
 
       <section className="rounded-xl border border-border bg-card/50 p-3 sm:p-4">
         <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Search calls..." className="min-h-11 bg-background pl-9 sm:min-h-10" value={search} onChange={event => setSearch(event.target.value)} /></div>
@@ -391,18 +412,27 @@ export default function Calls() {
         </div>
       </section>
 
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+          <input type="checkbox" className="h-4 w-4 accent-blue-600" checked={visibleIds.length > 0 && visibleIds.every(id => selectedIds.includes(id))} onChange={event => setSelectedIds(previous => event.target.checked ? [...new Set([...previous, ...visibleIds])] : previous.filter(id => !visibleIds.includes(id)))} />
+          Select all shown ({visibleIds.length})
+        </label>
+        <span className="text-xs text-muted-foreground">{visibleSelected.length} selected</span>
+        <Button variant="destructive" size="sm" disabled={!visibleSelected.length || bulkBusy} onClick={() => setBulkConfirm(true)}><Trash2 className="mr-1 h-4 w-4" />Delete selected</Button>
+      </div>
       <div className="space-y-3 md:hidden">
-        {isLoading ? [...Array(5)].map((_, index) => <Skeleton key={index} className="h-36 rounded-xl" />) : filtered?.length ? filtered.map(call => <MobileCallCard key={call.id} call={{ ...call, notes: localNotes[call.id] ?? call.notes }} onOpen={() => setSelectedCall({ ...call, notes: localNotes[call.id] ?? call.notes })} />) : <div className="rounded-xl border border-border bg-card py-16 text-center text-sm text-muted-foreground">No call logs found.</div>}
+        {isLoading ? [...Array(5)].map((_, index) => <Skeleton key={index} className="h-36 rounded-xl" />) : filtered?.length ? filtered.map(call => <div key={call.id} className="relative"><label className="mb-1 flex items-center gap-2 text-xs"><input type="checkbox" checked={selectedIds.includes(call.id)} onChange={() => toggleSelected(call.id)} className="h-4 w-4 accent-blue-600" />Select this call</label><MobileCallCard call={{ ...call, notes: localNotes[call.id] ?? call.notes }} onOpen={() => setSelectedCall({ ...call, notes: localNotes[call.id] ?? call.notes })} /></div>) : <div className="rounded-xl border border-border bg-card py-16 text-center text-sm text-muted-foreground">No call logs found.</div>}
       </div>
 
-      <Card className="hidden border-border md:block"><div className="overflow-x-auto"><Table className="min-w-[960px]"><TableHeader><TableRow className="border-border hover:bg-transparent"><TableHead>Date / Time</TableHead><TableHead>Direction</TableHead><TableHead>From</TableHead><TableHead>Caller</TableHead><TableHead>Type</TableHead><TableHead>Duration</TableHead><TableHead>Status</TableHead><TableHead>Priority</TableHead><TableHead>Recording</TableHead></TableRow></TableHeader><TableBody>{isLoading ? [...Array(5)].map((_, row) => <TableRow key={row}>{[...Array(9)].map((_, column) => <TableCell key={column}><Skeleton className="h-4 w-full" /></TableCell>)}</TableRow>) : filtered?.length ? filtered.map(call => { const name = callerName(call); const hasRecording = !!(call.recordingSid || call.recordingUrl); return <TableRow key={call.id} onClick={() => setSelectedCall({ ...call, notes: localNotes[call.id] ?? call.notes })} className="group cursor-pointer border-border hover:bg-muted/30"><TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(call.createdAt)}</TableCell><TableCell><DirectionBadge direction={call.direction} /></TableCell><TableCell>{(call.contactName || call.callerIdName) ? <div><div className="text-sm font-medium">{call.contactName || call.callerIdName}</div><div className="font-mono text-xs text-muted-foreground">{formatPhone(call.fromNumber)}</div></div> : <span className="font-mono text-xs">{formatPhone(call.fromNumber)}</span>}</TableCell><TableCell className="text-sm">{name || formatPhone(call.fromNumber)}</TableCell><TableCell><CallTypeBadge type={call.callType} /></TableCell><TableCell className="font-mono text-xs text-muted-foreground">{formatDuration(call.duration)}</TableCell><TableCell><StatusBadge status={call.status} /></TableCell><TableCell><PriorityBadge priority={call.priority} /></TableCell><TableCell onClick={event => event.stopPropagation()}><div className="flex items-center gap-2">{hasRecording ? <><button onClick={() => setSelectedCall(call)} className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-muted hover:bg-primary/20" aria-label="Open recording"><Play className="h-3 w-3" /></button><a href={`/api/call-logs/${call.id}/recording`} download className="flex h-8 w-8 items-center justify-center rounded-md text-cyan-400 hover:bg-cyan-500/10" aria-label="Download recording"><Download className="h-4 w-4" /></a></> : <span className="text-xs text-muted-foreground">--</span>}<button onClick={() => setConfirmDeleteId(call.id)} disabled={deletingId === call.id} className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-red-500/10 hover:text-red-400" aria-label="Delete call log">{deletingId === call.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button></div></TableCell></TableRow>; }) : <TableRow><TableCell colSpan={9} className="py-16 text-center text-muted-foreground">No call logs found.</TableCell></TableRow>}</TableBody></Table></div></Card>
+      <Card className="hidden border-border md:block"><div className="overflow-x-auto"><Table className="min-w-[960px]"><TableHeader><TableRow className="border-border hover:bg-transparent"><TableHead>Select</TableHead><TableHead>Date / Time</TableHead><TableHead>Direction</TableHead><TableHead>From</TableHead><TableHead>Caller</TableHead><TableHead>Type</TableHead><TableHead>Duration</TableHead><TableHead>Status</TableHead><TableHead>Priority</TableHead><TableHead>Recording</TableHead></TableRow></TableHeader><TableBody>{isLoading ? [...Array(5)].map((_, row) => <TableRow key={row}>{[...Array(10)].map((_, column) => <TableCell key={column}><Skeleton className="h-4 w-full" /></TableCell>)}</TableRow>) : filtered?.length ? filtered.map(call => { const name = callerName(call); const hasRecording = !!(call.recordingSid || call.recordingUrl); return <TableRow key={call.id} onClick={() => setSelectedCall({ ...call, notes: localNotes[call.id] ?? call.notes })} className="group cursor-pointer border-border hover:bg-muted/30"><TableCell onClick={event => event.stopPropagation()}><input type="checkbox" aria-label={`Select call ${call.id}`} className="h-4 w-4 accent-blue-600" checked={selectedIds.includes(call.id)} onChange={() => toggleSelected(call.id)} /></TableCell><TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(call.createdAt)}</TableCell><TableCell><DirectionBadge direction={call.direction} /></TableCell><TableCell>{(call.contactName || call.callerIdName) ? <div><div className="text-sm font-medium">{call.contactName || call.callerIdName}</div><div className="font-mono text-xs text-muted-foreground">{formatPhone(call.fromNumber)}</div></div> : <span className="font-mono text-xs">{formatPhone(call.fromNumber)}</span>}</TableCell><TableCell className="text-sm">{name || formatPhone(call.fromNumber)}</TableCell><TableCell><CallTypeBadge type={call.callType} /></TableCell><TableCell className="font-mono text-xs text-muted-foreground">{formatDuration(call.duration)}</TableCell><TableCell><StatusBadge status={call.status} /></TableCell><TableCell><PriorityBadge priority={call.priority} /></TableCell><TableCell onClick={event => event.stopPropagation()}><div className="flex items-center gap-2">{hasRecording ? <><button onClick={() => setSelectedCall(call)} className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-muted hover:bg-primary/20" aria-label="Open recording"><Play className="h-3 w-3" /></button><a href={`/api/call-logs/${call.id}/recording`} download className="flex h-8 w-8 items-center justify-center rounded-md text-cyan-400 hover:bg-cyan-500/10" aria-label="Download recording"><Download className="h-4 w-4" /></a></> : <span className="text-xs text-muted-foreground">--</span>}<button onClick={() => setConfirmDeleteId(call.id)} disabled={deletingId === call.id} className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-red-500/10 hover:text-red-400" aria-label="Delete call log">{deletingId === call.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button></div></TableCell></TableRow>; }) : <TableRow><TableCell colSpan={10} className="py-16 text-center text-muted-foreground">No call logs found.</TableCell></TableRow>}</TableBody></Table></div></Card>
 
-      <section className="md:hidden"><button onClick={() => setDataToolsOpen(open => !open)} className="flex min-h-11 w-full items-center justify-between rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground"><span className="flex items-center gap-2"><ShieldAlert className="h-4 w-4" />Data management</span><ChevronDown className={`h-4 w-4 transition-transform ${dataToolsOpen ? "rotate-180" : ""}`} /></button>{dataToolsOpen && <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/5 p-3"><p className="text-xs leading-relaxed text-muted-foreground">Clearing all permanently removes every visible call-log record. Use this only for testing or approved data cleanup.</p><Button variant="outline" onClick={() => setClearConfirm(true)} disabled={!calls?.length || isClearing} className="mt-3 w-full gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-4 w-4" />Clear all call logs</Button></div>}</section>
+      <section className="md:hidden"><button onClick={() => setDataToolsOpen(open => !open)} className="flex min-h-11 w-full items-center justify-between rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground"><span className="flex items-center gap-2"><ShieldAlert className="h-4 w-4" />Data management</span><ChevronDown className={`h-4 w-4 transition-transform ${dataToolsOpen ? "rotate-180" : ""}`} /></button>{dataToolsOpen && <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/5 p-3"><p className="text-xs leading-relaxed text-muted-foreground">Clearing all permanently removes every visible call-log record. Use this only for testing or approved data cleanup.</p><Button variant="outline" onClick={() => setClearConfirm(true)} disabled={!filtered?.length || isClearing} className="mt-3 w-full gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"><Trash2 className="h-4 w-4" />Clear all call logs</Button></div>}</section>
 
       <CallDetail call={selectedCall} open={!!selectedCall} onClose={() => setSelectedCall(null)} onDelete={id => setConfirmDeleteId(id)} onNotesUpdate={(id, notes) => { setLocalNotes(previous => ({ ...previous, [id]: notes })); setSelectedCall((previous: any) => previous?.id === id ? { ...previous, notes } : previous); }} />
 
+      <AlertDialog open={bulkConfirm} onOpenChange={setBulkConfirm}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete {visibleSelected.length} selected call logs?</AlertDialogTitle><AlertDialogDescription>This permanently removes the selected call logs from the current company view and cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={bulkBusy}>Cancel</AlertDialogCancel><AlertDialogAction disabled={bulkBusy} onClick={deleteSelected} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete selected</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       <AlertDialog open={confirmDeleteId !== null} onOpenChange={open => !open && setConfirmDeleteId(null)}><AlertDialogContent className="w-[calc(100vw-1rem)] border-border bg-card sm:w-full"><AlertDialogHeader><AlertDialogTitle>Delete this call log?</AlertDialogTitle><AlertDialogDescription>This record will be permanently removed. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={deleteCall} className="gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"><Trash2 className="h-4 w-4" />Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-      <AlertDialog open={clearConfirm} onOpenChange={setClearConfirm}><AlertDialogContent className="w-[calc(100vw-1rem)] border-border bg-card sm:w-full"><AlertDialogHeader><AlertDialogTitle>Clear all call logs?</AlertDialogTitle><AlertDialogDescription>This will permanently delete all {calls?.length ?? 0} call-log records. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isClearing}>Cancel</AlertDialogCancel><AlertDialogAction onClick={clearAll} disabled={isClearing} className="gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90">{isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}{isClearing ? "Clearing..." : "Clear All"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={clearConfirm} onOpenChange={setClearConfirm}><AlertDialogContent className="w-[calc(100vw-1rem)] border-border bg-card sm:w-full"><AlertDialogHeader><AlertDialogTitle>Clear all call logs?</AlertDialogTitle><AlertDialogDescription>This will permanently delete all call logs {scopedCompany ? `belonging to ${scopedCompany.name}` : "across all companies"}, including older records not currently shown. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={isClearing}>Cancel</AlertDialogCancel><AlertDialogAction onClick={clearAll} disabled={isClearing} className="gap-2 bg-destructive text-destructive-foreground hover:bg-destructive/90">{isClearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}{isClearing ? "Clearing..." : "Clear All"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );
 }
