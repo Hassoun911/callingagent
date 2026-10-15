@@ -439,21 +439,25 @@ export default function NumberDetail() {
                 onValueChange={(val) => val && setFormData({ ...formData, answerMode: val })}
                 className="!grid !grid-cols-2 sm:!grid-cols-4 !gap-2 !w-full !h-auto bg-secondary/50 p-2 rounded-lg border border-border mt-2"
               >
-                <ToggleGroupItem value="forward" className="!m-0 min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="forward" className="relative !m-0 min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight border-2 border-transparent bg-background/60 text-foreground/70 hover:bg-primary/10 data-[state=on]:!bg-blue-600 data-[state=on]:!text-white data-[state=on]:!border-blue-800 data-[state=on]:shadow-lg data-[state=on]:ring-2 data-[state=on]:ring-blue-400 dark:data-[state=on]:!bg-blue-500 dark:data-[state=on]:!border-blue-300">
                   <PhoneForwarded className="h-4 w-4" />
                   <div className="font-semibold text-sm leading-tight">Forward</div>
+                  {formData.answerMode === 'forward' && <span className="absolute right-1 top-1 rounded-full bg-white text-blue-700 p-0.5" aria-label="Selected"><CheckCircle2 className="h-4 w-4" /></span>}
                 </ToggleGroupItem>
-                <ToggleGroupItem value="ai_voice" className="!m-0 min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="ai_voice" className="relative !m-0 min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight border-2 border-transparent bg-background/60 text-foreground/70 hover:bg-primary/10 data-[state=on]:!bg-blue-600 data-[state=on]:!text-white data-[state=on]:!border-blue-800 data-[state=on]:shadow-lg data-[state=on]:ring-2 data-[state=on]:ring-blue-400 dark:data-[state=on]:!bg-blue-500 dark:data-[state=on]:!border-blue-300">
                   <Bot className="h-4 w-4" />
                   <div className="font-semibold text-sm leading-tight">AI Agent</div>
+                  {formData.answerMode === 'ai_voice' && <span className="absolute right-1 top-1 rounded-full bg-white text-blue-700 p-0.5" aria-label="Selected"><CheckCircle2 className="h-4 w-4" /></span>}
                 </ToggleGroupItem>
-                <ToggleGroupItem value="voicemail" className="!m-0 min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="voicemail" className="relative !m-0 min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight border-2 border-transparent bg-background/60 text-foreground/70 hover:bg-primary/10 data-[state=on]:!bg-blue-600 data-[state=on]:!text-white data-[state=on]:!border-blue-800 data-[state=on]:shadow-lg data-[state=on]:ring-2 data-[state=on]:ring-blue-400 dark:data-[state=on]:!bg-blue-500 dark:data-[state=on]:!border-blue-300">
                   <Voicemail className="h-4 w-4" />
                   <div className="font-semibold text-sm leading-tight">Voicemail</div>
+                  {formData.answerMode === 'voicemail' && <span className="absolute right-1 top-1 rounded-full bg-white text-blue-700 p-0.5" aria-label="Selected"><CheckCircle2 className="h-4 w-4" /></span>}
                 </ToggleGroupItem>
-                <ToggleGroupItem value="reject" className="!m-0 min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight data-[state=on]:bg-background data-[state=on]:shadow-sm">
+                <ToggleGroupItem value="reject" className="relative !m-0 min-w-0 w-full h-auto min-h-16 flex flex-col sm:flex-row items-center justify-center gap-1.5 px-2 py-3 text-center whitespace-normal break-normal leading-tight border-2 border-transparent bg-background/60 text-foreground/70 hover:bg-primary/10 data-[state=on]:!bg-blue-600 data-[state=on]:!text-white data-[state=on]:!border-blue-800 data-[state=on]:shadow-lg data-[state=on]:ring-2 data-[state=on]:ring-blue-400 dark:data-[state=on]:!bg-blue-500 dark:data-[state=on]:!border-blue-300">
                   <Ban className="h-4 w-4" />
                   <div className="font-semibold text-sm leading-tight">Reject</div>
+                  {formData.answerMode === 'reject' && <span className="absolute right-1 top-1 rounded-full bg-white text-blue-700 p-0.5" aria-label="Selected"><CheckCircle2 className="h-4 w-4" /></span>}
                 </ToggleGroupItem>
               </ToggleGroup>
             </CardHeader>
