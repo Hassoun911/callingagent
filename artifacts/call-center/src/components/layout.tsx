@@ -112,9 +112,11 @@ export function Layout({ children }: { children: ReactNode }) {
       if (!Array.isArray(rows)) return [];
       return Array.from(new Map(rows.map((row: any) => [row.id, row])).values());
     },
-    staleTime: 10_000,
-    refetchInterval: 30_000,
-    refetchIntervalInBackground: false,
+    staleTime: 5_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
   });
 
   const callLogsRoute = location === "/calls" || location.startsWith("/calls/");
