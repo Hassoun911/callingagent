@@ -302,11 +302,8 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
           }
         } else if (line.answerMode === "forward" && line.forwardTo) {
           try {
-            // A separate parked inbound leg otherwise sounds silent after the initial carrier ring.
-            await action(id, "speak", {
-              payload: "Please hold while we connect your call. If no one is available, you can leave a message.",
-              voice: "female", language: "en-US",
-            });
+            // Do not play a spoken announcement over the caller's normal ringback.
+            // Ringback depends on the Telnyx voice application's inbound ringback setting.
             await startControlledForward(id, line);
           }
           catch (error: any) {
