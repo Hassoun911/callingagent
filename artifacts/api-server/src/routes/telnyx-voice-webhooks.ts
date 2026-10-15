@@ -103,6 +103,41 @@ export async function initiateCompanyClickToCall(companyId: number, agent: strin
 }
 
 
+// North American ringback: 440 + 480 Hz, 2 seconds on / 4 seconds off.
+// Generated once as a small WAV and looped by Telnyx on the PARKED caller leg.
+function makeRingbackWav(): string {
+  const sampleRate = 8000;
+  const count = sampleRate * 6;
+  const pcm = Buffer.alloc(count * 2);
+  for (let i = 0; i < sampleRate * 2; i++) {
+    const t = i / sampleRate;
+    const envelope = Math.min(1, i / 80, (sampleRate * 2 - i) / 80);
+    const sample = Math.round(8000 * envelope * (Math.sin(2 * Math.PI * 440 * t) + Math.sin(2 * Math.PI * 480 * t)));
+    pcm.writeInt16LE(sample, i * 2);
+  }
+  const wav = Buffer.alloc(44 + pcm.length);
+  wav.write("RIFF", 0); wav.writeUInt32LE(36 + pcm.length, 4);
+  wav.write("WAVEfmt ", 8); wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(sampleRate, 24); wav.writeUInt32LE(sampleRate * 2, 28);
+  wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+  wav.write("data", 36); wav.writeUInt32LE(pcm.length, 40); pcm.copy(wav, 44);
+  return wav.toString("base64");
+}
+const RINGBACK_WAV = makeRingbackWav();
+async function beginCallerRingback(id: string) {
+  try {
+    await action(id, "playback_start", { playback_content: RINGBACK_WAV, audio_type: "wav", loop: "infinity", target_legs: "self" });
+  } catch (error: any) {
+    // Never block call routing due to an unsupported carrier media command.
+    console.warn("Telnyx ringback playback unavailable:", error?.message);
+  }
+}
+async function stopCallerRingback(id: string) {
+  try { await action(id, "playback_stop", { stop: "all" }); }
+  catch (error: any) { console.warn("Telnyx ringback stop unavailable:", error?.message); }
+}
+
 async function startControlledForward(inbound: string, line: typeof phoneNumbersTable.$inferSelect, route?: { phone: string; display: string; ringCount: number; team: { remaining: string[]; extension: string; fallback: string; ringCount: number } }): Promise<string> {
   if (!(route?.phone || line.forwardTo) || !/^\+[1-9]\d{7,14}$/.test(route?.phone || line.forwardTo || "")) throw new Error("Invalid forwarding destination");
   const key = process.env.TELNYX_API_KEY;
@@ -135,6 +170,7 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
 }
 
 async function startSystemVoicemail(inbound: string, line: typeof phoneNumbersTable.$inferSelect, from: string, department?: string) {
+  await stopCallerRingback(inbound);
   const [company] = line.companyId
     ? await db.select().from(companiesTable).where(eq(companiesTable.id, line.companyId))
     : [];
@@ -251,7 +287,8 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
           });
           req.log.info({ lineId: state.lineId }, "Waiting for forwarding recipient to press 1");
         } else {
-          await action(state.inbound, "bridge", { call_control_id: id, park_after_unbridge: "self" });
+          await stopCallerRingback(state.inbound);
+        await action(state.inbound, "bridge", { call_control_id: id, park_after_unbridge: "self" });
           state.bridged = true;
           req.log.info({ lineId: state.lineId }, "Forwarded Telnyx call bridged automatically");
         }
@@ -304,6 +341,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
           try {
             // Do not play a spoken announcement over the caller's normal ringback.
             // Ringback depends on the Telnyx voice application's inbound ringback setting.
+            await beginCallerRingback(id);
             await startControlledForward(id, line);
           }
           catch (error: any) {
