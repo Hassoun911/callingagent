@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { createPublicKey, verify } from "node:crypto";
+import nodemailer from "nodemailer";
 import { eq } from "drizzle-orm";
 import { db, phoneNumbersTable, companiesTable, callLogsTable, extensionsTable } from "@workspace/db";
 
@@ -32,6 +33,44 @@ async function action(id: string, name: string, payload: Record<string, unknown>
     body: JSON.stringify(payload), signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) { const detail = (await response.text()).slice(0, 600); throw new Error("Telnyx call command " + name + " failed (" + response.status + "): " + detail); }
+}
+
+async function notifyVoicemailEmail(logSid: string): Promise<void> {
+  const [log] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, logSid));
+  if (!log?.phoneNumberId) return;
+  const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, log.phoneNumberId));
+  if (!line?.notificationEmail?.trim()) return;
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) throw new Error("SMTP_HOST, SMTP_USER or SMTP_PASS not configured");
+  const [company] = line.companyId
+    ? await db.select().from(companiesTable).where(eq(companiesTable.id, line.companyId))
+    : [];
+  const transport = nodemailer.createTransport({
+    host, port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: { user, pass },
+  });
+  const companyName = company?.name || line.callerIdName || "Your company";
+  const caller = log.fromNumber || "Unknown caller";
+  const link = "https://callingagent.ca/calls?companyId=" + (line.companyId || "");
+  const subject = "New voicemail — " + companyName + " — " + caller;
+  const body = [
+    "A new voicemail has been saved for " + companyName + ".",
+    "Company line: " + line.number,
+    "Caller: " + caller,
+    "Received: " + (log.createdAt ? log.createdAt.toLocaleString("en-CA", { timeZone: "America/Toronto" }) + " Eastern" : "Recently"),
+    "Open CallingAgent to play the recording: " + link,
+    "Recording and transcript availability may depend on processing time.",
+  ].join("\n");
+  await transport.sendMail({
+    from: process.env.SMTP_FROM || user,
+    to: line.notificationEmail.trim(),
+    subject,
+    text: body,
+  });
+  console.info("Telnyx voicemail notification email sent", { phoneNumberId: line.id, callLogId: log.id });
 }
 
 async function notifyAdminOfVoicemail(logSid: string, recordingUrl: string) {
@@ -463,6 +502,10 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
         recordingSid: typeof payload?.recording_id === "string" ? payload.recording_id : null,
       }).where(eq(callLogsTable.twilioCallSid, logSid));
       req.log.info({ recordingSaved: true, hasUrl: Boolean(url) }, "Telnyx voicemail saved");
+      if (typeof url === "string") {
+        try { await notifyVoicemailEmail(logSid); }
+        catch (error: any) { req.log.error({ message: error?.message, logSid }, "Telnyx voicemail email notification failed"); }
+      }
       if (typeof url === "string") {
         try { await notifyAdminOfVoicemail(logSid, url); }
         catch (error: any) { req.log.error({ message: error?.message }, "Telnyx voicemail admin delivery failed"); }
