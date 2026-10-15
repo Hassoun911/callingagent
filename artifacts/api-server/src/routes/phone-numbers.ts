@@ -402,6 +402,7 @@ router.post("/phone-numbers/telnyx-register-order", async (req, res): Promise<vo
       await db.insert(phoneNumbersTable).values({
         number: phoneNumber, twilioSid: null, companyId, friendlyName: phoneNumber,
         callerIdName: company.name, answerMode: "forward", isActive: false,
+        ringCount: 4, callScreen: true, callScreenFallback: "voicemail", forwardNoAnswerAction: "voicemail",
         ...companyAiDefaults(company),
       }).onConflictDoNothing();
     }
@@ -501,7 +502,8 @@ router.post("/phone-numbers/telnyx-setup", async (req, res): Promise<void> => {
     if (!registered) {
       await db.insert(phoneNumbersTable).values({
         number, twilioSid: null, companyId, friendlyName: number,
-        callerIdName: company.name, answerMode: "voicemail",
+        callerIdName: company.name, answerMode: "forward",
+        ringCount: 4, callScreen: true, callScreenFallback: "voicemail", forwardNoAnswerAction: "voicemail",
         isActive: Boolean(results.voice),
         ...companyAiDefaults(company),
       }).onConflictDoNothing();
@@ -586,7 +588,7 @@ router.post("/phone-numbers/import", async (req, res): Promise<void> => {
     twilioSid: twilioNum.sid,
     friendlyName: displayName,
     callerIdName: displayName,
-    answerMode: "forward",
+    answerMode: "forward", ringCount: 4, callScreen: true, callScreenFallback: "voicemail", forwardNoAnswerAction: "voicemail",
   }).returning();
 
   res.status(201).json(GetPhoneNumberResponse.parse({
@@ -640,6 +642,9 @@ router.post("/phone-numbers", async (req, res): Promise<void> => {
     companyId: data.companyId ?? null,
     forwardTo: data.forwardTo ?? null,
     ringCount: data.ringCount ?? 4,
+    callScreen: true,
+    callScreenFallback: "voicemail",
+    forwardNoAnswerAction: "voicemail",
     answerMode: data.answerMode,
     aiSystemPrompt: data.aiSystemPrompt ?? aiDefaults?.aiSystemPrompt ?? null,
     aiGreeting: aiDefaults?.aiGreeting ?? null,
