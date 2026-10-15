@@ -273,8 +273,34 @@ router.patch("/call-logs/:id/notes", async (req, res): Promise<void> => {
   res.json({ ...updated, createdAt: updated.createdAt.toISOString() });
 });
 
+// Delete only the explicitly selected records, enforcing the caller's company scope.
+router.post("/call-logs/bulk-delete", async (req, res): Promise<void> => {
+  const ids = req.body?.ids;
+  if (!Array.isArray(ids) || ids.length < 1 || ids.length > 500 ||
+      ids.some((id: unknown) => !Number.isSafeInteger(id) || Number(id) <= 0)) {
+    res.status(400).json({ error: "Provide 1 to 500 valid call-log IDs." });
+    return;
+  }
+  const uniqueIds = [...new Set(ids as number[])];
+  const companyId = Number(req.body?.companyId);
+  const requestedCompanyId = Number.isSafeInteger(companyId) && companyId > 0 ? companyId : null;
+  const allowed = await getAllowedNumbers(req, requestedCompanyId);
+  const companyCondition = allowed ? companyLogCondition(allowed) : null;
+  if (allowed && !companyCondition) {
+    res.json({ deleted: 0 });
+    return;
+  }
+  const condition = companyCondition
+    ? and(inArray(callLogsTable.id, uniqueIds), companyCondition)
+    : inArray(callLogsTable.id, uniqueIds);
+  const removed = await db.delete(callLogsTable).where(condition).returning({ id: callLogsTable.id });
+  res.json({ deleted: removed.length });
+});
+
 router.delete("/call-logs", async (req, res): Promise<void> => {
-  const allowed = await getAllowedNumbers(req);
+  const companyId = Number(req.query.companyId);
+  const requestedCompanyId = Number.isSafeInteger(companyId) && companyId > 0 ? companyId : null;
+  const allowed = await getAllowedNumbers(req, requestedCompanyId);
   if (allowed === null) {
     await db.delete(callLogsTable);
   } else {
