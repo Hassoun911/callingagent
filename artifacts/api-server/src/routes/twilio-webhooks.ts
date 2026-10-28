@@ -86,7 +86,10 @@ async function sendCallNotificationIfConfigured(callSid: string, overrideRecordi
     const modeDisplay = modeLabels[log.answerMode ?? ""] ?? (log.answerMode ?? "Unknown");
 
     const calledAt = log.createdAt ?? new Date();
-    const subject = `Call Summary — ${callerDisplay} — ${calledAt.toLocaleString()}`;
+    const [recipientCompany] = phoneNumber?.companyId ? await db.select().from(companiesTable).where(eq(companiesTable.id, phoneNumber.companyId)) : [];
+    const companyDisplay = recipientCompany?.name || phoneNumber?.callerIdName || "Business";
+    const outcome = log.status === "voicemail_saved" || log.answerMode === "voicemail" ? "Voicemail" : log.status === "rejected" || log.answerMode === "reject" ? "Declined Call" : ["completed", "connected", "answered"].includes(log.status || "") ? "Answered Call" : log.answerMode === "ai_voice" ? "AI Call Summary" : "Missed Call";
+    const subject = `${companyDisplay} | ${outcome} | ${callerDisplay}`;
 
     const priorityColor: Record<string, string> = {
       high: "#ef4444", medium: "#f59e0b", low: "#22c55e",
