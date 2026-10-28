@@ -25,6 +25,11 @@ import { Trash2, Edit } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+// Preserve intentional brand casing (AgentCheck, IT), capitalize ordinary lowercase words.
+function displayCompanyName(name: string): string {
+  return name.replace(/\b[a-z][a-z]*\b/g, word => word.charAt(0).toUpperCase() + word.slice(1));
+}
+
 async function linkPhoneNumber(phoneNumberId: number, companyId: number) {
   await fetch(`${BASE}/api/phone-numbers/${phoneNumberId}`, {
     method: "PATCH",
@@ -269,7 +274,7 @@ export default function Companies() {
             ) : filteredCompanies.map((company) => (
               <TableRow key={company.id} className="border-border cursor-pointer hover:bg-blue-50/70 text-sm sm:text-base" onClick={() => navigate(`/companies/${company.id}`)}>
                 <TableCell>
-                  <div className="flex items-center gap-3"><span className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-xs font-bold text-blue-700">{company.name.slice(0,2).toUpperCase()}</span><div className="text-base sm:text-lg font-bold leading-snug text-foreground">{company.name}</div></div>
+                  <div className="flex items-center gap-3"><span className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-xs font-bold text-blue-700">{company.name.slice(0,2).toUpperCase()}</span><div className="text-base sm:text-lg font-bold leading-snug text-foreground">{displayCompanyName(company.name)}</div></div>
                   {(company as any).ownerName && (
                     <div className="text-sm font-medium text-muted-foreground mt-1">{(company as any).ownerName}</div>
                   )}
