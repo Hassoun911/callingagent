@@ -305,7 +305,7 @@ export default function NumberDetail() {
           if (number.holdMessage) return "hold_message";
           return "ringing";
         })(),
-        callScreen: number.callScreen ?? false,
+        callScreen: number.twilioSid ? (number.callScreen ?? false) : true,
         callScreenFallback: number.callScreenFallback || "voicemail",
         forwardNoAnswerAction: number.forwardNoAnswerAction === "personal_voicemail" ? "voicemail" : (number.forwardNoAnswerAction || "voicemail"),
         holdMessage: number.holdMessage ?? "",
@@ -585,13 +585,13 @@ export default function NumberDetail() {
                       <p className="text-xs text-muted-foreground mt-0.5">How should the call be connected to your phone?</p>
                     </div>
                     <div className="space-y-2">
-                      <button type="button" onClick={() => setFormData({...formData, callScreen: false})} className={`${radioBase} ${!formData.callScreen ? radioOn : radioOff}`}>
+                      {number.twilioSid ? <button type="button" onClick={() => setFormData({...formData, callScreen: false})} className={`${radioBase} ${!formData.callScreen ? radioOn : radioOff}`}>
                         <Radio on={!formData.callScreen} />
                         <div>
                           <div className="flex items-center gap-2 text-sm font-medium"><PhoneCall className="h-3.5 w-3.5" /> Connect immediately</div>
                           <div className="text-xs opacity-70 mt-0.5">Caller connects to you or your voicemail — whichever answers</div>
                         </div>
-                      </button>
+                      </button> : <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-900">Telnyx protection enabled: the forwarding recipient must press 1. This prevents the recipient’s personal voicemail from taking your business calls.</div>}
                       <button type="button" onClick={() => setFormData({...formData, callScreen: true})} className={`${radioBase} ${formData.callScreen ? radioOn : radioOff}`}>
                         <Radio on={!!formData.callScreen} />
                         <div>
@@ -600,7 +600,7 @@ export default function NumberDetail() {
                         </div>
                       </button>
                     </div>
-                    <p className="text-xs text-muted-foreground">No key press: a human answer connects automatically. Require key press: the recipient must press 1 before being connected.</p>
+                    <p className="text-xs text-muted-foreground">{number.twilioSid ? "No key press connects automatically. Require key press prevents personal voicemail from taking the call." : "On Telnyx, press 1 is required. Without acceptance, the call moves to CallingAgent voicemail."}</p>
                   </div>
 
                   <div className="space-y-3 py-6 border-t border-border">
