@@ -198,11 +198,38 @@ export default function Companies() {
     }
   };
 
-  const handleSave = () => {
-    if (editingCompany) {
-      updateMutation.mutate({ id: editingCompany.id, data: formData });
-    } else {
-      createMutation.mutate({ data: formData });
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      toast({ title: "Company name required", variant: "destructive" });
+      return;
+    }
+    try {
+      if (editingCompany) {
+        // Include the Google Site field even though the older generated API type omits it.
+        const response = await fetch(`${BASE}/api/companies/${editingCompany.id}`, {
+          method: "PATCH", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...formData, name: formData.name.trim() }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `Update failed (${response.status})`);
+        await queryClient.invalidateQueries({ queryKey: getListCompaniesQueryKey() });
+        setDialogOpen(false);
+        toast({ title: "Company updated" });
+      } else {
+        const response = await fetch(`${BASE}/api/companies`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...formData, name: formData.name.trim() }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `Creation failed (${response.status})`);
+        await queryClient.invalidateQueries({ queryKey: getListCompaniesQueryKey() });
+        setDialogOpen(false);
+        toast({ title: "Company created" });
+      }
+    } catch (error: any) {
+      toast({ title: "Could not save company", description: error?.message || "Please check the form and try again.", variant: "destructive" });
     }
   };
 
