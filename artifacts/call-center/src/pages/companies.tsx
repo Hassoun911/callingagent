@@ -70,6 +70,7 @@ export default function Companies() {
       (c.phone?.toLowerCase().includes(q)) ||
       (c.email?.toLowerCase().includes(q)) ||
       (c.website?.toLowerCase().includes(q)) ||
+      ((c as any).googleSite?.toLowerCase().includes(q)) ||
       (c.notes?.toLowerCase().includes(q))
     );
   })();
@@ -79,6 +80,7 @@ export default function Companies() {
     ownerName: "",
     industry: "",
     website: "",
+    googleSite: "",
     phone: "",
     notes: ""
   });
@@ -129,12 +131,13 @@ export default function Companies() {
         ownerName: company.ownerName || "",
         industry: company.industry || "",
         website: company.website || "",
+        googleSite: (company as any).googleSite || "",
         phone: company.phone || "",
         notes: company.notes || ""
       });
     } else {
       setEditingCompany(null);
-      setFormData({ name: "", ownerName: "", industry: "", website: "", phone: "", notes: "" });
+      setFormData({ name: "", ownerName: "", industry: "", website: "", googleSite: "", phone: "", notes: "" });
       setSelectedPhoneNumberId("");
     }
     setShowInlineImport(false);
@@ -280,7 +283,9 @@ export default function Companies() {
                       <Globe className="h-3 w-3" />
                       {company.website}
                     </a>
-                  ) : '--'}
+                  ) : null}
+                  {(company as any).googleSite && <a href={(company as any).googleSite} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:underline"><Globe className="h-3 w-3" />Google Site</a>}
+                  {!company.website && !(company as any).googleSite && <span className="text-muted-foreground/40">--</span>}
                 </TableCell>
                 <TableCell>
                   {(() => {
@@ -368,8 +373,12 @@ export default function Companies() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Website</Label>
+                <Label>Main Website</Label>
                 <Input value={formData.website} onChange={e => setFormData({...formData, website: e.target.value})} className="bg-background" placeholder="example.com" />
+              </div>
+              <div className="space-y-2">
+                <Label>Google Site / Google Business Profile</Label>
+                <Input value={formData.googleSite} onChange={e => setFormData({...formData, googleSite: e.target.value})} className="bg-background" placeholder="https://maps.app.goo.gl/... or https://sites.google.com/..." />
               </div>
               <div className="space-y-2">
                 <Label>Phone</Label>
