@@ -179,7 +179,7 @@ router.patch("/companies/:id", async (req, res): Promise<void> => {
       return;
     }
 
-    res.json(UpdateCompanyResponse.parse({ ...updated, createdAt: updated.createdAt.toISOString() }));
+    res.json({ ...UpdateCompanyResponse.parse({ ...updated, createdAt: updated.createdAt.toISOString() }), googleSite: updated.googleSite });
   } catch (error: any) {
     res.status(400).json({ error: error?.message ?? "Invalid notification setting" });
   }
