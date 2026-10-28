@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import planCatalogRouter from "./plan-catalog";
 import authRouter from "./auth";
 import phoneNumbersRouter from "./phone-numbers";
 import contactsRouter from "./contacts";
@@ -32,6 +33,7 @@ const router: IRouter = Router();
 
 // Public routes and Twilio callbacks remain outside the dashboard permission gate.
 router.use(healthRouter);
+router.use(planCatalogRouter);
 router.use(authRouter);
 router.use(aiDateContext);
 router.use(aiCallFinalizer);
