@@ -1,0 +1,37 @@
+import { useEffect, useState } from "react";
+import { Plus, Save, Trash2, ShieldCheck, AlertTriangle, RefreshCw } from "lucide-react";
+
+type Plan={id:number;slug:string;name:string;priceCents:number;monthlyMinutes:number;includedNumbers:number;features:string[];description:string;isPublished:boolean;isEnabled:boolean;checkoutEnabled:boolean;sortOrder:number};
+const featureNames:Record<string,string>={numbers:"Phone numbers",forwarding:"Call forwarding",voicemail:"Voicemail",email_alerts:"Email alerts",call_logs:"Call logs",extensions:"Extensions",ai_receptionist:"AI receptionist",sms:"SMS",appointments:"Appointments"};
+const empty:Plan={id:0,slug:"",name:"",priceCents:0,monthlyMinutes:0,includedNumbers:1,features:["numbers"],description:"",isPublished:false,isEnabled:false,checkoutEnabled:false,sortOrder:10};
+export default function PlanManagement(){
+ const [plans,setPlans]=useState<Plan[]>([]);
+ const [editing,setEditing]=useState<Plan|null>(null);
+ const [error,setError]=useState("");
+ const [notice,setNotice]=useState("");
+ const [busy,setBusy]=useState(false);
+ async function load(){try{const r=await fetch("/api/admin/plans",{credentials:"include"});const j=await r.json();if(!r.ok)throw Error(j.error||"Unable to fetch plans");setPlans(j);}catch(e:any){setError(e.message)}}
+ useEffect(()=>{void load()},[]);
+ async function save(plan:Plan){
+  setBusy(true);setError("");setNotice("");
+  try {
+   const r=await fetch(plan.id?"/api/admin/plans/"+plan.id:"/api/admin/plans",{method:plan.id?"PATCH":"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify(plan)});
+   const j=await r.json();if(!r.ok)throw Error(j.error||"Unable to save plan");
+   setEditing(null);setNotice("Plan saved. Public catalog will reflect enabled, published plans.");await load();
+  }catch(e:any){setError(e.message)}finally{setBusy(false)}
+ }
+ async function remove(plan:Plan){
+  if(!window.confirm("Permanently delete "+plan.name+"? Disable the plan instead if it has customers."))return;
+  setBusy(true);setError("");
+  try{const r=await fetch("/api/admin/plans/"+plan.id,{method:"DELETE",credentials:"include"});const j=await r.json();if(!r.ok)throw Error(j.error||"Could not delete");setEditing(null);await load();}
+  catch(e:any){setError(e.message)}finally{setBusy(false)}
+ }
+ return <div className="space-y-6">
+   <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-3xl font-bold">Package Manager</h1><p className="mt-1 text-sm text-muted-foreground">Create, edit, publish, disable, or remove CallingAgent packages.</p></div><button onClick={()=>setEditing({...empty})} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white"><Plus className="h-4 w-4"/>New plan</button></div>
+   <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><AlertTriangle className="h-5 w-5 shrink-0"/><p>Catalog management is available. Checkout, paid activation and minute enforcement are NOT live. A published plan can be viewed, but cannot yet be purchased.</p></div>
+   {error&&<div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</div>}
+   {notice&&<div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</div>}
+   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{plans.map(p=><div key={p.id} className="space-y-3 rounded-xl border bg-card p-5 shadow-sm"><div className="flex items-start justify-between gap-2"><div><h2 className="text-lg font-bold">{p.name}</h2><p className="text-xs text-muted-foreground">{p.slug}</p></div><span className={`rounded-full px-2 py-1 text-xs font-semibold ${p.isEnabled&&p.isPublished?"bg-emerald-50 text-emerald-700":"bg-slate-100 text-slate-600"}`}>{p.isEnabled&&p.isPublished?"Visible":"Hidden"}</span></div><div className="text-2xl font-bold">CA${(p.priceCents/100).toFixed(2)}<span className="text-xs font-normal text-muted-foreground"> / month</span></div><div className="text-sm">{p.monthlyMinutes.toLocaleString()} minutes · {p.includedNumbers} numbers</div><div className="flex flex-wrap gap-1">{p.features.map(f=><span key={f} className="rounded bg-blue-50 px-2 py-1 text-xs text-blue-700">{featureNames[f]||f}</span>)}</div><div className="flex gap-2"><button onClick={()=>setEditing({...p})} className="rounded-lg border px-4 py-2 text-sm font-semibold">Edit & restrictions</button><button title="Delete plan" aria-label={"Delete "+p.name} onClick={()=>remove(p)} className="rounded-lg border p-2 text-red-600"><Trash2 className="h-4 w-4"/></button></div></div>)}</div>
+   {editing&&<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-3" onClick={()=>!busy&&setEditing(null)}><div onClick={e=>e.stopPropagation()} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-background p-5 shadow-2xl sm:p-7"><div className="flex items-center justify-between"><h2 className="text-xl font-bold">{editing.id?"Edit package":"Create package"}</h2><button className="text-sm" onClick={()=>setEditing(null)}>Close ✕</button></div><div className="mt-5 grid gap-4 sm:grid-cols-2">{([{k:"name",label:"Name",type:"text"},{k:"slug",label:"Unique plan ID",type:"text"},{k:"priceCents",label:"Monthly price in cents (CAD)",type:"number"},{k:"monthlyMinutes",label:"Monthly billable minutes",type:"number"},{k:"includedNumbers",label:"Included phone numbers",type:"number"},{k:"sortOrder",label:"Display order",type:"number"}] as const).map(f=><label key={f.k} className="flex flex-col gap-1 text-sm font-semibold">{f.label}<input type={f.type} value={editing[f.k]} onChange={e=>setEditing({...editing,[f.k]:f.type==="number"?Number(e.target.value):e.target.value})} className="rounded-lg border bg-background p-2.5 font-normal"/></label>)}</div><label className="mt-4 flex flex-col gap-1 text-sm font-semibold">Short description<textarea value={editing.description} onChange={e=>setEditing({...editing,description:e.target.value})} className="rounded-lg border bg-background p-3 font-normal"/></label><h3 className="mt-5 font-bold">Feature permissions</h3><div className="mt-3 grid gap-3 sm:grid-cols-2">{Object.entries(featureNames).map(([id,label])=><label key={id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.features.includes(id)} onChange={e=>setEditing({...editing,features:e.target.checked?[...editing.features,id]:editing.features.filter(f=>f!==id)})}/>{label}</label>)}</div><h3 className="mt-5 font-bold">Availability controls</h3><div className="mt-3 space-y-2"><label className="flex gap-2 text-sm"><input type="checkbox" checked={editing.isEnabled} onChange={e=>setEditing({...editing,isEnabled:e.target.checked})}/>Enable plan</label><label className="flex gap-2 text-sm"><input type="checkbox" checked={editing.isPublished} onChange={e=>setEditing({...editing,isPublished:e.target.checked})}/>Show on public pricing page</label><div className="rounded-lg bg-slate-100 p-3 text-xs text-slate-700">Checkout cannot be enabled until payment, subscriptions and hard-cap enforcement pass launch testing.</div></div><button disabled={busy} onClick={()=>save(editing)} className="mt-6 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-3 text-sm font-bold text-white disabled:opacity-50"><Save className="h-4 w-4"/>Save package</button></div></div>}
+ </div>
+}
