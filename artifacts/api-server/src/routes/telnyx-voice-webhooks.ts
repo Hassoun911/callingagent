@@ -486,6 +486,13 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       const outbound = incomingToOutbound.get(id)!;
       incomingToOutbound.delete(id);
       outboundToInbound.delete(outbound);
+      const sid = "telnyx:" + id;
+      const [log] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid,sid));
+      if (log && !["voicemail_greeting","voicemail_recording","voicemail_saved"].includes(log.status)) {
+        await db.update(callLogsTable).set({status:log.status === "connected" ? "completed" : "no_answer",duration: typeof payload?.duration === "number" ? payload.duration : log.duration}).where(eq(callLogsTable.id,log.id));
+        try { await notifyCallEmail(sid); }
+        catch (error:any) { req.log.error({message:error?.message,callLogId:log.id},"Telnyx forwarded call email notification failed"); }
+      }
     } else if (type === "call.hangup" && payload?.direction !== "outgoing") {
       const sid = "telnyx:" + id;
       const [log] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid,sid));
