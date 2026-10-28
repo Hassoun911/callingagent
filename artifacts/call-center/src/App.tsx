@@ -239,6 +239,13 @@ function PortalRedirect({ user }: { user: AuthUser }) {
 
 function AuthGate({ children }: { children?: React.ReactNode }) {
   const { isLoading, isAuthenticated, user, logout, refetch } = useAuth();
+  const [currentPath, navigate] = useLocation();
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || !user) return;
+    if ((!user.role || user.role === "super_admin") && (currentPath === "/login" || currentPath === "/start")) {
+      navigate("/", { replace: true });
+    }
+  }, [isLoading, isAuthenticated, user, currentPath, navigate]);
 
   if (isLoading) {
     return <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center"><div className="text-slate-600 text-sm tracking-widest uppercase">Loading...</div></div>;
@@ -254,6 +261,9 @@ function AuthGate({ children }: { children?: React.ReactNode }) {
   }
 
   const isSuperAdmin = !user.role || user.role === "super_admin";
+  if (isSuperAdmin && (currentPath === "/login" || currentPath === "/start")) {
+    return <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">Opening dashboard...</div>;
+  }
 
   return (
     <AuthContext.Provider value={{ user, logout, refetch }}>
