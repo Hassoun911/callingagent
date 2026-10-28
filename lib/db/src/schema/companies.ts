@@ -10,6 +10,7 @@ export const companiesTable = pgTable("companies", {
   phone: text("phone"),
   email: text("email"),
   website: text("website"),
+  googleSite: text("google_site"),
   notes: text("notes"),
   adminNotificationEmail: text("admin_notification_email"),
   adminWhatsapp: text("admin_whatsapp"),
