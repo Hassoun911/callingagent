@@ -25,7 +25,7 @@ function normalizeGoogleSite(value: unknown): string | null {
   const raw = String(value).trim();
   const url = new URL(/^https?:\/\//i.test(raw) ? raw : "https://" + raw);
   if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("Invalid Google site URL");
-  if (url.hostname !== "google.com" && url.hostname !== "www.google.com" && url.hostname !== "sites.google.com" && !url.hostname.endsWith(".google.com") && !url.hostname.endsWith(".business.site") && url.hostname !== "g.page" && url.hostname !== "maps.app.goo.gl") throw new Error("Enter a Google Business Profile, Maps, or Google Sites URL");
+  if (url.hostname !== "google.com" && url.hostname !== "www.google.com" && url.hostname !== "sites.google.com" && !url.hostname.endsWith(".google.com") && !url.hostname.endsWith(".business.site") && url.hostname !== "g.page" && url.hostname !== "maps.app.goo.gl" && url.hostname !== "share.google" && url.hostname !== "maps.google.com") throw new Error("Enter a Google Business Profile, Maps, or Google Sites URL");
   return url.href;
 }
 
