@@ -35,42 +35,47 @@ async function action(id: string, name: string, payload: Record<string, unknown>
   if (!response.ok) { const detail = (await response.text()).slice(0, 600); throw new Error("Telnyx call command " + name + " failed (" + response.status + "): " + detail); }
 }
 
-async function notifyVoicemailEmail(logSid: string): Promise<void> {
+const emailNotified = new Set<string>();
+function esc(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c] || c));
+}
+async function notifyCallEmail(logSid: string, kind: "voicemail" | "completed" = "completed"): Promise<void> {
   const [log] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid, logSid));
   if (!log?.phoneNumberId) return;
   const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, log.phoneNumberId));
-  if (!line?.notificationEmail?.trim()) return;
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!host || !user || !pass) throw new Error("SMTP_HOST, SMTP_USER or SMTP_PASS not configured");
-  const [company] = line.companyId
-    ? await db.select().from(companiesTable).where(eq(companiesTable.id, line.companyId))
-    : [];
-  const transport = nodemailer.createTransport({
-    host, port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: { user, pass },
-  });
-  const companyName = company?.name || line.callerIdName || "Your company";
-  const caller = log.fromNumber || "Unknown caller";
-  const link = "https://callingagent.ca/calls?companyId=" + (line.companyId || "");
-  const subject = "New voicemail — " + companyName + " — " + caller;
-  const body = [
-    "A new voicemail has been saved for " + companyName + ".",
-    "Company line: " + line.number,
-    "Caller: " + caller,
-    "Received: " + (log.createdAt ? log.createdAt.toLocaleString("en-CA", { timeZone: "America/Toronto" }) + " Eastern" : "Recently"),
-    "Open CallingAgent to play the recording: " + link,
-    "Recording and transcript availability may depend on processing time.",
-  ].join("\n");
-  await transport.sendMail({
-    from: process.env.SMTP_FROM || user,
-    to: line.notificationEmail.trim(),
-    subject,
-    text: body,
-  });
-  console.info("Telnyx voicemail notification email sent", { phoneNumberId: line.id, callLogId: log.id });
+  const recipient = line?.notificationEmail?.trim();
+  if (!line || !recipient) return;
+  const marker = logSid + ":" + kind;
+  if (emailNotified.has(marker)) return;
+  const host = process.env.SMTP_HOST, user = process.env.SMTP_USER, pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) throw new Error("SMTP credentials missing (SMTP_HOST, SMTP_USER or SMTP_PASS)");
+  const [company] = line.companyId ? await db.select().from(companiesTable).where(eq(companiesTable.id,line.companyId)) : [];
+  const companyName = company?.name || line.callerIdName || "Your business";
+  const outcome = kind === "voicemail" ? "Voicemail received" : (log.status === "connected" || log.status === "completed" ? "Call completed" : log.status === "rejected" ? "Call rejected" : "Call ended / no message");
+  const recorded = kind === "voicemail" && Boolean(log.recordingUrl);
+  const listen = "https://callingagent.ca/api/call-logs/" + log.id + "/recording";
+  const dashboard = "https://callingagent.ca/calls?companyId=" + (line.companyId || "");
+  const time = log.createdAt.toLocaleString("en-CA", {timeZone:"America/Toronto", dateStyle:"medium",timeStyle:"short"}) + " ET";
+  const duration = log.duration == null ? "Not available" : Math.floor(log.duration/60)+"m "+log.duration%60+"s";
+  const data = [["Call result",outcome],["Caller",log.fromNumber || "Unknown / private"],["Company",companyName],["Business number",line.number],["Date and time",time],["Duration",duration]];
+  const rows = data.map(([label,value])=>'<tr><td style="padding:12px 16px;border-bottom:1px solid #e8eef5;color:#64748b;font-size:13px">'+esc(label)+'</td><td style="padding:12px 16px;border-bottom:1px solid #e8eef5;font-weight:650;color:#0f2743;font-size:14px">'+esc(value)+'</td></tr>').join("");
+  const html = '<!doctype html><html><body style="background:#f1f6fb;margin:0;padding:26px 12px;font-family:Arial,Helvetica,sans-serif;color:#10243b"><div style="max-width:560px;margin:auto;border-radius:18px;overflow:hidden;background:#fff;border:1px solid #e2eaf4"><div style="background:#10324c;padding:25px 26px;color:#fff"><div style="font-weight:800;font-size:21px">Calling<span style="color:#41d4b5">Agent</span></div><p style="margin:18px 0 4px;color:#bdebdc;font-weight:700;font-size:12px;letter-spacing:1.5px;text-transform:uppercase">Call notification</p><h1 style="margin:0;font-size:25px;color:#fff">'+esc(outcome)+'</h1><p style="margin:9px 0 0;color:#e1edf5;font-size:14px">'+esc(companyName)+'</p></div><div style="padding:16px 20px"><table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse">'+rows+'</table>'+(log.transcription?'<div style="margin:20px 0;background:#f5f9fc;padding:16px;border-radius:10px"><b>Transcript</b><p style="white-space:pre-wrap">'+esc(log.transcription)+'</p></div>':'')+'<div style="padding:20px 4px;text-align:center">'+(recorded?'<a style="display:inline-block;background:#047857;color:white;padding:13px 24px;text-decoration:none;border-radius:10px;font-weight:bold" href="'+esc(listen)+'">▶ Listen to voicemail</a><p style="font-size:12px;color:#64748b">Sign in to CallingAgent to play the recording. An MP3 may be attached.</p>':'')+'<p><a style="color:#0866c2;text-decoration:none;font-weight:bold" href="'+esc(dashboard)+'">Open call details in CallingAgent</a></p></div></div><div style="background:#f7f9fc;text-align:center;padding:16px;font-size:12px;color:#64748b">Sent to your configured notification email · CallingAgent</div></div></body></html>';
+  const attachments: Array<{filename:string;content:Buffer;contentType:string}> = [];
+  if (recorded && /^https:\/\//i.test(log.recordingUrl || "")) {
+    try {
+      const response = await fetch(log.recordingUrl!, {signal:AbortSignal.timeout(12000)});
+      const len = Number(response.headers.get("content-length") || 0);
+      if (response.ok && (!len || len <= 8_000_000)) {
+        const buf = Buffer.from(await response.arrayBuffer());
+        if (buf.length <= 8_000_000) attachments.push({filename:"callingagent-voicemail-"+log.id+".mp3",content:buf,contentType:"audio/mpeg"});
+      }
+    } catch (error:any) { console.warn("Voicemail email MP3 attachment unavailable", {callLogId:log.id,message:error?.message}); }
+  }
+  const transport = nodemailer.createTransport({host,port:Number(process.env.SMTP_PORT || 587),secure:process.env.SMTP_SECURE === "true",auth:{user,pass}});
+  const result = await transport.sendMail({from:process.env.SMTP_FROM || user,to:recipient,subject:"CallingAgent · "+outcome+" · "+(log.fromNumber || "Unknown caller"),html,text:data.map(([k,v])=>k+": "+v).join("\n")+"\n"+(recorded?"Listen (login required): "+listen+"\n":"")+"Call details: "+dashboard,attachments});
+  emailNotified.add(marker);
+  if (emailNotified.size > 5000) emailNotified.clear();
+  console.info("Telnyx call email submitted", {callLogId:log.id,phoneNumberId:line.id,kind,hasAttachment:attachments.length>0,messageId:result.messageId});
 }
 
 async function notifyAdminOfVoicemail(logSid: string, recordingUrl: string) {
@@ -342,6 +347,11 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
         ? await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, destination))
         : [];
       req.log.info({ foundLine: Boolean(line), active: Boolean(line?.isActive), mode: line?.answerMode }, "Telnyx inbound routing decision");
+      if (line) {
+        const logSid = "telnyx:" + id;
+        const [prior] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid,logSid));
+        if (!prior) await db.insert(callLogsTable).values({twilioCallSid:logSid,phoneNumberId:line.id,direction:"inbound",status:line.answerMode === "reject" ? "rejected" : "ringing",fromNumber:typeof payload?.from === "string" ? payload.from : "Unknown",toNumber:line.number,answerMode:line.answerMode});
+      }
       if (!line?.isActive) {
         await action(id, "speak", {
           payload: "This number is not currently accepting calls. Please try again later.",
@@ -424,6 +434,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       if (state.pressOne && String(payload?.digits || "") === "1") {
         await action(state.inbound, "bridge", { call_control_id: id, park_after_unbridge: "self" });
         state.bridged = true;
+        await db.update(callLogsTable).set({status:"connected"}).where(eq(callLogsTable.twilioCallSid,"telnyx:"+state.inbound));
         req.log.info({ lineId: state.lineId }, "Forwarded call accepted with key 1");
       } else {
         req.log.info({ lineId: state.lineId }, "Forwarded call not accepted; returning caller to CallingAgent voicemail immediately");
@@ -475,6 +486,18 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       const outbound = incomingToOutbound.get(id)!;
       incomingToOutbound.delete(id);
       outboundToInbound.delete(outbound);
+    } else if (type === "call.hangup" && payload?.direction !== "outgoing") {
+      const sid = "telnyx:" + id;
+      const [log] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid,sid));
+      if (log) {
+        const voicemailPending = ["voicemail_greeting","voicemail_recording","voicemail_saved"].includes(log.status);
+        const seconds = typeof payload?.duration === "number" ? payload.duration : log.duration;
+        await db.update(callLogsTable).set({duration:seconds ?? null,status:voicemailPending ? log.status : log.status === "connected" ? "completed" : log.status === "rejected" ? "rejected" : "no_answer"}).where(eq(callLogsTable.id,log.id));
+        if (!voicemailPending) {
+          try { await notifyCallEmail(sid); }
+          catch (error:any) { req.log.error({message:error?.message,callLogId:log.id},"Telnyx call email notification failed"); }
+        }
+      }
     } else if (type === "call.speak.ended") {
       // speak.ended omits "to": recover the exact line from the call log created at answer time.
       const logSid = "telnyx:" + id;
@@ -503,7 +526,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
       }).where(eq(callLogsTable.twilioCallSid, logSid));
       req.log.info({ recordingSaved: true, hasUrl: Boolean(url) }, "Telnyx voicemail saved");
       if (typeof url === "string") {
-        try { await notifyVoicemailEmail(logSid); }
+        try { await notifyCallEmail(logSid, "voicemail"); }
         catch (error: any) { req.log.error({ message: error?.message, logSid }, "Telnyx voicemail email notification failed"); }
       }
       if (typeof url === "string") {
