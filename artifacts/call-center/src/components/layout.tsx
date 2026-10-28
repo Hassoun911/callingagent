@@ -361,6 +361,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
         <div className="flex-shrink-0 border-t border-border bg-card">
           <div className={`${compact ? "px-2 py-1.5" : "px-3 py-2"}`}>
+            <Link href="/plans-admin" onClick={onNav} className={navClass("/plans-admin", compact)}><CreditCard className="h-4 w-4 flex-shrink-0" /> Packages</Link>
             <Link href="/billing" onClick={onNav} className={navClass("/billing", compact)}>
               <CreditCard className="h-4 w-4 flex-shrink-0" /> Billing
             </Link>
