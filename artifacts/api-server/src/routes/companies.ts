@@ -16,6 +16,16 @@ import {
 
 const router: IRouter = Router();
 
+function normalizeGoogleSite(value: unknown): string | null {
+  if (value == null || String(value).trim() === "") return null;
+  const raw = String(value).trim();
+  const url = new URL(/^https?:\/\//i.test(raw) ? raw : "https://" + raw);
+  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("Invalid Google site URL");
+  if (url.hostname !== "google.com" && url.hostname !== "www.google.com" && url.hostname !== "sites.google.com" && !url.hostname.endsWith(".google.com") && !url.hostname.endsWith(".business.site") && url.hostname !== "g.page" && url.hostname !== "maps.app.goo.gl") throw new Error("Enter a Google Business Profile, Maps, or Google Sites URL");
+  return url.href;
+}
+
+
 function normalizeNorthAmericanPhone(value: unknown): string | null | undefined {
   if (value === undefined) return undefined;
   if (value === null || String(value).trim() === "") return null;
@@ -55,10 +65,7 @@ router.get("/companies", async (req, res): Promise<void> => {
   if (companyId !== null) {
     companies = companies.filter(c => c.id === companyId);
   }
-  res.json(ListCompaniesResponse.parse(companies.map(c => ({
-    ...c,
-    createdAt: c.createdAt.toISOString(),
-  }))));
+  res.json(companies.map(c => ({ ...ListCompaniesResponse.element.parse({ ...c, createdAt: c.createdAt.toISOString() }), googleSite: c.googleSite })));
 });
 
 router.post("/companies", async (req, res): Promise<void> => {
@@ -77,10 +84,11 @@ router.post("/companies", async (req, res): Promise<void> => {
     const adminNotificationEmail = normalizeNotificationEmail(req.body?.adminNotificationEmail);
     const [company] = await db.insert(companiesTable).values({
       ...parsed.data,
+      googleSite: normalizeGoogleSite(req.body?.googleSite),
       ...(adminWhatsapp !== undefined ? { adminWhatsapp } : {}),
       ...(adminNotificationEmail !== undefined ? { adminNotificationEmail } : {}),
     } as any).returning();
-    res.status(201).json(GetCompanyResponse.parse({ ...company, createdAt: company.createdAt.toISOString() }));
+    res.status(201).json({ ...GetCompanyResponse.parse({ ...company, createdAt: company.createdAt.toISOString() }), googleSite: company.googleSite });
   } catch (error: any) {
     res.status(400).json({ error: error?.message ?? "Invalid notification setting" });
   }
@@ -105,7 +113,7 @@ router.get("/companies/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(GetCompanyResponse.parse({ ...company, createdAt: company.createdAt.toISOString() }));
+  res.json({ ...GetCompanyResponse.parse({ ...company, createdAt: company.createdAt.toISOString() }), googleSite: company.googleSite });
 });
 
 router.patch("/companies/:id", async (req, res): Promise<void> => {
@@ -136,6 +144,7 @@ router.patch("/companies/:id", async (req, res): Promise<void> => {
     if (body.phone !== undefined) updateData.phone = body.phone;
     if (body.email !== undefined) updateData.email = body.email;
     if (body.website !== undefined) updateData.website = body.website;
+    if (req.body?.googleSite !== undefined) updateData.googleSite = normalizeGoogleSite(req.body.googleSite);
     if (body.notes !== undefined) updateData.notes = body.notes;
 
     const adminWhatsapp = normalizeNorthAmericanPhone(req.body?.adminWhatsapp ?? req.body?.companyAdminWhatsapp);
