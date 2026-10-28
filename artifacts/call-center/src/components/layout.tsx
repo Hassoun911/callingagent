@@ -1,3 +1,4 @@
+import SiteFooter from "@/components/site-footer";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
@@ -423,7 +424,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
         </div>
         <div className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background p-3 sm:p-4 md:p-6">
-          <div className={`mx-auto min-w-0 w-full ${location === "/" || location === "/billing" ? "max-w-[1600px]" : "max-w-6xl"}`}>{children}</div>
+          <div className={`mx-auto min-w-0 w-full ${location === "/" || location === "/billing" ? "max-w-[1600px]" : "max-w-6xl"}`}><div className="min-h-[calc(100vh-11rem)]">{children}</div><SiteFooter compact /></div>
         </div>
       </main>
     </div>
