@@ -72,7 +72,7 @@ async function notifyCallEmail(logSid: string, kind: "voicemail" | "completed" =
     } catch (error:any) { console.warn("Voicemail email MP3 attachment unavailable", {callLogId:log.id,message:error?.message}); }
   }
   const transport = nodemailer.createTransport({host,port:Number(process.env.SMTP_PORT || 587),secure:process.env.SMTP_SECURE === "true",auth:{user,pass}});
-  const result = await transport.sendMail({from:process.env.SMTP_FROM || user,to:recipient,subject:"CallingAgent · "+outcome+" · "+(log.fromNumber || "Unknown caller"),html,text:data.map(([k,v])=>k+": "+v).join("\n")+"\n"+(recorded?"Listen (login required): "+listen+"\n":"")+"Call details: "+dashboard,attachments});
+  const result = await transport.sendMail({from:process.env.SMTP_FROM || user,to:recipient,subject:[companyName, kind === "voicemail" ? "Voicemail" : outcome === "Call completed" ? "Answered Call" : outcome === "Call rejected" ? "Declined Call" : "Missed Call", (log.contactName || log.callerIdName || log.callerName) ? (log.contactName || log.callerIdName || log.callerName) + " (" + (log.fromNumber || "Unknown") + ")" : (log.fromNumber || "Unknown Caller")].join(" | "),html,text:data.map(([k,v])=>k+": "+v).join("\n")+"\n"+(recorded?"Listen (login required): "+listen+"\n":"")+"Call details: "+dashboard,attachments});
   emailNotified.add(marker);
   if (emailNotified.size > 5000) emailNotified.clear();
   console.info("Telnyx call email submitted", {callLogId:log.id,phoneNumberId:line.id,kind,hasAttachment:attachments.length>0,messageId:result.messageId});
