@@ -16,6 +16,10 @@ import {
 
 const router: IRouter = Router();
 
+function capitalizeCompanyName(name: string): string {
+  return name.trim().replace(/\b[a-z][a-z]*\b/g, word => word.charAt(0).toUpperCase() + word.slice(1));
+}
+
 function normalizeGoogleSite(value: unknown): string | null {
   if (value == null || String(value).trim() === "") return null;
   const raw = String(value).trim();
@@ -84,6 +88,7 @@ router.post("/companies", async (req, res): Promise<void> => {
     const adminNotificationEmail = normalizeNotificationEmail(req.body?.adminNotificationEmail);
     const [company] = await db.insert(companiesTable).values({
       ...parsed.data,
+      name: capitalizeCompanyName(parsed.data.name),
       googleSite: normalizeGoogleSite(req.body?.googleSite),
       ...(adminWhatsapp !== undefined ? { adminWhatsapp } : {}),
       ...(adminNotificationEmail !== undefined ? { adminNotificationEmail } : {}),
@@ -138,7 +143,7 @@ router.patch("/companies/:id", async (req, res): Promise<void> => {
   try {
     const updateData: any = {};
     const body = parsed.data;
-    if (body.name != null) updateData.name = body.name;
+    if (body.name != null) updateData.name = capitalizeCompanyName(body.name);
     if (body.ownerName !== undefined) updateData.ownerName = body.ownerName;
     if (body.industry !== undefined) updateData.industry = body.industry;
     if (body.phone !== undefined) updateData.phone = body.phone;
