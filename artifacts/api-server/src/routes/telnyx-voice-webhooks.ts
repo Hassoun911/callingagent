@@ -191,7 +191,7 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
       from: line.number, // Always present the verified CallingAgent business number
       // Independent outbound leg: bridge only after acceptance. Linking at dial time
       // can propagate the original caller identity and bypass screening.
-      ...((route || line.callScreen) ? {} : { answering_machine_detection: "detect" }),
+      // All Telnyx forwards require a human to press 1. Never bridge a personal voicemail.
       timeout_secs: Math.max(5, Math.min(60, (route?.ringCount || line.ringCount || 4) * 6)),
       client_state: Buffer.from(JSON.stringify({ inbound, lineId: line.id })).toString("base64"),
     }),
@@ -201,7 +201,7 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
   const result: any = await response.json();
   const outbound = result?.data?.call_control_id;
   if (typeof outbound !== "string") throw new Error("Telnyx dial did not return an outbound leg");
-  outboundToInbound.set(outbound, { inbound, lineId: line.id, bridged: false, pressOne: route ? true : Boolean(line.callScreen), displayName: (route?.display || line.callerIdName?.trim() || line.friendlyName?.trim() || "your business").slice(0, 50), team: route?.team });
+  outboundToInbound.set(outbound, { inbound, lineId: line.id, bridged: false, pressOne: true, displayName: (route?.display || line.callerIdName?.trim() || line.friendlyName?.trim() || "your business").slice(0, 50), team: route?.team });
   // Carrier accepted the dial command; this does not mean the destination handset rang.
 
   incomingToOutbound.set(inbound, outbound);
