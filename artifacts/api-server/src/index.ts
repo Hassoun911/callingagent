@@ -1,4 +1,6 @@
 import app from "./app";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 import { logger } from "./lib/logger";
 import { startWatchPoller } from "./lib/watch-poller";
 import { startReminderPoller } from "./lib/reminders";
@@ -25,6 +27,7 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 async function start(): Promise<void> {
+  await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS google_site text`);
   await ensureBookingSchema();
   await ensureExtensionSchema();
   await ensureAiBookingBehavior();
