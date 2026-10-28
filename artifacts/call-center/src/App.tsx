@@ -19,6 +19,7 @@ import CompanyDetail from "@/pages/company-detail";
 import CompanyAdministrationCenter from "@/pages/company-administration-center";
 import Settings from "@/pages/settings";
 import Billing from "@/pages/billing";
+import PlanManagement from "@/pages/plan-management";
 import Messages from "@/pages/messages";
 import Campaigns from "@/pages/campaigns";
 import CampaignDetail from "@/pages/campaign-detail";
@@ -212,6 +213,7 @@ function AdminRouter() {
         <Route path="/company-setup" component={CompanyAdministrationCenter} />
         <Route path="/settings" component={Settings} />
         <Route path="/billing" component={Billing} />
+        <Route path="/plans-admin" component={PlanManagement} />
         <Route path="/messages" component={Messages} />
         <Route path="/campaigns" component={Campaigns} />
         <Route path="/campaigns/:id" component={CampaignDetail} />
