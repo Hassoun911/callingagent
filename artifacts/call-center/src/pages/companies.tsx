@@ -36,6 +36,15 @@ async function linkPhoneNumber(phoneNumberId: number, companyId: number) {
 export default function Companies() {
   const { data: companies, isLoading } = useListCompanies();
   const { data: allNumbers } = useListPhoneNumbers();
+  const companyLines = (id: number) => (allNumbers ?? []).filter(n => n.companyId === id);
+  const industryTone = (industry?: string | null) => {
+    const name = (industry ?? "").toLowerCase();
+    if (/health|medical/.test(name)) return "bg-rose-50 text-rose-700 border-rose-100";
+    if (/software|it|technology|computer/.test(name)) return "bg-indigo-50 text-indigo-700 border-indigo-100";
+    if (/construction|renovat/.test(name)) return "bg-amber-50 text-amber-800 border-amber-100";
+    if (/tire|auto/.test(name)) return "bg-orange-50 text-orange-700 border-orange-100";
+    return "bg-sky-50 text-sky-700 border-sky-100";
+  };
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -193,7 +202,7 @@ export default function Companies() {
     <div className="companies-admin-page space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Companies</h1>
+          <h1 className="flex items-center gap-3 text-3xl font-bold tracking-tight text-foreground"><span className="rounded-xl bg-blue-50 p-2 text-blue-600"><Building2 className="h-7 w-7" /></span>Companies</h1>
           <p className="text-muted-foreground mt-1">Manage organizations and accounts.</p>
         </div>
         <Button onClick={() => handleOpenDialog()} className="gap-2">
@@ -221,7 +230,7 @@ export default function Companies() {
         )}
       </div>
 
-      <Card className="border-border">
+      <Card className="overflow-hidden rounded-2xl border-slate-200 shadow-sm">
         <div className="overflow-x-auto">
         <Table className="min-w-[700px] text-sm sm:text-base">
           <TableHeader>
@@ -230,6 +239,7 @@ export default function Companies() {
               <TableHead>Industry</TableHead>
               <TableHead>Website</TableHead>
               <TableHead>Phone</TableHead>
+              <TableHead>Line Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -246,7 +256,7 @@ export default function Companies() {
               ))
             ) : filteredCompanies.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                   <div className="flex flex-col items-center justify-center">
                     <Building2 className="h-8 w-8 mb-4 opacity-50" />
                     <p>{search ? `No companies match "${search}"` : "No companies found."}</p>
@@ -254,15 +264,15 @@ export default function Companies() {
                 </TableCell>
               </TableRow>
             ) : filteredCompanies.map((company) => (
-              <TableRow key={company.id} className="border-border cursor-pointer hover:bg-secondary/30 text-sm sm:text-base" onClick={() => navigate(`/companies/${company.id}`)}>
+              <TableRow key={company.id} className="border-border cursor-pointer hover:bg-blue-50/70 text-sm sm:text-base" onClick={() => navigate(`/companies/${company.id}`)}>
                 <TableCell>
-                  <div className="text-base sm:text-lg font-bold leading-snug text-foreground">{company.name}</div>
+                  <div className="flex items-center gap-3"><span className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-xs font-bold text-blue-700">{company.name.slice(0,2).toUpperCase()}</span><div className="text-base sm:text-lg font-bold leading-snug text-foreground">{company.name}</div></div>
                   {(company as any).ownerName && (
                     <div className="text-sm font-medium text-muted-foreground mt-1">{(company as any).ownerName}</div>
                   )}
                 </TableCell>
                 <TableCell className="text-foreground text-sm sm:text-base font-semibold">
-                  {company.industry || '--'}
+                  <span className={`inline-flex rounded-lg border px-2.5 py-1 text-xs font-semibold ${industryTone(company.industry)}`}>{company.industry || "Uncategorized"}</span>
                 </TableCell>
                 <TableCell>
                   {company.website ? (
@@ -277,7 +287,7 @@ export default function Companies() {
                     if (company.phone) {
                       return (
                         <div className="flex items-center gap-1.5 text-sm sm:text-base font-medium text-foreground">
-                          <Phone className="h-3 w-3" />
+                          <Phone className="h-4 w-4 text-emerald-600" />
                           {company.phone}
                         </div>
                       );
@@ -288,7 +298,7 @@ export default function Companies() {
                         <div className="space-y-0.5">
                           {linked.map(n => (
                             <div key={n.id} className="flex items-center gap-1.5 text-sm sm:text-base font-medium text-foreground">
-                              <Phone className="h-3 w-3 flex-shrink-0" />
+                              <Phone className={`h-4 w-4 flex-shrink-0 ${n.isActive ? "text-emerald-600" : "text-slate-400"}`} />
                               {n.number}
                             </div>
                           ))}
@@ -298,6 +308,7 @@ export default function Companies() {
                     return <span className="text-muted-foreground/40">--</span>;
                   })()}
                 </TableCell>
+                <TableCell><div className="flex flex-wrap gap-1.5">{companyLines(company.id).length ? companyLines(company.id).map(n => <span key={n.id} className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${n.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}><span className={`h-1.5 w-1.5 rounded-full ${n.isActive ? "bg-emerald-500" : "bg-slate-400"}`}/>{n.isActive ? "Active" : "Inactive"}</span>) : <span className="text-xs text-slate-400">No linked line</span>}</div></TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
                     <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleOpenDialog(company); }}>
