@@ -568,7 +568,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
   }
 
   const answerMode = phoneNumber?.answerMode ?? "forward";
-  const ringCount = phoneNumber?.ringCount ?? 4;
+  const ringCount = Math.max(1, Math.min(5, phoneNumber?.ringCount ?? 5));
   const forwardTo = phoneNumber?.forwardTo;
 
   let twiml = "";
@@ -627,8 +627,8 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     // When "caller" is selected, omit callerId — Twilio cannot use an unverified
     // inbound number as an outbound callerId, so we let Twilio use its account default.
     const callerIdAttr = forwardCallerId === "line" ? ` callerId="${To}"` : "";
-    const callScreen = phoneNumber?.callScreen ?? false;
-    const callScreenFallback = phoneNumber?.callScreenFallback ?? "voicemail";
+    const callScreen = true; // All forwarded Twilio calls require explicit press-1 acceptance.
+    const callScreenFallback = "voicemail"; // Never send screened forwards to personal voicemail.
 
     const recordAttr = ` record="record-from-answer-dual-channel" recordingStatusCallback="${baseUrl}/api/twilio/recording" recordingStatusCallbackMethod="POST"`;
 
