@@ -197,7 +197,7 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
       // Independent outbound leg: bridge only after acceptance. Linking at dial time
       // can propagate the original caller identity and bypass screening.
       // All Telnyx forwards require a human to press 1. Never bridge a personal voicemail.
-      timeout_secs: Math.max(5, Math.min(60, (route?.ringCount || line.ringCount || 4) * 6)),
+      timeout_secs: Math.max(6, Math.min(30, (route?.ringCount || line.ringCount || 4) * 6)),
       client_state: Buffer.from(JSON.stringify({ inbound, lineId: line.id })).toString("base64"),
     }),
     signal: AbortSignal.timeout(10000),
