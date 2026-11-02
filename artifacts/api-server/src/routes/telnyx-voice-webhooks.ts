@@ -432,6 +432,10 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
     } else if (type === "call.gather.ended" && outboundToInbound.has(id)) {
       const state = outboundToInbound.get(id)!;
       if (state.pressOne && String(payload?.digits || "") === "1") {
+        // The caller has been hearing our looping ringback while the forwarded
+        // phone rings. Stop that playback before bridging, otherwise its audio
+        // can continue over the live conversation even after key 1 is accepted.
+        await stopCallerRingback(state.inbound);
         await action(state.inbound, "bridge", { call_control_id: id, park_after_unbridge: "self" });
         state.bridged = true;
         await db.update(callLogsTable).set({status:"connected"}).where(eq(callLogsTable.twilioCallSid,"telnyx:"+state.inbound));
