@@ -1,5 +1,6 @@
 import app from "./app";
 import { ensurePlanCatalog } from "./routes/plan-catalog";
+import { ensureStripeBillingSchema } from "./routes/stripe-billing";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "./lib/logger";
@@ -29,6 +30,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function start(): Promise<void> {
   await ensurePlanCatalog();
+  await ensureStripeBillingSchema();
   await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS google_site text`);
   await ensureBookingSchema();
   await ensureExtensionSchema();
