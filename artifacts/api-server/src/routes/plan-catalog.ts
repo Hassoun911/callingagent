@@ -1,6 +1,20 @@
 import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 const router: IRouter = Router();
+// Verified against the dedicated CallingAgent Stripe account on 2026-11-02.
+// These IDs describe live Stripe prices; they do not enable checkout by themselves.
+const stripePriceBySlug: Record<string, { priceId: string; cents: number }> = {
+  payg: { priceId: "price_1UXTBYK5sDJyhAaePgEaz4K3", cents: 900 },
+  starter: { priceId: "price_1UXTBaK5sDJyhAae0rWx2ULM", cents: 1900 },
+  business: { priceId: "price_1UXTBcK5sDJyhAaeRTIzd0tX", cents: 3900 },
+  plus: { priceId: "price_1UXTBdK5sDJyhAaef4tMLWJW", cents: 6900 },
+  pro: { priceId: "price_1UXTBfK5sDJyhAaeZIKCCcG2", cents: 11900 },
+};
+function withVerifiedStripePrice(plan: any) {
+  const match = stripePriceBySlug[String(plan.slug)];
+  return { ...plan, stripePriceId: match && match.cents === Number(plan.priceCents) ? match.priceId : null };
+}
+
 
 const defaults = [
   ["payg","Pay as you go",900,0,1,["numbers","call_logs"],"Your Canadian business number without a big monthly bill."],
@@ -38,7 +52,7 @@ const admin = (req:any,res:any) => {
 router.get("/public-plans", async (_req,res) => {
   try {
     const r=await pool.query(`SELECT ${columns} FROM ca_plans WHERE is_published=true AND is_enabled=true ORDER BY sort_order,id`);
-    res.json(r.rows.map(p=>({...p,checkoutEnabled:false}))); // checkout is intentionally unavailable until verified billing + caps
+    res.json(r.rows.map(p=>withVerifiedStripePrice({...p,checkoutEnabled:false}))); // checkout is intentionally unavailable until verified billing + caps
   } catch(err:any){res.status(503).json({error:"Plan catalog is unavailable"});}
 });
 router.get("/admin/plans",async(req,res)=>{
