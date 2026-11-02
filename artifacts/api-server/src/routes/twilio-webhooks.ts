@@ -568,7 +568,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
   }
 
   const answerMode = phoneNumber?.answerMode ?? "forward";
-  const ringCount = Math.max(1, Math.min(5, phoneNumber?.ringCount ?? 5));
+  const ringCount = phoneNumber?.ringCount ?? 4;
   const forwardTo = phoneNumber?.forwardTo;
 
   let twiml = "";
@@ -656,7 +656,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   ${preDialSay}
-  <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}" action="${fallbackUrl}" method="POST">
+  <Dial${callerIdAttr}${recordAttr} timeout="${Math.max(1, Math.min(5, ringCount)) * 5}" action="${fallbackUrl}" method="POST">
     <Number url="${screenUrl}">${forwardTo}</Number>
   </Dial>
 </Response>`;
@@ -669,7 +669,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
       twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   ${preDialSay}
-  <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}"${noAnswerActionAttr}>
+  <Dial${callerIdAttr}${recordAttr} timeout="${Math.max(1, Math.min(5, ringCount)) * 5}"${noAnswerActionAttr}>
     <Number>${forwardTo}</Number>
   </Dial>
 </Response>`;
@@ -1265,7 +1265,7 @@ router.post("/twilio/name-recorded", async (req, res): Promise<void> => {
   res.set("Content-Type", "text/xml");
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial${callerIdAttr}${recordAttr} timeout="${ringCount * 5}">
+  <Dial${callerIdAttr}${recordAttr} timeout="${Math.max(1, Math.min(5, ringCount)) * 5}">
     <Number url="${nameScreenUrl}">${escapeXml(fwdTo)}</Number>
   </Dial>
   <Redirect method="POST">${fallbackUrl}</Redirect>
