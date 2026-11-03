@@ -10,6 +10,7 @@ const prices: Record<string, string> = {
   plus: "price_1UXTBdK5sDJyhAaef4tMLWJW",
   pro: "price_1UXTBfK5sDJyhAaeZIKCCcG2",
 };
+const expectedCents: Record<string,number> = {payg:900,starter:1900,business:3900,plus:6900,pro:11900};
 const supported = new Set(["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted", "invoice.paid", "invoice.payment_failed"]);
 const billingEnabled = () => process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED === "true";
 const stripeKey = () => process.env.CALLINGAGENT_STRIPE_SECRET_KEY || "";
@@ -53,8 +54,8 @@ router.post("/billing/checkout", async (req, res) => {
   const priceId = prices[slug];
   if (!priceId) { res.status(400).json({ error: "Unknown package" }); return; }
   try {
-    const available = await pool.query("SELECT price_cents,is_enabled,is_published FROM ca_plans WHERE slug=$1", [slug]);
-    if (!available.rows[0]?.is_enabled || !available.rows[0]?.is_published) { res.status(403).json({error:"Plan unavailable"}); return; }
+    const available = await pool.query("SELECT price_cents,is_enabled,is_published,checkout_enabled FROM ca_plans WHERE slug=$1", [slug]);
+    if (!available.rows[0]?.is_enabled || !available.rows[0]?.is_published || !available.rows[0]?.checkout_enabled || Number(available.rows[0]?.price_cents) !== expectedCents[slug]) { res.status(403).json({error:"Plan unavailable for checkout"}); return; }
     const existing = await pool.query("SELECT stripe_customer_id,status FROM ca_stripe_subscriptions WHERE company_id=$1", [req.user.companyId]);
     if (existing.rows[0] && !["canceled","incomplete_expired"].includes(existing.rows[0].status)) {
       res.status(409).json({error:"This company already has a subscription. Use the billing portal for changes."}); return;
