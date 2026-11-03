@@ -18,6 +18,18 @@ const billingEnabled = () =>
   Boolean(process.env.CALLINGAGENT_STRIPE_SECRET_KEY) &&
   Boolean(process.env.CALLINGAGENT_STRIPE_WEBHOOK_SECRET);
 const stripeKey = () => process.env.CALLINGAGENT_STRIPE_SECRET_KEY || "";
+const expectedStripeAccountId = "acct_1UXSv6K5sDJyhAae";
+async function confirmCallingAgentMerchant(): Promise<void> {
+  const key = stripeKey();
+  // Never create a live customer subscription using a test key or a different merchant.
+  if (!/^(sk_live_|rk_live_)/.test(key)) throw new Error("A live CallingAgent Stripe API key is required");
+  const response = await fetch("https://api.stripe.com/v1/account",{
+    headers:{Authorization:"Bearer "+key},signal:AbortSignal.timeout(10000)
+  });
+  if(!response.ok) throw new Error("Cannot verify the connected Stripe merchant");
+  const account:any = await response.json();
+  if(account.id!==expectedStripeAccountId) throw new Error("Stripe key belongs to a different business account");
+}
 async function stripeRequest(path: string, params: URLSearchParams) {
   const key = stripeKey();
   if (!key) throw new Error("Stripe secret key not configured");
@@ -60,6 +72,7 @@ router.post("/billing/checkout", async (req, res) => {
   const priceId = prices[slug];
   if (!priceId) { res.status(400).json({ error: "Unknown package" }); return; }
   try {
+    await confirmCallingAgentMerchant();
     const available = await pool.query("SELECT price_cents,is_enabled,is_published,checkout_enabled FROM ca_plans WHERE slug=$1", [slug]);
     if (!available.rows[0]?.is_enabled || !available.rows[0]?.is_published || !available.rows[0]?.checkout_enabled || Number(available.rows[0]?.price_cents) !== expectedCents[slug]) { res.status(403).json({error:"Plan unavailable for checkout"}); return; }
     const pending = await pool.query("SELECT 1 FROM ca_stripe_checkout_intents WHERE company_id=$1 AND subscription_id IS NULL AND created_at > now()-interval '30 minutes' LIMIT 1",[req.user.companyId]);
@@ -99,6 +112,8 @@ router.get("/billing/readiness", async(req,res)=>{
     res.json({
       liveStripePricesMapped:Object.keys(prices).length===5,
       secretKeyConfigured:Boolean(stripeKey()),
+      liveKeyFormatValid:/^(sk_live_|rk_live_)/.test(stripeKey()),
+      expectedMerchant:expectedStripeAccountId,
       webhookSecretConfigured:Boolean(process.env.CALLINGAGENT_STRIPE_WEBHOOK_SECRET),
       entitlementEnforcementCertified:process.env.CALLINGAGENT_STRIPE_ENTITLEMENTS_CERTIFIED==="true",
       globalCheckoutApproved:process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED==="true",
@@ -133,6 +148,7 @@ router.post("/billing/portal", async (req, res) => {
   try {
     const result=await pool.query("SELECT stripe_customer_id FROM ca_stripe_subscriptions WHERE company_id=$1",[req.user.companyId]);
     if(!result.rowCount){res.status(404).json({error:"No Stripe subscription found for this company"});return;}
+    await confirmCallingAgentMerchant();
     const params=new URLSearchParams({customer:result.rows[0].stripe_customer_id,return_url:"https://callingagent.ca/"});
     const session=await stripeRequest("billing_portal/sessions",params);
     if(!session?.url)throw Error("Stripe portal URL unavailable");
