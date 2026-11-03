@@ -3,6 +3,7 @@ import { Plus, Save, Trash2, ShieldCheck, AlertTriangle, RefreshCw } from "lucid
 
 type Plan={id:number;slug:string;name:string;priceCents:number;monthlyMinutes:number;includedNumbers:number;features:string[];description:string;isPublished:boolean;isEnabled:boolean;checkoutEnabled:boolean;sortOrder:number};
 type BillingReadiness={stripePriceVerificationIssues?:string[];telnyxCallCostWebhookEnabled:boolean|null;telnyxVoiceWebhookCorrect:boolean|null;telnyxConfigurationWarning:string|null;liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;liveMerchantVerified:boolean;merchantVerificationWarning:string|null;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;carrierUsageVerified:boolean;automaticProvisioningCertified:boolean;productionSnapshot:{existingCompanies:number;subscriptionsRecorded:number;activePhoneLines:number;activeTwilioLines:number;activeUnattributedLines:number;currentMonthCallRecords:number;currentMonthCallsMissingDuration:number};plans:{slug:string;checkoutEnabled:boolean}[]};
+type LaunchAudit={merchantVerified:boolean;liveStripePricesVerified:boolean;checkoutEnabled:boolean;plans:{slug:string;amountMatchesStripeMapping:boolean;stripePriceVerified:boolean;monthlyMinutes:number;includedNumbers:number;checkoutApproved:boolean}[];metrics:{subscriptions:number;checkout_intents:number;telnyx_cost_legs:number;monthly_calls:number;missing_call_durations:number};issues:string[];verdict:string;chargeAttempted:boolean;phoneProvisioningAttempted:boolean};
 const featureNames:Record<string,string>={numbers:"Phone numbers",forwarding:"Call forwarding",voicemail:"Voicemail",email_alerts:"Email alerts",call_logs:"Call logs",extensions:"Extensions",ai_receptionist:"AI receptionist",sms:"SMS",appointments:"Appointments"};
 const empty:Plan={id:0,slug:"",name:"",priceCents:0,monthlyMinutes:0,includedNumbers:1,features:["numbers"],description:"",isPublished:false,isEnabled:false,checkoutEnabled:false,sortOrder:10};
 export default function PlanManagement(){
@@ -16,6 +17,19 @@ export default function PlanManagement(){
  const [readinessLoading,setReadinessLoading]=useState(false);
  const [readinessCheckedAt,setReadinessCheckedAt]=useState("");
  const [readinessMessage,setReadinessMessage]=useState("");
+ const [launchAudit,setLaunchAudit]=useState<LaunchAudit|null>(null);
+ const [launchAuditError,setLaunchAuditError]=useState("");
+ const [launchAuditBusy,setLaunchAuditBusy]=useState(false);
+ async function runLaunchAudit(){
+  setLaunchAuditBusy(true);setLaunchAuditError("");
+  try {
+    const response=await fetch("/api/billing/launch-audit",{credentials:"include",cache:"no-store"});
+    const body=await response.json();
+    if(!response.ok||!Array.isArray(body.issues))throw Error(body.error||"Launch audit failed");
+    setLaunchAudit(body);
+  }catch(e:any){setLaunchAuditError(e?.message||"Launch audit unavailable");}
+  finally{setLaunchAuditBusy(false);}
+ }
  async function loadReadiness(){
   setReadinessLoading(true);setReadinessMessage("");
   try{
@@ -79,6 +93,17 @@ export default function PlanManagement(){
      {readinessError&&<p role="alert" className="mt-3 text-red-700">{readinessError}</p>}
      <button type="button" disabled={readinessLoading} aria-busy={readinessLoading} onClick={()=>void loadReadiness()} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold disabled:cursor-wait disabled:opacity-60"><RefreshCw className={readinessLoading?"h-4 w-4 animate-spin":"h-4 w-4"}/>{readinessLoading?"Checking readiness…":"Recheck readiness"}</button>
      <p className="mt-2 text-xs text-amber-950" role="status" aria-live="polite">{readinessLoading?"Contacting the billing server…":readinessMessage}{readinessCheckedAt&&!readinessLoading?" Last checked: "+readinessCheckedAt+" (your local time).":""}</p>
+     <div className="mt-4 border-t border-amber-200 pt-3">
+      <button type="button" disabled={launchAuditBusy} onClick={()=>void runLaunchAudit()} className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold disabled:opacity-60">{launchAuditBusy?"Auditing live billing…":"Run full launch audit (no charges)"}</button>
+      {launchAuditError&&<p className="mt-2 text-xs text-red-700" role="alert">{launchAuditError}</p>}
+      {launchAudit&&<div className="mt-3 rounded-lg bg-white/90 p-3 text-sm">
+       <p className="font-semibold">Live Stripe checkout: {launchAudit.checkoutEnabled?"Enabled":"Disabled"} · Merchant: {launchAudit.merchantVerified?"Verified":"Not verified"}</p>
+       <p className="mt-1 text-xs">This audit cannot charge a card or purchase a phone number.</p>
+       <div className="mt-2 grid gap-1 sm:grid-cols-2">{launchAudit.plans.map(plan=><p key={plan.slug} className="text-xs">{plan.slug}: {plan.amountMatchesStripeMapping&&plan.stripePriceVerified?"Stripe price verified":"Price needs attention"} · {plan.includedNumbers} numbers · {plan.monthlyMinutes} minutes</p>)}</div>
+       <p className="mt-3 font-semibold">Launch blockers ({launchAudit.issues.length})</p>
+       <ul className="mt-1 list-inside list-disc space-y-1 text-xs">{launchAudit.issues.map((issue,index)=><li key={index}>{issue}</li>)}</ul>
+      </div>}
+     </div>
    </div>
    {error&&<div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</div>}
    {notice&&<div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</div>}
