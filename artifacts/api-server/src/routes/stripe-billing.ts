@@ -3,7 +3,6 @@ import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 
 const router: IRouter = Router();
-const stripeAccount = "acct_1UXSv6K5sDJyhAae";
 const prices: Record<string, string> = {
   payg: "price_1UXTBYK5sDJyhAaePgEaz4K3",
   starter: "price_1UXTBaK5sDJyhAae0rWx2ULM",
@@ -37,6 +36,11 @@ export async function ensureStripeBillingSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS ca_stripe_events (
     event_id text PRIMARY KEY, received_at timestamptz NOT NULL DEFAULT now()
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS ca_stripe_checkout_intents (
+    session_id text PRIMARY KEY, company_id integer NOT NULL, plan_slug text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(), subscription_id text
+  )`);
+  await pool.query(`ALTER TABLE ca_stripe_subscriptions ADD COLUMN IF NOT EXISTS last_event_created bigint NOT NULL DEFAULT 0`);
 }
 // Only authenticated company administrators can start their own company's checkout.
 // The kill switch is deliberately OFF until provisioning and usage enforcement are certified.
@@ -51,7 +55,10 @@ router.post("/billing/checkout", async (req, res) => {
   try {
     const available = await pool.query("SELECT price_cents,is_enabled,is_published FROM ca_plans WHERE slug=$1", [slug]);
     if (!available.rows[0]?.is_enabled || !available.rows[0]?.is_published) { res.status(403).json({error:"Plan unavailable"}); return; }
-    const existing = await pool.query("SELECT stripe_customer_id FROM ca_stripe_subscriptions WHERE company_id=$1", [req.user.companyId]);
+    const existing = await pool.query("SELECT stripe_customer_id,status FROM ca_stripe_subscriptions WHERE company_id=$1", [req.user.companyId]);
+    if (existing.rows[0] && !["canceled","incomplete_expired"].includes(existing.rows[0].status)) {
+      res.status(409).json({error:"This company already has a subscription. Use the billing portal for changes."}); return;
+    }
     const companyId = String(req.user.companyId);
     const params = new URLSearchParams({
       mode: "subscription",
@@ -67,6 +74,8 @@ router.post("/billing/checkout", async (req, res) => {
     });
     if (existing.rows[0]?.stripe_customer_id) params.set("customer", existing.rows[0].stripe_customer_id);
     const session = await stripeRequest("checkout/sessions", params);
+    if (!session?.id || !session?.url) throw new Error("Stripe checkout session has no URL");
+    await pool.query("INSERT INTO ca_stripe_checkout_intents(session_id,company_id,plan_slug) VALUES($1,$2,$3) ON CONFLICT DO NOTHING", [session.id, req.user.companyId,slug]);
     res.json({ url: session.url });
   } catch (err: any) {
     req.log.error({ error: err.message }, "Stripe checkout failed");
@@ -83,7 +92,60 @@ function verifySignature(raw: Buffer, header: string, secret: string) {
     return /^[a-f0-9]{64}$/.test(value) && crypto.timingSafeEqual(Buffer.from(value, "hex"), Buffer.from(expected, "hex"));
   });
 }
-// Event storage is an audit ledger, not entitlement activation; that remains gated.
+// Billing events update an internal status ledger only. They never provision, suspend,
+// purchase or release a phone number; that requires separately certified enforcement.
+function subscriptionPriceId(subscription: any): string | null {
+  return subscription?.items?.data?.[0]?.price?.id || null;
+}
+async function applyStripeEvent(event: any): Promise<void> {
+  const kind = String(event.type || "");
+  const object = event?.data?.object;
+  if (!object?.id) return;
+  if (kind === "checkout.session.completed") {
+    if (object.mode !== "subscription" || !object.subscription || !object.customer) return;
+    const pending = await pool.query("SELECT company_id,plan_slug,subscription_id FROM ca_stripe_checkout_intents WHERE session_id=$1", [object.id]);
+    const intent = pending.rows[0];
+    if (!intent || (intent.subscription_id && intent.subscription_id !== object.subscription)) return;
+    const expected = prices[String(intent.plan_slug)];
+    if (!expected) return;
+    // Retrieve the subscription directly from Stripe rather than trust browser redirects or client metadata.
+    const key = stripeKey();
+    if (!key) throw new Error("Stripe secret key unavailable for subscription verification");
+    const response = await fetch("https://api.stripe.com/v1/subscriptions/" + encodeURIComponent(object.subscription) + "?expand[]=items.data.price", {
+      headers: { Authorization: "Bearer " + key }, signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) throw new Error("Unable to verify subscription with Stripe");
+    const sub: any = await response.json();
+    if (sub.customer !== object.customer || subscriptionPriceId(sub) !== expected) throw new Error("Checkout subscription did not match selected plan");
+    await pool.query(`INSERT INTO ca_stripe_subscriptions(company_id,stripe_customer_id,stripe_subscription_id,plan_slug,status,current_period_end,last_event_created)
+      VALUES($1,$2,$3,$4,$5,$6,$7)
+      ON CONFLICT(company_id) DO UPDATE SET
+      stripe_customer_id=EXCLUDED.stripe_customer_id,
+      stripe_subscription_id=EXCLUDED.stripe_subscription_id,
+      plan_slug=EXCLUDED.plan_slug,status=EXCLUDED.status,current_period_end=EXCLUDED.current_period_end,
+      last_event_created=EXCLUDED.last_event_created,updated_at=now()`, [
+      intent.company_id,sub.customer,sub.id,intent.plan_slug,sub.status,
+      Number.isFinite(sub.current_period_end) ? new Date(sub.current_period_end*1000) : null,
+      event.created || 0,
+    ]);
+    await pool.query("UPDATE ca_stripe_checkout_intents SET subscription_id=$2 WHERE session_id=$1", [object.id,sub.id]);
+    return;
+  }
+  if (kind.startsWith("customer.subscription.")) {
+    const current = await pool.query("SELECT company_id,last_event_created FROM ca_stripe_subscriptions WHERE stripe_subscription_id=$1", [object.id]);
+    if (!current.rowCount || Number(current.rows[0].last_event_created) > Number(event.created || 0)) return;
+    const nextSlug = Object.entries(prices).find(([,id])=>id===subscriptionPriceId(object))?.[0];
+    if (!nextSlug) return;
+    await pool.query(`UPDATE ca_stripe_subscriptions SET status=$2,plan_slug=$3,current_period_end=$4,
+      last_event_created=$5,updated_at=now()
+      WHERE stripe_subscription_id=$1 AND last_event_created<=$5`,[
+      object.id,object.status,nextSlug,
+      Number.isFinite(object.current_period_end) ? new Date(object.current_period_end*1000) : null,
+      event.created || 0,
+    ]);
+  }
+}
+
 router.post("/billing/stripe-webhook", async (req, res) => {
   const secret = process.env.CALLINGAGENT_STRIPE_WEBHOOK_SECRET;
   const raw = (req as typeof req & {rawBody?: Buffer}).rawBody;
@@ -95,8 +157,12 @@ router.post("/billing/stripe-webhook", async (req, res) => {
     if (typeof event.id !== "string" || !supported.has(event.type) || event.livemode !== true) {
       res.json({received:true}); return;
     }
-    await pool.query("INSERT INTO ca_stripe_events(event_id) VALUES($1) ON CONFLICT DO NOTHING", [event.id]);
-    req.log.info({ eventType:event.type, eventId:event.id }, "Verified Stripe billing event received");
+    const prior = await pool.query("SELECT event_id FROM ca_stripe_events WHERE event_id=$1", [event.id]);
+    if (!prior.rowCount) {
+      await applyStripeEvent(event);
+      await pool.query("INSERT INTO ca_stripe_events(event_id) VALUES($1) ON CONFLICT DO NOTHING", [event.id]);
+    }
+    req.log.info({ eventType:event.type, eventId:event.id }, "Verified Stripe billing event processed");
     res.json({received:true});
   } catch (err: any) {
     req.log.error({error:err.message}, "Stripe webhook processing failed");
