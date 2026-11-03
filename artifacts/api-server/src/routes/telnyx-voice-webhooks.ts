@@ -244,6 +244,19 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
   const id = payload?.call_control_id;
   if (typeof type !== "string" || typeof id !== "string" || !id) { res.status(400).end(); return; }
 
+  // Unlike latency-sensitive live voice events, carrier cost reports
+  // must reach durable storage before being acknowledged. A 5xx prompts
+  // Telnyx to retry; the leg-id upsert handles repeat deliveries safely.
+  if (type === "call.cost") {
+    try {
+      await recordSignedTelnyxCost(event);
+      res.status(200).json({ received:true });
+    } catch(error:any){
+      req.log.error({ message:error?.message }, "Telnyx cost ledger write failed");
+      res.status(503).json({error:"Carrier cost ingestion unavailable"});
+    }
+    return;
+  }
   const eventId = event?.id;
   const now = Date.now();
   for (const [k, time] of seen) if (now - time > keepSeconds * 1000) seen.delete(k);
@@ -253,12 +266,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
   // Fast acknowledgment prevents carrier retries while Call Control runs.
   res.status(200).json({ received: true });
   try {
-    if (type === "call.cost") {
-      // Telnyx reports billed_duration_secs here, not in call.hangup.
-      // Persist signed carrier evidence per call leg; do not automatically
-      // change customer balances or route live calls based on this event.
-      await recordSignedTelnyxCost(event);
-    } else if (type === "call.answered" && clickToCallByLeg.has(id)) {
+    if (type === "call.answered" && clickToCallByLeg.has(id)) {
       const call = clickToCallByLeg.get(id)!;
       if (id === call.agent && call.stage === "calling_agent") {
         await action(id, "gather_using_speak", {
