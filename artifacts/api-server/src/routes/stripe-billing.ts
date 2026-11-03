@@ -208,6 +208,49 @@ router.get("/billing/readiness", async(req,res)=>{
     });
   }catch(err:any){req.log.error({error:err.message},"Billing readiness check failed");res.status(503).json({error:"Readiness unavailable"});}
 });
+// Verify each published product against the live Stripe account, catalog,
+// and delivery readiness without creating charges or subscriptions.
+router.get("/billing/launch-audit",async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Platform administrator access required"});return;}
+  try{
+    const issues:string[]=[];
+    let merchantVerified=false;
+    try{await confirmCallingAgentMerchant();merchantVerified=true;}
+    catch{issues.push("Live Stripe merchant API access could not be verified");}
+    const catalog=await pool.query("SELECT slug,price_cents,monthly_minutes,included_numbers,is_enabled,is_published,checkout_enabled FROM ca_plans ORDER BY sort_order,id");
+    const verifiedPrices=merchantVerified?await verifyLiveStripePrices():{ready:false,issues:["Stripe prices cannot be checked until merchant verification succeeds"]};
+    issues.push(...verifiedPrices.issues);
+    const totals=await pool.query(`SELECT
+      (SELECT COUNT(*)::integer FROM ca_stripe_subscriptions) AS subscriptions,
+      (SELECT COUNT(*)::integer FROM ca_stripe_checkout_intents) AS checkout_intents,
+      (SELECT COUNT(*)::integer FROM ca_telnyx_cost_legs) AS telnyx_cost_legs,
+      (SELECT COUNT(*)::integer FROM ca_telnyx_cost_legs WHERE billed_duration_secs IS NULL) AS telnyx_missing_durations,
+      (SELECT COUNT(*)::integer FROM call_logs WHERE created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS monthly_calls,
+      (SELECT COUNT(*)::integer FROM call_logs WHERE created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AND duration IS NULL) AS missing_call_durations`);
+    const metrics=totals.rows[0];
+    if(Number(metrics.missing_call_durations)>0)issues.push("Unmeasured call-log durations prevent reliable minute accounting");
+    if(!Number(metrics.telnyx_cost_legs))issues.push("No signed Telnyx carrier cost-leg records have been reconciled");
+    issues.push("Verified carrier-leg minute enforcement has not been certified");
+    issues.push("Automatic paid-customer number selection and provisioning has not been certified");
+    const plans=catalog.rows.map(p=>({
+      slug:p.slug,livePriceId:prices[p.slug]||null,amountMatchesStripeMapping:expectedCents[p.slug]===Number(p.price_cents),
+      monthlyMinutes:Number(p.monthly_minutes),includedNumbers:Number(p.included_numbers),
+      published:Boolean(p.is_published),enabled:Boolean(p.is_enabled),checkoutApproved:Boolean(p.checkout_enabled),
+      stripePriceVerified:merchantVerified&&verifiedPrices.ready&&Boolean(prices[p.slug])
+    }));
+    if(plans.some(p=>!p.amountMatchesStripeMapping))issues.push("At least one catalog amount differs from its mapped live Stripe price");
+    res.set("Cache-Control","no-store");
+    res.json({merchantVerified,liveStripePricesVerified:verifiedPrices.ready,
+      checkoutEnabled:billingEnabled(),
+      merchantId:expectedStripeAccountId,
+      plans,metrics,issues,
+      chargeAttempted:false,phoneProvisioningAttempted:false,
+      verdict:"not_certified_for_live_checkout"});
+  }catch(err:any){
+    req.log.error({message:err?.message},"Live billing launch audit failed");
+    res.status(503).json({error:"Launch audit unavailable"});
+  }
+});
 // Independent read-only Twilio call-leg audit. This deliberately does NOT
 // alter service access or certify customer billable minutes. Twilio's rated
 // invoice is still the financial source of truth.
