@@ -290,14 +290,15 @@ async function applyStripeEvent(event: any): Promise<void> {
     });
     if (!response.ok) throw new Error("Unable to verify subscription with Stripe");
     const sub: any = await response.json();
-    if (sub.customer !== object.customer || subscriptionPriceId(sub) !== expected) throw new Error("Checkout subscription did not match selected plan");
+    if (sub.livemode !== true || sub.customer !== object.customer || subscriptionPriceId(sub) !== expected) throw new Error("Checkout subscription did not match selected live plan");
     await pool.query(`INSERT INTO ca_stripe_subscriptions(company_id,stripe_customer_id,stripe_subscription_id,plan_slug,status,current_period_end,last_event_created)
       VALUES($1,$2,$3,$4,$5,$6,$7)
       ON CONFLICT(company_id) DO UPDATE SET
       stripe_customer_id=EXCLUDED.stripe_customer_id,
       stripe_subscription_id=EXCLUDED.stripe_subscription_id,
       plan_slug=EXCLUDED.plan_slug,status=EXCLUDED.status,current_period_end=EXCLUDED.current_period_end,
-      last_event_created=EXCLUDED.last_event_created,updated_at=now()`, [
+      last_event_created=EXCLUDED.last_event_created,updated_at=now()
+      WHERE ca_stripe_subscriptions.last_event_created <= EXCLUDED.last_event_created`, [
       intent.company_id,sub.customer,sub.id,intent.plan_slug,sub.status,
       Number.isFinite(sub.current_period_end) ? new Date(sub.current_period_end*1000) : null,
       event.created || 0,
@@ -342,10 +343,21 @@ router.post("/billing/stripe-webhook", async (req, res) => {
     if (typeof event.id !== "string" || !supported.has(event.type) || event.livemode !== true) {
       res.json({received:true}); return;
     }
-    const prior = await pool.query("SELECT event_id FROM ca_stripe_events WHERE event_id=$1", [event.id]);
-    if (!prior.rowCount) {
-      await applyStripeEvent(event);
-      await pool.query("INSERT INTO ca_stripe_events(event_id) VALUES($1) ON CONFLICT DO NOTHING", [event.id]);
+    // Serialize deliveries of the same event (and checkout/subscription updates)
+    // across Render workers. A session-level advisory lock is released in finally.
+    // This prevents simultaneous duplicate webhook deliveries from both applying.
+    const client = await pool.connect();
+    let locked = false;
+    try {
+      await client.query("SELECT pg_advisory_lock(820762101)"); locked = true;
+      const prior = await client.query("SELECT event_id FROM ca_stripe_events WHERE event_id=$1", [event.id]);
+      if (!prior.rowCount) {
+        await applyStripeEvent(event);
+        await client.query("INSERT INTO ca_stripe_events(event_id) VALUES($1) ON CONFLICT DO NOTHING", [event.id]);
+      }
+    } finally {
+      if (locked) await client.query("SELECT pg_advisory_unlock(820762101)").catch(() => {});
+      client.release();
     }
     req.log.info({ eventType:event.type, eventId:event.id }, "Verified Stripe billing event processed");
     res.json({received:true});
