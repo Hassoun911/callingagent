@@ -100,7 +100,7 @@ router.post("/billing/checkout", async (req, res) => {
     let lockHeld = false;
     try {
       await lockClient.query("SELECT pg_advisory_lock($1)",[advisoryKey]); lockHeld=true;
-      const pending = await lockClient.query("SELECT 1 FROM ca_stripe_checkout_intents WHERE company_id=$1 AND subscription_id IS NULL AND created_at > now()-interval '31 minutes' LIMIT 1",[req.user.companyId]);
+      const pending = await lockClient.query("SELECT 1 FROM ca_stripe_checkout_intents WHERE company_id=$1 AND subscription_id IS NULL AND created_at > now()-interval '33 minutes' LIMIT 1",[req.user.companyId]);
       if(pending.rowCount){res.status(409).json({error:"A checkout was started recently. Complete it or retry after it expires."});return;}
       const existing = await lockClient.query("SELECT stripe_customer_id,status FROM ca_stripe_subscriptions WHERE company_id=$1", [req.user.companyId]);
       if (existing.rows[0] && !["canceled","incomplete_expired"].includes(existing.rows[0].status)) {
@@ -115,9 +115,9 @@ router.post("/billing/checkout", async (req, res) => {
         "metadata[plan_slug]": slug,
         "subscription_data[metadata][company_id]": companyId,
         "subscription_data[metadata][plan_slug]": slug,
-        // Checkout will expire after 30 minutes so abandoned purchases cannot
+        // Checkout will expire after about 31 minutes so abandoned purchases cannot
         // create a second simultaneous subscription indefinitely.
-        expires_at: String(Math.floor(Date.now()/1000)+1800),
+        expires_at: String(Math.floor(Date.now()/1000)+1860),
         success_url: "https://callingagent.ca/portal/billing?checkout=return",
         cancel_url: "https://callingagent.ca/portal/billing?checkout=cancel",
       });
