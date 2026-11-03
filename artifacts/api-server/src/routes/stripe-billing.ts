@@ -82,6 +82,41 @@ router.post("/billing/checkout", async (req, res) => {
     res.status(502).json({ error: "Checkout could not be started" });
   }
 });
+// Company-only subscription reporting; never rely on the public package query
+// to decide whether a company has paid entitlements.
+router.get("/billing/status", async (req, res) => {
+  if (!req.user || !["company_admin","company_user","company_read_only"].includes(req.user.role) || !Number.isInteger(req.user.companyId)) {
+    res.status(403).json({error:"Company access required"}); return;
+  }
+  try {
+    const result = await pool.query("SELECT plan_slug,status,current_period_end,updated_at FROM ca_stripe_subscriptions WHERE company_id=$1",[req.user.companyId]);
+    const row=result.rows[0] || null;
+    res.set("Cache-Control","no-store");
+    res.json({ subscription:row ? {
+      plan:row.plan_slug,status:row.status,currentPeriodEnd:row.current_period_end,
+      updatedAt:row.updated_at
+    } : null,checkoutEnabled:billingEnabled() });
+  } catch(err:any) {
+    req.log.error({error:err.message},"Failed to retrieve company billing status");
+    res.status(503).json({error:"Billing status unavailable"});
+  }
+});
+router.post("/billing/portal", async (req, res) => {
+  if (req.user?.role !== "company_admin" || !Number.isInteger(req.user.companyId)) {
+    res.status(403).json({error:"Company administrator access required"}); return;
+  }
+  try {
+    const result=await pool.query("SELECT stripe_customer_id FROM ca_stripe_subscriptions WHERE company_id=$1",[req.user.companyId]);
+    if(!result.rowCount){res.status(404).json({error:"No Stripe subscription found for this company"});return;}
+    const params=new URLSearchParams({customer:result.rows[0].stripe_customer_id,return_url:"https://callingagent.ca/"});
+    const session=await stripeRequest("billing_portal/sessions",params);
+    if(!session?.url)throw Error("Stripe portal URL unavailable");
+    res.json({url:session.url});
+  }catch(err:any){
+    req.log.error({error:err.message},"Failed to create company billing portal session");
+    res.status(502).json({error:"Billing portal unavailable"});
+  }
+});
 function verifySignature(raw: Buffer, header: string, secret: string) {
   const chunks = Object.fromEntries(header.split(",").map(item => item.trim().split("=", 2)));
   const timestamp = Number(chunks.t);
