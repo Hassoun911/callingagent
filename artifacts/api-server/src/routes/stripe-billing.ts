@@ -92,30 +92,44 @@ router.post("/billing/checkout", async (req, res) => {
     await confirmCallingAgentMerchant();
     const available = await pool.query("SELECT price_cents,is_enabled,is_published,checkout_enabled FROM ca_plans WHERE slug=$1", [slug]);
     if (!available.rows[0]?.is_enabled || !available.rows[0]?.is_published || !available.rows[0]?.checkout_enabled || Number(available.rows[0]?.price_cents) !== expectedCents[slug]) { res.status(403).json({error:"Plan unavailable for checkout"}); return; }
-    const pending = await pool.query("SELECT 1 FROM ca_stripe_checkout_intents WHERE company_id=$1 AND subscription_id IS NULL AND created_at > now()-interval '30 minutes' LIMIT 1",[req.user.companyId]);
-    if(pending.rowCount){res.status(409).json({error:"A checkout was started recently. Please complete it or try again in 30 minutes."});return;}
-    const existing = await pool.query("SELECT stripe_customer_id,status FROM ca_stripe_subscriptions WHERE company_id=$1", [req.user.companyId]);
-    if (existing.rows[0] && !["canceled","incomplete_expired"].includes(existing.rows[0].status)) {
-      res.status(409).json({error:"This company already has a subscription. Use the billing portal for changes."}); return;
-    }
+    // Serialize Checkout creation per company. The lock protects the pending-
+    // session check and insert, avoiding duplicate paid sessions from parallel clicks.
+    const lockClient = await pool.connect();
     const companyId = String(req.user.companyId);
-    const params = new URLSearchParams({
-      mode: "subscription",
-      "line_items[0][price]": priceId,
-      "line_items[0][quantity]": "1",
-      client_reference_id: companyId,
-      "metadata[company_id]": companyId,
-      "metadata[plan_slug]": slug,
-      "subscription_data[metadata][company_id]": companyId,
-      "subscription_data[metadata][plan_slug]": slug,
-      success_url: "https://callingagent.ca/?billing=return",
-      cancel_url: "https://callingagent.ca/?billing=cancel",
-    });
-    if (existing.rows[0]?.stripe_customer_id) params.set("customer", existing.rows[0].stripe_customer_id);
-    const session = await stripeRequest("checkout/sessions", params);
-    if (!session?.id || !session?.url) throw new Error("Stripe checkout session has no URL");
-    await pool.query("INSERT INTO ca_stripe_checkout_intents(session_id,company_id,plan_slug) VALUES($1,$2,$3) ON CONFLICT DO NOTHING", [session.id, req.user.companyId,slug]);
-    res.json({ url: session.url });
+    const advisoryKey = 820762102 + req.user.companyId;
+    let lockHeld = false;
+    try {
+      await lockClient.query("SELECT pg_advisory_lock($1)",[advisoryKey]); lockHeld=true;
+      const pending = await lockClient.query("SELECT 1 FROM ca_stripe_checkout_intents WHERE company_id=$1 AND subscription_id IS NULL AND created_at > now()-interval '31 minutes' LIMIT 1",[req.user.companyId]);
+      if(pending.rowCount){res.status(409).json({error:"A checkout was started recently. Complete it or retry after it expires."});return;}
+      const existing = await lockClient.query("SELECT stripe_customer_id,status FROM ca_stripe_subscriptions WHERE company_id=$1", [req.user.companyId]);
+      if (existing.rows[0] && !["canceled","incomplete_expired"].includes(existing.rows[0].status)) {
+        res.status(409).json({error:"This company already has a subscription. Use the billing portal for changes."}); return;
+      }
+      const params = new URLSearchParams({
+        mode: "subscription",
+        "line_items[0][price]": priceId,
+        "line_items[0][quantity]": "1",
+        client_reference_id: companyId,
+        "metadata[company_id]": companyId,
+        "metadata[plan_slug]": slug,
+        "subscription_data[metadata][company_id]": companyId,
+        "subscription_data[metadata][plan_slug]": slug,
+        // Checkout will expire after 30 minutes so abandoned purchases cannot
+        // create a second simultaneous subscription indefinitely.
+        expires_at: String(Math.floor(Date.now()/1000)+1800),
+        success_url: "https://callingagent.ca/portal/billing?checkout=return",
+        cancel_url: "https://callingagent.ca/portal/billing?checkout=cancel",
+      });
+      if (existing.rows[0]?.stripe_customer_id) params.set("customer", existing.rows[0].stripe_customer_id);
+      const session = await stripeRequest("checkout/sessions", params);
+      if (!session?.id || !session?.url) throw new Error("Stripe checkout session has no URL");
+      await lockClient.query("INSERT INTO ca_stripe_checkout_intents(session_id,company_id,plan_slug) VALUES($1,$2,$3) ON CONFLICT DO NOTHING", [session.id, req.user.companyId,slug]);
+      res.json({ url: session.url });
+    } finally {
+      if(lockHeld) await lockClient.query("SELECT pg_advisory_unlock($1)",[advisoryKey]).catch(()=>{});
+      lockClient.release();
+    }
   } catch (err: any) {
     req.log.error({ error: err.message }, "Stripe checkout failed");
     res.status(502).json({ error: "Checkout could not be started" });
