@@ -3,6 +3,7 @@ import { Plus, Save, Trash2, ShieldCheck, AlertTriangle, RefreshCw } from "lucid
 
 type Plan={id:number;slug:string;name:string;priceCents:number;monthlyMinutes:number;includedNumbers:number;features:string[];description:string;isPublished:boolean;isEnabled:boolean;checkoutEnabled:boolean;sortOrder:number};
 type BillingReadiness={stripePriceVerificationIssues?:string[];telnyxCallCostWebhookEnabled:boolean|null;telnyxVoiceWebhookCorrect:boolean|null;telnyxConfigurationWarning:string|null;liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;liveMerchantVerified:boolean;merchantVerificationWarning:string|null;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;carrierUsageVerified:boolean;automaticProvisioningCertified:boolean;productionSnapshot:{existingCompanies:number;subscriptionsRecorded:number;activePhoneLines:number;activeTwilioLines:number;activeUnattributedLines:number;currentMonthCallRecords:number;currentMonthCallsMissingDuration:number};plans:{slug:string;checkoutEnabled:boolean}[]};
+type LaunchInterest={id:number;plan_slug:string;contact_name:string;email:string;phone:string|null;company_name:string|null;created_at:string};
 type FulfillmentItem={company_id:number;company_name:string;plan_slug:string;fulfillment_status:string;created_at:string;subscription_status:string|null;last_payment_status:string|null;active_numbers:number;included_numbers:number|null};
 type LaunchAudit={merchantVerified:boolean;liveStripePricesVerified:boolean;checkoutEnabled:boolean;plans:{slug:string;amountMatchesStripeMapping:boolean;stripePriceVerified:boolean;monthlyMinutes:number;includedNumbers:number;checkoutApproved:boolean}[];metrics:{subscriptions:number;checkout_intents:number;telnyx_cost_legs:number;monthly_calls:number;missing_call_durations:number};issues:string[];verdict:string;chargeAttempted:boolean;phoneProvisioningAttempted:boolean};
 const featureNames:Record<string,string>={numbers:"Phone numbers",forwarding:"Call forwarding",voicemail:"Voicemail",email_alerts:"Email alerts",call_logs:"Call logs",extensions:"Extensions",ai_receptionist:"AI receptionist",sms:"SMS",appointments:"Appointments"};
@@ -24,6 +25,19 @@ export default function PlanManagement(){
  const [fulfillmentQueue,setFulfillmentQueue]=useState<FulfillmentItem[]|null>(null);
  const [queueBusy,setQueueBusy]=useState(false);
  const [queueError,setQueueError]=useState("");
+ const [interestRequests,setInterestRequests]=useState<LaunchInterest[]|null>(null);
+ const [interestBusy,setInterestBusy]=useState(false);
+ const [interestError,setInterestError]=useState("");
+ async function loadInterestRequests(){
+   setInterestBusy(true);setInterestError("");
+   try {
+     const response=await fetch("/api/admin/launch-interest",{credentials:"include",cache:"no-store"});
+     const data=await response.json();
+     if(!response.ok||!Array.isArray(data.requests))throw Error(data.error||"Inquiries unavailable");
+     setInterestRequests(data.requests);
+   }catch(e:any){setInterestError(e?.message||"Could not load inquiries");}
+   finally{setInterestBusy(false);}
+ }
  async function loadFulfillmentQueue(){
   setQueueBusy(true);setQueueError("");
   try{
@@ -112,6 +126,17 @@ export default function PlanManagement(){
       {launchAuditError&&<p className="mt-2 text-xs text-red-700" role="alert">{launchAuditError}</p>}
       <button type="button" disabled={queueBusy} onClick={()=>void loadFulfillmentQueue()} className="ml-2 mt-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold disabled:opacity-60">{queueBusy?"Checking fulfillment…":"Review paid-customer provisioning queue"}</button>
       {queueError&&<p role="alert" className="mt-2 text-xs text-red-700">{queueError}</p>}
+      <button type="button" disabled={interestBusy} onClick={()=>void loadInterestRequests()} className="ml-2 mt-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold disabled:opacity-60">{interestBusy?"Loading inquiries…":"View package inquiries"}</button>
+      {interestError&&<p role="alert" className="mt-2 text-xs text-red-700">{interestError}</p>}
+      {interestRequests&&<div className="mt-2 rounded-lg bg-white/90 p-3">
+        <p className="text-sm font-semibold">Early-access inquiries ({interestRequests.length} most recent)</p>
+        {interestRequests.length===0?<p className="mt-2 text-xs">No new inquiries yet.</p>:<div className="mt-2 max-h-72 space-y-2 overflow-auto">
+          {interestRequests.map(item=><div key={item.id} className="rounded border p-2 text-xs">
+            <strong>{item.contact_name}</strong> · {item.plan_slug} · {item.company_name||"Business not specified"}
+            <p><a className="underline" href={"mailto:"+item.email}>{item.email}</a>{item.phone?" · "+item.phone:""} · {new Date(item.created_at).toLocaleString()}</p>
+          </div>)}
+        </div>}
+      </div>}
       {fulfillmentQueue&&<div className="mt-2 rounded-lg bg-white/90 p-3">
        <p className="text-sm font-semibold">Verified paid subscriptions awaiting operator review ({fulfillmentQueue.length})</p>
        <p className="mt-1 text-xs">Read-only queue. This page does not purchase numbers or suspend service.</p>
