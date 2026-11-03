@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db, phoneNumbersTable, companiesTable } from "@workspace/db";
 import { getCompanyScope } from "../lib/scope";
+import { newNumberAllowanceError } from "../lib/billing-entitlements";
 import {
   ListPhoneNumbersResponse,
   GetPhoneNumberResponse,
@@ -298,6 +299,8 @@ router.post("/phone-numbers/telnyx-order", async (req, res): Promise<void> => {
   }
   const [company] = await db.select().from(companiesTable).where(eq(companiesTable.id, companyId));
   if (!company) { res.status(404).json({ error: "Selected company was not found." }); return; }
+  const allowanceError=await newNumberAllowanceError(companyId);
+  if(allowanceError){res.status(409).json({error:allowanceError});return;}
   const number = req.body?.phoneNumber;
   if (typeof number !== "string" || !/^\+[1-9]\d{7,14}$/.test(number) || req.body?.confirmPurchase !== true) {
     res.status(400).json({ error: "Valid E.164 phone number and explicit confirmation required." });
@@ -399,6 +402,8 @@ router.post("/phone-numbers/telnyx-register-order", async (req, res): Promise<vo
       res.status(409).json({ error: "This phone number is already assigned to another company." }); return;
     }
     if (!existing) {
+      const allowanceError=await newNumberAllowanceError(companyId);
+      if(allowanceError){res.status(409).json({error:allowanceError});return;}
       await db.insert(phoneNumbersTable).values({
         number: phoneNumber, twilioSid: null, companyId, friendlyName: phoneNumber,
         callerIdName: company.name, answerMode: "forward", isActive: false,
@@ -610,6 +615,10 @@ router.post("/phone-numbers", async (req, res): Promise<void> => {
     ? await db.select().from(companiesTable).where(eq(companiesTable.id, data.companyId))
     : [];
   const aiDefaults = companyForDefaults ? companyAiDefaults(companyForDefaults) : null;
+  if (data.companyId != null) {
+    const allowanceError=await newNumberAllowanceError(data.companyId);
+    if(allowanceError){res.status(409).json({error:allowanceError});return;}
+  }
 
   // If purchasing from Twilio
   if (!twilioSid && data.number) {
@@ -722,6 +731,15 @@ router.patch("/phone-numbers/:id", async (req, res): Promise<void> => {
 
   const updateData: any = {};
   const body = parsed.data;
+  if (body.companyId != null) {
+    const [original] = await db.select({id:phoneNumbersTable.id,companyId:phoneNumbersTable.companyId})
+      .from(phoneNumbersTable).where(eq(phoneNumbersTable.id,params.data.id));
+    if(!original){res.status(404).json({error:"Phone number not found"});return;}
+    if(original.companyId!==body.companyId) {
+      const allowanceError=await newNumberAllowanceError(body.companyId);
+      if(allowanceError){res.status(409).json({error:allowanceError});return;}
+    }
+  }
   if (body.friendlyName != null) updateData.friendlyName = body.friendlyName;
   if (body.callerIdName != null) updateData.callerIdName = body.callerIdName;
   if (body.companyId !== undefined) updateData.companyId = body.companyId;
