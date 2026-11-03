@@ -30,6 +30,23 @@ async function confirmCallingAgentMerchant(): Promise<void> {
   const account:any = await response.json();
   if(account.id!==expectedStripeAccountId) throw new Error("Stripe key belongs to a different business account");
 }
+async function verifyLiveStripePrices(): Promise<{ready:boolean;issues:string[]}> {
+  const key=stripeKey();
+  const checks=await Promise.all(Object.entries(prices).map(async ([slug,id])=>{
+    try{
+      const response=await fetch("https://api.stripe.com/v1/prices/"+encodeURIComponent(id),{
+        headers:{Authorization:"Bearer "+key},signal:AbortSignal.timeout(10000)
+      });
+      if(!response.ok)return slug+": Stripe price unavailable";
+      const p:any=await response.json();
+      if(p.livemode!==true||p.active!==true||p.currency!=="cad"||p.unit_amount!==expectedCents[slug]||
+        p.recurring?.interval!=="month"||p.recurring?.interval_count!==1)return slug+": price details do not match catalog";
+      return null;
+    }catch{return slug+": Stripe price verification failed";}
+  }));
+  const issues=checks.filter((x):x is string=>typeof x==="string");
+  return {ready:issues.length===0,issues};
+}
 async function stripeRequest(path: string, params: URLSearchParams) {
   const key = stripeKey();
   if (!key) throw new Error("Stripe secret key not configured");
@@ -111,6 +128,9 @@ router.get("/billing/readiness", async(req,res)=>{
     let merchantVerificationWarning: string|null=null;
     try { await confirmCallingAgentMerchant(); liveMerchantVerified=true; }
     catch { merchantVerificationWarning="The CallingAgent merchant could not be verified with the configured API key."; }
+    const stripePrices=liveMerchantVerified
+      ? await verifyLiveStripePrices()
+      : {ready:false,issues:["Live Stripe merchant verification required"]};
     const plans=await pool.query("SELECT slug,checkout_enabled FROM ca_plans ORDER BY sort_order");
     const legacy=await pool.query(`SELECT
       (SELECT COUNT(*)::integer FROM companies) AS companies,
@@ -123,7 +143,8 @@ router.get("/billing/readiness", async(req,res)=>{
     `);
     res.set("Cache-Control","no-store");
     res.json({
-      liveStripePricesMapped:Object.keys(prices).length===5,
+      liveStripePricesMapped:stripePrices.ready,
+      stripePriceVerificationIssues:stripePrices.issues,
       secretKeyConfigured:Boolean(stripeKey()),
       liveKeyFormatValid:/^(sk_live_|rk_live_)/.test(stripeKey()),
       expectedMerchant:expectedStripeAccountId,
