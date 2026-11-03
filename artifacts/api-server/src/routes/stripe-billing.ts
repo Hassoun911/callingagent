@@ -108,6 +108,11 @@ router.get("/billing/readiness", async(req,res)=>{
   if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
   try{
     const plans=await pool.query("SELECT slug,checkout_enabled FROM ca_plans ORDER BY sort_order");
+    const legacy=await pool.query(`SELECT
+      (SELECT COUNT(*)::integer FROM companies) AS companies,
+      (SELECT COUNT(*)::integer FROM ca_stripe_subscriptions) AS subscribed_companies,
+      (SELECT COUNT(*)::integer FROM phone_numbers WHERE is_active IS TRUE) AS active_lines
+    `);
     res.set("Cache-Control","no-store");
     res.json({
       liveStripePricesMapped:Object.keys(prices).length===5,
@@ -120,6 +125,11 @@ router.get("/billing/readiness", async(req,res)=>{
       checkoutEnabled:billingEnabled(),
       carrierUsageVerified:false,
       automaticProvisioningCertified:false,
+      productionSnapshot:{
+        existingCompanies:legacy.rows[0].companies,
+        subscriptionsRecorded:legacy.rows[0].subscribed_companies,
+        activePhoneLines:legacy.rows[0].active_lines
+      },
       plans:plans.rows.map(p=>({slug:p.slug,checkoutEnabled:Boolean(p.checkout_enabled)}))
     });
   }catch(err:any){req.log.error({error:err.message},"Billing readiness check failed");res.status(503).json({error:"Readiness unavailable"});}
