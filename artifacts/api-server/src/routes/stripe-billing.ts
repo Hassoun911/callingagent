@@ -132,10 +132,23 @@ router.get("/billing/status", async (req, res) => {
     const result = await pool.query("SELECT plan_slug,status,current_period_end,updated_at,last_payment_status,last_payment_at FROM ca_stripe_subscriptions WHERE company_id=$1",[req.user.companyId]);
     const row=result.rows[0] || null;
     res.set("Cache-Control","no-store");
+    // This reports contractual limits, NOT metered consumption or provisioning.
+    // Never call these numbers "remaining minutes" until carrier-leg CDR
+    // reconciliation and hard-stop policy are independently certified.
+    const plan = row ? await pool.query(
+      "SELECT monthly_minutes,included_numbers,features FROM ca_plans WHERE slug=$1",
+      [row.plan_slug]
+    ) : null;
+    const limits = plan?.rows[0] || null;
     res.json({ subscription:row ? {
       plan:row.plan_slug,status:row.status,currentPeriodEnd:row.current_period_end,
       updatedAt:row.updated_at,lastPaymentStatus:row.last_payment_status,lastPaymentAt:row.last_payment_at
-    } : null,checkoutEnabled:billingEnabled() });
+    } : null, planLimits:limits ? {
+      includedMonthlyMinutes:limits.monthly_minutes,
+      includedNumbers:limits.included_numbers,
+      features:limits.features
+    } : null, usageCertified:false, provisioningCertified:false,
+      checkoutEnabled:billingEnabled() });
   } catch(err:any) {
     req.log.error({error:err.message},"Failed to retrieve company billing status");
     res.status(503).json({error:"Billing status unavailable"});
