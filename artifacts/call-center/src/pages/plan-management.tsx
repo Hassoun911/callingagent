@@ -3,6 +3,7 @@ import { Plus, Save, Trash2, ShieldCheck, AlertTriangle, RefreshCw } from "lucid
 
 type Plan={id:number;slug:string;name:string;priceCents:number;monthlyMinutes:number;includedNumbers:number;features:string[];description:string;isPublished:boolean;isEnabled:boolean;checkoutEnabled:boolean;sortOrder:number};
 type BillingReadiness={stripePriceVerificationIssues?:string[];telnyxCallCostWebhookEnabled:boolean|null;telnyxVoiceWebhookCorrect:boolean|null;telnyxConfigurationWarning:string|null;liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;liveMerchantVerified:boolean;merchantVerificationWarning:string|null;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;carrierUsageVerified:boolean;automaticProvisioningCertified:boolean;productionSnapshot:{existingCompanies:number;subscriptionsRecorded:number;activePhoneLines:number;activeTwilioLines:number;activeUnattributedLines:number;currentMonthCallRecords:number;currentMonthCallsMissingDuration:number};plans:{slug:string;checkoutEnabled:boolean}[]};
+type FulfillmentItem={company_id:number;company_name:string;plan_slug:string;fulfillment_status:string;created_at:string;subscription_status:string|null;last_payment_status:string|null;active_numbers:number;included_numbers:number|null};
 type LaunchAudit={merchantVerified:boolean;liveStripePricesVerified:boolean;checkoutEnabled:boolean;plans:{slug:string;amountMatchesStripeMapping:boolean;stripePriceVerified:boolean;monthlyMinutes:number;includedNumbers:number;checkoutApproved:boolean}[];metrics:{subscriptions:number;checkout_intents:number;telnyx_cost_legs:number;monthly_calls:number;missing_call_durations:number};issues:string[];verdict:string;chargeAttempted:boolean;phoneProvisioningAttempted:boolean};
 const featureNames:Record<string,string>={numbers:"Phone numbers",forwarding:"Call forwarding",voicemail:"Voicemail",email_alerts:"Email alerts",call_logs:"Call logs",extensions:"Extensions",ai_receptionist:"AI receptionist",sms:"SMS",appointments:"Appointments"};
 const empty:Plan={id:0,slug:"",name:"",priceCents:0,monthlyMinutes:0,includedNumbers:1,features:["numbers"],description:"",isPublished:false,isEnabled:false,checkoutEnabled:false,sortOrder:10};
@@ -20,6 +21,19 @@ export default function PlanManagement(){
  const [launchAudit,setLaunchAudit]=useState<LaunchAudit|null>(null);
  const [launchAuditError,setLaunchAuditError]=useState("");
  const [launchAuditBusy,setLaunchAuditBusy]=useState(false);
+ const [fulfillmentQueue,setFulfillmentQueue]=useState<FulfillmentItem[]|null>(null);
+ const [queueBusy,setQueueBusy]=useState(false);
+ const [queueError,setQueueError]=useState("");
+ async function loadFulfillmentQueue(){
+  setQueueBusy(true);setQueueError("");
+  try{
+    const response=await fetch("/api/billing/fulfillment-queue",{credentials:"include",cache:"no-store"});
+    const body=await response.json();
+    if(!response.ok||!Array.isArray(body.items))throw Error(body.error||"Fulfillment queue unavailable");
+    setFulfillmentQueue(body.items);
+  }catch(e:any){setQueueError(e?.message||"Could not load queue");}
+  finally{setQueueBusy(false);}
+ }
  async function runLaunchAudit(){
   setLaunchAuditBusy(true);setLaunchAuditError("");
   try {
@@ -96,6 +110,14 @@ export default function PlanManagement(){
      <div className="mt-4 border-t border-amber-200 pt-3">
       <button type="button" disabled={launchAuditBusy} onClick={()=>void runLaunchAudit()} className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold disabled:opacity-60">{launchAuditBusy?"Auditing live billing…":"Run full launch audit (no charges)"}</button>
       {launchAuditError&&<p className="mt-2 text-xs text-red-700" role="alert">{launchAuditError}</p>}
+      <button type="button" disabled={queueBusy} onClick={()=>void loadFulfillmentQueue()} className="ml-2 mt-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold disabled:opacity-60">{queueBusy?"Checking fulfillment…":"Review paid-customer provisioning queue"}</button>
+      {queueError&&<p role="alert" className="mt-2 text-xs text-red-700">{queueError}</p>}
+      {fulfillmentQueue&&<div className="mt-2 rounded-lg bg-white/90 p-3">
+       <p className="text-sm font-semibold">Verified paid subscriptions awaiting operator review ({fulfillmentQueue.length})</p>
+       <p className="mt-1 text-xs">Read-only queue. This page does not purchase numbers or suspend service.</p>
+       {fulfillmentQueue.length===0?<p className="mt-2 text-xs">No paid subscriptions require provisioning review.</p>:
+       <div className="mt-2 space-y-2">{fulfillmentQueue.map(item=><div key={item.company_id+":"+item.created_at} className="rounded border p-2 text-xs"><strong>{item.company_name}</strong> · {item.plan_slug} · {item.fulfillment_status}<p>Stripe: {item.subscription_status||"Unknown"} · Payment: {item.last_payment_status||"Unknown"} · Active numbers: {item.active_numbers}/{item.included_numbers??"—"}</p></div>)}</div>}
+      </div>}
       {launchAudit&&<div className="mt-3 rounded-lg bg-white/90 p-3 text-sm">
        <p className="font-semibold">Live Stripe checkout: {launchAudit.checkoutEnabled?"Enabled":"Disabled"} · Merchant: {launchAudit.merchantVerified?"Verified":"Not verified"}</p>
        <p className="mt-1 text-xs">This audit cannot charge a card or purchase a phone number.</p>
