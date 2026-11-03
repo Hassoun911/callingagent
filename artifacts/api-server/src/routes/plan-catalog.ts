@@ -46,7 +46,7 @@ export async function ensurePlanCatalog():Promise<void> {
 }
 const columns = "id,slug,name,price_cents AS \"priceCents\",monthly_minutes AS \"monthlyMinutes\",included_numbers AS \"includedNumbers\",features,description,is_published AS \"isPublished\",is_enabled AS \"isEnabled\",checkout_enabled AS \"checkoutEnabled\",sort_order AS \"sortOrder\"";
 const admin = (req:any,res:any) => {
-  if (!req.user || (req.user.role && req.user.role !== "super_admin")) {res.status(403).json({error:"Only the platform administrator can manage plans."});return false;}
+  if (!req.user || req.user.role !== "super_admin") {res.status(403).json({error:"Only the platform administrator can manage plans."});return false;}
   return true;
 };
 router.get("/public-plans", async (_req,res) => {
