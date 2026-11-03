@@ -115,7 +115,11 @@ router.get("/billing/readiness", async(req,res)=>{
     const legacy=await pool.query(`SELECT
       (SELECT COUNT(*)::integer FROM companies) AS companies,
       (SELECT COUNT(*)::integer FROM ca_stripe_subscriptions) AS subscribed_companies,
-      (SELECT COUNT(*)::integer FROM phone_numbers WHERE is_active IS TRUE) AS active_lines
+      (SELECT COUNT(*)::integer FROM phone_numbers WHERE is_active IS TRUE) AS active_lines,
+      (SELECT COUNT(*)::integer FROM phone_numbers WHERE is_active IS TRUE AND twilio_sid IS NOT NULL) AS active_twilio_lines,
+      (SELECT COUNT(*)::integer FROM phone_numbers WHERE is_active IS TRUE AND twilio_sid IS NULL) AS active_unattributed_lines,
+      (SELECT COUNT(*)::integer FROM call_logs WHERE created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS current_month_call_records,
+      (SELECT COUNT(*)::integer FROM call_logs WHERE created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AND duration IS NULL) AS current_month_missing_durations
     `);
     res.set("Cache-Control","no-store");
     res.json({
@@ -134,7 +138,11 @@ router.get("/billing/readiness", async(req,res)=>{
       productionSnapshot:{
         existingCompanies:legacy.rows[0].companies,
         subscriptionsRecorded:legacy.rows[0].subscribed_companies,
-        activePhoneLines:legacy.rows[0].active_lines
+        activePhoneLines:legacy.rows[0].active_lines,
+        activeTwilioLines:legacy.rows[0].active_twilio_lines,
+        activeUnattributedLines:legacy.rows[0].active_unattributed_lines,
+        currentMonthCallRecords:legacy.rows[0].current_month_call_records,
+        currentMonthCallsMissingDuration:legacy.rows[0].current_month_missing_durations
       },
       plans:plans.rows.map(p=>({slug:p.slug,checkoutEnabled:Boolean(p.checkout_enabled)}))
     });
