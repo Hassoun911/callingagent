@@ -19,7 +19,7 @@ export async function ensureTelnyxUsageSchema(){
   await pool.query("CREATE INDEX IF NOT EXISTS ca_telnyx_cost_legs_company_idx ON ca_telnyx_cost_legs(company_id,occurred_at)");
 }
 export async function attributeTelnyxSession(sessionId:unknown,companyId:number|null|undefined,lineId:number):Promise<void>{
-  if(typeof sessionId!=="string"||!sessionId||!Number.isSafeInteger(companyId)||!Number.isSafeInteger(lineId))return;
+  if(typeof sessionId!=="string"||!sessionId||typeof companyId!=="number"||!Number.isSafeInteger(companyId)||!Number.isSafeInteger(lineId))return;
   await pool.query(`INSERT INTO ca_telnyx_session_attribution(call_session_id,company_id,phone_number_id)
   VALUES($1,$2,$3) ON CONFLICT(call_session_id) DO NOTHING`,[sessionId,companyId,lineId]);
   // Late attribution: cost webhooks can arrive before other webhook deliveries.
