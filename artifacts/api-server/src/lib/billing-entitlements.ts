@@ -11,14 +11,16 @@ import { pool } from "@workspace/db";
 export async function newNumberAllowanceError(companyId: number, excludedPhoneId?: number): Promise<string | null> {
   if (!Number.isSafeInteger(companyId) || companyId <= 0) return null;
   const subscription = await pool.query(
-    `SELECT s.status,p.included_numbers AS included_limit
+    `SELECT s.status,s.last_payment_status,p.included_numbers AS included_limit
       FROM ca_stripe_subscriptions s
       LEFT JOIN ca_plans p ON p.slug=s.plan_slug WHERE s.company_id=$1`, [companyId]
   );
   if (!subscription.rowCount) return null; // Existing legacy customers unaffected.
   const row=subscription.rows[0];
-  if (!["active","trialing"].includes(String(row.status))) {
-    return "This company's subscription is not active. Number purchases and new assignments are unavailable.";
+  // The CallingAgent live catalog does not currently offer a free trial.
+  // An "active" Stripe flag by itself is not evidence that the first invoice paid.
+  if (row.status !== "active" || row.last_payment_status !== "paid") {
+    return "A verified active and paid subscription is required before adding another phone number.";
   }
   if (row.included_limit == null || Number(row.included_limit) < 1) {
     return "No verified number allowance was found for this subscription.";
