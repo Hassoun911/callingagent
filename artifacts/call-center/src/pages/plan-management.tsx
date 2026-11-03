@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, Save, Trash2, ShieldCheck, AlertTriangle, RefreshCw } from "lucide-react";
 
 type Plan={id:number;slug:string;name:string;priceCents:number;monthlyMinutes:number;includedNumbers:number;features:string[];description:string;isPublished:boolean;isEnabled:boolean;checkoutEnabled:boolean;sortOrder:number};
+type BillingReadiness={liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;plans:{slug:string;checkoutEnabled:boolean}[]};
 const featureNames:Record<string,string>={numbers:"Phone numbers",forwarding:"Call forwarding",voicemail:"Voicemail",email_alerts:"Email alerts",call_logs:"Call logs",extensions:"Extensions",ai_receptionist:"AI receptionist",sms:"SMS",appointments:"Appointments"};
 const empty:Plan={id:0,slug:"",name:"",priceCents:0,monthlyMinutes:0,includedNumbers:1,features:["numbers"],description:"",isPublished:false,isEnabled:false,checkoutEnabled:false,sortOrder:10};
 export default function PlanManagement(){
@@ -10,8 +11,18 @@ export default function PlanManagement(){
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
  const [busy,setBusy]=useState(false);
+ const [readiness,setReadiness]=useState<BillingReadiness|null>(null);
+ const [readinessError,setReadinessError]=useState("");
+ async function loadReadiness(){
+  try{
+   const r=await fetch("/api/billing/readiness",{credentials:"include"});
+   const data=await r.json();
+   if(!r.ok)throw Error(data.error||"Readiness unavailable");
+   setReadiness(data);setReadinessError("");
+  }catch(e:any){setReadiness(null);setReadinessError(e.message||"Readiness unavailable");}
+ }
  async function load(){try{const r=await fetch("/api/admin/plans",{credentials:"include"});const j=await r.json();if(!r.ok)throw Error(j.error||"Unable to fetch plans");setPlans(j);}catch(e:any){setError(e.message)}}
- useEffect(()=>{void load()},[]);
+ useEffect(()=>{void load();void loadReadiness()},[]);
  async function save(plan:Plan){
   setBusy(true);setError("");setNotice("");
   try {
@@ -28,7 +39,15 @@ export default function PlanManagement(){
  }
  return <div className="space-y-6">
    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-3xl font-bold">Package Manager</h1><p className="mt-1 text-sm text-muted-foreground">Create, edit, publish, disable, or remove CallingAgent packages.</p></div><button onClick={()=>setEditing({...empty})} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white"><Plus className="h-4 w-4"/>New plan</button></div>
-   <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><AlertTriangle className="h-5 w-5 shrink-0"/><p>Catalog management is available. Checkout, paid activation and minute enforcement are NOT live. A published plan can be viewed, but cannot yet be purchased.</p></div>
+   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+     <div className="flex items-center gap-2 font-bold"><AlertTriangle className="h-5 w-5 shrink-0"/>Live billing readiness</div>
+     <p className="mt-2">Publishing a package does not activate customer checkout. Carrier usage and automatic provisioning must be independently certified before live payments are allowed.</p>
+     {readiness && <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      {([["Stripe prices mapped",readiness.liveStripePricesMapped],["Live API key configured",readiness.secretKeyConfigured&&readiness.liveKeyFormatValid],["Stripe webhook signing secret",readiness.webhookSecretConfigured],["Entitlement enforcement certified",readiness.entitlementEnforcementCertified],["Global checkout approved",readiness.globalCheckoutApproved],["Customer checkout operational",readiness.checkoutEnabled]] as [string,boolean][]).map(([label,ok])=><div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-white/80 p-2"><span>{label}</span><span className={ok?"font-bold text-emerald-700":"font-bold text-amber-800"}>{ok?"Ready":"Pending"}</span></div>)}
+     </div>}
+     {readinessError&&<p role="alert" className="mt-3 text-red-700">{readinessError}</p>}
+     <button type="button" onClick={()=>void loadReadiness()} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold"><RefreshCw className="h-4 w-4"/>Recheck readiness</button>
+   </div>
    {error&&<div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</div>}
    {notice&&<div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</div>}
    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{plans.map(p=><div key={p.id} className="space-y-3 rounded-xl border bg-card p-5 shadow-sm"><div className="flex items-start justify-between gap-2"><div><h2 className="text-lg font-bold">{p.name}</h2><p className="text-xs text-muted-foreground">{p.slug}</p></div><span className={`rounded-full px-2 py-1 text-xs font-semibold ${p.isEnabled&&p.isPublished?"bg-emerald-50 text-emerald-700":"bg-slate-100 text-slate-600"}`}>{p.isEnabled&&p.isPublished?"Visible":"Hidden"}</span></div><div className="text-2xl font-bold">CA${(p.priceCents/100).toFixed(2)}<span className="text-xs font-normal text-muted-foreground"> / month</span></div><div className="text-sm">{p.monthlyMinutes.toLocaleString()} minutes · {p.includedNumbers} numbers</div><div className="flex flex-wrap gap-1">{p.features.map(f=><span key={f} className="rounded bg-blue-50 px-2 py-1 text-xs text-blue-700">{featureNames[f]||f}</span>)}</div><div className="flex gap-2"><button onClick={()=>setEditing({...p})} className="rounded-lg border px-4 py-2 text-sm font-semibold">Edit & restrictions</button><button title="Delete plan" aria-label={"Delete "+p.name} onClick={()=>remove(p)} className="rounded-lg border p-2 text-red-600"><Trash2 className="h-4 w-4"/></button></div></div>)}</div>
