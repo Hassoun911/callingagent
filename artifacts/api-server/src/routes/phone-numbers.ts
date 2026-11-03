@@ -437,6 +437,10 @@ router.post("/phone-numbers/telnyx-setup", async (req, res): Promise<void> => {
   if (registered && registered.companyId !== companyId) {
     res.status(409).json({ error: "Number is already assigned to another company." }); return;
   }
+  if (!registered) {
+    const allowanceError=await newNumberAllowanceError(companyId);
+    if(allowanceError){res.status(409).json({error:allowanceError});return;}
+  }
   const apiKey = process.env.TELNYX_API_KEY;
   const connectionId = process.env.TELNYX_CONNECTION_ID;
   const messagingProfileId = process.env.TELNYX_MESSAGING_PROFILE_ID;
