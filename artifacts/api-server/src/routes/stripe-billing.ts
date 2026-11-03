@@ -98,7 +98,35 @@ export async function ensureStripeBillingSchema() {
   await pool.query(`ALTER TABLE ca_stripe_subscriptions ADD COLUMN IF NOT EXISTS last_event_created bigint NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE ca_stripe_subscriptions ADD COLUMN IF NOT EXISTS last_payment_status text`);
   await pool.query(`ALTER TABLE ca_stripe_subscriptions ADD COLUMN IF NOT EXISTS last_payment_at timestamptz`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS ca_billing_fulfillment (
+    stripe_subscription_id text PRIMARY KEY,
+    company_id integer NOT NULL,
+    plan_slug text NOT NULL,
+    status text NOT NULL DEFAULT 'awaiting_review',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  await pool.query("CREATE INDEX IF NOT EXISTS ca_billing_fulfillment_status_idx ON ca_billing_fulfillment(status,created_at)");
+
 }
+// Operations queue only: no automatic number purchases or suspensions.
+router.get("/billing/fulfillment-queue",async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Platform administrator required"});return;}
+  try{
+    const result=await pool.query(`SELECT f.company_id,c.name AS company_name,
+      f.plan_slug,f.status AS fulfillment_status,f.created_at,
+      s.status AS subscription_status,s.last_payment_status,
+      (SELECT count(*)::integer FROM phone_numbers n WHERE n.company_id=f.company_id AND n.is_active IS TRUE) AS active_numbers,
+      p.included_numbers
+      FROM ca_billing_fulfillment f
+      JOIN companies c ON c.id=f.company_id
+      LEFT JOIN ca_stripe_subscriptions s ON s.stripe_subscription_id=f.stripe_subscription_id
+      LEFT JOIN ca_plans p ON p.slug=f.plan_slug
+      ORDER BY f.created_at DESC LIMIT 100`);
+    res.set("Cache-Control","no-store");
+    res.json({items:result.rows,automaticProvisioningEnabled:false});
+  }catch(error:any){req.log.error({error:error?.message},"Fulfillment queue unavailable");res.status(503).json({error:"Fulfillment queue unavailable"});}
+});
 // Only authenticated company administrators can start their own company's checkout.
 // The kill switch is deliberately OFF until provisioning and usage enforcement are certified.
 router.post("/billing/checkout", async (req, res) => {
@@ -492,6 +520,10 @@ async function applyStripeEvent(event: any): Promise<void> {
       event.created || 0,latestPayment,latestPayment==="paid" ? new Date() : null,
     ]);
     await pool.query("UPDATE ca_stripe_checkout_intents SET subscription_id=$2 WHERE session_id=$1", [object.id,sub.id]);
+    if(latestPayment==="paid" && sub.status==="active"){
+      await pool.query(`INSERT INTO ca_billing_fulfillment(stripe_subscription_id,company_id,plan_slug)
+        VALUES($1,$2,$3) ON CONFLICT(stripe_subscription_id) DO NOTHING`,[sub.id,intent.company_id,intent.plan_slug]);
+    }
     return;
   }
   if (kind === "invoice.paid" || kind === "invoice.payment_failed") {
@@ -499,10 +531,16 @@ async function applyStripeEvent(event: any): Promise<void> {
     const subscriptionId = typeof object.subscription === "string" ? object.subscription :
       object.parent?.subscription_details?.subscription;
     if (typeof subscriptionId !== "string") return;
-    await pool.query(`UPDATE ca_stripe_subscriptions SET last_payment_status=$2,last_payment_at=now(),
-      updated_at=now() WHERE stripe_subscription_id=$1`, [
+    const updated=await pool.query(`UPDATE ca_stripe_subscriptions SET last_payment_status=$2,last_payment_at=now(),
+      updated_at=now() WHERE stripe_subscription_id=$1 RETURNING company_id,plan_slug,status`, [
       subscriptionId,kind === "invoice.paid" ? "paid" : "failed"
     ]);
+    if(kind==="invoice.paid" && updated.rows[0]?.status==="active"){
+      await pool.query(`INSERT INTO ca_billing_fulfillment(stripe_subscription_id,company_id,plan_slug)
+        VALUES($1,$2,$3) ON CONFLICT(stripe_subscription_id) DO NOTHING`,[
+        subscriptionId,updated.rows[0].company_id,updated.rows[0].plan_slug
+      ]);
+    }
     return;
   }
   if (kind.startsWith("customer.subscription.")) {
