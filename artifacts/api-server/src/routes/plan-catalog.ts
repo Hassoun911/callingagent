@@ -52,7 +52,7 @@ const admin = (req:any,res:any) => {
 router.get("/public-plans", async (_req,res) => {
   try {
     const r=await pool.query(`SELECT ${columns} FROM ca_plans WHERE is_published=true AND is_enabled=true ORDER BY sort_order,id`);
-    res.json(r.rows.map(p=>{ const verified=withVerifiedStripePrice(p); return {...verified,checkoutEnabled:process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED === "true" && Boolean(p.checkoutEnabled) && Boolean(verified.stripePriceId)}; }));
+    res.json(r.rows.map(p=>{ const verified=withVerifiedStripePrice(p); return {...verified,checkoutEnabled:process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED === "true" && process.env.CALLINGAGENT_STRIPE_ENTITLEMENTS_CERTIFIED === "true" && Boolean(process.env.CALLINGAGENT_STRIPE_SECRET_KEY) && Boolean(process.env.CALLINGAGENT_STRIPE_WEBHOOK_SECRET) && Boolean(p.checkoutEnabled) && Boolean(verified.stripePriceId)}; }));
   } catch(err:any){res.status(503).json({error:"Plan catalog is unavailable"});}
 });
 router.get("/admin/plans",async(req,res)=>{
@@ -85,7 +85,7 @@ router.patch("/admin/plans/:id",async(req,res)=>{
 // gate. Default is off for all packages; plan changes reset it to off.
 router.patch("/admin/plans/:id/checkout",async(req,res)=>{
  if(!req.user || req.user.role!=="super_admin"){res.status(403).json({error:"Super administrator required"});return;}
- if(process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED!=="true"){res.status(503).json({error:"Checkout has not passed launch readiness"});return;}
+ if(process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED!=="true" || process.env.CALLINGAGENT_STRIPE_ENTITLEMENTS_CERTIFIED!=="true" || !process.env.CALLINGAGENT_STRIPE_SECRET_KEY || !process.env.CALLINGAGENT_STRIPE_WEBHOOK_SECRET){res.status(503).json({error:"Checkout has not passed launch readiness"});return;}
  const id=Number(req.params.id),enabled=req.body?.enabled;
  if(!Number.isSafeInteger(id)||id<=0||typeof enabled!=="boolean"){res.status(400).json({error:"Invalid checkout setting"});return;}
  try{
