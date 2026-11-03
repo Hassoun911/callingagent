@@ -107,6 +107,10 @@ router.post("/billing/checkout", async (req, res) => {
 router.get("/billing/readiness", async(req,res)=>{
   if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
   try{
+    let liveMerchantVerified=false;
+    let merchantVerificationWarning: string|null=null;
+    try { await confirmCallingAgentMerchant(); liveMerchantVerified=true; }
+    catch { merchantVerificationWarning="The CallingAgent merchant could not be verified with the configured API key."; }
     const plans=await pool.query("SELECT slug,checkout_enabled FROM ca_plans ORDER BY sort_order");
     const legacy=await pool.query(`SELECT
       (SELECT COUNT(*)::integer FROM companies) AS companies,
@@ -119,6 +123,8 @@ router.get("/billing/readiness", async(req,res)=>{
       secretKeyConfigured:Boolean(stripeKey()),
       liveKeyFormatValid:/^(sk_live_|rk_live_)/.test(stripeKey()),
       expectedMerchant:expectedStripeAccountId,
+      liveMerchantVerified,
+      merchantVerificationWarning,
       webhookSecretConfigured:Boolean(process.env.CALLINGAGENT_STRIPE_WEBHOOK_SECRET),
       entitlementEnforcementCertified:process.env.CALLINGAGENT_STRIPE_ENTITLEMENTS_CERTIFIED==="true",
       globalCheckoutApproved:process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED==="true",
