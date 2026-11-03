@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, Save, Trash2, ShieldCheck, AlertTriangle, RefreshCw } from "lucide-react";
 
 type Plan={id:number;slug:string;name:string;priceCents:number;monthlyMinutes:number;includedNumbers:number;features:string[];description:string;isPublished:boolean;isEnabled:boolean;checkoutEnabled:boolean;sortOrder:number};
-type BillingReadiness={liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;liveMerchantVerified:boolean;merchantVerificationWarning:string|null;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;carrierUsageVerified:boolean;automaticProvisioningCertified:boolean;productionSnapshot:{existingCompanies:number;subscriptionsRecorded:number;activePhoneLines:number};plans:{slug:string;checkoutEnabled:boolean}[]};
+type BillingReadiness={liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;liveMerchantVerified:boolean;merchantVerificationWarning:string|null;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;carrierUsageVerified:boolean;automaticProvisioningCertified:boolean;productionSnapshot:{existingCompanies:number;subscriptionsRecorded:number;activePhoneLines:number;activeTwilioLines:number;activeUnattributedLines:number;currentMonthCallRecords:number;currentMonthCallsMissingDuration:number};plans:{slug:string;checkoutEnabled:boolean}[]};
 const featureNames:Record<string,string>={numbers:"Phone numbers",forwarding:"Call forwarding",voicemail:"Voicemail",email_alerts:"Email alerts",call_logs:"Call logs",extensions:"Extensions",ai_receptionist:"AI receptionist",sms:"SMS",appointments:"Appointments"};
 const empty:Plan={id:0,slug:"",name:"",priceCents:0,monthlyMinutes:0,includedNumbers:1,features:["numbers"],description:"",isPublished:false,isEnabled:false,checkoutEnabled:false,sortOrder:10};
 export default function PlanManagement(){
@@ -69,6 +69,7 @@ export default function PlanManagement(){
         <span>Stripe subscriptions: <strong>{readiness.productionSnapshot?.subscriptionsRecorded??"—"}</strong></span>
       </div>
       <p className="mt-2 text-xs">Carrier usage metering: <strong>{readiness.carrierUsageVerified?"Verified":"Not certified"}</strong>. Automatic provisioning: <strong>{readiness.automaticProvisioningCertified?"Verified":"Not certified"}</strong>. These checks do not change existing phone service.</p>
+      <p className="mt-2 text-xs">Carrier coverage: <strong>{readiness.productionSnapshot?.activeTwilioLines ?? "—"} Twilio</strong> and <strong>{readiness.productionSnapshot?.activeUnattributedLines ?? "—"} not linked to Twilio</strong>. Current UTC month: <strong>{readiness.productionSnapshot?.currentMonthCallsMissingDuration ?? "—"}/{readiness.productionSnapshot?.currentMonthCallRecords ?? "—"}</strong> call records missing measured duration.</p>
      </div>}
      {readiness?.merchantVerificationWarning&&<p className="mt-3 text-xs text-red-700" role="status">{readiness.merchantVerificationWarning}</p>}
      {readinessError&&<p role="alert" className="mt-3 text-red-700">{readinessError}</p>}
