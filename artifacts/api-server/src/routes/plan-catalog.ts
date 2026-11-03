@@ -52,7 +52,7 @@ const admin = (req:any,res:any) => {
 router.get("/public-plans", async (_req,res) => {
   try {
     const r=await pool.query(`SELECT ${columns} FROM ca_plans WHERE is_published=true AND is_enabled=true ORDER BY sort_order,id`);
-    res.json(r.rows.map(p=>withVerifiedStripePrice({...p,checkoutEnabled:false}))); // checkout is intentionally unavailable until verified billing + caps
+    res.json(r.rows.map(p=>{ const verified=withVerifiedStripePrice(p); return {...verified,checkoutEnabled:process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED === "true" && Boolean(p.checkoutEnabled) && Boolean(verified.stripePriceId)}; }));
   } catch(err:any){res.status(503).json({error:"Plan catalog is unavailable"});}
 });
 router.get("/admin/plans",async(req,res)=>{
@@ -80,6 +80,22 @@ router.patch("/admin/plans/:id",async(req,res)=>{
  const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<=0){res.status(400).json({error:"Invalid plan ID"});return;}
  try {const p=validate(req.body);const r=await pool.query(`UPDATE ca_plans SET slug=$2,name=$3,price_cents=$4,monthly_minutes=$5,included_numbers=$6,features=$7::jsonb,description=$8,is_published=$9,is_enabled=$10,checkout_enabled=false,sort_order=$11,updated_at=now() WHERE id=$1 RETURNING id`,[id,p.slug,p.name,p.price,p.minutes,p.numbers,JSON.stringify(p.features),p.description,p.isPublished,p.isEnabled,p.order]);if(!r.rowCount){res.status(404).json({error:"Plan not found"});return;}res.json(r.rows[0]);}
  catch(e:any){res.status(e.code==="23505"?409:400).json({error:e.code==="23505"?"Plan slug already exists":e.message});}
+});
+// An explicit per-plan approval is required in addition to the global deployment
+// gate. Default is off for all packages; plan changes reset it to off.
+router.patch("/admin/plans/:id/checkout",async(req,res)=>{
+ if(!req.user || req.user.role!=="super_admin"){res.status(403).json({error:"Super administrator required"});return;}
+ if(process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED!=="true"){res.status(503).json({error:"Checkout has not passed launch readiness"});return;}
+ const id=Number(req.params.id),enabled=req.body?.enabled;
+ if(!Number.isSafeInteger(id)||id<=0||typeof enabled!=="boolean"){res.status(400).json({error:"Invalid checkout setting"});return;}
+ try{
+  const found=await pool.query("SELECT slug,price_cents,is_enabled,is_published FROM ca_plans WHERE id=$1",[id]);
+  const p=found.rows[0];if(!p){res.status(404).json({error:"Plan not found"});return;}
+  const verified=withVerifiedStripePrice({...p,priceCents:p.price_cents});
+  if(enabled && (!p.is_enabled||!p.is_published||!verified.stripePriceId)){res.status(409).json({error:"Plan is not eligible for verified checkout"});return;}
+  await pool.query("UPDATE ca_plans SET checkout_enabled=$2,updated_at=now() WHERE id=$1",[id,enabled]);
+  res.json({id,checkoutEnabled:enabled});
+ }catch(e:any){res.status(500).json({error:"Checkout approval could not be updated"});}
 });
 router.delete("/admin/plans/:id",async(req,res)=>{
  if(!admin(req,res))return;
