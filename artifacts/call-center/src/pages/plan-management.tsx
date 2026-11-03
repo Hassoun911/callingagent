@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, Save, Trash2, ShieldCheck, AlertTriangle, RefreshCw } from "lucide-react";
 
 type Plan={id:number;slug:string;name:string;priceCents:number;monthlyMinutes:number;includedNumbers:number;features:string[];description:string;isPublished:boolean;isEnabled:boolean;checkoutEnabled:boolean;sortOrder:number};
-type BillingReadiness={liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;plans:{slug:string;checkoutEnabled:boolean}[]};
+type BillingReadiness={liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;carrierUsageVerified:boolean;automaticProvisioningCertified:boolean;productionSnapshot:{existingCompanies:number;subscriptionsRecorded:number;activePhoneLines:number};plans:{slug:string;checkoutEnabled:boolean}[]};
 const featureNames:Record<string,string>={numbers:"Phone numbers",forwarding:"Call forwarding",voicemail:"Voicemail",email_alerts:"Email alerts",call_logs:"Call logs",extensions:"Extensions",ai_receptionist:"AI receptionist",sms:"SMS",appointments:"Appointments"};
 const empty:Plan={id:0,slug:"",name:"",priceCents:0,monthlyMinutes:0,includedNumbers:1,features:["numbers"],description:"",isPublished:false,isEnabled:false,checkoutEnabled:false,sortOrder:10};
 export default function PlanManagement(){
@@ -60,6 +60,15 @@ export default function PlanManagement(){
      <p className="mt-2">Publishing a package does not activate customer checkout. Carrier usage and automatic provisioning must be independently certified before live payments are allowed.</p>
      {readiness && <div className="mt-3 grid gap-2 sm:grid-cols-2">
       {([["Stripe prices mapped",readiness.liveStripePricesMapped],["Live API key configured",readiness.secretKeyConfigured&&readiness.liveKeyFormatValid],["Stripe webhook signing secret",readiness.webhookSecretConfigured],["Entitlement enforcement certified",readiness.entitlementEnforcementCertified],["Global checkout approved",readiness.globalCheckoutApproved],["Customer checkout operational",readiness.checkoutEnabled]] as [string,boolean][]).map(([label,ok])=><div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-white/80 p-2"><span>{label}</span><span className={ok?"font-bold text-emerald-700":"font-bold text-amber-800"}>{ok?"Ready":"Pending"}</span></div>)}
+     </div>}
+     {readiness&&<div className="mt-3 rounded-lg border border-amber-200 bg-white/80 p-3">
+      <p className="font-semibold">Production inventory (read-only)</p>
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <span>Companies: <strong>{readiness.productionSnapshot?.existingCompanies??"—"}</strong></span>
+        <span>Active lines: <strong>{readiness.productionSnapshot?.activePhoneLines??"—"}</strong></span>
+        <span>Stripe subscriptions: <strong>{readiness.productionSnapshot?.subscriptionsRecorded??"—"}</strong></span>
+      </div>
+      <p className="mt-2 text-xs">Carrier usage metering: <strong>{readiness.carrierUsageVerified?"Verified":"Not certified"}</strong>. Automatic provisioning: <strong>{readiness.automaticProvisioningCertified?"Verified":"Not certified"}</strong>. These checks do not change existing phone service.</p>
      </div>}
      {readinessError&&<p role="alert" className="mt-3 text-red-700">{readinessError}</p>}
      <button type="button" disabled={readinessLoading} aria-busy={readinessLoading} onClick={()=>void loadReadiness()} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold disabled:cursor-wait disabled:opacity-60"><RefreshCw className={readinessLoading?"h-4 w-4 animate-spin":"h-4 w-4"}/>{readinessLoading?"Checking readiness…":"Recheck readiness"}</button>
