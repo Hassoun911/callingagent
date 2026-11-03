@@ -12,7 +12,11 @@ const prices: Record<string, string> = {
 };
 const expectedCents: Record<string,number> = {payg:900,starter:1900,business:3900,plus:6900,pro:11900};
 const supported = new Set(["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted", "invoice.paid", "invoice.payment_failed"]);
-const billingEnabled = () => process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED === "true";
+const billingEnabled = () =>
+  process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED === "true" &&
+  process.env.CALLINGAGENT_STRIPE_ENTITLEMENTS_CERTIFIED === "true" &&
+  Boolean(process.env.CALLINGAGENT_STRIPE_SECRET_KEY) &&
+  Boolean(process.env.CALLINGAGENT_STRIPE_WEBHOOK_SECRET);
 const stripeKey = () => process.env.CALLINGAGENT_STRIPE_SECRET_KEY || "";
 async function stripeRequest(path: string, params: URLSearchParams) {
   const key = stripeKey();
@@ -82,6 +86,22 @@ router.post("/billing/checkout", async (req, res) => {
     req.log.error({ error: err.message }, "Stripe checkout failed");
     res.status(502).json({ error: "Checkout could not be started" });
   }
+});
+router.get("/billing/readiness", async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
+  try{
+    const plans=await pool.query("SELECT slug,checkout_enabled FROM ca_plans ORDER BY sort_order");
+    res.set("Cache-Control","no-store");
+    res.json({
+      liveStripePricesMapped:Object.keys(prices).length===5,
+      secretKeyConfigured:Boolean(stripeKey()),
+      webhookSecretConfigured:Boolean(process.env.CALLINGAGENT_STRIPE_WEBHOOK_SECRET),
+      entitlementEnforcementCertified:process.env.CALLINGAGENT_STRIPE_ENTITLEMENTS_CERTIFIED==="true",
+      globalCheckoutApproved:process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED==="true",
+      checkoutEnabled:billingEnabled(),
+      plans:plans.rows.map(p=>({slug:p.slug,checkoutEnabled:Boolean(p.checkout_enabled)}))
+    });
+  }catch(err:any){req.log.error({error:err.message},"Billing readiness check failed");res.status(503).json({error:"Readiness unavailable"});}
 });
 // Company-only subscription reporting; never rely on the public package query
 // to decide whether a company has paid entitlements.
