@@ -118,9 +118,58 @@ router.get("/billing/readiness", async(req,res)=>{
       entitlementEnforcementCertified:process.env.CALLINGAGENT_STRIPE_ENTITLEMENTS_CERTIFIED==="true",
       globalCheckoutApproved:process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED==="true",
       checkoutEnabled:billingEnabled(),
+      carrierUsageVerified:false,
+      automaticProvisioningCertified:false,
       plans:plans.rows.map(p=>({slug:p.slug,checkoutEnabled:Boolean(p.checkout_enabled)}))
     });
   }catch(err:any){req.log.error({error:err.message},"Billing readiness check failed");res.status(503).json({error:"Readiness unavailable"});}
+});
+// Read-only entitlement audit. This does not meter billable carrier legs or
+// activate service: existing customers without Stripe rows remain untouched.
+router.get("/billing/entitlements", async (req,res) => {
+  const role=req.user?.role;
+  if(!req.user || !["super_admin","company_admin","company_user","company_read_only"].includes(role||"")){
+    res.status(403).json({error:"Authenticated company access required"});return;
+  }
+  const isSuper=role==="super_admin";
+  const companyId=isSuper?Number(req.query.companyId):req.user?.companyId;
+  if(!Number.isSafeInteger(companyId)||companyId<=0){
+    res.status(400).json({error:"Valid company ID required"});return;
+  }
+  try{
+    const result=await pool.query(`
+      SELECT c.id AS company_id, c.name AS company_name,
+        s.plan_slug,s.status,s.current_period_end,
+        p.monthly_minutes,p.included_numbers,p.features,
+        (SELECT COUNT(*)::integer FROM phone_numbers n WHERE n.company_id=c.id) AS assigned_numbers,
+        (SELECT COUNT(*)::integer FROM phone_numbers n WHERE n.company_id=c.id AND n.is_active IS TRUE) AS active_numbers
+      FROM companies c
+      LEFT JOIN ca_stripe_subscriptions s ON s.company_id=c.id
+      LEFT JOIN ca_plans p ON p.slug=s.plan_slug
+      WHERE c.id=$1
+    `,[companyId]);
+    const row=result.rows[0];
+    if(!row){res.status(404).json({error:"Company not found"});return;}
+    const hasSubscription=Boolean(row.plan_slug);
+    const numberLimit=hasSubscription?Number(row.included_numbers):null;
+    const assigned=Number(row.assigned_numbers);
+    res.set("Cache-Control","no-store");
+    res.json({
+      companyId:row.company_id,companyName:row.company_name,
+      billingType:hasSubscription?"stripe":"legacy_unassigned",
+      subscription:hasSubscription?{plan:row.plan_slug,status:row.status,currentPeriodEnd:row.current_period_end}:null,
+      numbers:{assigned,active:Number(row.active_numbers),included:numberLimit,
+        withinAllowance:numberLimit===null?null:assigned<=numberLimit},
+      monthlyMinutes:row.monthly_minutes===null?null:Number(row.monthly_minutes),
+      enabledFeatures:row.features||[],
+      carrierUsageVerified:false,
+      automaticProvisioningCertified:false,
+      note:hasSubscription?"Allowances are catalog limits, not verified carrier usage.":"Existing line preserved; no Stripe subscription assigned.",
+    });
+  }catch(error:any){
+    req.log.error({message:error?.message},"Failed to audit company entitlements");
+    res.status(503).json({error:"Entitlement audit unavailable"});
+  }
 });
 // Company-only subscription reporting; never rely on the public package query
 // to decide whether a company has paid entitlements.
