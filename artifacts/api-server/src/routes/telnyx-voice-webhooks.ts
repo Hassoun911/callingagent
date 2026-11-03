@@ -3,6 +3,7 @@ import { createPublicKey, verify } from "node:crypto";
 import nodemailer from "nodemailer";
 import { eq } from "drizzle-orm";
 import { db, phoneNumbersTable, companiesTable, callLogsTable, extensionsTable } from "@workspace/db";
+import { recordSignedTelnyxCost, attributeTelnyxSession } from "../lib/telnyx-carrier-usage";
 
 const router: IRouter = Router();
 const seen = new Map<string, number>();
@@ -252,7 +253,12 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
   // Fast acknowledgment prevents carrier retries while Call Control runs.
   res.status(200).json({ received: true });
   try {
-    if (type === "call.answered" && clickToCallByLeg.has(id)) {
+    if (type === "call.cost") {
+      // Telnyx reports billed_duration_secs here, not in call.hangup.
+      // Persist signed carrier evidence per call leg; do not automatically
+      // change customer balances or route live calls based on this event.
+      await recordSignedTelnyxCost(event);
+    } else if (type === "call.answered" && clickToCallByLeg.has(id)) {
       const call = clickToCallByLeg.get(id)!;
       if (id === call.agent && call.stage === "calling_agent") {
         await action(id, "gather_using_speak", {
@@ -348,6 +354,7 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
         : [];
       req.log.info({ foundLine: Boolean(line), active: Boolean(line?.isActive), mode: line?.answerMode }, "Telnyx inbound routing decision");
       if (line) {
+        await attributeTelnyxSession(payload?.call_session_id,line.companyId,line.id);
         const logSid = "telnyx:" + id;
         const [prior] = await db.select().from(callLogsTable).where(eq(callLogsTable.twilioCallSid,logSid));
         if (!prior) await db.insert(callLogsTable).values({twilioCallSid:logSid,phoneNumberId:line.id,direction:"inbound",status:line.answerMode === "reject" ? "rejected" : "ringing",fromNumber:typeof payload?.from === "string" ? payload.from : "Unknown",toNumber:line.number,answerMode:line.answerMode});
