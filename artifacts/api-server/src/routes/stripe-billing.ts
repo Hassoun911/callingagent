@@ -46,6 +46,8 @@ export async function ensureStripeBillingSchema() {
     created_at timestamptz NOT NULL DEFAULT now(), subscription_id text
   )`);
   await pool.query(`ALTER TABLE ca_stripe_subscriptions ADD COLUMN IF NOT EXISTS last_event_created bigint NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE ca_stripe_subscriptions ADD COLUMN IF NOT EXISTS last_payment_status text`);
+  await pool.query(`ALTER TABLE ca_stripe_subscriptions ADD COLUMN IF NOT EXISTS last_payment_at timestamptz`);
 }
 // Only authenticated company administrators can start their own company's checkout.
 // The kill switch is deliberately OFF until provisioning and usage enforcement are certified.
@@ -60,6 +62,8 @@ router.post("/billing/checkout", async (req, res) => {
   try {
     const available = await pool.query("SELECT price_cents,is_enabled,is_published,checkout_enabled FROM ca_plans WHERE slug=$1", [slug]);
     if (!available.rows[0]?.is_enabled || !available.rows[0]?.is_published || !available.rows[0]?.checkout_enabled || Number(available.rows[0]?.price_cents) !== expectedCents[slug]) { res.status(403).json({error:"Plan unavailable for checkout"}); return; }
+    const pending = await pool.query("SELECT 1 FROM ca_stripe_checkout_intents WHERE company_id=$1 AND subscription_id IS NULL AND created_at > now()-interval '30 minutes' LIMIT 1",[req.user.companyId]);
+    if(pending.rowCount){res.status(409).json({error:"A checkout was started recently. Please complete it or try again in 30 minutes."});return;}
     const existing = await pool.query("SELECT stripe_customer_id,status FROM ca_stripe_subscriptions WHERE company_id=$1", [req.user.companyId]);
     if (existing.rows[0] && !["canceled","incomplete_expired"].includes(existing.rows[0].status)) {
       res.status(409).json({error:"This company already has a subscription. Use the billing portal for changes."}); return;
@@ -110,12 +114,12 @@ router.get("/billing/status", async (req, res) => {
     res.status(403).json({error:"Company access required"}); return;
   }
   try {
-    const result = await pool.query("SELECT plan_slug,status,current_period_end,updated_at FROM ca_stripe_subscriptions WHERE company_id=$1",[req.user.companyId]);
+    const result = await pool.query("SELECT plan_slug,status,current_period_end,updated_at,last_payment_status,last_payment_at FROM ca_stripe_subscriptions WHERE company_id=$1",[req.user.companyId]);
     const row=result.rows[0] || null;
     res.set("Cache-Control","no-store");
     res.json({ subscription:row ? {
       plan:row.plan_slug,status:row.status,currentPeriodEnd:row.current_period_end,
-      updatedAt:row.updated_at
+      updatedAt:row.updated_at,lastPaymentStatus:row.last_payment_status,lastPaymentAt:row.last_payment_at
     } : null,checkoutEnabled:billingEnabled() });
   } catch(err:any) {
     req.log.error({error:err.message},"Failed to retrieve company billing status");
@@ -185,6 +189,17 @@ async function applyStripeEvent(event: any): Promise<void> {
       event.created || 0,
     ]);
     await pool.query("UPDATE ca_stripe_checkout_intents SET subscription_id=$2 WHERE session_id=$1", [object.id,sub.id]);
+    return;
+  }
+  if (kind === "invoice.paid" || kind === "invoice.payment_failed") {
+    // Status is reported independently of the subscription's entitlement state.
+    const subscriptionId = typeof object.subscription === "string" ? object.subscription :
+      object.parent?.subscription_details?.subscription;
+    if (typeof subscriptionId !== "string") return;
+    await pool.query(`UPDATE ca_stripe_subscriptions SET last_payment_status=$2,last_payment_at=now(),
+      updated_at=now() WHERE stripe_subscription_id=$1`, [
+      subscriptionId,kind === "invoice.paid" ? "paid" : "failed"
+    ]);
     return;
   }
   if (kind.startsWith("customer.subscription.")) {
