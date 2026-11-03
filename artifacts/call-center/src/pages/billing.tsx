@@ -15,7 +15,7 @@ type TwilioPerNumber = {
 type CostData = {
   period: string;
   openai?: {available:boolean;totalCost?:number;currency?:string;error?:string;breakdown?:{model:string;cost:number}[]};
-  telnyx?: { available: boolean; totalCost: number | null; error: string; perNumber: {phoneNumber:string;friendlyName:string;cost:null;status:string}[] };
+  telnyx?: { available: boolean; totalCost: number | null; error: string; callCostEvidence?:{signedLegEvents:number;attributedLegEvents:number;billedSeconds:number;missingDurationEvents:number;latestReceivedAt:string|null;verifiedMoneyTotal:false;billingStatus:string}|null; perNumber: {phoneNumber:string;friendlyName:string;cost:null;status:string}[] };
   providerTotals?: { twilio: {totalCost:number;currency:string}|null; telnyx:{totalCost:null;currency:string}; combined:null;note:string };
   twilio:
     | { available: true; totalCost: number; currency: string; breakdown: { category: string; label: string; cost: number; usage: string; usageUnit: string }[]; perNumber: TwilioPerNumber[] }
@@ -131,8 +131,14 @@ export default function Billing() {
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-xs font-semibold text-muted-foreground">Telnyx · billing</p>
-            <p className="text-xl font-semibold mt-2">Not yet verified</p>
-            <p className="text-xs text-muted-foreground mt-1">{costs?.telnyx?.error ?? "Billing API not connected."}</p>
+            <p className="text-xl font-semibold mt-2">Monthly dollar charges unverified</p>
+            {costs?.telnyx?.callCostEvidence ? <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <p><strong className="text-foreground">{costs.telnyx.callCostEvidence.signedLegEvents}</strong> signed call-cost leg events received</p>
+              <p><strong className="text-foreground">{costs.telnyx.callCostEvidence.billedSeconds.toLocaleString()}</strong> billed carrier seconds recorded</p>
+              <p>{costs.telnyx.callCostEvidence.attributedLegEvents} attributed to companies; {costs.telnyx.callCostEvidence.missingDurationEvents} missing billed seconds</p>
+              <p>These events are not a complete carrier invoice or a certified minute cap.</p>
+            </div> : <p className="text-xs text-muted-foreground mt-1">Carrier event evidence unavailable.</p>}
+            <p className="text-xs text-muted-foreground mt-2">{costs?.telnyx?.error ?? "Billing API not connected."}</p>
             <a href="https://portal.telnyx.com/" target="_blank" rel="noreferrer" className="text-xs underline text-primary mt-2 inline-block">Open Telnyx monthly charges</a>
           </div>
           <div className="rounded-lg border border-border bg-card p-4 min-w-0">
@@ -159,7 +165,7 @@ export default function Billing() {
             </div>
             <div className="rounded-lg border border-border p-3">
               <p className="font-bold text-foreground">Telnyx</p>
-              <p className="text-sm text-muted-foreground mt-1">Actual charges not yet connected</p>
+              <p className="text-sm text-muted-foreground mt-1">Monthly money charges not yet connected{costs?.telnyx?.callCostEvidence ? ` · ${costs.telnyx.callCostEvidence.signedLegEvents} signed cost-leg events received` : ""}</p>
               <p className="mt-1 text-xs text-muted-foreground">Phone orders and carrier billing are separate from the search API.</p>
             </div>
             <div className="rounded-lg border border-border p-3">
