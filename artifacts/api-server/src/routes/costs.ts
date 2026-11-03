@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, phoneNumbersTable, aiVoiceConfigTable, companiesTable } from "@workspace/db";
+import { db, pool, phoneNumbersTable, aiVoiceConfigTable, companiesTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
@@ -216,7 +216,39 @@ router.get("/costs", async (req, res): Promise<void> => {
   // Only confirmed Twilio SID-backed lines can be attributed to Twilio.
   const savedLines = await db.select().from(phoneNumbersTable);
   const telnyxLines = savedLines.filter(n => !n.twilioSid);
+  // Signed provider call.cost webhooks provide billed seconds, not a verified
+  // monthly monetary invoice. Keep these distinct so account totals are never
+  // represented as paid/settled charges or as an enforceable minute balance.
+  let telnyxCallCostEvidence: {
+    signedLegEvents:number; attributedLegEvents:number; billedSeconds:number;
+    missingDurationEvents:number; latestReceivedAt:string|null;
+    verifiedMoneyTotal:false; billingStatus:string;
+  } | null = null;
+  try {
+    const events=await pool.query(`
+      SELECT COUNT(*)::integer AS signed_leg_events,
+        COUNT(*) FILTER (WHERE company_id IS NOT NULL)::integer AS attributed_leg_events,
+        COALESCE(SUM(billed_duration_secs),0)::bigint AS billed_seconds,
+        COUNT(*) FILTER (WHERE billed_duration_secs IS NULL)::integer AS missing_duration_events,
+        MAX(received_at) AS latest_received_at
+      FROM ca_telnyx_cost_legs
+      WHERE occurred_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+    `);
+    const row=events.rows[0];
+    telnyxCallCostEvidence={
+      signedLegEvents:Number(row.signed_leg_events),
+      attributedLegEvents:Number(row.attributed_leg_events),
+      billedSeconds:Number(row.billed_seconds),
+      missingDurationEvents:Number(row.missing_duration_events),
+      latestReceivedAt:row.latest_received_at?new Date(row.latest_received_at).toISOString():null,
+      verifiedMoneyTotal:false,
+      billingStatus:"Signed carrier leg evidence only; no verified monthly money total."
+    };
+  }catch(error:any){
+    req.log.warn({message:error?.message},"Telnyx call-cost evidence read failed");
+  }
   const telnyx = {
+    callCostEvidence:telnyxCallCostEvidence,
     available: Boolean(process.env.TELNYX_API_KEY),
     totalCost: null,
     currency: "USD",
