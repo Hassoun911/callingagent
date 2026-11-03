@@ -134,7 +134,7 @@ router.post("/launch-interest",async(req,res)=>{
   if(payload.website){res.status(202).json({received:true});return;}
   if(!Object.prototype.hasOwnProperty.call(prices,plan)||
      name.length<2||name.length>100||
-     email.length>254||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||
+     email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||
      phone.length>40||company.length>120){
     res.status(400).json({error:"Enter a valid name, email and package."});return;
   }
