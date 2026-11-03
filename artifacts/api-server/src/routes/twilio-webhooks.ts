@@ -1659,7 +1659,7 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
     const updateData: Record<string, any> = { status: CallStatus };
     // Twilio callbacks can omit CallDuration (especially non-terminal events).
     // Never overwrite a previously measured call duration with null/NaN.
-    const parsedDuration = typeof CallDuration === "string" && /^\\d+$/.test(CallDuration.trim())
+    const parsedDuration = typeof CallDuration === "string" && /^[0-9]+$/.test(CallDuration.trim())
       ? Number(CallDuration.trim()) : null;
     if (parsedDuration !== null && Number.isSafeInteger(parsedDuration)) {
       updateData.duration = parsedDuration;
