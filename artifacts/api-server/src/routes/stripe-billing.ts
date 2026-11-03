@@ -367,23 +367,30 @@ async function applyStripeEvent(event: any): Promise<void> {
     // Retrieve the subscription directly from Stripe rather than trust browser redirects or client metadata.
     const key = stripeKey();
     if (!key) throw new Error("Stripe secret key unavailable for subscription verification");
-    const response = await fetch("https://api.stripe.com/v1/subscriptions/" + encodeURIComponent(object.subscription) + "?expand[]=items.data.price", {
+    const response = await fetch("https://api.stripe.com/v1/subscriptions/" + encodeURIComponent(object.subscription) + "?expand[]=items.data.price&expand[]=latest_invoice", {
       headers: { Authorization: "Bearer " + key }, signal: AbortSignal.timeout(15000),
     });
     if (!response.ok) throw new Error("Unable to verify subscription with Stripe");
     const sub: any = await response.json();
     if (sub.livemode !== true || sub.customer !== object.customer || subscriptionPriceId(sub) !== expected) throw new Error("Checkout subscription did not match selected live plan");
-    await pool.query(`INSERT INTO ca_stripe_subscriptions(company_id,stripe_customer_id,stripe_subscription_id,plan_slug,status,current_period_end,last_event_created)
-      VALUES($1,$2,$3,$4,$5,$6,$7)
+    const latestInvoice = typeof sub.latest_invoice==="object" ? sub.latest_invoice : null;
+    const latestPayment = latestInvoice?.paid===true ? "paid" :
+      latestInvoice?.status==="open" ? "pending" :
+      latestInvoice?.status==="uncollectible" ? "failed" : null;
+    await pool.query(`INSERT INTO ca_stripe_subscriptions(company_id,stripe_customer_id,stripe_subscription_id,plan_slug,status,current_period_end,last_event_created,last_payment_status,last_payment_at)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
       ON CONFLICT(company_id) DO UPDATE SET
       stripe_customer_id=EXCLUDED.stripe_customer_id,
       stripe_subscription_id=EXCLUDED.stripe_subscription_id,
       plan_slug=EXCLUDED.plan_slug,status=EXCLUDED.status,current_period_end=EXCLUDED.current_period_end,
-      last_event_created=EXCLUDED.last_event_created,updated_at=now()
+      last_event_created=EXCLUDED.last_event_created,
+      last_payment_status=COALESCE(EXCLUDED.last_payment_status,ca_stripe_subscriptions.last_payment_status),
+      last_payment_at=COALESCE(EXCLUDED.last_payment_at,ca_stripe_subscriptions.last_payment_at),
+      updated_at=now()
       WHERE ca_stripe_subscriptions.last_event_created <= EXCLUDED.last_event_created`, [
       intent.company_id,sub.customer,sub.id,intent.plan_slug,sub.status,
       Number.isFinite(sub.current_period_end) ? new Date(sub.current_period_end*1000) : null,
-      event.created || 0,
+      event.created || 0,latestPayment,latestPayment==="paid" ? new Date() : null,
     ]);
     await pool.query("UPDATE ca_stripe_checkout_intents SET subscription_id=$2 WHERE session_id=$1", [object.id,sub.id]);
     return;
