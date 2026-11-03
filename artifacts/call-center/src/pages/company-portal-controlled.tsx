@@ -23,6 +23,7 @@ import { useGetCompany } from "@workspace/api-client-react";
 import type { AuthUser } from "@/App";
 import PortalNavigation from "@/components/portal-navigation";
 import PortalNumberDetail from "@/pages/portal-number-detail";
+import CompanySubscriptionBilling from "@/pages/company-subscription-billing";
 import Calls from "@/pages/calls";
 import Messages from "@/pages/messages";
 import Contacts from "@/pages/contacts";
@@ -213,6 +214,7 @@ export default function CompanyPortalControlled({ user }: { user: AuthUser }) {
         <Route path={`${PORTAL}/messages`}>{() => allowed("messages", <Messages />)}</Route>
         <Route path={`${PORTAL}/contacts`}>{() => allowed("contacts", <Contacts />)}</Route>
         <Route path={`${PORTAL}/bookings`}>{() => allowed("bookings", <Bookings />)}</Route>
+        <Route path={`${PORTAL}/billing`}>{() => <CompanySubscriptionBilling isAdmin={user.role==="company_admin"} />}</Route>
         <Route>{() => <Restricted />}</Route>
       </Switch></main>
     </div>
