@@ -2,7 +2,7 @@ import SiteFooter from "@/components/site-footer";
 import { useEffect, useState } from "react";
 import { ArrowRight, Check, ChevronDown, PhoneCall, ShieldCheck, Bot, MessageSquare, CreditCard, Menu, X, Building2, Clock3, Sparkles } from "lucide-react";
 
-type DisplayPlan = { id:string; name:string; price:number; minutes:number; numbers:number; tagline:string; features:string[]; popular:boolean };
+type DisplayPlan = { id:string; name:string; price:number; minutes:number; numbers:number; tagline:string; features:string[]; popular:boolean; checkoutEnabled:boolean };
 const featureLabels:Record<string,string> = {numbers:"Canadian phone numbers",forwarding:"Call forwarding",voicemail:"Company voicemail",email_alerts:"Email notifications",call_logs:"Call history",extensions:"Team extensions",ai_receptionist:"AI receptionist",sms:"SMS messaging",appointments:"Appointment scheduling"};
 function usePublicPlans() {
  const [plans,setPlans]=useState<DisplayPlan[]>([]);
@@ -10,7 +10,7 @@ function usePublicPlans() {
  const [error,setError]=useState("");
  useEffect(()=>{
   let cancelled=false;
-  fetch("/api/public-plans").then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error||"Plans are unavailable");if(!cancelled)setPlans(data.map((p:any)=>({id:p.slug,name:p.name,price:p.priceCents/100,minutes:p.monthlyMinutes,numbers:p.includedNumbers,tagline:p.description,features:p.features.map((f:string)=>featureLabels[f]||f),popular:p.slug==="business"})));}).catch(e=>{if(!cancelled)setError(e.message)}).finally(()=>{if(!cancelled)setLoading(false)});
+  fetch("/api/public-plans").then(async r=>{const data=await r.json();if(!r.ok)throw Error(data.error||"Plans are unavailable");if(!cancelled)setPlans(data.map((p:any)=>({id:p.slug,name:p.name,price:p.priceCents/100,minutes:p.monthlyMinutes,numbers:p.includedNumbers,tagline:p.description,features:p.features.map((f:string)=>featureLabels[f]||f),popular:p.slug==="business",checkoutEnabled:p.checkoutEnabled===true})));}).catch(e=>{if(!cancelled)setError(e.message)}).finally(()=>{if(!cancelled)setLoading(false)});
   return ()=>{cancelled=true};
  },[]);
  return {plans,loading,error};
@@ -72,8 +72,22 @@ export default function PublicHome() {
 
 export function PublicStart() {
   const {plans,loading,error}=usePublicPlans();
+  const [startingCheckout,setStartingCheckout]=useState(false);
+  const [checkoutError,setCheckoutError]=useState("");
+  async function startCheckout(planId:string) {
+    if(startingCheckout) return;
+    setStartingCheckout(true); setCheckoutError("");
+    try {
+      const res=await fetch("/api/billing/checkout",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({plan:planId})});
+      const data=await res.json();
+      if(!res.ok||typeof data.url!=="string")throw Error(data.error||"Checkout unavailable");
+      const destination=new URL(data.url);
+      if(destination.protocol!=="https:"||!destination.hostname.endsWith(".stripe.com"))throw Error("Unexpected checkout destination");
+      window.location.assign(destination.href);
+    }catch(error:any){setCheckoutError(String(error?.message||"Checkout unavailable"));setStartingCheckout(false);}
+  }
   const plan = plans.find(x=>x.id===new URLSearchParams(window.location.search).get("plan"));
   if (loading) return <div className="min-h-screen p-12">Loading your selected plan…</div>;
   if (error || !plan) return <div className="min-h-screen p-12 text-slate-900"><h1 className="text-2xl font-bold">Package unavailable</h1><p className="mt-2">This package is currently unavailable. No purchase has been made.</p><a href="/#pricing" className="mt-4 inline-block text-blue-700 underline">Return to pricing</a></div>;
-  return <div className="min-h-screen bg-[#f7faff] text-slate-900"><main className="mx-auto max-w-xl px-5 py-12"><a href="/#pricing" className="text-sm text-blue-600">← Back to packages</a><div className="mt-10 rounded-3xl border border-blue-100 bg-white p-7 sm:p-10"><div className="inline-flex items-center gap-2 text-blue-600"><CreditCard className="h-5 w-5"/> Package selection</div><h1 className="mt-4 text-3xl font-extrabold">{plan.name}</h1><p className="mt-2 text-slate-600">{plan.tagline}</p><div className="mt-6 rounded-xl bg-blue-50 p-5"><p className="text-3xl font-bold">${plan.price} CAD <span className="text-sm font-normal text-slate-600">per month</span></p><p className="mt-2 text-sm text-slate-600">{plan.numbers} number{plan.numbers>1?"s":""} · {plan.minutes?plan.minutes.toLocaleString()+" monthly voice minutes":"pay-as-you-go minutes"}</p></div><div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4"><div className="flex items-center gap-2 font-bold text-amber-900"><Clock3 className="h-4 w-4"/> Checkout coming soon</div><p className="mt-2 text-sm leading-relaxed text-slate-700">You've selected your package. Customer registration, secure payment, and automatic phone activation are being connected. We won't charge you or purchase a phone number until that process is ready.</p></div><div className="mt-6 flex flex-wrap gap-3"><ButtonLink href="/login">Already have an account? Sign in</ButtonLink><ButtonLink href="/#pricing" solid>Compare packages</ButtonLink></div></div></main><SiteFooter /></div>;
+  return <div className="min-h-screen bg-[#f7faff] text-slate-900"><main className="mx-auto max-w-xl px-5 py-12"><a href="/#pricing" className="text-sm text-blue-600">← Back to packages</a><div className="mt-10 rounded-3xl border border-blue-100 bg-white p-7 sm:p-10"><div className="inline-flex items-center gap-2 text-blue-600"><CreditCard className="h-5 w-5"/> Package selection</div><h1 className="mt-4 text-3xl font-extrabold">{plan.name}</h1><p className="mt-2 text-slate-600">{plan.tagline}</p><div className="mt-6 rounded-xl bg-blue-50 p-5"><p className="text-3xl font-bold">${plan.price} CAD <span className="text-sm font-normal text-slate-600">per month</span></p><p className="mt-2 text-sm text-slate-600">{plan.numbers} number{plan.numbers>1?"s":""} · {plan.minutes?plan.minutes.toLocaleString()+" monthly voice minutes":"pay-as-you-go minutes"}</p></div>{plan.checkoutEnabled ? <div className="mt-6"><p className="text-sm text-slate-600">Sign in as your company's administrator to purchase this package.</p><button type="button" disabled={startingCheckout} onClick={()=>startCheckout(plan.id)} className="mt-3 w-full rounded-xl bg-blue-600 px-5 py-3 font-bold text-white disabled:opacity-50">{startingCheckout?"Opening secure checkout…":"Continue to secure checkout"}</button>{checkoutError&&<p className="mt-3 text-sm text-red-700" role="alert">{checkoutError}</p>}</div> : <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4"><div className="flex items-center gap-2 font-bold text-amber-900"><Clock3 className="h-4 w-4"/> Checkout coming soon</div><p className="mt-2 text-sm leading-relaxed text-slate-700">You've selected your package. Customer registration, secure payment, and automatic phone activation are being connected. We won't charge you or purchase a phone number until that process is ready.</p></div>}<div className="mt-6 flex flex-wrap gap-3"><ButtonLink href="/login">Already have an account? Sign in</ButtonLink><ButtonLink href="/#pricing" solid>Compare packages</ButtonLink></div></div></main><SiteFooter /></div>;
 }
