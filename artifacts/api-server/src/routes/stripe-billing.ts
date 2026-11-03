@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
+import twilio from "twilio";
 
 const router: IRouter = Router();
 const prices: Record<string, string> = {
@@ -206,6 +207,61 @@ router.get("/billing/readiness", async(req,res)=>{
       plans:plans.rows.map(p=>({slug:p.slug,checkoutEnabled:Boolean(p.checkout_enabled)}))
     });
   }catch(err:any){req.log.error({error:err.message},"Billing readiness check failed");res.status(503).json({error:"Readiness unavailable"});}
+});
+// Independent read-only Twilio call-leg audit. This deliberately does NOT
+// alter service access or certify customer billable minutes. Twilio's rated
+// invoice is still the financial source of truth.
+router.get("/billing/twilio-diagnostic", async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Platform administrator access required"});return;}
+  const sid=process.env.TWILIO_ACCOUNT_SID,token=process.env.TWILIO_AUTH_TOKEN;
+  if(!sid||!token){res.status(503).json({error:"Twilio billing credentials unavailable"});return;}
+  try {
+    const assigned=await pool.query("SELECT number,company_id FROM phone_numbers WHERE twilio_sid IS NOT NULL AND company_id IS NOT NULL");
+    const assignedNumbers=new Map<string,number>(assigned.rows.map(x=>[String(x.number),Number(x.company_id)]));
+    const monthStart=new Date(Date.UTC(new Date().getUTCFullYear(),new Date().getUTCMonth(),1));
+    const calls=await twilio(sid,token).calls.list({startTimeAfter:monthStart,pageSize:100,limit:300});
+    const found=new Map<string,number>();
+    // Parent inbound calls identify the company by its business number.
+    for(const call of calls){
+      const company=assignedNumbers.get(String(call.to));
+      if(company)found.set(String(call.sid),company);
+    }
+    // Child forwarding legs inherit the company of their parent call.
+    for(let pass=0;pass<4;pass++){
+      for(const call of calls){
+        const parent=String(call.parentCallSid||"");
+        if(!found.has(String(call.sid))&&found.has(parent))found.set(String(call.sid),found.get(parent)!);
+      }
+    }
+    const groups=new Map<number,{legs:number;withDuration:number;missingDuration:number;approxRoundedLegMinutes:number;childLegs:number}>();
+    for(const call of calls){
+      const company=found.get(String(call.sid));
+      if(!company)continue;
+      const stat=groups.get(company)||{legs:0,withDuration:0,missingDuration:0,approxRoundedLegMinutes:0,childLegs:0};
+      stat.legs++;
+      if(call.parentCallSid)stat.childLegs++;
+      const raw=call.duration;
+      const value=raw===null||raw===undefined?NaN:Number(raw);
+      if(Number.isSafeInteger(value)&&value>=0){
+        stat.withDuration++;stat.approxRoundedLegMinutes+=Math.ceil(value/60);
+      }else stat.missingDuration++;
+      groups.set(company,stat);
+    }
+    res.set("Cache-Control","no-store");
+    res.json({
+      periodStartUTC:monthStart.toISOString(),
+      accountCallRecordsFetched:calls.length,
+      truncated:calls.length===300,
+      assignedTwilioNumbers:assigned.rows.length,
+      attributionComplete:false,
+      financialBillingCertified:false,
+      warning:"Read-only partial carrier call-leg audit; 300-record cap, calendar-month period and possible missing child legs. Not an invoice or enforceable remaining-minute balance.",
+      companies:Array.from(groups.entries()).map(([companyId,data])=>({companyId,...data}))
+    });
+  }catch(error:any){
+    req.log.error({message:error?.message},"Twilio carrier diagnostic failed");
+    res.status(503).json({error:"Twilio carrier diagnostic unavailable"});
+  }
 });
 // Read-only entitlement audit. This does not meter billable carrier legs or
 // activate service: existing customers without Stripe rows remain untouched.
