@@ -13,13 +13,29 @@ export default function PlanManagement(){
  const [busy,setBusy]=useState(false);
  const [readiness,setReadiness]=useState<BillingReadiness|null>(null);
  const [readinessError,setReadinessError]=useState("");
+ const [readinessLoading,setReadinessLoading]=useState(false);
+ const [readinessCheckedAt,setReadinessCheckedAt]=useState("");
+ const [readinessMessage,setReadinessMessage]=useState("");
  async function loadReadiness(){
+  setReadinessLoading(true);setReadinessMessage("");
   try{
-   const r=await fetch("/api/billing/readiness",{credentials:"include"});
+   const r=await fetch("/api/billing/readiness",{credentials:"include",cache:"no-store",headers:{"Accept":"application/json"}});
+   if(!r.ok){
+     let detail="";
+     try{const body=await r.json();detail=String(body.error||"");}catch{}
+     throw Error(detail||("Readiness check failed (HTTP "+r.status+")"));
+   }
    const data=await r.json();
-   if(!r.ok)throw Error(data.error||"Readiness unavailable");
+   if(typeof data.checkoutEnabled!=="boolean" || !Array.isArray(data.plans))throw Error("Unexpected billing readiness response");
    setReadiness(data);setReadinessError("");
-  }catch(e:any){setReadiness(null);setReadinessError(e.message||"Readiness unavailable");}
+   setReadinessCheckedAt(new Date().toLocaleTimeString());
+   setReadinessMessage(data.checkoutEnabled
+     ? "Check completed. Checkout prerequisites are enabled."
+     : "Check completed. The configuration is unchanged; checkout remains disabled until pending requirements are completed.");
+  }catch(e:any){
+   setReadinessError(e?.message||"Readiness check failed. Please retry.");
+   setReadinessMessage("");
+  }finally{setReadinessLoading(false)}
  }
  async function load(){try{const r=await fetch("/api/admin/plans",{credentials:"include"});const j=await r.json();if(!r.ok)throw Error(j.error||"Unable to fetch plans");setPlans(j);}catch(e:any){setError(e.message)}}
  useEffect(()=>{void load();void loadReadiness()},[]);
@@ -46,7 +62,8 @@ export default function PlanManagement(){
       {([["Stripe prices mapped",readiness.liveStripePricesMapped],["Live API key configured",readiness.secretKeyConfigured&&readiness.liveKeyFormatValid],["Stripe webhook signing secret",readiness.webhookSecretConfigured],["Entitlement enforcement certified",readiness.entitlementEnforcementCertified],["Global checkout approved",readiness.globalCheckoutApproved],["Customer checkout operational",readiness.checkoutEnabled]] as [string,boolean][]).map(([label,ok])=><div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-white/80 p-2"><span>{label}</span><span className={ok?"font-bold text-emerald-700":"font-bold text-amber-800"}>{ok?"Ready":"Pending"}</span></div>)}
      </div>}
      {readinessError&&<p role="alert" className="mt-3 text-red-700">{readinessError}</p>}
-     <button type="button" onClick={()=>void loadReadiness()} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold"><RefreshCw className="h-4 w-4"/>Recheck readiness</button>
+     <button type="button" disabled={readinessLoading} aria-busy={readinessLoading} onClick={()=>void loadReadiness()} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold disabled:cursor-wait disabled:opacity-60"><RefreshCw className={readinessLoading?"h-4 w-4 animate-spin":"h-4 w-4"}/>{readinessLoading?"Checking readiness…":"Recheck readiness"}</button>
+     <p className="mt-2 text-xs text-amber-950" role="status" aria-live="polite">{readinessLoading?"Contacting the billing server…":readinessMessage}{readinessCheckedAt&&!readinessLoading?" Last checked: "+readinessCheckedAt+" (your local time).":""}</p>
    </div>
    {error&&<div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{error}</div>}
    {notice&&<div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</div>}
