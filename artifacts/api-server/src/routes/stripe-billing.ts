@@ -107,8 +107,62 @@ export async function ensureStripeBillingSchema() {
     updated_at timestamptz NOT NULL DEFAULT now()
   )`);
   await pool.query("CREATE INDEX IF NOT EXISTS ca_billing_fulfillment_status_idx ON ca_billing_fulfillment(status,created_at)");
+  await pool.query(`CREATE TABLE IF NOT EXISTS ca_launch_interest (
+    id bigserial PRIMARY KEY,
+    plan_slug text NOT NULL,
+    contact_name text NOT NULL,
+    email text NOT NULL,
+    phone text,
+    company_name text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT ca_launch_interest_email_len CHECK(length(email)<=254)
+  )`);
+  await pool.query("CREATE INDEX IF NOT EXISTS ca_launch_interest_created_idx ON ca_launch_interest(created_at DESC)");
+
 
 }
+// Public launch inquiry collection. Never collects card data or opens Stripe.
+router.post("/launch-interest",async(req,res)=>{
+  res.set("Cache-Control","no-store");
+  const payload=req.body||{};
+  const plan=String(payload.plan||"").trim().toLowerCase();
+  const name=String(payload.name||"").trim();
+  const email=String(payload.email||"").trim().toLowerCase();
+  const phone=String(payload.phone||"").trim();
+  const company=String(payload.company||"").trim();
+  // Honeypot; do not disclose why unsolicited submissions are ignored.
+  if(payload.website){res.status(202).json({received:true});return;}
+  if(!Object.prototype.hasOwnProperty.call(prices,plan)||
+     name.length<2||name.length>100||
+     email.length>254||!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)||
+     phone.length>40||company.length>120){
+    res.status(400).json({error:"Enter a valid name, email and package."});return;
+  }
+  try{
+    const recent=await pool.query(
+      "SELECT count(*)::integer AS total FROM ca_launch_interest WHERE email=$1 AND created_at>now()-interval '1 hour'",[email]
+    );
+    if(Number(recent.rows[0].total)>=3){
+      res.status(429).json({error:"Your request was already received. Please try again later."});return;
+    }
+    await pool.query(
+      "INSERT INTO ca_launch_interest(plan_slug,contact_name,email,phone,company_name) VALUES($1,$2,$3,$4,$5)",
+      [plan,name,email,phone||null,company||null]
+    );
+    res.status(201).json({received:true,message:"Your request was received. No payment has been taken."});
+  }catch(err:any){
+    req.log.error({message:err?.message},"Launch interest submission failed");
+    res.status(503).json({error:"We could not save your request. Please try again."});
+  }
+});
+router.get("/admin/launch-interest",async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Platform administrator required"});return;}
+  try{
+    const data=await pool.query("SELECT id,plan_slug,contact_name,email,phone,company_name,created_at FROM ca_launch_interest ORDER BY created_at DESC LIMIT 100");
+    res.set("Cache-Control","no-store");
+    res.json({requests:data.rows});
+  }catch(err:any){req.log.error({message:err?.message},"Launch interest list failed");res.status(503).json({error:"Requests unavailable"});}
+});
 // Operations queue only: no automatic number purchases or suspensions.
 router.get("/billing/fulfillment-queue",async(req,res)=>{
   if(req.user?.role!=="super_admin"){res.status(403).json({error:"Platform administrator required"});return;}
