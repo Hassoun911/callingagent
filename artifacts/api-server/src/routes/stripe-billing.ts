@@ -225,6 +225,14 @@ router.get("/billing/entitlements", async (req,res) => {
         AND l.created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
     `,[companyId]);
     const approximate=usage.rows[0];
+    const telnyxEvidence=await pool.query(`SELECT
+      COUNT(*)::integer AS leg_records,
+      COUNT(*) FILTER(WHERE billed_duration_secs IS NULL)::integer AS missing_billed_duration,
+      COALESCE(SUM(billed_duration_secs),0)::bigint AS billed_leg_seconds
+      FROM ca_telnyx_cost_legs
+      WHERE company_id=$1 AND occurred_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+    `,[companyId]);
+    const leg=telnyxEvidence.rows[0];
     res.set("Cache-Control","no-store");
     res.json({
       companyId:row.company_id,companyName:row.company_name,
@@ -235,6 +243,13 @@ router.get("/billing/entitlements", async (req,res) => {
       monthlyMinutes:row.monthly_minutes===null?null:Number(row.monthly_minutes),
       enabledFeatures:row.features||[],
       carrierUsageVerified:false,
+      telnyxCarrierEvidence:{
+        period:"current UTC calendar month",
+        signedCostLegRecords:Number(leg.leg_records),
+        missingBilledDurations:Number(leg.missing_billed_duration),
+        sumBilledLegSeconds:Number(leg.billed_leg_seconds),
+        notYetReconciled:true
+      },
       internalLogEstimate:{
         period:"current UTC calendar month",
         callRecords:Number(approximate.calls),
