@@ -163,6 +163,19 @@ router.get("/billing/entitlements", async (req,res) => {
     const hasSubscription=Boolean(row.plan_slug);
     const numberLimit=hasSubscription?Number(row.included_numbers):null;
     const assigned=Number(row.assigned_numbers);
+    // This is an internal call-log estimate, not Stripe/carrier-rated minutes:
+    // forward legs may be billed separately, and missing durations are not free.
+    const usage=await pool.query(`
+      SELECT COUNT(*)::integer AS calls,
+        COUNT(*) FILTER (WHERE l.duration IS NULL OR l.duration < 0)::integer AS unmetered_calls,
+        COALESCE(SUM(CASE WHEN l.duration >= 0
+          THEN CEIL(l.duration::numeric / 60) ELSE 0 END),0)::integer AS logged_rounded_minutes
+      FROM call_logs l
+      JOIN phone_numbers n ON n.id=l.phone_number_id
+      WHERE n.company_id=$1
+        AND l.created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+    `,[companyId]);
+    const approximate=usage.rows[0];
     res.set("Cache-Control","no-store");
     res.json({
       companyId:row.company_id,companyName:row.company_name,
@@ -173,6 +186,13 @@ router.get("/billing/entitlements", async (req,res) => {
       monthlyMinutes:row.monthly_minutes===null?null:Number(row.monthly_minutes),
       enabledFeatures:row.features||[],
       carrierUsageVerified:false,
+      internalLogEstimate:{
+        period:"current UTC calendar month",
+        callRecords:Number(approximate.calls),
+        callsWithMissingDuration:Number(approximate.unmetered_calls),
+        roundedCallMinutes:Number(approximate.logged_rounded_minutes),
+        notForBilling:true
+      },
       automaticProvisioningCertified:false,
       note:hasSubscription?"Allowances are catalog limits, not verified carrier usage.":"Existing line preserved; no Stripe subscription assigned.",
     });
