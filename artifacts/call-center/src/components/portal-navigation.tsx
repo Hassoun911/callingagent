@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
+  CreditCard,
   Building2,
   CalendarDays,
   LayoutDashboard,
@@ -43,7 +44,7 @@ type NavigationItem = {
   label: string;
   href: string;
   icon: LucideIcon;
-  visibilityKey: keyof PortalVisibility["pages"];
+  visibilityKey?: keyof PortalVisibility["pages"];
   badgeKey?: keyof PortalLiveStats;
   companyAdminOnly?: boolean;
 };
@@ -74,6 +75,7 @@ const navigationGroups: NavigationGroup[] = [
     items: [
       { label: "Notifications", href: `${PORTAL}/notifications`, icon: Bell, visibilityKey: "notifications", companyAdminOnly: true },
       { label: "Users", href: `${PORTAL}/users`, icon: Users, visibilityKey: "users", companyAdminOnly: true },
+      { label: "Subscription & billing", href: `${PORTAL}/billing`, icon: CreditCard, companyAdminOnly: true },
     ],
   },
 ];
@@ -131,7 +133,7 @@ export default function PortalNavigation({
       .map(group => ({
         ...group,
         items: group.items.filter(item =>
-          visibility.pages[item.visibilityKey]
+          (!item.visibilityKey || visibility.pages[item.visibilityKey])
           && (!item.companyAdminOnly || user?.role === "company_admin"),
         ),
       }))
