@@ -1656,10 +1656,14 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
   const isTerminal = ["completed", "failed", "busy", "no-answer", "canceled"].includes(CallStatus);
 
   if (CallSid) {
-    const updateData: Record<string, any> = {
-      status: CallStatus,
-      duration: CallDuration ? parseInt(CallDuration, 10) : null,
-    };
+    const updateData: Record<string, any> = { status: CallStatus };
+    // Twilio callbacks can omit CallDuration (especially non-terminal events).
+    // Never overwrite a previously measured call duration with null/NaN.
+    const parsedDuration = typeof CallDuration === "string" && /^\\d+$/.test(CallDuration.trim())
+      ? Number(CallDuration.trim()) : null;
+    if (parsedDuration !== null && Number.isSafeInteger(parsedDuration)) {
+      updateData.duration = parsedDuration;
+    }
 
     // Capture recording fields if Twilio includes them in the status callback
     if (RecordingUrl) updateData.recordingUrl = `${RecordingUrl}.mp3`;
