@@ -47,6 +47,26 @@ async function verifyLiveStripePrices(): Promise<{ready:boolean;issues:string[]}
   const issues=checks.filter((x):x is string=>typeof x==="string");
   return {ready:issues.length===0,issues};
 }
+async function checkTelnyxCostConfiguration(): Promise<{enabled:boolean|null;webhookCorrect:boolean|null;warning:string|null}> {
+  const id=process.env.TELNYX_CONNECTION_ID;
+  const key=process.env.TELNYX_API_KEY;
+  if(!id||!key)return {enabled:null,webhookCorrect:null,warning:"Telnyx application credentials unavailable"};
+  try{
+    const response=await fetch("https://api.telnyx.com/v2/call_control_applications/"+encodeURIComponent(id),{
+      headers:{Authorization:"Bearer "+key,Accept:"application/json"},signal:AbortSignal.timeout(10000)
+    });
+    if(!response.ok)return {enabled:null,webhookCorrect:null,warning:"Telnyx application configuration could not be read"};
+    const app:any=(await response.json())?.data;
+    const url=typeof app?.webhook_event_url==="string"?app.webhook_event_url:"";
+    return {
+      enabled:typeof app?.call_cost_in_webhooks==="boolean"?app.call_cost_in_webhooks:null,
+      webhookCorrect:url.startsWith("https://callingagent.ca/api/telnyx/voice"),
+      warning:null
+    };
+  }catch{
+    return {enabled:null,webhookCorrect:null,warning:"Telnyx configuration check timed out or failed"};
+  }
+}
 async function stripeRequest(path: string, params: URLSearchParams) {
   const key = stripeKey();
   if (!key) throw new Error("Stripe secret key not configured");
@@ -145,6 +165,7 @@ router.get("/billing/readiness", async(req,res)=>{
     const stripePrices=liveMerchantVerified
       ? await verifyLiveStripePrices()
       : {ready:false,issues:["Live Stripe merchant verification required"]};
+    const telnyxCost=await checkTelnyxCostConfiguration();
     const plans=await pool.query("SELECT slug,checkout_enabled FROM ca_plans ORDER BY sort_order");
     const legacy=await pool.query(`SELECT
       (SELECT COUNT(*)::integer FROM companies) AS companies,
@@ -169,6 +190,9 @@ router.get("/billing/readiness", async(req,res)=>{
       globalCheckoutApproved:process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED==="true",
       checkoutEnabled:billingEnabled(),
       carrierUsageVerified:false,
+      telnyxCallCostWebhookEnabled:telnyxCost.enabled,
+      telnyxVoiceWebhookCorrect:telnyxCost.webhookCorrect,
+      telnyxConfigurationWarning:telnyxCost.warning,
       automaticProvisioningCertified:false,
       productionSnapshot:{
         existingCompanies:legacy.rows[0].companies,
