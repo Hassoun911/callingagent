@@ -1686,6 +1686,26 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
       .set(updateData)
       .where(eq(callLogsTable.twilioCallSid, CallSid));
 
+    // If Twilio omitted the measured duration, retrieve the parent call's
+    // recorded duration directly from Twilio after a terminal status.
+    // This improves call-history completeness, but does NOT meter the
+    // independent outbound forwarding leg or certify billable carrier minutes.
+    if (isTerminal && parsedDuration === null && /^CA[a-fA-F0-9]{32}$/.test(String(CallSid || ""))) {
+      setImmediate(() => {
+        (async () => {
+          try {
+            const call = await getTwilioClient().calls(CallSid).fetch();
+            const measured = Number(call.duration);
+            if (call.duration == null || !Number.isSafeInteger(measured) || measured < 0) return;
+            await db.update(callLogsTable).set({ duration:measured })
+              .where(and(eq(callLogsTable.twilioCallSid,CallSid),sql`${callLogsTable.duration} IS NULL`));
+          } catch (error:any) {
+            req.log.warn({ message:error?.message, callSid:CallSid }, "Twilio duration fallback unavailable");
+          }
+        })().catch(() => {});
+      });
+    }
+
     // Fire SMS/WhatsApp notification immediately after DB write (no need to wait for recording)
     if (isTerminal) {
       setImmediate(() => { sendSmsNotificationIfConfigured(CallSid).catch(() => {}); });
