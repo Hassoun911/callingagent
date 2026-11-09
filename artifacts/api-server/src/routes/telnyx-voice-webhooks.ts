@@ -266,6 +266,28 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
   // Fast acknowledgment prevents carrier retries while Call Control runs.
   res.status(200).json({ received: true });
   try {
+    // Cost legs have their own session IDs (including forwarded and click-to-call
+    // outbound legs). Attribute them while the leg-to-company relationship is
+    // available, so signed call.cost events can reconcile without guessing.
+    // This is evidence ingestion only, never a billing certification.
+    if (typeof payload?.call_session_id === "string" && payload.call_session_id) {
+      try {
+        const forwarded = outboundToInbound.get(id);
+        if (forwarded) {
+          const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, forwarded.lineId));
+          if (line?.companyId) await attributeTelnyxSession(payload.call_session_id, line.companyId, line.id);
+        }
+        const click = clickToCallByLeg.get(id);
+        if (click) {
+          const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, click.from));
+          if (line?.companyId === click.companyId) {
+            await attributeTelnyxSession(payload.call_session_id, click.companyId, line.id);
+          }
+        }
+      } catch (attributionError: any) {
+        req.log.error({message:attributionError?.message}, "Outbound Telnyx session attribution failed");
+      }
+    }
     if (type === "call.answered" && clickToCallByLeg.has(id)) {
       const call = clickToCallByLeg.get(id)!;
       if (id === call.agent && call.stage === "calling_agent") {
