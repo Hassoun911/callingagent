@@ -307,11 +307,18 @@ router.get("/billing/launch-audit",async(req,res)=>{
       (SELECT COUNT(*)::integer FROM ca_stripe_checkout_intents) AS checkout_intents,
       (SELECT COUNT(*)::integer FROM ca_telnyx_cost_legs) AS telnyx_cost_legs,
       (SELECT COUNT(*)::integer FROM ca_telnyx_cost_legs WHERE billed_duration_secs IS NULL) AS telnyx_missing_durations,
+      (SELECT COUNT(*)::integer FROM ca_telnyx_cost_legs WHERE company_id IS NULL) AS telnyx_unattributed_legs,
+      (SELECT COUNT(*)::integer FROM ca_telnyx_cost_legs WHERE company_id IS NOT NULL) AS telnyx_attributed_legs,
+      (SELECT COALESCE(SUM(billed_duration_secs),0)::bigint FROM ca_telnyx_cost_legs WHERE company_id IS NOT NULL) AS telnyx_attributed_billed_seconds,
       (SELECT COUNT(*)::integer FROM call_logs WHERE created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS monthly_calls,
       (SELECT COUNT(*)::integer FROM call_logs WHERE created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AND duration IS NULL) AS missing_call_durations`);
     const metrics=totals.rows[0];
     if(Number(metrics.missing_call_durations)>0)issues.push("Unmeasured call-log durations prevent reliable minute accounting");
     if(!Number(metrics.telnyx_cost_legs))issues.push("No signed Telnyx carrier cost-leg records have been reconciled");
+    if(Number(metrics.telnyx_unattributed_legs)>0)
+      issues.push(`${metrics.telnyx_unattributed_legs} Telnyx cost legs are missing verified company ownership; usage cannot be fully invoiced or enforced`);
+    if(Number(metrics.telnyx_missing_durations)>0)
+      issues.push(`${metrics.telnyx_missing_durations} Telnyx cost legs are missing carrier-rated duration`);
     issues.push("Verified carrier-leg minute enforcement has not been certified");
     issues.push("Automatic paid-customer number selection and provisioning has not been certified");
     const plans=catalog.rows.map(p=>({
