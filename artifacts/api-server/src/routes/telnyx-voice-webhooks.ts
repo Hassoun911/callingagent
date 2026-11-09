@@ -271,21 +271,26 @@ router.post("/telnyx/voice", async (req, res): Promise<void> => {
     // available, so signed call.cost events can reconcile without guessing.
     // This is evidence ingestion only, never a billing certification.
     if (typeof payload?.call_session_id === "string" && payload.call_session_id) {
-      try {
-        const forwarded = outboundToInbound.get(id);
-        if (forwarded) {
-          const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, forwarded.lineId));
-          if (line?.companyId) await attributeTelnyxSession(payload.call_session_id, line.companyId, line.id);
-        }
-        const click = clickToCallByLeg.get(id);
-        if (click) {
-          const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, click.from));
-          if (line?.companyId === click.companyId) {
-            await attributeTelnyxSession(payload.call_session_id, click.companyId, line.id);
+      // Capture ownership before the routing state is removed on hangup.
+      const forwarded = outboundToInbound.get(id);
+      const click = clickToCallByLeg.get(id);
+      if (forwarded || click) {
+        const sessionId: string = payload.call_session_id;
+        // Never delay the live voice action on a metering database round-trip.
+        void (async () => {
+          if (forwarded) {
+            const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.id, forwarded.lineId));
+            if (line?.companyId) await attributeTelnyxSession(sessionId, line.companyId, line.id);
           }
-        }
-      } catch (attributionError: any) {
-        req.log.error({message:attributionError?.message}, "Outbound Telnyx session attribution failed");
+          if (click) {
+            const [line] = await db.select().from(phoneNumbersTable).where(eq(phoneNumbersTable.number, click.from));
+            if (line?.companyId === click.companyId) {
+              await attributeTelnyxSession(sessionId, click.companyId, line.id);
+            }
+          }
+        })().catch((attributionError: any) => {
+          req.log.error({ message: attributionError?.message }, "Outbound Telnyx session attribution failed");
+        });
       }
     }
     if (type === "call.answered" && clickToCallByLeg.has(id)) {
