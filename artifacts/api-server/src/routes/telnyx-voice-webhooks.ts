@@ -54,23 +54,49 @@ async function notifyCallEmail(logSid: string, kind: "voicemail" | "completed" =
   const companyName = company?.name || line.callerIdName || "Your business";
   const outcome = kind === "voicemail" ? "Voicemail received" : (log.status === "connected" || log.status === "completed" ? "Call completed" : log.status === "rejected" ? "Call rejected" : "Call ended / no message");
   const recorded = kind === "voicemail" && Boolean(log.recordingUrl);
-  const listen = "https://callingagent.ca/api/call-logs/" + log.id + "/recording";
+  const listen = "https://callingagent.ca/calls?companyId=" + (line.companyId || "") + "&recordingId=" + log.id;
   const dashboard = "https://callingagent.ca/calls?companyId=" + (line.companyId || "");
   const time = log.createdAt.toLocaleString("en-CA", {timeZone:"America/Toronto", dateStyle:"medium",timeStyle:"short"}) + " ET";
   const duration = log.duration == null ? "Not available" : Math.floor(log.duration/60)+"m "+log.duration%60+"s";
   const data = [["Call result",outcome],["Caller",log.fromNumber || "Unknown / private"],["Company",companyName],["Business number",line.number],["Date and time",time],["Duration",duration]];
   const rows = data.map(([label,value])=>'<tr><td style="padding:12px 16px;border-bottom:1px solid #e8eef5;color:#64748b;font-size:13px">'+esc(label)+'</td><td style="padding:12px 16px;border-bottom:1px solid #e8eef5;font-weight:650;color:#0f2743;font-size:14px">'+esc(value)+'</td></tr>').join("");
-  const html = '<!doctype html><html><body style="background:#f1f6fb;margin:0;padding:26px 12px;font-family:Arial,Helvetica,sans-serif;color:#10243b"><div style="max-width:560px;margin:auto;border-radius:18px;overflow:hidden;background:#fff;border:1px solid #e2eaf4"><div style="background:#10324c;padding:25px 26px;color:#fff"><div style="font-weight:800;font-size:21px">Calling<span style="color:#41d4b5">Agent</span></div><p style="margin:18px 0 4px;color:#bdebdc;font-weight:700;font-size:12px;letter-spacing:1.5px;text-transform:uppercase">Call notification</p><h1 style="margin:0;font-size:25px;color:#fff">'+esc(outcome)+'</h1><p style="margin:9px 0 0;color:#e1edf5;font-size:14px">'+esc(companyName)+'</p></div><div style="padding:16px 20px"><table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse">'+rows+'</table>'+(log.transcription?'<div style="margin:20px 0;background:#f5f9fc;padding:16px;border-radius:10px"><b>Transcript</b><p style="white-space:pre-wrap">'+esc(log.transcription)+'</p></div>':'')+'<div style="padding:20px 4px;text-align:center">'+(recorded?'<a style="display:inline-block;background:#047857;color:white;padding:13px 24px;text-decoration:none;border-radius:10px;font-weight:bold" href="'+esc(listen)+'">▶ Listen to voicemail</a><p style="font-size:12px;color:#64748b">Sign in to CallingAgent to play the recording. An MP3 may be attached.</p>':'')+'<p><a style="color:#0866c2;text-decoration:none;font-weight:bold" href="'+esc(dashboard)+'">Open call details in CallingAgent</a></p></div></div><div style="background:#f7f9fc;text-align:center;padding:16px;font-size:12px;color:#64748b">Sent to your configured notification email · CallingAgent</div></div></body></html>';
+  const html = '<!doctype html><html><body style="background:#f1f6fb;margin:0;padding:26px 12px;font-family:Arial,Helvetica,sans-serif;color:#10243b"><div style="max-width:560px;margin:auto;border-radius:18px;overflow:hidden;background:#fff;border:1px solid #e2eaf4"><div style="background:#10324c;padding:25px 26px;color:#fff"><div style="font-weight:800;font-size:21px">Calling<span style="color:#41d4b5">Agent</span></div><p style="margin:18px 0 4px;color:#bdebdc;font-weight:700;font-size:12px;letter-spacing:1.5px;text-transform:uppercase">Call notification</p><h1 style="margin:0;font-size:25px;color:#fff">'+esc(outcome)+'</h1><p style="margin:9px 0 0;color:#e1edf5;font-size:14px">'+esc(companyName)+'</p></div><div style="padding:16px 20px"><table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse">'+rows+'</table>'+(log.transcription?'<div style="margin:20px 0;background:#f5f9fc;padding:16px;border-radius:10px"><b>Transcript</b><p style="white-space:pre-wrap">'+esc(log.transcription)+'</p></div>':'')+'<div style="padding:20px 4px;text-align:center">'+(recorded?'<a style="display:inline-block;background:#047857;color:white;padding:13px 24px;text-decoration:none;border-radius:10px;font-weight:bold" href="'+esc(listen)+'">▶ Listen to voicemail</a><p style="font-size:12px;color:#64748b">Open CallingAgent and sign in to play the recording. When available, an MP3 is attached to this email.</p>':'')+'<p><a style="color:#0866c2;text-decoration:none;font-weight:bold" href="'+esc(dashboard)+'">Open call details in CallingAgent</a></p></div></div><div style="background:#f7f9fc;text-align:center;padding:16px;font-size:12px;color:#64748b">Sent to your configured notification email · CallingAgent</div></div></body></html>';
   const attachments: Array<{filename:string;content:Buffer;contentType:string}> = [];
-  if (recorded && /^https:\/\//i.test(log.recordingUrl || "")) {
+  if (recorded) {
     try {
-      const response = await fetch(log.recordingUrl!, {signal:AbortSignal.timeout(12000)});
-      const len = Number(response.headers.get("content-length") || 0);
-      if (response.ok && (!len || len <= 8_000_000)) {
-        const buf = Buffer.from(await response.arrayBuffer());
-        if (buf.length <= 8_000_000) attachments.push({filename:"callingagent-voicemail-"+log.id+".mp3",content:buf,contentType:"audio/mpeg"});
+      // Webhook recording URLs can expire before the notification is sent.
+      // Refresh the download link from Telnyx using the trusted recording ID.
+      let sourceUrl = log.recordingUrl || "";
+      const telnyxKey = process.env.TELNYX_API_KEY;
+      if (telnyxKey && log.recordingSid && /^[0-9a-f-]{36}$/i.test(log.recordingSid)) {
+        const metadata = await fetch("https://api.telnyx.com/v2/recordings/" + encodeURIComponent(log.recordingSid), {
+          headers: { Authorization: "Bearer " + telnyxKey },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (metadata.ok) {
+          const body: any = await metadata.json();
+          const data = body.data || body;
+          sourceUrl = data.download_urls?.mp3 || data.recording_urls?.mp3 || sourceUrl;
+        }
       }
-    } catch (error:any) { console.warn("Voicemail email MP3 attachment unavailable", {callLogId:log.id,message:error?.message}); }
+      const recording = new URL(sourceUrl);
+      const host = recording.hostname.toLowerCase();
+      const permitted = (host === "s3.amazonaws.com" && recording.pathname.startsWith("/telephony-recorder-prod/"))
+        || host === "telnyx.com" || host.endsWith(".telnyx.com") || host.endsWith(".telnyxcloudstorage.com");
+      if (recording.protocol !== "https:" || !permitted) throw new Error("Untrusted recording download host");
+      const response = await fetch(recording.toString(), { redirect: "error", signal: AbortSignal.timeout(15000) });
+      const len = Number(response.headers.get("content-length") || 0);
+      if (!response.ok || (len && len > 8_000_000)) throw new Error("Recording unavailable or too large");
+      const buf = Buffer.from(await response.arrayBuffer());
+      const type = response.headers.get("content-type") || "";
+      if (buf.length && buf.length <= 8_000_000 && (type.includes("audio/") || type.includes("octet-stream"))) {
+        attachments.push({ filename: "callingagent-voicemail-" + log.id + ".mp3", content: buf, contentType: "audio/mpeg" });
+      } else {
+        throw new Error("Recording was not a valid audio response");
+      }
+    } catch (error: any) {
+      console.warn("Voicemail email MP3 attachment unavailable", { callLogId: log.id, message: error?.message });
+    }
   }
   const transport = nodemailer.createTransport({host,port:Number(process.env.SMTP_PORT || 587),secure:process.env.SMTP_SECURE === "true",auth:{user,pass}});
   const result = await transport.sendMail({from:process.env.SMTP_FROM || user,to:recipient,subject:[companyName, kind === "voicemail" ? "Voicemail" : outcome === "Call completed" ? "Answered Call" : outcome === "Call rejected" ? "Declined Call" : "Missed Call", (log.contactName || log.callerIdName || log.callerName) ? (log.contactName || log.callerIdName || log.callerName) + " (" + (log.fromNumber || "Unknown") + ")" : (log.fromNumber || "Unknown Caller")].join(" | "),html,text:data.map(([k,v])=>k+": "+v).join("\n")+"\n"+(recorded?"Listen (login required): "+listen+"\n":"")+"Call details: "+dashboard,attachments});
