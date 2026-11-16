@@ -8,7 +8,9 @@ type TwilioPerNumber = {
   friendlyName: string | null;
   companyId: number | null;
   companyName: string | null;
-  cost: number;
+  cost: number | null;
+  costStatus?: string;
+  costNote?: string;
   breakdown: { category: string; label: string; cost: number; usage: string; isFixed?: boolean }[];
 };
 
@@ -27,7 +29,7 @@ type CompanyGroup = {
   companyId: number | null;
   companyName: string | null;
   lines: TwilioPerNumber[];
-  total: number;
+  total: number | null;
 };
 
 function groupByCompany(perNumber: TwilioPerNumber[]): CompanyGroup[] {
@@ -35,13 +37,13 @@ function groupByCompany(perNumber: TwilioPerNumber[]): CompanyGroup[] {
   for (const num of perNumber) {
     const key = num.companyId != null ? `c:${num.companyId}` : `u:${num.phoneNumber}`;
     if (!map.has(key)) {
-      map.set(key, { companyId: num.companyId, companyName: num.companyName, lines: [], total: 0 });
+      map.set(key, { companyId: num.companyId, companyName: num.companyName, lines: [], total: null });
     }
     const group = map.get(key)!;
     group.lines.push(num);
-    group.total += num.cost;
+    if (num.cost != null) group.total = (group.total ?? 0) + num.cost;
   }
-  return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  return Array.from(map.values()).sort((a, b) => (b.total ?? -1) - (a.total ?? -1));
 }
 
 export default function Billing() {
@@ -127,7 +129,7 @@ export default function Billing() {
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-xs font-semibold text-muted-foreground">Twilio · reported usage</p>
             <p className="text-xl font-semibold mt-2">{costs?.twilio?.available ? fmtMoney(costs.twilio.totalCost) : "Unavailable"}</p>
-            <p className="text-xs text-muted-foreground mt-1">Provider-account usage; per-number detail below.</p>
+            <p className="text-xs text-muted-foreground mt-1">Provider-account usage; number-level allocation is not verified.</p>
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-xs font-semibold text-muted-foreground">Telnyx · billing</p>
@@ -161,7 +163,7 @@ export default function Billing() {
             <div className="rounded-lg border border-border p-3">
               <p className="font-bold text-foreground">Twilio</p>
               <p className="text-sm text-muted-foreground mt-1">{costs?.twilio?.available ? moneyLabel(costs.twilio.totalCost) : (costs?.twilio as any)?.error ?? "Unavailable"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Voice, SMS, phone numbers and account usage; per-number detail below.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Voice, SMS, phone numbers and account usage; per-number charges are not verified.</p>
             </div>
             <div className="rounded-lg border border-border p-3">
               <p className="font-bold text-foreground">Telnyx</p>
@@ -241,7 +243,7 @@ export default function Billing() {
                       {group.lines.length} {group.lines.length === 1 ? "line" : "lines"}
                     </span>
                   </div>
-                  <span className="font-mono text-sm font-bold text-foreground">{fmtMoney(group.total)}</span>
+                  <span className="font-mono text-sm font-bold text-foreground">{group.total == null ? "Unattributed" : fmtMoney(group.total)}</span>
                 </div>
 
                 {/* Lines */}
@@ -266,10 +268,10 @@ export default function Billing() {
                           <div className="flex items-center gap-3">
                             {multiLine && (
                               <span className="text-[10px] text-muted-foreground font-mono">
-                                {num.cost > 0 ? `${((num.cost / group.total) * 100).toFixed(0)}%` : "—"}
+                                {num.cost != null && group.total != null && group.total > 0 ? `${((num.cost / group.total) * 100).toFixed(0)}%` : "—"}
                               </span>
                             )}
-                            <span className="font-mono text-xs font-bold text-foreground shrink-0">{fmtMoney(num.cost)}</span>
+                            <span className="font-mono text-xs font-bold text-foreground shrink-0">{num.cost == null ? "Unattributed" : fmtMoney(num.cost)}</span>
                           </div>
                         </button>
                         {isOpen && (
@@ -285,7 +287,7 @@ export default function Billing() {
                                 <span className="font-mono text-muted-foreground shrink-0 ml-2">{fmtMoney(r.cost)}</span>
                               </div>
                             )) : (
-                              <p className="text-[11px] text-muted-foreground">No charges this month</p>
+                              <p className="text-[11px] text-muted-foreground">{num.cost == null ? "Per-number cost has not been verified. The account total cannot be attributed to this line." : "No charges this month"}</p>
                             )}
                           </div>
                         )}
