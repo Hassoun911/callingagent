@@ -17,7 +17,7 @@ type TwilioPerNumber = {
 type CostData = {
   period: string;
   openai?: {available:boolean;totalCost?:number;currency?:string;error?:string;breakdown?:{model:string;cost:number}[]};
-  telnyx?: { available: boolean; totalCost: number | null; error: string; callCostEvidence?:{signedLegEvents:number;attributedLegEvents:number;billedSeconds:number;missingDurationEvents:number;latestReceivedAt:string|null;verifiedMoneyTotal:false;billingStatus:string}|null; perNumber: {phoneNumber:string;friendlyName:string;cost:null;status:string}[] };
+  telnyx?: { available: boolean; totalCost: number | null; error: string; callCostEvidence?:{signedLegEvents:number;attributedLegEvents:number;billedSeconds:number;missingDurationEvents:number;latestReceivedAt:string|null;verifiedMoneyTotal:false;billingStatus:string}|null; inventoryVerification?:{twilioInventoryAvailable:boolean;telnyxInventoryAvailable:boolean;verifiedTwilio:number;verifiedTelnyx:number;conflicts:number;unverified:number}; perNumber: {phoneNumber:string;friendlyName:string;provider:string;cost:null;status:string}[] };
   providerTotals?: { twilio: {totalCost:number;currency:string}|null; telnyx:{totalCost:null;currency:string}; combined:null;note:string };
   twilio:
     | { available: true; totalCost: number; currency: string; breakdown: { category: string; label: string; cost: number; usage: string; usageUnit: string }[]; perNumber: TwilioPerNumber[] }
@@ -183,12 +183,12 @@ export default function Billing() {
       )}
       {!isLoading && (costs?.telnyx?.perNumber?.length ?? 0) > 0 && (
         <section className="rounded-lg border border-border bg-card/30 p-4">
-          <h2 className="font-semibold mb-2">Numbers pending provider and cost verification</h2>
-          <p className="text-xs text-muted-foreground mb-3">These saved numbers have no Twilio SID; this alone does not prove they are Telnyx numbers.</p>
+          <h2 className="font-semibold mb-2">Numbers requiring provider verification</h2>
+          <p className="text-xs text-muted-foreground mb-3">Numbers are checked against available Twilio and Telnyx inventories. A missing match is not proof of ownership by another provider.</p>
           {costs!.telnyx!.perNumber.map(n => (
             <div key={n.phoneNumber} className="flex items-center justify-between border-t border-border py-2 text-sm gap-3">
               <span className="font-mono">{fmt(n.phoneNumber)}</span>
-              <span className="text-xs text-amber-500">Cost unavailable · provider unverified</span>
+              <span className="text-xs text-amber-500">{n.status}</span>
             </div>
           ))}
         </section>

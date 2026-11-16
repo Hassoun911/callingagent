@@ -50,6 +50,49 @@ async function fetchTwilioUsage(accountSid: string, auth: string, phoneNumber?: 
   return (body.usage_records ?? []) as any[];
 }
 
+// Read-only provider inventory verification. A missing Twilio SID in our database
+// does not identify a number's carrier. Only exact provider inventory matches do.
+function normalizeE164(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  return digits.length === 10 ? "+1" + digits : "+" + digits;
+}
+async function getTwilioInventory(accountSid: string, auth: string): Promise<Set<string> | null> {
+  const found = new Set<string>();
+  let next: string | null = "https://api.twilio.com/2010-04-01/Accounts/" + encodeURIComponent(accountSid) + "/IncomingPhoneNumbers.json?PageSize=1000";
+  try {
+    for (let page = 0; next && page < 20; page++) {
+      const target = new URL(next, "https://api.twilio.com");
+      if (target.hostname !== "api.twilio.com" || target.protocol !== "https:") throw new Error("Unexpected Twilio pagination URL");
+      const response = await fetch(target.toString(), { headers: { Authorization: "Basic " + auth }, signal: AbortSignal.timeout(10000) });
+      if (!response.ok) return null;
+      const data: any = await response.json();
+      for (const item of data.incoming_phone_numbers ?? []) if (item.phone_number) found.add(normalizeE164(item.phone_number));
+      next = data.next_page_uri ? new URL(data.next_page_uri, "https://api.twilio.com").toString() : null;
+    }
+    // Fail closed rather than claim exhaustive coverage after reaching the page cap.
+    if (next) return null;
+    return found;
+  } catch { return null; }
+}
+async function getTelnyxInventory(apiKey: string): Promise<Set<string> | null> {
+  const found = new Set<string>();
+  try {
+    for (let page = 1; page <= 20; page++) {
+      const target = new URL("https://api.telnyx.com/v2/phone_numbers");
+      target.searchParams.set("page[number]", String(page));
+      target.searchParams.set("page[size]", "100");
+      const response = await fetch(target, { headers: { Authorization: "Bearer " + apiKey }, signal: AbortSignal.timeout(10000) });
+      if (!response.ok) return null;
+      const data: any = await response.json();
+      const items: any[] = data.data ?? [];
+      for (const item of items) if (item.phone_number) found.add(normalizeE164(item.phone_number));
+      const totalPages = Number(data.meta?.total_pages ?? 0);
+      if ((totalPages && page >= totalPages) || (!totalPages && items.length < 100)) return found;
+    }
+    return null;
+  } catch { return null; }
+}
+
 router.patch("/costs/openai-credit", async (req, res): Promise<void> => {
   const { balance } = req.body;
   if (typeof balance !== "number" || isNaN(balance) || balance < 0) {
@@ -200,7 +243,22 @@ router.get("/costs", async (req, res): Promise<void> => {
   // rate cards, or classify Telnyx inventory searches as purchased numbers.
   // Only confirmed Twilio SID-backed lines can be attributed to Twilio.
   const savedLines = await db.select().from(phoneNumbersTable);
-  const telnyxLines = savedLines.filter(n => !n.twilioSid);
+  const [twilioInventory, telnyxInventory] = await Promise.all([
+    accountSid && authToken ? getTwilioInventory(accountSid, Buffer.from(accountSid + ":" + authToken).toString("base64")) : Promise.resolve(null),
+    process.env.TELNYX_API_KEY ? getTelnyxInventory(process.env.TELNYX_API_KEY) : Promise.resolve(null),
+  ]);
+  const inventoryStatus = savedLines.map(n => {
+    const number = normalizeE164(n.number);
+    const inTwilio = twilioInventory?.has(number) ?? false;
+    const inTelnyx = telnyxInventory?.has(number) ?? false;
+    const provider = inTwilio && inTelnyx ? "conflict" : inTwilio ? "twilio" : inTelnyx ? "telnyx" : "unverified";
+    return { phoneNumber: n.number, friendlyName: n.friendlyName, companyId: n.companyId,
+      provider, verified: provider === "twilio" || provider === "telnyx",
+      cost: null, breakdown: [], status: provider === "conflict" ? "Matched multiple provider inventories — manual review required"
+        : provider === "unverified" ? "Provider not verified in available inventories"
+        : "Provider verified; monetary charges not yet attributed" };
+  });
+  const telnyxLines = inventoryStatus.filter(n => !n.verified || n.provider === "conflict");
   // Signed provider call.cost webhooks provide billed seconds, not a verified
   // monthly monetary invoice. Keep these distinct so account totals are never
   // represented as paid/settled charges or as an enforceable minute balance.
@@ -241,11 +299,15 @@ router.get("/costs", async (req, res): Promise<void> => {
     error: process.env.TELNYX_API_KEY
       ? "Live Telnyx billing totals are not connected. See Telnyx Portal → Reporting → Monthly Charges."
       : "Telnyx API key is not configured.",
-    perNumber: telnyxLines.map(n => ({
-      phoneNumber: n.number, friendlyName: n.friendlyName,
-      companyId: n.companyId, provider: "unverified",
-      cost: null, breakdown: [], status: "Provider and billing not verified"
-    }))
+    inventoryVerification: {
+      twilioInventoryAvailable: twilioInventory !== null,
+      telnyxInventoryAvailable: telnyxInventory !== null,
+      verifiedTwilio: inventoryStatus.filter(n => n.provider === "twilio").length,
+      verifiedTelnyx: inventoryStatus.filter(n => n.provider === "telnyx").length,
+      conflicts: inventoryStatus.filter(n => n.provider === "conflict").length,
+      unverified: inventoryStatus.filter(n => n.provider === "unverified").length,
+    },
+    perNumber: telnyxLines
   };
   const providerTotals = {
     twilio: twilio?.available ? { totalCost: twilio.totalCost, currency: twilio.currency, verified: true } : null,
