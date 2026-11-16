@@ -110,38 +110,23 @@ router.get("/costs", async (req, res): Promise<void> => {
 
       const totalCost = breakdown.reduce((s: number, r: any) => s + r.cost, 0);
 
-      // Per-number breakdown — query each provisioned number in parallel
-      const perNumber = numbers.length > 0
-        ? await Promise.all(
-            numbers.map(async (num) => {
-              const records = await fetchTwilioUsage(accountSid!, auth, num.number);
-              if (!records) return { phoneNumber: num.number, friendlyName: num.friendlyName, cost: 0, breakdown: [] };
+      // Twilio Usage/Records/ThisMonth is an account-level summary. Its
+      // PhoneNumber query parameter does NOT provide reliable per-number billing.
+      // Never repeat the account total for each line/company.
+      // Per-line costs require independently attributed provider call/message
+      // records and verified phone-number rental fees.
+      const perNumber = numbers.map(num => ({
+        phoneNumber: num.number,
+        friendlyName: num.friendlyName,
+        companyId: num.companyId ?? null,
+        companyName: num.companyId ? (companyMap.get(num.companyId) ?? null) : null,
+        cost: null,
+        breakdown: [],
+        costStatus: "unattributed",
+        costNote: "Account-level Twilio usage cannot be assigned to this number without verified itemized records.",
+      }));
 
-              const numBreakdown = records
-                .filter((rec: any) => parseFloat(rec.price ?? "0") > 0)
-                .map((rec: any) => ({
-                  category: rec.category as string,
-                  label:    TWILIO_LABELS[rec.category]?.label ?? rec.category,
-                  cost:     parseFloat(rec.price ?? "0"),
-                  usage:    rec.usage as string,
-                  isFixed:  TWILIO_FIXED.has(rec.category as string),
-                }))
-                .sort((a: any, b: any) => b.cost - a.cost);
-
-              const numTotal = numBreakdown.reduce((s: number, r: any) => s + r.cost, 0);
-              return {
-                phoneNumber:  num.number,
-                friendlyName: num.friendlyName,
-                companyId:    num.companyId ?? null,
-                companyName:  num.companyId ? (companyMap.get(num.companyId) ?? null) : null,
-                cost: numTotal,
-                breakdown: numBreakdown,
-              };
-            })
-          )
-        : [];
-
-      twilio = { totalCost, currency, period, breakdown, perNumber, available: true };
+      twilio = { totalCost, currency, period, breakdown, perNumber, available: true, attributionStatus: "account_only", attributionNote: "Per-number and per-company costs are not verified and must not be summed or presented as billed amounts." };
     } else {
       twilio = { available: false, error: "Twilio API error" };
     }
