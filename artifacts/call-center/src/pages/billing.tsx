@@ -16,7 +16,7 @@ type TwilioPerNumber = {
 
 type CostData = {
   period: string;
-  openai?: {available:boolean;totalCost?:number;currency?:string;error?:string;breakdown?:{model:string;cost:number}[]};
+  openai?: {available:boolean;totalCost?:number;currency?:string;error?:string;warning?:string;stale?:boolean;cached?:boolean;lastVerifiedAt?:string;breakdown?:{model:string;cost:number}[]};
   telnyx?: { available: boolean; totalCost: number | null; error: string; callCostEvidence?:{signedLegEvents:number;attributedLegEvents:number;billedSeconds:number;missingDurationEvents:number;latestReceivedAt:string|null;verifiedMoneyTotal:false;billingStatus:string}|null; inventoryVerification?:{twilioInventoryAvailable:boolean;telnyxInventoryAvailable:boolean;verifiedTwilio:number;verifiedTelnyx:number;conflicts:number;unverified:number}; perNumber: {phoneNumber:string;friendlyName:string;provider:string;cost:null;status:string}[] };
   providerTotals?: { twilio: {totalCost:number;currency:string}|null; telnyx:{totalCost:null;currency:string}; combined:null;note:string };
   twilio:
@@ -147,6 +147,7 @@ export default function Billing() {
             <p className="text-xs font-semibold text-muted-foreground">OpenAI · AI usage</p>
             <p className="text-xl font-semibold mt-2">{costs?.openai?.available && typeof costs.openai.totalCost === "number" ? fmtMoney(costs.openai.totalCost) : "Unavailable"}</p>
             <p className="text-xs text-muted-foreground mt-1">{costs?.openai?.available ? "Reported OpenAI organization costs for this period." : (costs?.openai?.error ?? "OpenAI organization billing is not connected.")}</p>
+            {costs?.openai?.warning && <p className="text-xs text-amber-600 mt-2">{costs.openai.warning}</p>}
             <a href="https://platform.openai.com/settings/organization/billing" target="_blank" rel="noreferrer" className="text-xs underline text-primary mt-2 inline-block">Open OpenAI billing</a>
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
