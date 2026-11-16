@@ -157,6 +157,42 @@ export default function Billing() {
         </div>
       )}
       {!isLoading && (
+        <section className="rounded-xl border border-border bg-card p-4 sm:p-5" aria-label="Billing reconciliation status">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h2 className="text-base font-bold">Billing reconciliation status</h2>
+            <span className="text-xs font-semibold text-amber-600">Incomplete — not an invoice</span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">The provider account totals above are not company charges. We only display a company cost when provider evidence can be matched to that company.</p>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 text-xs">
+            <div className="rounded-md border border-border p-3">
+              <p className="font-semibold">Phone number ownership</p>
+              <p className="mt-1">{costs?.telnyx?.inventoryVerification
+                ? `${costs.telnyx.inventoryVerification.verifiedTwilio} Twilio · ${costs.telnyx.inventoryVerification.verifiedTelnyx} Telnyx`
+                : "Inventory checks unavailable"}</p>
+              <p className="text-muted-foreground mt-1">{costs?.telnyx?.inventoryVerification
+                ? `${costs.telnyx.inventoryVerification.unverified} unverified · ${costs.telnyx.inventoryVerification.conflicts} conflicts`
+                : "Cannot verify provider"}</p>
+              <p className="text-muted-foreground mt-1">Twilio API: {costs?.telnyx?.inventoryVerification?.twilioInventoryAvailable ? "Connected" : "Unavailable"} · Telnyx API: {costs?.telnyx?.inventoryVerification?.telnyxInventoryAvailable ? "Connected" : "Unavailable"}</p>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <p className="font-semibold">Twilio allocation</p>
+              <p className="mt-1">Account usage reported</p>
+              <p className="text-muted-foreground mt-1">Company-level call, SMS and number rental costs not reconciled</p>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <p className="font-semibold">Telnyx allocation</p>
+              <p className="mt-1">{costs?.telnyx?.callCostEvidence?.attributedLegEvents ?? 0} company-attributed call legs</p>
+              <p className="text-muted-foreground mt-1">Monthly invoice and monetary charges unavailable</p>
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <p className="font-semibold">OpenAI allocation</p>
+              <p className="mt-1">{costs?.openai?.available ? "Organization usage reported" : "Billing API unavailable"}</p>
+              <p className="text-muted-foreground mt-1">Company-level usage attribution not verified</p>
+            </div>
+          </div>
+        </section>
+      )}
+      {!isLoading && (
         <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
           <h2 className="text-base font-bold text-foreground mb-3">API provider breakdown</h2>
           <div className="grid gap-3 sm:grid-cols-3">
