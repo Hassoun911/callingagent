@@ -103,15 +103,21 @@ async function fetchTwilioItemized(
   const rows: any[] = [];
   let next: string | null = `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/${resource}.json?PageSize=1000`;
   const dateField = resource === "Calls" ? "StartTime" : "DateSent";
-  const initial = new URL(next);
-  initial.searchParams.set(dateField + ">=", monthStart);
   const lastDay = new Date(Date.parse(nextMonth + "T00:00:00Z") - 86400000).toISOString().slice(0, 10);
-  initial.searchParams.set(dateField + "<=", lastDay);
+  // Twilio's next_page_uri is provider-generated. Reapply the original filters
+  // on EVERY page; never assume the provider preserves them in pagination URLs.
+  const applyPeriodFilters = (url: URL) => {
+    url.searchParams.set(dateField + ">=", monthStart);
+    url.searchParams.set(dateField + "<=", lastDay);
+  };
+  const initial = new URL(next);
+  applyPeriodFilters(initial);
   next = initial.toString();
   try {
     for (let page = 0; next && page < 20; page++) {
       const url = new URL(next);
-      if (url.hostname !== "api.twilio.com" || url.protocol !== "https:") return { rows, complete: false, error: "Invalid pagination URL" };
+      if (url.hostname !== "api.twilio.com" || url.protocol !== "https:" || !url.pathname.startsWith("/2010-04-01/Accounts/" + encodeURIComponent(accountSid) + "/" + resource + ".json")) return { rows, complete: false, error: "Invalid pagination URL" };
+      applyPeriodFilters(url);
       const response = await fetch(url, { headers: { Authorization: "Basic " + auth }, signal: AbortSignal.timeout(15000) });
       if (!response.ok) return { rows, complete: false, error: "Provider returned " + response.status };
       const body: any = await response.json();
