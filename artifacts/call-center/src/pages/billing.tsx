@@ -18,7 +18,7 @@ type CostData = {
   period: string;
   openai?: {available:boolean;totalCost?:number;currency?:string;error?:string;warning?:string;stale?:boolean;cached?:boolean;lastVerifiedAt?:string;breakdown?:{model:string;cost:number}[]};
   telnyx?: { available: boolean; totalCost: number | null; error: string; callCostEvidence?:{signedLegEvents:number;attributedLegEvents:number;billedSeconds:number;missingDurationEvents:number;latestReceivedAt:string|null;verifiedMoneyTotal:false;billingStatus:string}|null; inventoryVerification?:{twilioInventoryAvailable:boolean;telnyxInventoryAvailable:boolean;verifiedTwilio:number;verifiedTelnyx:number;conflicts:number;unverified:number}; perNumber: {phoneNumber:string;friendlyName:string;provider:string;cost:null;status:string}[] };
-  twilioItemized?: {available:boolean;reason?:string;currency?:string|null;complete?:boolean;invoiceReconciled?:boolean;callRecords?:number;messageRecords?:number;unattributedRecords?:number;unpricedRecords?:number;conflictingRecords?:number;outOfPeriodRecords?:number;missingTimestampRecords?:number;errors?:string[];companies?:{companyId:number;calls:number;messages:number;knownUsageCost:number;callRecords:number;messageRecords:number;status:string}[]};
+  twilioItemized?: {available:boolean;reason?:string;currency?:string|null;complete?:boolean;invoiceReconciled?:boolean;callRecords?:number;messageRecords?:number;unattributedRecords?:number;unpricedRecords?:number;conflictingRecords?:number;outOfPeriodRecords?:number;missingTimestampRecords?:number;attributionSuppressed?:boolean;errors?:string[];companies?:{companyId:number;calls:number;messages:number;knownUsageCost:number;callRecords:number;messageRecords:number;status:string}[]};
   providerTotals?: { twilio: {totalCost:number;currency:string}|null; telnyx:{totalCost:null;currency:string}; combined:null;note:string };
   twilio:
     | { available: true; totalCost: number; currency: string; breakdown: { category: string; label: string; cost: number; usage: string; usageUnit: string }[]; perNumber: TwilioPerNumber[] }
@@ -170,6 +170,7 @@ export default function Billing() {
                 {costs.twilioItemized.callRecords ?? 0} calls · {costs.twilioItemized.messageRecords ?? 0} messages · {costs.twilioItemized.unpricedRecords ?? 0} unpriced · {costs.twilioItemized.unattributedRecords ?? 0} unmatched · {costs.twilioItemized.conflictingRecords ?? 0} conflicts · {costs.twilioItemized.outOfPeriodRecords ?? 0} outside period · {costs.twilioItemized.missingTimestampRecords ?? 0} missing timestamps
                 {!costs.twilioItemized.complete && " · Incomplete provider pagination"}
               </p>
+              {costs.twilioItemized.attributionSuppressed && <p className="text-xs font-semibold text-amber-600">Company amounts temporarily hidden: provider pagination or billing-period validation is incomplete. No partial amounts will be presented as verified.</p>}
               {costs.twilioItemized.errors?.length ? <p className="text-xs text-amber-600">{costs.twilioItemized.errors.join("; ")}</p> : null}
               {costs.twilioItemized.companies?.length ? (
                 <div className="space-y-2">
