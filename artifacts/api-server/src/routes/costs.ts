@@ -93,6 +93,12 @@ async function getTelnyxInventory(apiKey: string): Promise<Set<string> | null> {
   } catch { return null; }
 }
 
+// Cache successful organization billing reads across dashboard refreshes.
+// Do not cache authentication failures. This reduces duplicate calls and
+// preserves the last verified amount when the provider temporarily throttles.
+let openaiCostsCache: { key: string; value: any; fetchedAt: number } | null = null;
+const OPENAI_COSTS_CACHE_MS = 15 * 60 * 1000;
+
 router.patch("/costs/openai-credit", async (req, res): Promise<void> => {
   const { balance } = req.body;
   if (typeof balance !== "number" || isNaN(balance) || balance < 0) {
@@ -183,6 +189,10 @@ router.get("/costs", async (req, res): Promise<void> => {
   const openaiKey = process.env.OPENAI_API_KEY_ADMIN ?? process.env.OPENAI_ADMIN_API_KEY ?? process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
+      const cacheKey = period + ":" + openaiKey.slice(-12);
+      if (openaiCostsCache?.key === cacheKey && Date.now() - openaiCostsCache.fetchedAt < OPENAI_COSTS_CACHE_MS) {
+        openai = { ...openaiCostsCache.value, cached: true, lastVerifiedAt: new Date(openaiCostsCache.fetchedAt).toISOString() };
+      } else {
       const startTime = Math.floor(new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000);
       const endTime   = Math.floor(now.getTime() / 1000);
 
@@ -222,14 +232,19 @@ router.get("/costs", async (req, res): Promise<void> => {
           available: true,
           viaProxy,
         };
+        openaiCostsCache = { key: cacheKey, value: openai, fetchedAt: Date.now() };
       } else {
         const status = r.status;
-        openai = {
-          available: false,
-          error: status === 401 || status === 403
-            ? "Admin API key required — visit platform.openai.com/settings/organization/billing for totals"
-            : `OpenAI API returned ${status}`,
-        };
+        const stale = status === 429 && openaiCostsCache?.key === cacheKey ? openaiCostsCache : null;
+        openai = stale
+          ? { ...stale.value, cached: true, stale: true, lastVerifiedAt: new Date(stale.fetchedAt).toISOString(),
+              warning: "OpenAI billing temporarily rate-limited (429). Showing last verified result." }
+          : { available: false, error: status === 429
+              ? "OpenAI billing rate-limited (429). Try again later."
+              : status === 401 || status === 403
+                ? "Admin API key required — visit platform.openai.com/settings/organization/billing for totals"
+                : `OpenAI API returned ${status}` };
+      }
       }
     } catch (err: any) {
       req.log.warn({ err: err?.message }, "Failed to fetch OpenAI costs");
