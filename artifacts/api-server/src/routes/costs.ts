@@ -121,6 +121,7 @@ async function fetchTwilioItemized(
   } catch { return { rows, complete: false, error: "Provider request failed" }; }
 }
 
+let twilioItemizedCache: { key: string; at: number; data: any } | null = null;
 async function buildTwilioAttribution(
   accountSid: string, auth: string,
   inventory: Set<string> | null,
@@ -128,6 +129,8 @@ async function buildTwilioAttribution(
 ) {
   if (!inventory) return { available: false, reason: "Twilio inventory unavailable" };
   const now = new Date();
+  const cacheKey = accountSid + ":" + now.getUTCFullYear() + "-" + now.getUTCMonth();
+  if (twilioItemizedCache?.key === cacheKey && Date.now() - twilioItemizedCache.at < 5 * 60 * 1000) return twilioItemizedCache.data;
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const monthStart = start.toISOString().slice(0, 10);
@@ -172,7 +175,7 @@ async function buildTwilioAttribution(
   };
   for (const call of calls.rows) accumulate(call, "calls");
   for (const message of messages.rows) accumulate(message, "messages");
-  return {
+  const result = {
     available: true,
     period: monthStart.slice(0, 7),
     currency,
@@ -188,6 +191,8 @@ async function buildTwilioAttribution(
       status: "partial_itemized_usage_not_invoice",
     })),
   };
+  if (result.complete) twilioItemizedCache = { key: cacheKey, at: Date.now(), data: result };
+  return result;
 }
 
 // Cache successful organization billing reads across dashboard refreshes.
