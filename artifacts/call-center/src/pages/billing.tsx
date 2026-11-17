@@ -18,6 +18,7 @@ type CostData = {
   period: string;
   openai?: {available:boolean;totalCost?:number;currency?:string;error?:string;warning?:string;stale?:boolean;cached?:boolean;lastVerifiedAt?:string;breakdown?:{model:string;cost:number}[]};
   telnyx?: { available: boolean; totalCost: number | null; error: string; callCostEvidence?:{signedLegEvents:number;attributedLegEvents:number;billedSeconds:number;missingDurationEvents:number;latestReceivedAt:string|null;verifiedMoneyTotal:false;billingStatus:string}|null; inventoryVerification?:{twilioInventoryAvailable:boolean;telnyxInventoryAvailable:boolean;verifiedTwilio:number;verifiedTelnyx:number;conflicts:number;unverified:number}; perNumber: {phoneNumber:string;friendlyName:string;provider:string;cost:null;status:string}[] };
+  twilioItemized?: {available:boolean;reason?:string;currency?:string|null;complete?:boolean;invoiceReconciled?:boolean;callRecords?:number;messageRecords?:number;unattributedRecords?:number;unpricedRecords?:number;conflictingRecords?:number;outOfPeriodRecords?:number;missingTimestampRecords?:number;errors?:string[];companies?:{companyId:number;calls:number;messages:number;knownUsageCost:number;callRecords:number;messageRecords:number;status:string}[]};
   providerTotals?: { twilio: {totalCost:number;currency:string}|null; telnyx:{totalCost:null;currency:string}; combined:null;note:string };
   twilio:
     | { available: true; totalCost: number; currency: string; breakdown: { category: string; label: string; cost: number; usage: string; usageUnit: string }[]; perNumber: TwilioPerNumber[] }
@@ -156,6 +157,37 @@ export default function Billing() {
             <p className="text-xs text-muted-foreground mt-1">Requires verified charges from both providers in the same currency.</p>
           </div>
         </div>
+      )}
+      {!isLoading && (
+        <section className="rounded-xl border border-border bg-card p-4 sm:p-5" aria-label="Twilio itemized cost evidence">
+          <h2 className="text-base font-bold">Twilio itemized call &amp; SMS costs</h2>
+          <p className="text-xs text-muted-foreground mt-1">These are only provider-priced usage records matched to company numbers. They exclude phone rental, taxes, unpriced records and other fees. They are not final company invoices or profit figures.</p>
+          {!costs?.twilioItemized?.available ? (
+            <p className="text-sm text-amber-600 mt-3">{costs?.twilioItemized?.reason ?? "Itemized records unavailable"}</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                {costs.twilioItemized.callRecords ?? 0} calls · {costs.twilioItemized.messageRecords ?? 0} messages · {costs.twilioItemized.unpricedRecords ?? 0} unpriced · {costs.twilioItemized.unattributedRecords ?? 0} unmatched · {costs.twilioItemized.conflictingRecords ?? 0} conflicts · {costs.twilioItemized.outOfPeriodRecords ?? 0} outside period · {costs.twilioItemized.missingTimestampRecords ?? 0} missing timestamps
+                {!costs.twilioItemized.complete && " · Incomplete provider pagination"}
+              </p>
+              {costs.twilioItemized.errors?.length ? <p className="text-xs text-amber-600">{costs.twilioItemized.errors.join("; ")}</p> : null}
+              {costs.twilioItemized.companies?.length ? (
+                <div className="space-y-2">
+                  {costs.twilioItemized.companies.map(item => {
+                    const company = groups.find(g => g.companyId === item.companyId);
+                    const amount = costs.twilioItemized?.currency === "USD"
+                      ? fmtMoney(item.knownUsageCost)
+                      : `${costs.twilioItemized?.currency ?? "Unknown currency"} ${item.knownUsageCost.toFixed(4)}`;
+                    return <div key={item.companyId} className="flex flex-wrap items-center justify-between gap-2 border border-border rounded-md px-3 py-2 text-xs">
+                      <span className="font-medium">{company?.companyName ?? `Company #${item.companyId}`}</span>
+                      <span>{amount} <span className="text-muted-foreground">partial usage only</span></span>
+                    </div>;
+                  })}
+                </div>
+              ) : <p className="text-xs text-muted-foreground">No priced, company-matched Twilio usage records returned.</p>}
+            </div>
+          )}
+        </section>
       )}
       {!isLoading && (
         <section className="rounded-xl border border-border bg-card p-4 sm:p-5" aria-label="Billing reconciliation status">
