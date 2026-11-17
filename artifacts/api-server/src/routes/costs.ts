@@ -153,7 +153,20 @@ async function buildTwilioAttribution(
   let unpricedRecords = 0;
   let conflictingRecords = 0;
   let currency: string | null = null;
+  let outOfPeriodRecords = 0;
+  let missingTimestampRecords = 0;
+  const seen = new Set<string>();
   const accumulate = (record: any, type: "calls" | "messages") => {
+    const recordDate = type === "calls" ? record.start_time : (record.date_sent ?? record.date_created);
+    const timestamp = recordDate ? Date.parse(String(recordDate)) : NaN;
+    if (!Number.isFinite(timestamp)) { missingTimestampRecords++; return; }
+    if (timestamp < start.getTime() || timestamp >= end.getTime()) { outOfPeriodRecords++; return; }
+    const sid = String(record.sid ?? "");
+    if (sid) {
+      const unique = type + ":" + sid;
+      if (seen.has(unique)) return;
+      seen.add(unique);
+    }
     const from = normalizeE164(String(record.from ?? ""));
     const to = normalizeE164(String(record.to ?? ""));
     const a = numberOwners.get(from);
@@ -184,7 +197,7 @@ async function buildTwilioAttribution(
     excluded: "Phone number rentals, taxes, other provider fees, and unmatched/unpriced records",
     callRecords: calls.rows.length,
     messageRecords: messages.rows.length,
-    unattributedRecords, unpricedRecords, conflictingRecords,
+    unattributedRecords, unpricedRecords, conflictingRecords, outOfPeriodRecords, missingTimestampRecords,
     errors: [calls.error, messages.error].filter(Boolean),
     companies: Array.from(companyCosts.entries()).map(([companyId, cost]) => ({
       companyId, ...cost, knownUsageCost: Math.round((cost.calls + cost.messages) * 1e6) / 1e6,
