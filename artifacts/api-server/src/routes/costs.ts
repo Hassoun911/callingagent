@@ -105,7 +105,8 @@ async function fetchTwilioItemized(
   const dateField = resource === "Calls" ? "StartTime" : "DateSent";
   const initial = new URL(next);
   initial.searchParams.set(dateField + ">=", monthStart);
-  initial.searchParams.set(dateField + "<", nextMonth);
+  const lastDay = new Date(Date.parse(nextMonth + "T00:00:00Z") - 86400000).toISOString().slice(0, 10);
+  initial.searchParams.set(dateField + "<=", lastDay);
   next = initial.toString();
   try {
     for (let page = 0; next && page < 20; page++) {
@@ -199,10 +200,14 @@ async function buildTwilioAttribution(
     messageRecords: messages.rows.length,
     unattributedRecords, unpricedRecords, conflictingRecords, outOfPeriodRecords, missingTimestampRecords,
     errors: [calls.error, messages.error].filter(Boolean),
-    companies: Array.from(companyCosts.entries()).map(([companyId, cost]) => ({
+    // Fail closed: never display partial monetary attribution when the provider
+    // returned incomplete pages or ignored date filters.
+    companies: (calls.complete && messages.complete && outOfPeriodRecords === 0)
+      ? Array.from(companyCosts.entries()).map(([companyId, cost]) => ({
       companyId, ...cost, knownUsageCost: Math.round((cost.calls + cost.messages) * 1e6) / 1e6,
       status: "partial_itemized_usage_not_invoice",
-    })),
+    })) : [],
+    attributionSuppressed: !(calls.complete && messages.complete && outOfPeriodRecords === 0),
   };
   if (result.complete) twilioItemizedCache = { key: cacheKey, at: Date.now(), data: result };
   return result;
