@@ -93,6 +93,103 @@ async function getTelnyxInventory(apiKey: string): Promise<Set<string> | null> {
   } catch { return null; }
 }
 
+// Twilio's itemized Calls and Messages endpoints expose actual provider price
+// fields. These are partial usage evidence, not a complete invoice: they exclude
+// monthly number rental and any charges not represented by these records.
+async function fetchTwilioItemized(
+  accountSid: string, auth: string, resource: "Calls" | "Messages",
+  monthStart: string, nextMonth: string
+): Promise<{ rows: any[]; complete: boolean; error?: string }> {
+  const rows: any[] = [];
+  let next: string | null = `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/${resource}.json?PageSize=1000`;
+  const dateField = resource === "Calls" ? "StartTime" : "DateSent";
+  const initial = new URL(next);
+  initial.searchParams.set(dateField + ">=", monthStart);
+  initial.searchParams.set(dateField + "<", nextMonth);
+  next = initial.toString();
+  try {
+    for (let page = 0; next && page < 20; page++) {
+      const url = new URL(next);
+      if (url.hostname !== "api.twilio.com" || url.protocol !== "https:") return { rows, complete: false, error: "Invalid pagination URL" };
+      const response = await fetch(url, { headers: { Authorization: "Basic " + auth }, signal: AbortSignal.timeout(15000) });
+      if (!response.ok) return { rows, complete: false, error: "Provider returned " + response.status };
+      const body: any = await response.json();
+      rows.push(...(resource === "Calls" ? body.calls ?? [] : body.messages ?? []));
+      next = body.next_page_uri ? new URL(body.next_page_uri, "https://api.twilio.com").toString() : null;
+    }
+    return { rows, complete: !next, error: next ? "Pagination limit reached" : undefined };
+  } catch { return { rows, complete: false, error: "Provider request failed" }; }
+}
+
+async function buildTwilioAttribution(
+  accountSid: string, auth: string,
+  inventory: Set<string> | null,
+  savedLines: Array<{ number: string; companyId: number | null }>
+) {
+  if (!inventory) return { available: false, reason: "Twilio inventory unavailable" };
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const monthStart = start.toISOString().slice(0, 10);
+  const nextMonth = end.toISOString().slice(0, 10);
+  const [calls, messages] = await Promise.all([
+    fetchTwilioItemized(accountSid, auth, "Calls", monthStart, nextMonth),
+    fetchTwilioItemized(accountSid, auth, "Messages", monthStart, nextMonth),
+  ]);
+  const numberOwners = new Map<string, number>();
+  const ambiguous = new Set<string>();
+  for (const line of savedLines) {
+    const number = normalizeE164(line.number);
+    if (!inventory.has(number) || line.companyId == null) continue;
+    if (numberOwners.has(number) && numberOwners.get(number) !== line.companyId) ambiguous.add(number);
+    else numberOwners.set(number, line.companyId);
+  }
+  for (const number of ambiguous) numberOwners.delete(number);
+  const companyCosts = new Map<number, { calls: number; messages: number; callRecords: number; messageRecords: number }>();
+  let unattributedRecords = 0;
+  let unpricedRecords = 0;
+  let conflictingRecords = 0;
+  let currency: string | null = null;
+  const accumulate = (record: any, type: "calls" | "messages") => {
+    const from = normalizeE164(String(record.from ?? ""));
+    const to = normalizeE164(String(record.to ?? ""));
+    const a = numberOwners.get(from);
+    const b = numberOwners.get(to);
+    if (a != null && b != null && a !== b) { conflictingRecords++; return; }
+    const companyId = a ?? b;
+    if (companyId == null) { unattributedRecords++; return; }
+    const price = record.price;
+    const unit = String(record.price_unit ?? "").toUpperCase();
+    if (price == null || !Number.isFinite(Number(price)) || !unit) { unpricedRecords++; return; }
+    if (currency && currency !== unit) { conflictingRecords++; return; }
+    currency = unit;
+    const entry = companyCosts.get(companyId) ?? { calls: 0, messages: 0, callRecords: 0, messageRecords: 0 };
+    // Twilio itemized prices are commonly negative for debits; cost is magnitude.
+    entry[type] += Math.abs(Number(price));
+    if (type === "calls") entry.callRecords++;
+    else entry.messageRecords++;
+    companyCosts.set(companyId, entry);
+  };
+  for (const call of calls.rows) accumulate(call, "calls");
+  for (const message of messages.rows) accumulate(message, "messages");
+  return {
+    available: true,
+    period: monthStart.slice(0, 7),
+    currency,
+    complete: calls.complete && messages.complete,
+    invoiceReconciled: false,
+    excluded: "Phone number rentals, taxes, other provider fees, and unmatched/unpriced records",
+    callRecords: calls.rows.length,
+    messageRecords: messages.rows.length,
+    unattributedRecords, unpricedRecords, conflictingRecords,
+    errors: [calls.error, messages.error].filter(Boolean),
+    companies: Array.from(companyCosts.entries()).map(([companyId, cost]) => ({
+      companyId, ...cost, knownUsageCost: Math.round((cost.calls + cost.messages) * 1e6) / 1e6,
+      status: "partial_itemized_usage_not_invoice",
+    })),
+  };
+}
+
 // Cache successful organization billing reads across dashboard refreshes.
 // Do not cache authentication failures. This reduces duplicate calls and
 // preserves the last verified amount when the provider temporarily throttles.
@@ -324,6 +421,20 @@ router.get("/costs", async (req, res): Promise<void> => {
     },
     perNumber: telnyxLines
   };
+  // Itemized evidence is reported separately from the invoice total.
+  // Do not substitute it for a verified company invoice or margin calculation.
+  let twilioItemized: any = { available: false, reason: "Twilio credentials not configured" };
+  if (accountSid && authToken) {
+    try {
+      twilioItemized = await buildTwilioAttribution(
+        accountSid, Buffer.from(accountSid + ":" + authToken).toString("base64"),
+        twilioInventory, savedLines.map(n => ({ number: n.number, companyId: n.companyId }))
+      );
+    } catch (error: any) {
+      req.log.warn({ message: error?.message }, "Twilio itemized attribution failed");
+      twilioItemized = { available: false, reason: "Itemized provider data unavailable" };
+    }
+  }
   const providerTotals = {
     twilio: twilio?.available ? { totalCost: twilio.totalCost, currency: twilio.currency, verified: true } : null,
     telnyx: { totalCost: null, currency: "USD", verified: false },
@@ -333,6 +444,7 @@ router.get("/costs", async (req, res): Promise<void> => {
 
   res.json({
     telnyx,
+    twilioItemized,
     providerTotals,
     twilio,
     openai,
