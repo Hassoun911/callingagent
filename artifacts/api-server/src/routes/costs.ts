@@ -104,35 +104,42 @@ async function fetchTwilioItemized(
   let next: string | null = `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/${resource}.json?PageSize=1000`;
   const dateField = resource === "Calls" ? "StartTime" : "DateSent";
   const lastDay = new Date(Date.parse(nextMonth + "T00:00:00Z") - 86400000).toISOString().slice(0, 10);
-  // Twilio's next_page_uri is provider-generated. Reapply the original filters
-  // on EVERY page; never assume the provider preserves them in pagination URLs.
   const applyPeriodFilters = (url: URL) => {
     url.searchParams.set(dateField + ">=", monthStart);
     url.searchParams.set(dateField + "<=", lastDay);
   };
-  const initial = new URL(next);
-  applyPeriodFilters(initial);
-  next = initial.toString();
+  const first = new URL(next);
+  applyPeriodFilters(first);
+  next = first.toString();
+  const visitedPages = new Set<string>();
+  // Fail closed quickly on large accounts. This endpoint is on the dashboard
+  // request path, not a background reconciliation worker.
+  const deadline = Date.now() + 12_000;
   try {
-    const visitedPages = new Set<string>();
-    // The former 20-page cap truncated accounts with more than 20,000 SMS.
-    // Bound both pages and elapsed time; never return partial amounts as complete.
-    const deadline = Date.now() + 90_000;
-    for (let page = 0; next && page < 100 && Date.now() < deadline; page++) {
+    for (let page = 0; next && page < 5 && Date.now() < deadline; page++) {
       const url = new URL(next);
-      if (url.hostname !== "api.twilio.com" || url.protocol !== "https:" || !url.pathname.startsWith("/2010-04-01/Accounts/" + encodeURIComponent(accountSid) + "/" + resource + ".json")) return { rows, complete: false, error: "Invalid pagination URL" };
+      if (url.hostname !== "api.twilio.com" || url.protocol !== "https:" ||
+          !url.pathname.startsWith("/2010-04-01/Accounts/" + encodeURIComponent(accountSid) + "/" + resource + ".json"))
+        return { rows, complete: false, error: "Invalid pagination URL" };
       applyPeriodFilters(url);
-      const pageKey = url.toString();
-      if (visitedPages.has(pageKey)) return { rows, complete: false, error: "Provider pagination loop detected" };
-      visitedPages.add(pageKey);
-      const response = await fetch(url, { headers: { Authorization: "Basic " + auth }, signal: AbortSignal.timeout(15000) });
+      const key = url.toString();
+      if (visitedPages.has(key)) return { rows, complete: false, error: "Provider pagination loop detected" };
+      visitedPages.add(key);
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      const response = await fetch(url, {
+        headers: { Authorization: "Basic " + auth },
+        signal: AbortSignal.timeout(Math.min(remaining, 5000)),
+      });
       if (!response.ok) return { rows, complete: false, error: "Provider returned " + response.status };
       const body: any = await response.json();
       rows.push(...(resource === "Calls" ? body.calls ?? [] : body.messages ?? []));
       next = body.next_page_uri ? new URL(body.next_page_uri, "https://api.twilio.com").toString() : null;
     }
-    return { rows, complete: !next, error: next ? "Pagination page/time limit reached" : undefined };
-  } catch { return { rows, complete: false, error: "Provider request failed" }; }
+    return { rows, complete: !next, error: next ? "Itemized reconciliation deferred; dashboard request budget reached" : undefined };
+  } catch {
+    return { rows, complete: false, error: "Itemized provider request timed out or failed" };
+  }
 }
 
 let twilioItemizedCache: { key: string; at: number; data: any } | null = null;
