@@ -55,7 +55,14 @@ export async function reconcileTwilioBatch(args: {
     }));
     const continuation = payload.next_page_uri ?
       new URL(String(payload.next_page_uri), "https://api.twilio.com").toString() : null;
-    if (continuation) {\n      const nextUrl = new URL(continuation);\n      if (nextUrl.protocol !== "https:" || nextUrl.hostname !== "api.twilio.com" || nextUrl.pathname !== basePath)\n        throw new Error("Invalid Twilio continuation URL");\n      nextUrl.searchParams.set(dateField + ">=", start);\n      nextUrl.searchParams.set(dateField + "<=", end);\n      if (nextUrl.toString() === canonical) throw new Error("Twilio continuation repeats current page");\n    }
+    if (continuation) {
+      const nextUrl = new URL(continuation);
+      if (nextUrl.protocol !== "https:" || nextUrl.hostname !== "api.twilio.com" || nextUrl.pathname !== basePath)
+        throw new Error("Invalid Twilio continuation URL");
+      nextUrl.searchParams.set(dateField + ">=", start);
+      nextUrl.searchParams.set(dateField + "<=", end);
+      if (nextUrl.toString() === canonical) throw new Error("Twilio continuation repeats current page");
+    }
     await persistTwilioPage({ accountSid, month, resource, rows, nextPageUri: continuation });
     records += rows.length;
     pages++;
