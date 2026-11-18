@@ -143,7 +143,7 @@ async function fetchTwilioItemized(
 }
 
 let twilioItemizedCache: { key: string; at: number; data: any } | null = null;
-async function buildTwilioAttribution(
+async function computeTwilioAttribution(
   accountSid: string, auth: string,
   inventory: Set<string> | null,
   savedLines: Array<{ number: string; companyId: number | null }>
@@ -231,6 +231,45 @@ async function buildTwilioAttribution(
   };
   // Short-lived incomplete snapshots prevent repeated provider scans on each\n  // dashboard refresh. Monetary attribution remains suppressed until complete.\n  twilioItemizedCache = { key: cacheKey, at: Date.now(), data: result };
   return result;
+}
+
+// A single in-process refresh runs outside the dashboard response path.
+// Incomplete results remain explicitly unverified; a later dashboard request
+// can read the cached snapshot without waiting for Twilio pagination.
+let twilioRefresh: { key: string; promise: Promise<void> } | null = null;
+let twilioRefreshAttempt: { key: string; at: number } | null = null;
+function buildTwilioAttribution(
+  accountSid: string, auth: string,
+  inventory: Set<string> | null,
+  savedLines: Array<{ number: string; companyId: number | null }>
+): any {
+  if (!inventory) return { available: false, reason: "Twilio inventory unavailable" };
+  const now = new Date();
+  const key = accountSid + ":" + now.getUTCFullYear() + "-" + now.getUTCMonth();
+  const cached = twilioItemizedCache?.key === key ? twilioItemizedCache : null;
+  const freshness = cached?.data.complete ? 5 * 60_000 : 60_000;
+  if (!twilioRefresh || twilioRefresh.key !== key) {
+    if ((!cached || Date.now() - cached.at >= freshness) &&
+        (!twilioRefreshAttempt || twilioRefreshAttempt.key !== key || Date.now() - twilioRefreshAttempt.at >= 60_000)) {
+      twilioRefreshAttempt = { key, at: Date.now() };
+      const promise = computeTwilioAttribution(accountSid, auth, inventory, savedLines)
+        .then(() => undefined)
+        .catch(() => {
+          twilioItemizedCache = {
+            key, at: Date.now(),
+            data: { available: false, complete: false, attributionSuppressed: true,
+              reason: "Provider reconciliation refresh failed" }
+          };
+        })
+        .finally(() => { if (twilioRefresh?.promise === promise) twilioRefresh = null; });
+      twilioRefresh = { key, promise };
+    }
+  }
+  return cached?.data ?? {
+    available: true, complete: false, attributionSuppressed: true,
+    reason: "Twilio itemized reconciliation is refreshing in the background",
+    companies: [], errors: ["Reconciliation pending"]
+  };
 }
 
 // Cache successful organization billing reads across dashboard refreshes.
