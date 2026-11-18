@@ -17,6 +17,18 @@ export async function reconcileTwilioBatch(args: {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("Invalid billing month");
   const maxPages = Number.isFinite(args.maxPages) ? Math.max(1, Math.min(10, Math.floor(args.maxPages!))) : 3;
   await ensureTwilioReconciliationTables();
+  // Serialize workers across processes using a PostgreSQL advisory lock.
+  // The lock is held on one dedicated connection for the whole batch.
+  const lockClient = await (await import("@workspace/db")).pool.connect();
+  const lockKey = accountSid + ":" + month + ":" + resource;
+  const lockResult = await lockClient.query(
+    "SELECT pg_try_advisory_lock(hashtext($1), hashtext($2)) AS acquired",
+    ["twilio-reconciliation", lockKey]);
+  if (!lockResult.rows[0]?.acquired) {
+    lockClient.release();
+    throw new Error("Reconciliation batch already running for this account and month");
+  }
+  try {
   const checkpoint = await readTwilioCheckpoint(accountSid, month, resource);
   if (checkpoint?.status === "complete") return { complete: true, pages: 0, records: 0 };
   const [year, mm] = month.split("-").map(Number);
@@ -69,4 +81,10 @@ export async function reconcileTwilioBatch(args: {
     next = continuation;
   }
   return { complete: next === null, pages, records };
+  } finally {
+    try {
+      await lockClient.query("SELECT pg_advisory_unlock(hashtext($1), hashtext($2))",
+        ["twilio-reconciliation", lockKey]);
+    } finally { lockClient.release(); }
+  }
 }
