@@ -114,17 +114,24 @@ async function fetchTwilioItemized(
   applyPeriodFilters(initial);
   next = initial.toString();
   try {
-    for (let page = 0; next && page < 20; page++) {
+    const visitedPages = new Set<string>();
+    // The former 20-page cap truncated accounts with more than 20,000 SMS.
+    // Bound both pages and elapsed time; never return partial amounts as complete.
+    const deadline = Date.now() + 90_000;
+    for (let page = 0; next && page < 100 && Date.now() < deadline; page++) {
       const url = new URL(next);
       if (url.hostname !== "api.twilio.com" || url.protocol !== "https:" || !url.pathname.startsWith("/2010-04-01/Accounts/" + encodeURIComponent(accountSid) + "/" + resource + ".json")) return { rows, complete: false, error: "Invalid pagination URL" };
       applyPeriodFilters(url);
+      const pageKey = url.toString();
+      if (visitedPages.has(pageKey)) return { rows, complete: false, error: "Provider pagination loop detected" };
+      visitedPages.add(pageKey);
       const response = await fetch(url, { headers: { Authorization: "Basic " + auth }, signal: AbortSignal.timeout(15000) });
       if (!response.ok) return { rows, complete: false, error: "Provider returned " + response.status };
       const body: any = await response.json();
       rows.push(...(resource === "Calls" ? body.calls ?? [] : body.messages ?? []));
       next = body.next_page_uri ? new URL(body.next_page_uri, "https://api.twilio.com").toString() : null;
     }
-    return { rows, complete: !next, error: next ? "Pagination limit reached" : undefined };
+    return { rows, complete: !next, error: next ? "Pagination page/time limit reached" : undefined };
   } catch { return { rows, complete: false, error: "Provider request failed" }; }
 }
 
