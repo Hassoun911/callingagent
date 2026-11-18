@@ -15,7 +15,7 @@ export async function reconcileTwilioBatch(args: {
   const { accountSid, authToken, month, resource } = args;
   if (!/^AC[a-fA-F0-9]{32}$/.test(accountSid)) throw new Error("Invalid Twilio account SID");
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("Invalid billing month");
-  const maxPages = Math.max(1, Math.min(10, Math.floor(args.maxPages ?? 3)));
+  const maxPages = Number.isFinite(args.maxPages) ? Math.max(1, Math.min(10, Math.floor(args.maxPages!))) : 3;
   await ensureTwilioReconciliationTables();
   const checkpoint = await readTwilioCheckpoint(accountSid, month, resource);
   if (checkpoint?.status === "complete") return { complete: true, pages: 0, records: 0 };
@@ -55,7 +55,7 @@ export async function reconcileTwilioBatch(args: {
     }));
     const continuation = payload.next_page_uri ?
       new URL(String(payload.next_page_uri), "https://api.twilio.com").toString() : null;
-    if (continuation === canonical) throw new Error("Twilio continuation repeats current page");
+    if (continuation) {\n      const nextUrl = new URL(continuation);\n      if (nextUrl.protocol !== "https:" || nextUrl.hostname !== "api.twilio.com" || nextUrl.pathname !== basePath)\n        throw new Error("Invalid Twilio continuation URL");\n      nextUrl.searchParams.set(dateField + ">=", start);\n      nextUrl.searchParams.set(dateField + "<=", end);\n      if (nextUrl.toString() === canonical) throw new Error("Twilio continuation repeats current page");\n    }
     await persistTwilioPage({ accountSid, month, resource, rows, nextPageUri: continuation });
     records += rows.length;
     pages++;
