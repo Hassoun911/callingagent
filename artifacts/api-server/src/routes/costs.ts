@@ -151,7 +151,7 @@ async function buildTwilioAttribution(
   if (!inventory) return { available: false, reason: "Twilio inventory unavailable" };
   const now = new Date();
   const cacheKey = accountSid + ":" + now.getUTCFullYear() + "-" + now.getUTCMonth();
-  if (twilioItemizedCache?.key === cacheKey && Date.now() - twilioItemizedCache.at < 5 * 60 * 1000) return twilioItemizedCache.data;
+  if (twilioItemizedCache?.key === cacheKey && Date.now() - twilioItemizedCache.at < (twilioItemizedCache.data.complete ? 5 * 60 * 1000 : 60 * 1000)) return twilioItemizedCache.data;
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const monthStart = start.toISOString().slice(0, 10);
@@ -229,7 +229,7 @@ async function buildTwilioAttribution(
     })) : [],
     attributionSuppressed: !(calls.complete && messages.complete && outOfPeriodRecords === 0),
   };
-  if (result.complete) twilioItemizedCache = { key: cacheKey, at: Date.now(), data: result };
+  // Short-lived incomplete snapshots prevent repeated provider scans on each\n  // dashboard refresh. Monetary attribution remains suppressed until complete.\n  twilioItemizedCache = { key: cacheKey, at: Date.now(), data: result };
   return result;
 }
 
