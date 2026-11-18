@@ -68,9 +68,16 @@ export async function persistTwilioPage(args: {
       !url.pathname.startsWith("/2010-04-01/Accounts/" + encodeURIComponent(accountSid) + "/" + resource + ".json"))
       throw new Error("Invalid Twilio continuation URL");
   }
+  // Ensure a checkpoint cannot silently skip a page or be advanced by a
+  // stale worker. Cross-instance execution is serialized by the worker lock.
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const checkpoint = await client.query(
+      "SELECT status FROM ca_twilio_reconciliation_checkpoints WHERE account_sid=$1 AND billing_month=$2 AND resource=$3 FOR UPDATE",
+      [accountSid, month, resource]);
+    if (checkpoint.rows[0]?.status === "complete")
+      throw new Error("Cannot append to completed reconciliation");
     for (const row of rows) {
       if (row.price != null && (!Number.isFinite(Number(row.price)) || !row.currency))
         throw new Error("Invalid Twilio price evidence");
