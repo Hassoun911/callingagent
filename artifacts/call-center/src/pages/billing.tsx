@@ -3,6 +3,66 @@ import { useQuery } from "@tanstack/react-query";
 import { RefreshCw, AlertCircle, ExternalLink, ChevronDown, ChevronRight, Building2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
+type CustomerBillingRow = {
+  companyId: number; companyName: string; subscribedPlan: string | null;
+  subscriptionStatus: string | null; packageName: string | null;
+  monthlyPriceCents: number | string | null; includedMonthlyMinutes: number | null;
+  includedNumbers: number | null; activeNumbers: number;
+  lastPaymentStatus: string | null; currentPeriodEnd: string | null;
+};
+type CustomerBillingResponse = { currency: string; companies: CustomerBillingRow[] };
+
+function CustomerBillingOverview() {
+  const { data, isLoading, error, refetch } = useQuery<CustomerBillingResponse>({
+    queryKey: ["company-billing-overview"],
+    queryFn: async () => {
+      const response = await fetch("/api/billing/company-overview", { credentials: "include" });
+      if (!response.ok) throw new Error("Company subscription data unavailable (" + response.status + ")");
+      return response.json();
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const formatPrice = (cents: number | string | null) =>
+    cents == null || !Number.isFinite(Number(cents))
+      ? "Not configured"
+      : new Intl.NumberFormat("en-CA", { style: "currency", currency: data?.currency || "CAD" }).format(Number(cents) / 100);
+  return (
+    <section className="rounded-lg border bg-white p-4 mb-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Company subscriptions & billing</h2>
+          <p className="text-xs text-slate-500">Package prices and subscription status are separate from provider operating costs. Amounts below are not invoices.</p>
+        </div>
+        <button className="rounded border px-3 py-1.5 text-xs hover:bg-slate-50" onClick={() => refetch()}>Refresh subscriptions</button>
+      </div>
+      {isLoading ? <p className="text-sm text-slate-500">Loading company subscriptions…</p> :
+        error ? <p role="alert" className="text-sm text-red-700">Unable to load subscriptions. Check the billing API before issuing invoices.</p> :
+        !data?.companies?.length ? <p className="text-sm text-amber-700">No company subscription records found.</p> :
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="border-b bg-slate-50 text-slate-600"><tr>
+              <th className="p-2">Company</th><th className="p-2">Package</th>
+              <th className="p-2">Monthly price</th><th className="p-2">Included minutes</th>
+              <th className="p-2">Phone numbers</th><th className="p-2">Subscription</th>
+              <th className="p-2">Payment</th>
+            </tr></thead>
+            <tbody>{data.companies.map(company => <tr key={company.companyId} className="border-b">
+              <td className="p-2 font-medium">{company.companyName}</td>
+              <td className="p-2">{company.packageName ?? company.subscribedPlan ?? "Not assigned"}</td>
+              <td className="p-2 font-medium">{formatPrice(company.monthlyPriceCents)}</td>
+              <td className="p-2">{company.includedMonthlyMinutes ?? "—"}</td>
+              <td className="p-2">{company.activeNumbers} active / {company.includedNumbers ?? "—"} included</td>
+              <td className="p-2">{company.subscriptionStatus ?? "Not configured"}</td>
+              <td className="p-2">{company.lastPaymentStatus ?? "Unknown"}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>}
+      <p className="mt-3 text-xs text-amber-800">Usage overages and invoice totals are not verified. No automatic charges are initiated from this view.</p>
+    </section>
+  );
+}
+
 type TwilioPerNumber = {
   phoneNumber: string;
   friendlyName: string | null;
@@ -88,6 +148,7 @@ export default function Billing() {
 
   return (
     <div className="space-y-6 min-w-0 overflow-x-hidden">
+      <CustomerBillingOverview />
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
