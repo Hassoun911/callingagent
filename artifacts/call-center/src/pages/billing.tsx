@@ -9,8 +9,43 @@ type CustomerBillingRow = {
   monthlyPriceCents: number | string | null; includedMonthlyMinutes: number | null;
   includedNumbers: number | null; activeNumbers: number;
   lastPaymentStatus: string | null; currentPeriodEnd: string | null;
+  proposedPlan: string | null; proposedPlanName: string | null;
 };
 type CustomerBillingResponse = { currency: string; companies: CustomerBillingRow[] };
+
+type AdminPlan = { slug: string; name: string; priceCents: number; isEnabled: boolean };
+function PlanOnboardingControl({ company, plans, onSaved }: {
+  company: CustomerBillingRow; plans: AdminPlan[]; onSaved: () => void;
+}) {
+  const [selected, setSelected] = useState(company.proposedPlan ?? "");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const save = async () => {
+    setBusy(true); setMessage("");
+    try {
+      const response = await fetch("/api/billing/company-onboarding/" + company.companyId, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planSlug: selected || null }),
+      });
+      if (!response.ok) throw new Error("Could not save proposed plan");
+      setMessage("Saved for review; no payment or subscription created.");
+      onSaved();
+    } catch { setMessage("Unable to save. Check administrator access."); }
+    finally { setBusy(false); }
+  };
+  return <div className="flex flex-wrap items-center gap-1">
+    <select aria-label={"Proposed package for " + company.companyName}
+      className="rounded border px-1 py-1" value={selected}
+      onChange={e => setSelected(e.target.value)}>
+      <option value="">No proposed plan</option>
+      {plans.filter(p => p.isEnabled).map(p => <option key={p.slug} value={p.slug}>{p.name} — CAD {(p.priceCents / 100).toFixed(2)}/mo</option>)}
+    </select>
+    <button type="button" className="rounded border px-2 py-1 disabled:opacity-50"
+      disabled={busy || selected === (company.proposedPlan ?? "")} onClick={save}>Save proposal</button>
+    {message && <span role="status" className="text-amber-700">{message}</span>}
+  </div>;
+}
 
 function CustomerBillingOverview() {
   const { data, isLoading, error, refetch } = useQuery<CustomerBillingResponse>({
@@ -22,6 +57,15 @@ function CustomerBillingOverview() {
     },
     staleTime: 60_000,
     refetchOnWindowFocus: false,
+  });
+  const { data: plans } = useQuery<AdminPlan[]>({
+    queryKey: ["admin-plans-for-billing"],
+    queryFn: async () => {
+      const response = await fetch("/api/admin/plans", { credentials: "include" });
+      if (!response.ok) return [];
+      return response.json();
+    },
+    staleTime: 60_000,
   });
   const unconfigured = data?.companies?.filter(c => !c.packageName || c.monthlyPriceCents == null || !c.subscriptionStatus) ?? [];
   const configured = (data?.companies?.length ?? 0) - unconfigured.length;
@@ -58,7 +102,7 @@ function CustomerBillingOverview() {
               <th className="p-2">Company</th><th className="p-2">Package</th>
               <th className="p-2">Monthly price</th><th className="p-2">Included minutes</th>
               <th className="p-2">Phone numbers</th><th className="p-2">Subscription</th>
-              <th className="p-2">Payment</th>
+              <th className="p-2">Payment</th><th className="p-2">Plan onboarding (no charge)</th>
             </tr></thead>
             <tbody>{data.companies.map(company => <tr key={company.companyId} className="border-b">
               <td className="p-2 font-medium">{company.companyName}</td>
@@ -68,6 +112,7 @@ function CustomerBillingOverview() {
               <td className="p-2">{company.activeNumbers} active / {company.includedNumbers ?? "—"} included</td>
               <td className="p-2">{company.subscriptionStatus ?? "Not configured"}{(!company.packageName || company.monthlyPriceCents == null) && <span className="ml-1 text-amber-700">(setup required)</span>}</td>
               <td className="p-2">{company.lastPaymentStatus ?? "Unknown"}</td>
+              <td className="p-2">{company.subscriptionStatus ? "Manage in Stripe" : plans?.length ? <PlanOnboardingControl key={company.companyId + ":" + (company.proposedPlan ?? "")} company={company} plans={plans} onSaved={() => refetch()} /> : company.proposedPlanName ?? "Admin setup only"}</td>
             </tr>)}</tbody>
           </table>
         </div>}
