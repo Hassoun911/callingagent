@@ -452,7 +452,7 @@ router.get("/costs", async (req, res): Promise<void> => {
         : provider === "unverified" ? "Provider not verified in available inventories"
         : "Provider verified; monetary charges not yet attributed" };
   });
-  const telnyxLines = inventoryStatus.filter(n => !n.verified || n.provider === "conflict");
+  const telnyxLines = inventoryStatus.filter(n => n.provider === "telnyx");
   // Signed provider call.cost webhooks provide billed seconds, not a verified
   // monthly monetary invoice. Keep these distinct so account totals are never
   // represented as paid/settled charges or as an enforceable minute balance.
@@ -460,6 +460,8 @@ router.get("/costs", async (req, res): Promise<void> => {
     signedLegEvents:number; attributedLegEvents:number; billedSeconds:number;
     missingDurationEvents:number; latestReceivedAt:string|null;
     verifiedMoneyTotal:false; billingStatus:string;
+    companies:Array<{companyId:number; signedLegEvents:number; billedSeconds:number; missingDurationEvents:number}>;
+    unattributedLegEvents:number;
   } | null = null;
   try {
     const events=await pool.query(`
@@ -471,6 +473,17 @@ router.get("/costs", async (req, res): Promise<void> => {
       FROM ca_telnyx_cost_legs
       WHERE occurred_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
     `);
+    const byCompany = await pool.query(`
+      SELECT company_id,
+        COUNT(*)::integer AS signed_leg_events,
+        COALESCE(SUM(billed_duration_secs),0)::bigint AS billed_seconds,
+        COUNT(*) FILTER (WHERE billed_duration_secs IS NULL)::integer AS missing_duration_events
+      FROM ca_telnyx_cost_legs
+      WHERE occurred_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+        AND occurred_at < (date_trunc('month',now() AT TIME ZONE 'UTC') + interval '1 month') AT TIME ZONE 'UTC'
+        AND company_id IS NOT NULL
+      GROUP BY company_id
+    `);
     const row=events.rows[0];
     telnyxCallCostEvidence={
       signedLegEvents:Number(row.signed_leg_events),
@@ -479,6 +492,13 @@ router.get("/costs", async (req, res): Promise<void> => {
       missingDurationEvents:Number(row.missing_duration_events),
       latestReceivedAt:row.latest_received_at?new Date(row.latest_received_at).toISOString():null,
       verifiedMoneyTotal:false,
+      companies:byCompany.rows.map((r:any)=>({
+        companyId:Number(r.company_id),
+        signedLegEvents:Number(r.signed_leg_events),
+        billedSeconds:Number(r.billed_seconds),
+        missingDurationEvents:Number(r.missing_duration_events)
+      })),
+      unattributedLegEvents:Number(row.signed_leg_events)-Number(row.attributed_leg_events),
       billingStatus:"Signed carrier leg evidence only; no verified monthly money total."
     };
   }catch(error:any){
