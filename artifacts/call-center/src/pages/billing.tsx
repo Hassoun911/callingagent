@@ -23,6 +23,8 @@ function CustomerBillingOverview() {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
+  const unconfigured = data?.companies?.filter(c => !c.packageName || c.monthlyPriceCents == null || !c.subscriptionStatus) ?? [];
+  const configured = (data?.companies?.length ?? 0) - unconfigured.length;
   const formatPrice = (cents: number | string | null) =>
     cents == null || !Number.isFinite(Number(cents))
       ? "Not configured"
@@ -36,6 +38,17 @@ function CustomerBillingOverview() {
         </div>
         <button className="rounded border px-3 py-1.5 text-xs hover:bg-slate-50" onClick={() => refetch()}>Refresh subscriptions</button>
       </div>
+      {!isLoading && !error && data?.companies?.length ? (
+        <div className="mb-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950" role="status">
+          <strong>{configured} of {data.companies.length} companies have complete subscription setup.</strong>
+          {unconfigured.length > 0 && (
+            <p className="mt-1">
+              {unconfigured.length} {unconfigured.length === 1 ? "company needs" : "companies need"} a verified package, price, or subscription record before customer billing can be enabled.
+              Review your <a className="underline font-medium" href="/packages">Packages</a> and the affected company subscriptions.
+            </p>
+          )}
+        </div>
+      ) : null}
       {isLoading ? <p className="text-sm text-slate-500">Loading company subscriptions…</p> :
         error ? <p role="alert" className="text-sm text-red-700">Unable to load subscriptions. Check the billing API before issuing invoices.</p> :
         !data?.companies?.length ? <p className="text-sm text-amber-700">No company subscription records found.</p> :
@@ -53,7 +66,7 @@ function CustomerBillingOverview() {
               <td className="p-2 font-medium">{formatPrice(company.monthlyPriceCents)}</td>
               <td className="p-2">{company.includedMonthlyMinutes ?? "—"}</td>
               <td className="p-2">{company.activeNumbers} active / {company.includedNumbers ?? "—"} included</td>
-              <td className="p-2">{company.subscriptionStatus ?? "Not configured"}</td>
+              <td className="p-2">{company.subscriptionStatus ?? "Not configured"}{(!company.packageName || company.monthlyPriceCents == null) && <span className="ml-1 text-amber-700">(setup required)</span>}</td>
               <td className="p-2">{company.lastPaymentStatus ?? "Unknown"}</td>
             </tr>)}</tbody>
           </table>
