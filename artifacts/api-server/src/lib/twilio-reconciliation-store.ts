@@ -65,7 +65,8 @@ export async function persistTwilioPage(args: {
   if (nextPageUri) {
     const url = new URL(nextPageUri, "https://api.twilio.com");
     if (url.protocol !== "https:" || url.hostname !== "api.twilio.com" ||
-      !url.pathname.startsWith("/2010-04-01/Accounts/" + encodeURIComponent(accountSid) + "/" + resource + ".json"))
+      url.pathname !== "/2010-04-01/Accounts/" + encodeURIComponent(accountSid) + "/" + resource + ".json" ||
+      url.username || url.password || url.port || url.hash)
       throw new Error("Invalid Twilio continuation URL");
   }
   // Ensure a checkpoint cannot silently skip a page or be advanced by a
