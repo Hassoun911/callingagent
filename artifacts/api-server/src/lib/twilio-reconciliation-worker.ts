@@ -21,10 +21,17 @@ export async function reconcileTwilioBatch(args: {
   // The lock is held on one dedicated connection for the whole batch.
   const lockClient = await (await import("@workspace/db")).pool.connect();
   const lockKey = accountSid + ":" + month + ":" + resource;
-  const lockResult = await lockClient.query(
-    "SELECT pg_try_advisory_lock(hashtext($1), hashtext($2)) AS acquired",
-    ["twilio-reconciliation", lockKey]);
-  if (!lockResult.rows[0]?.acquired) {
+  let acquired = false;
+  try {
+    const lockResult = await lockClient.query(
+      "SELECT pg_try_advisory_lock(hashtext($1), hashtext($2)) AS acquired",
+      ["twilio-reconciliation", lockKey]);
+    acquired = lockResult.rows[0]?.acquired === true;
+  } catch (error) {
+    lockClient.release();
+    throw error;
+  }
+  if (!acquired) {
     lockClient.release();
     throw new Error("Reconciliation batch already running for this account and month");
   }
