@@ -49,7 +49,8 @@ export async function reconcileTwilioBatch(args: {
   let pages = 0, records = 0;
   while (next && pages < maxPages) {
     const url = new URL(next, "https://api.twilio.com");
-    if (url.protocol !== "https:" || url.hostname !== "api.twilio.com" || url.pathname !== basePath)
+    if (url.protocol !== "https:" || url.hostname !== "api.twilio.com" || url.pathname !== basePath ||
+      url.username || url.password || url.port || url.hash)
       throw new Error("Invalid Twilio page URL");
     url.searchParams.set(dateField + ">=", start);
     url.searchParams.set(dateField + "<=", end);
@@ -76,7 +77,8 @@ export async function reconcileTwilioBatch(args: {
       new URL(String(payload.next_page_uri), "https://api.twilio.com").toString() : null;
     if (continuation) {
       const nextUrl = new URL(continuation);
-      if (nextUrl.protocol !== "https:" || nextUrl.hostname !== "api.twilio.com" || nextUrl.pathname !== basePath)
+      if (nextUrl.protocol !== "https:" || nextUrl.hostname !== "api.twilio.com" || nextUrl.pathname !== basePath ||
+        nextUrl.username || nextUrl.password || nextUrl.port || nextUrl.hash)
         throw new Error("Invalid Twilio continuation URL");
       nextUrl.searchParams.set(dateField + ">=", start);
       nextUrl.searchParams.set(dateField + "<=", end);
