@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import nodemailer from "nodemailer";
 import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import twilio from "twilio";
@@ -121,6 +122,46 @@ export async function ensureStripeBillingSchema() {
 
 
 }
+
+// Best-effort sales alert: the saved database inquiry remains authoritative.
+// Email failure must never turn a successfully recorded lead into an API error.
+async function notifySalesOfLaunchInterest(lead: {plan:string;name:string;email:string;phone:string;company:string}): Promise<void> {
+  const recipient = (process.env.CALLINGAGENT_SALES_EMAIL || process.env.SMTP_USER || "").trim();
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!recipient || !host || !user || !pass) return;
+  const transport = nodemailer.createTransport({
+    host,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_SECURE === "true",
+    auth: {user,pass},
+    connectionTimeout: 4000,
+    greetingTimeout: 4000,
+    socketTimeout: 4000,
+  });
+  try {
+    await transport.sendMail({
+      from: process.env.SMTP_FROM || user,
+      to: recipient,
+      subject: "CallingAgent package inquiry — " + lead.plan,
+      text: [
+        "New CallingAgent package inquiry",
+        "Package: " + lead.plan,
+        "Contact: " + lead.name,
+        "Email: " + lead.email,
+        "Phone: " + (lead.phone || "Not provided"),
+        "Business: " + (lead.company || "Not provided"),
+        "",
+        "Follow up through the platform administrator's Package Manager.",
+        "This is an inquiry, not a paid subscription.",
+      ].join("\n"),
+    });
+  } finally {
+    transport.close();
+  }
+}
+
 // Public launch inquiry collection. Never collects card data or opens Stripe.
 router.post("/launch-interest",async(req,res)=>{
   res.set("Cache-Control","no-store");
@@ -149,6 +190,10 @@ router.post("/launch-interest",async(req,res)=>{
       "INSERT INTO ca_launch_interest(plan_slug,contact_name,email,phone,company_name) VALUES($1,$2,$3,$4,$5)",
       [plan,name,email,phone||null,company||null]
     );
+    // Respond immediately after persistence; SMTP delivery is advisory, not transactional.
+    void notifySalesOfLaunchInterest({plan,name,email,phone,company}).catch((error:any)=>{
+      req.log.warn({message:error?.message},"Package inquiry saved but sales email delivery failed");
+    });
     res.status(201).json({received:true,message:"Your request was received. No payment has been taken."});
   }catch(err:any){
     req.log.error({message:err?.message},"Launch interest submission failed");
