@@ -1,6 +1,7 @@
 import app from "./app";
 import { ensurePlanCatalog } from "./routes/plan-catalog";
 import { ensureStripeBillingSchema } from "./routes/stripe-billing";
+import { ensureCompanySignupSchema } from "./routes/company-signup";
 import { ensureTelnyxUsageSchema } from "./lib/telnyx-carrier-usage";
 import { ensureTelnyxCpsSchema } from "./lib/telnyx-cps-guard";
 import { db } from "@workspace/db";
@@ -33,6 +34,7 @@ if (Number.isNaN(port) || port <= 0) {
 async function start(): Promise<void> {
   await ensurePlanCatalog();
   await ensureStripeBillingSchema();
+  await ensureCompanySignupSchema();
   await ensureTelnyxUsageSchema();
   await ensureTelnyxCpsSchema();
   await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS google_site text`);
