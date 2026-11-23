@@ -15,7 +15,16 @@ export async function newNumberAllowanceError(companyId: number, excludedPhoneId
       FROM ca_stripe_subscriptions s
       LEFT JOIN ca_plans p ON p.slug=s.plan_slug WHERE s.company_id=$1`, [companyId]
   );
-  if (!subscription.rowCount) return null; // Existing legacy customers unaffected.
+  if (!subscription.rowCount) {
+    // Do not let a new self-registered customer bypass paid plan requirements.
+    // Existing pre-launch companies without Stripe records keep their lines.
+    const origin = await pool.query(
+      "SELECT 1 FROM ca_self_registered_companies WHERE company_id=$1", [companyId]
+    );
+    return origin.rowCount
+      ? "A verified active and paid subscription is required before assigning or purchasing a business number."
+      : null;
+  }
   const row=subscription.rows[0];
   // The CallingAgent live catalog does not currently offer a free trial.
   // An "active" Stripe flag by itself is not evidence that the first invoice paid.
