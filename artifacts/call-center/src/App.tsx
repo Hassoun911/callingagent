@@ -246,6 +246,18 @@ function AuthGate({ children }: { children?: React.ReactNode }) {
     if (isLoading || !isAuthenticated || !user) return;
     if ((!user.role || user.role === "super_admin") && (currentPath === "/login" || currentPath === "/start")) {
       navigate("/", { replace: true });
+    } else if (user.role === "company_admin" && currentPath === "/login") {
+      // Preserve only the known plan-selection destination; never use an
+      // unvalidated next= value as a general-purpose redirect.
+      const next = new URLSearchParams(window.location.search).get("next");
+      if (next) {
+        const match = /^\/start\?plan=(payg|starter|business|plus|pro)$/.exec(next);
+        if (match) {
+          navigate(next, { replace: true });
+          return;
+        }
+      }
+      navigate("/portal", { replace: true });
     }
   }, [isLoading, isAuthenticated, user, currentPath, navigate]);
 
@@ -269,7 +281,9 @@ function AuthGate({ children }: { children?: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, logout, refetch }}>
-      {isSuperAdmin ? children : <PortalRedirect user={user} />}
+      {isSuperAdmin ? children : currentPath === "/start"
+        ? <PublicStart canCheckout={user.role === "company_admin"} />
+        : <PortalRedirect user={user} />}
     </AuthContext.Provider>
   );
 }
