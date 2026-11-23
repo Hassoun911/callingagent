@@ -5,6 +5,7 @@ import { pool } from "@workspace/db";
 import twilio from "twilio";
 import { verifiedCurrentPaidInvoice } from "../lib/stripe-paid-invoice-evidence";
 import { verifyStripeWebhookSignature } from "../lib/stripe-webhook-signature";
+import { applyStripeEventAtomically } from "../lib/stripe-event-atomic";
 
 const router: IRouter = Router();
 const prices: Record<string, string> = {
@@ -680,13 +681,13 @@ router.post("/billing/portal", async (req, res) => {
 function subscriptionPriceId(subscription: any): string | null {
   return subscription?.items?.data?.[0]?.price?.id || null;
 }
-async function applyStripeEvent(event: any): Promise<void> {
+async function applyStripeEvent(event: any, client: Awaited<ReturnType<typeof pool.connect>>): Promise<void> {
   const kind = String(event.type || "");
   const object = event?.data?.object;
   if (!object?.id) return;
   if (kind === "checkout.session.completed") {
     if (object.mode !== "subscription" || !object.subscription || !object.customer) return;
-    const pending = await pool.query("SELECT company_id,plan_slug,subscription_id FROM ca_stripe_checkout_intents WHERE session_id=$1", [object.id]);
+    const pending = await client.query("SELECT company_id,plan_slug,subscription_id FROM ca_stripe_checkout_intents WHERE session_id=$1", [object.id]);
     const intent = pending.rows[0];
     if (!intent || (intent.subscription_id && intent.subscription_id !== object.subscription)) return;
     const expected = prices[String(intent.plan_slug)];
@@ -704,7 +705,7 @@ async function applyStripeEvent(event: any): Promise<void> {
     const latestPayment = latestInvoice?.paid===true ? "paid" :
       latestInvoice?.status==="open" ? "pending" :
       latestInvoice?.status==="uncollectible" ? "failed" : null;
-    await pool.query(`INSERT INTO ca_stripe_subscriptions(company_id,stripe_customer_id,stripe_subscription_id,plan_slug,status,current_period_end,last_event_created,last_payment_status,last_payment_at)
+    await client.query(`INSERT INTO ca_stripe_subscriptions(company_id,stripe_customer_id,stripe_subscription_id,plan_slug,status,current_period_end,last_event_created,last_payment_status,last_payment_at)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
       ON CONFLICT(company_id) DO UPDATE SET
       stripe_customer_id=EXCLUDED.stripe_customer_id,
@@ -723,9 +724,9 @@ async function applyStripeEvent(event: any): Promise<void> {
       Number.isFinite(sub.current_period_end) ? new Date(sub.current_period_end*1000) : null,
       event.created || 0,latestPayment,latestPayment==="paid" ? new Date() : null,
     ]);
-    await pool.query("UPDATE ca_stripe_checkout_intents SET subscription_id=$2 WHERE session_id=$1", [object.id,sub.id]);
+    await client.query("UPDATE ca_stripe_checkout_intents SET subscription_id=$2 WHERE session_id=$1", [object.id,sub.id]);
     if(latestPayment==="paid" && sub.status==="active"){
-      await pool.query(`INSERT INTO ca_billing_fulfillment(stripe_subscription_id,company_id,plan_slug)
+      await client.query(`INSERT INTO ca_billing_fulfillment(stripe_subscription_id,company_id,plan_slug)
         VALUES($1,$2,$3) ON CONFLICT(stripe_subscription_id) DO NOTHING`,[sub.id,intent.company_id,intent.plan_slug]);
     }
     return;
@@ -743,7 +744,7 @@ async function applyStripeEvent(event: any): Promise<void> {
     if(kind==="invoice.paid"){
       // A signed webhook alone does not prove that this invoice paid for
       // the company's CURRENT plan. Plan upgrades can race old invoices.
-      const assigned=await pool.query(
+      const assigned=await client.query(
         "SELECT plan_slug FROM ca_stripe_subscriptions WHERE stripe_subscription_id=$1",
         [subscriptionId]);
       if(!assigned.rowCount)return; // Checkout completion can later reconcile its invoice.
@@ -768,7 +769,7 @@ async function applyStripeEvent(event: any): Promise<void> {
         return;
       }
     }
-    const updated=await pool.query(`UPDATE ca_stripe_subscriptions
+    const updated=await client.query(`UPDATE ca_stripe_subscriptions
       SET last_payment_status=$2,
           last_payment_at=now(),
           last_invoice_event_created=$3,
@@ -780,7 +781,7 @@ async function applyStripeEvent(event: any): Promise<void> {
       subscriptionId,paymentStatus,eventCreated
     ]);
     if(kind==="invoice.paid" && updated.rows[0]?.status==="active"){
-      await pool.query(`INSERT INTO ca_billing_fulfillment(stripe_subscription_id,company_id,plan_slug)
+      await client.query(`INSERT INTO ca_billing_fulfillment(stripe_subscription_id,company_id,plan_slug)
         VALUES($1,$2,$3) ON CONFLICT(stripe_subscription_id)
         DO UPDATE SET status='awaiting_review',updated_at=now()
         WHERE ca_billing_fulfillment.status='payment_hold'`,[
@@ -790,18 +791,18 @@ async function applyStripeEvent(event: any): Promise<void> {
     if(kind==="invoice.payment_failed" && updated.rowCount){
       // Hold requests still awaiting operator fulfillment. Existing lines
       // are unchanged; no automatic suspension or deprovisioning.
-      await pool.query(`UPDATE ca_billing_fulfillment
+      await client.query(`UPDATE ca_billing_fulfillment
         SET status='payment_hold',updated_at=now()
         WHERE stripe_subscription_id=$1 AND status='awaiting_review'`,[subscriptionId]);
     }
     return;
   }
   if (kind.startsWith("customer.subscription.")) {
-    const current = await pool.query("SELECT company_id,last_event_created FROM ca_stripe_subscriptions WHERE stripe_subscription_id=$1", [object.id]);
+    const current = await client.query("SELECT company_id,last_event_created FROM ca_stripe_subscriptions WHERE stripe_subscription_id=$1", [object.id]);
     if (!current.rowCount || Number(current.rows[0].last_event_created) > Number(event.created || 0)) return;
     const nextSlug = Object.entries(prices).find(([,id])=>id===subscriptionPriceId(object))?.[0];
     if (!nextSlug) return;
-    const subscriptionUpdate=await pool.query(`UPDATE ca_stripe_subscriptions
+    const subscriptionUpdate=await client.query(`UPDATE ca_stripe_subscriptions
       SET status=$2,plan_slug=$3,current_period_end=$4,
       last_event_created=$5,updated_at=now(),
       -- A previously paid invoice does not prove that a newly selected
@@ -815,7 +816,7 @@ async function applyStripeEvent(event: any): Promise<void> {
       event.created || 0,
     ]);
     if(subscriptionUpdate.rowCount && ["canceled","unpaid","incomplete_expired"].includes(String(object.status))){
-      await pool.query(`UPDATE ca_billing_fulfillment
+      await client.query(`UPDATE ca_billing_fulfillment
         SET status='payment_hold',updated_at=now()
         WHERE stripe_subscription_id=$1 AND status='awaiting_review'`,[object.id]);
     }
@@ -833,20 +834,13 @@ router.post("/billing/stripe-webhook", async (req, res) => {
     if (typeof event.id !== "string" || !supported.has(event.type) || event.livemode !== true) {
       res.json({received:true}); return;
     }
-    // Serialize deliveries of the same event (and checkout/subscription updates)
-    // across Render workers. A session-level advisory lock is released in finally.
-    // This prevents simultaneous duplicate webhook deliveries from both applying.
+    // Serialize Stripe deliveries in a single DB transaction: a crash cannot
+    // persist only the subscription status or only the idempotency receipt.
+    // Transaction-scoped lock is automatically released on commit/rollback.
     const client = await pool.connect();
-    let locked = false;
     try {
-      await client.query("SELECT pg_advisory_lock(820762101)"); locked = true;
-      const prior = await client.query("SELECT event_id FROM ca_stripe_events WHERE event_id=$1", [event.id]);
-      if (!prior.rowCount) {
-        await applyStripeEvent(event);
-        await client.query("INSERT INTO ca_stripe_events(event_id) VALUES($1) ON CONFLICT DO NOTHING", [event.id]);
-      }
+      await applyStripeEventAtomically(client,event.id,()=>applyStripeEvent(event,client));
     } finally {
-      if (locked) await client.query("SELECT pg_advisory_unlock(820762101)").catch(() => {});
       client.release();
     }
     req.log.info({ eventType:event.type, eventId:event.id }, "Verified Stripe billing event processed");
