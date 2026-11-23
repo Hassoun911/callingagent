@@ -49,6 +49,32 @@ async function verifyLiveStripePrices(): Promise<{ready:boolean;issues:string[]}
   const issues=checks.filter((x):x is string=>typeof x==="string");
   return {ready:issues.length===0,issues};
 }
+// Read-only tax diagnostics. Stripe Tax cannot calculate automatic tax while
+// its account setup is pending. This does not decide whether a business must
+// register for tax or substitute for accountant/legal advice.
+async function checkStripeTaxReadiness(): Promise<{
+  status: string | null; missingFields: string[]; warning: string | null;
+}> {
+  const key = stripeKey();
+  if (!key) return { status:null, missingFields:[], warning:"Stripe key unavailable for tax readiness" };
+  try {
+    const response = await fetch("https://api.stripe.com/v1/tax/settings",{
+      headers:{Authorization:"Bearer "+key},signal:AbortSignal.timeout(10000)
+    });
+    if (!response.ok) return {status:null,missingFields:[],warning:"Stripe Tax settings could not be verified"};
+    const settings:any=await response.json();
+    const status=typeof settings.status==="string" ? settings.status : null;
+    const raw=settings?.status_details?.pending?.missing_fields;
+    const missingFields=Array.isArray(raw) ? raw.filter((x:any)=>typeof x==="string").slice(0,15) : [];
+    return {
+      status,missingFields,
+      warning:status==="active" ? null
+        : "Stripe Tax setup is not active. Confirm tax registrations, head office address, and tax treatment before enabling automated tax.",
+    };
+  } catch {
+    return {status:null,missingFields:[],warning:"Stripe Tax settings could not be verified"};
+  }
+}
 async function checkTelnyxCostConfiguration(): Promise<{enabled:boolean|null;webhookCorrect:boolean|null;warning:string|null}> {
   const id=process.env.TELNYX_CONNECTION_ID;
   const key=process.env.TELNYX_API_KEY;
@@ -295,6 +321,9 @@ router.get("/billing/readiness", async(req,res)=>{
     const stripePrices=liveMerchantVerified
       ? await verifyLiveStripePrices()
       : {ready:false,issues:["Live Stripe merchant verification required"]};
+    const stripeTax=liveMerchantVerified
+      ? await checkStripeTaxReadiness()
+      : {status:null,missingFields:[],warning:"Stripe Tax merchant verification required"};
     const telnyxCost=await checkTelnyxCostConfiguration();
     const plans=await pool.query("SELECT slug,checkout_enabled FROM ca_plans ORDER BY sort_order");
     const legacy=await pool.query(`SELECT
@@ -315,6 +344,9 @@ router.get("/billing/readiness", async(req,res)=>{
       expectedMerchant:expectedStripeAccountId,
       liveMerchantVerified,
       merchantVerificationWarning,
+      stripeTaxStatus:stripeTax.status,
+      stripeTaxMissingFields:stripeTax.missingFields,
+      stripeTaxWarning:stripeTax.warning,
       webhookSecretConfigured:Boolean(process.env.CALLINGAGENT_STRIPE_WEBHOOK_SECRET),
       entitlementEnforcementCertified:process.env.CALLINGAGENT_STRIPE_ENTITLEMENTS_CERTIFIED==="true",
       globalCheckoutApproved:process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED==="true",
@@ -349,6 +381,13 @@ router.get("/billing/launch-audit",async(req,res)=>{
     const catalog=await pool.query("SELECT slug,price_cents,monthly_minutes,included_numbers,is_enabled,is_published,checkout_enabled FROM ca_plans ORDER BY sort_order,id");
     const verifiedPrices=merchantVerified?await verifyLiveStripePrices():{ready:false,issues:["Stripe prices cannot be checked until merchant verification succeeds"]};
     issues.push(...verifiedPrices.issues);
+    const stripeTax=merchantVerified
+      ? await checkStripeTaxReadiness()
+      : {status:null,missingFields:[],warning:"Stripe Tax merchant verification required"};
+    if(stripeTax.warning)issues.push(stripeTax.warning);
+    if(stripeTax.missingFields.length)issues.push(
+      "Stripe Tax missing configuration fields: "+stripeTax.missingFields.join(", ")
+    );
     const totals=await pool.query(`SELECT
       (SELECT COUNT(*)::integer FROM ca_stripe_subscriptions) AS subscriptions,
       (SELECT COUNT(*)::integer FROM ca_stripe_checkout_intents) AS checkout_intents,
@@ -377,6 +416,7 @@ router.get("/billing/launch-audit",async(req,res)=>{
     if(plans.some(p=>!p.amountMatchesStripeMapping))issues.push("At least one catalog amount differs from its mapped live Stripe price");
     res.set("Cache-Control","no-store");
     res.json({merchantVerified,liveStripePricesVerified:verifiedPrices.ready,
+      stripeTaxStatus:stripeTax.status,stripeTaxMissingFields:stripeTax.missingFields,stripeTaxWarning:stripeTax.warning,
       checkoutEnabled:billingEnabled(),
       merchantId:expectedStripeAccountId,
       plans,metrics,issues,
