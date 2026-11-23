@@ -774,8 +774,6 @@ async function applyStripeEvent(event: any): Promise<void> {
       const subscription:any=await subResponse.json();
       if(!verifiedCurrentPaidInvoice(invoice,subscription,subscriptionId,expectedPrice)){
         // A genuine historical paid invoice cannot reactivate an old plan.
-        req.log?.warn?.({ invoiceId:object.id,subscriptionId },
-          "Ignoring paid invoice without matching current subscription evidence");
         return;
       }
     }
