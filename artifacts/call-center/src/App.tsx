@@ -8,6 +8,7 @@ import { Layout } from "@/components/layout";
 import { ContextualGuide } from "@/components/contextual-guide";
 import CompanyPortal from "@/pages/company-portal";
 import PublicHome, { PublicStart } from "@/pages/public-home";
+import CompanySignup from "@/pages/company-signup";
 
 import Dashboard from "@/pages/dashboard";
 import Numbers from "@/pages/numbers";
@@ -267,6 +268,7 @@ function AuthGate({ children }: { children?: React.ReactNode }) {
 
   if (!isAuthenticated || !user) {
     if (window.location.pathname === "/start") return <PublicStart />;
+    if (window.location.pathname === "/signup") return <CompanySignup />;
     if (window.location.pathname !== "/login" && !window.location.pathname.startsWith("/portal")) return <PublicHome />;
     const params = new URLSearchParams(window.location.search);
     const companyParam = params.get("company");
