@@ -121,6 +121,63 @@ function CustomerBillingOverview() {
   );
 }
 
+type FulfillmentItem = {
+  company_id:number;company_name:string;plan_slug:string;
+  fulfillment_status:string;subscription_status:string|null;
+  last_payment_status:string|null;active_numbers:number;included_numbers:number|null;
+  eligibleForProvisioning:boolean;requiresManualReview:boolean;created_at:string;
+};
+type FulfillmentQueueResponse={items:FulfillmentItem[];automaticProvisioningEnabled:false};
+
+/** Operator view, not a provisioning action. Clicking a company only opens its account. */
+function PaidFulfillmentReview(){
+  const {data,isLoading,error,refetch,isFetching}=useQuery<FulfillmentQueueResponse>({
+    queryKey:["paid-fulfillment-review"],
+    queryFn:async()=>{
+      const response=await fetch("/api/billing/fulfillment-queue",{credentials:"include",cache:"no-store"});
+      if(!response.ok)throw Error("Unable to load the protected fulfillment queue.");
+      return response.json();
+    },
+    staleTime:0,
+    refetchOnWindowFocus:false
+  });
+  const pending=data?.items.filter(x=>x.eligibleForProvisioning)??[];
+  const held=data?.items.filter(x=>!x.eligibleForProvisioning)??[];
+  return <section className="rounded-lg border bg-white p-4 shadow-sm space-y-3">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-900">Paid customer activation review</h2>
+        <p className="text-xs text-slate-600">Only active, paid subscriptions may be eligible for manual phone activation. No automatic purchases, assignments or suspensions occur here.</p>
+      </div>
+      <button type="button" onClick={()=>void refetch()} disabled={isFetching}
+        className="rounded border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-800 disabled:opacity-50">Refresh queue</button>
+    </div>
+    {error?<p role="alert" className="text-sm text-red-700">Fulfillment information is unavailable. Do not provision a line based on cached data.</p>:
+    isLoading?<p className="text-sm text-slate-600">Checking payment and activation statuses…</p>:
+    <div>
+      <p className="text-sm font-medium text-slate-800">{pending.length} eligible for manual review · {held.length} held or not yet eligible</p>
+      {!data?.items.length?<p className="mt-2 text-sm text-slate-500">No paid customer activation requests have been recorded.</p>:
+      <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-xs">
+        <thead className="border-b bg-slate-50 text-slate-700"><tr>
+          <th className="p-2">Company</th><th className="p-2">Package</th>
+          <th className="p-2">Subscription / payment</th><th className="p-2">Lines</th>
+          <th className="p-2">Activation review</th>
+        </tr></thead>
+        <tbody>{data?.items.map(x=><tr key={x.company_id+":"+x.plan_slug+":"+x.created_at} className="border-b">
+          <td className="p-2"><a className="font-semibold text-blue-700 underline" href={"/companies/"+x.company_id}>{x.company_name}</a></td>
+          <td className="p-2">{x.plan_slug}</td>
+          <td className="p-2">{x.subscription_status??"Unverified"} / {x.last_payment_status??"Unverified"}</td>
+          <td className="p-2">{x.active_numbers} active / {x.included_numbers??"—"} allowed</td>
+          <td className="p-2"><span className={x.eligibleForProvisioning?"font-semibold text-emerald-700":"font-semibold text-amber-800"}>
+            {x.eligibleForProvisioning?"Paid — manual review required":"HOLD — do not provision"}
+          </span></td>
+        </tr>)}</tbody>
+      </table></div>}
+    </div>}
+    <p className="text-xs text-amber-900">A paid status does not certify carrier inventory, available call minutes, or automatic provisioning. Verify the payment directly in Stripe and carrier inventory before any manual change.</p>
+  </section>;
+}
+
 type TwilioPerNumber = {
   phoneNumber: string;
   friendlyName: string | null;
@@ -207,6 +264,7 @@ export default function Billing() {
   return (
     <div className="space-y-6 min-w-0 overflow-x-hidden">
       <CustomerBillingOverview />
+      <PaidFulfillmentReview />
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
