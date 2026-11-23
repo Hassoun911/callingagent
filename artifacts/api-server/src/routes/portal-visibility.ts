@@ -1,6 +1,7 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
+import { hasCompanyFullAccess } from "../lib/company-full-access";
 
 const router: IRouter = Router();
 
@@ -106,6 +107,17 @@ async function ensureTable(): Promise<void> {
 }
 
 export async function getPortalVisibility(companyId: number): Promise<PortalVisibility> {
+  // Full Access grants all presently available portal features even if the
+  // saved per-company visibility rules are restrictive. Revocation restores
+  // those rules unchanged.
+  if (await hasCompanyFullAccess(companyId)) {
+    return {
+      pages: Object.fromEntries(Object.keys(DEFAULT_PORTAL_VISIBILITY.pages).map(k=>[k,true])) as PortalVisibility["pages"],
+      dashboard: Object.fromEntries(Object.keys(DEFAULT_PORTAL_VISIBILITY.dashboard).map(k=>[k,true])) as PortalVisibility["dashboard"],
+      phoneNumber: Object.fromEntries(Object.keys(DEFAULT_PORTAL_VISIBILITY.phoneNumber).map(k=>[k,true])) as PortalVisibility["phoneNumber"],
+      notifications: Object.fromEntries(Object.keys(DEFAULT_PORTAL_VISIBILITY.notifications).map(k=>[k,true])) as PortalVisibility["notifications"],
+    };
+  }
   await ensureTable();
   const result: any = await db.execute(sql`
     SELECT settings FROM company_portal_visibility WHERE company_id = ${companyId}
