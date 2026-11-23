@@ -127,7 +127,7 @@ async function dialClickToCallLeg(to: string, from: string, label: string, timeo
   const key = process.env.TELNYX_API_KEY;
   const connection = process.env.TELNYX_CONNECTION_ID;
   if (!key || !connection) throw new Error("Telnyx outbound credentials are missing");
-  await recordTelnyxOutboundStart("click_to_call");
+  await recordTelnyxOutboundStart(label === "agent" ? "click_to_call" : "click_to_call_followup");
   const result = await fetch("https://api.telnyx.com/v2/calls", {
     method: "POST",
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
