@@ -11,14 +11,14 @@ import { logger } from "./logger";
  *
  * OFF (default): no checks or DB writes on call attempts.
  * OBSERVE: record and warn, without changing voice behavior.
- * ENFORCE: reject excess user-initiated click-to-call starts only;
- *          critical inbound-call forwarding stays available and is warned.
+ * ENFORCE: reject excess initial user-initiated click-to-call starts only;
+ *          ongoing click-to-call second legs and inbound-call forwarding stay\n *          available and are warned, so accepted callers are not stranded.
  *
  * Configure TELNYX_CPS_ACCOUNT_KEY consistently for every worker/connection
  * belonging to the same Telnyx account. If absent, the same API key hashes
  * to the same scope. A different API key requires a shared account key.
  */
-export type OutboundKind = "click_to_call" | "forwarding";
+export type OutboundKind = "click_to_call" | "click_to_call_followup" | "forwarding";
 export type CpsMode = "off" | "observe" | "enforce";
 
 export class TelnyxCpsLimitError extends Error {
@@ -87,7 +87,7 @@ export async function recordTelnyxOutboundStart(
         forwarding_attempts=ca_telnyx_outbound_cps_seconds.forwarding_attempts+EXCLUDED.forwarding_attempts,
         click_attempts=ca_telnyx_outbound_cps_seconds.click_attempts+EXCLUDED.click_attempts
       RETURNING attempts, bucket_second`,
-    [scope, kind === "forwarding" ? 1 : 0, kind === "click_to_call" ? 1 : 0]);
+    [scope, kind === "forwarding" ? 1 : 0, kind === "forwarding" ? 0 : 1]);
     count = Number(outcome.rows[0]?.attempts);
     if (!Number.isSafeInteger(count)) throw new Error("Invalid CPS ledger count");
   } catch (error) {
