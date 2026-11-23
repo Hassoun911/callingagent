@@ -40,8 +40,8 @@ async function probe(name,path,check) {
 }
 async function main(){
   if(repository!=="Hassoun911/callingagent"||!token)throw Error("Expected CallingAgent repository and GitHub token");
-  const [issue,p23,p32,health,plans,start] = await Promise.all([
-    api("/issues/30"),api("/pulls/23"),api("/pulls/32"),
+  const [issue,openPrs,health,plans,start,signup] = await Promise.all([
+    api("/issues/30"),api("/pulls?state=open&per_page=100"),
     probe("Health","/api/healthz",async r=>{
       const v=await r.json();if(v.status!=="ok")throw Error("Health is not ok");return "PASS";}),
     probe("Five CAD plans","/api/public-plans",async r=>{
@@ -49,15 +49,20 @@ async function main(){
     probe("Starter page","/start?plan=starter",async r=>{
       if(!String(r.headers.get("content-type")).includes("text/html"))throw Error("Not an HTML page");
       const text=await r.text();if(!/<html[\s>]/i.test(text))throw Error("Not an HTML document");
-      return "PASS";})
+      return "PASS";}),
+    probe("Signup gate","/api/signup/config",async r=>{
+      const data=await r.json();
+      if(typeof data.enabled!=="boolean")throw Error("Missing signup feature gate");
+      return data.enabled?"ENABLED — verify SMTP and abuse safeguards":"DISABLED — signup not publicly available";
+    })
   ]);
   const tasks=countChecklist(issue.body);
-  const probes=[health,plans,start];
+  const probes=[health,plans,start,signup];
   const overall=probes.every(x=>x.ok);
   const row=x=>"| "+x.name+" | "+(x.ok?"OK":"FAIL")+" | "+x.detail.replace(/[|\r\n]/g," ")+" |";
   const state={
     issue:issue.state,tasks,checks:probes,
-    prs:[{number:23,state:p23.state,draft:p23.draft},{number:32,state:p32.state,draft:p32.draft}]
+    prs:openPrs.map(p=>({number:p.number,state:p.state,draft:p.draft})).sort((a,b)=>a.number-b.number)
   };
   const status=JSON.stringify(state);
   const markdown=[
@@ -67,7 +72,7 @@ async function main(){
     "**Checklist state:** "+issue.state,
     "","| Check | Status | Detail |","|---|---|---|",...probes.map(row),
     "","**Open development PRs:** "+
-      state.prs.map(p=>"[#"+p.number+"](https://github.com/Hassoun911/callingagent/pull/"+p.number+") "+p.state+(p.draft?" (draft)":"")).join("; "),
+      (state.prs.length?state.prs.map(p=>"[#"+p.number+"](https://github.com/Hassoun911/callingagent/pull/"+p.number+") "+p.state+(p.draft?" (draft)":"")).join("; "):"None"),
     "","**Probe result:** "+(overall?"PASS":"FAIL")+". This does not verify live Stripe purchase, webhooks, provisioning, Telnyx invoices or paid entitlements.",
     "","[All 20-minute runs](https://github.com/Hassoun911/callingagent/actions/workflows/callingagent-launch-monitor.yml)",
     "<!-- monitor-state="+Buffer.from(status).toString("base64")+" -->"
