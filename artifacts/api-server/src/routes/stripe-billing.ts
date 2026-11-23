@@ -99,6 +99,8 @@ export async function ensureStripeBillingSchema() {
   await pool.query(`ALTER TABLE ca_stripe_subscriptions ADD COLUMN IF NOT EXISTS last_event_created bigint NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE ca_stripe_subscriptions ADD COLUMN IF NOT EXISTS last_payment_status text`);
   await pool.query(`ALTER TABLE ca_stripe_subscriptions ADD COLUMN IF NOT EXISTS last_payment_at timestamptz`);
+  // Invoice events can arrive out of order and must not overwrite newer payment state.
+  await pool.query(`ALTER TABLE ca_stripe_subscriptions ADD COLUMN IF NOT EXISTS last_invoice_event_created bigint NOT NULL DEFAULT 0`);
   await pool.query(`CREATE TABLE IF NOT EXISTS ca_billing_fulfillment (
     stripe_subscription_id text PRIMARY KEY,
     company_id integer NOT NULL,
@@ -617,8 +619,12 @@ async function applyStripeEvent(event: any): Promise<void> {
       stripe_subscription_id=EXCLUDED.stripe_subscription_id,
       plan_slug=EXCLUDED.plan_slug,status=EXCLUDED.status,current_period_end=EXCLUDED.current_period_end,
       last_event_created=EXCLUDED.last_event_created,
-      last_payment_status=COALESCE(EXCLUDED.last_payment_status,ca_stripe_subscriptions.last_payment_status),
-      last_payment_at=COALESCE(EXCLUDED.last_payment_at,ca_stripe_subscriptions.last_payment_at),
+      last_payment_status=CASE WHEN ca_stripe_subscriptions.last_invoice_event_created=0
+        THEN COALESCE(EXCLUDED.last_payment_status,ca_stripe_subscriptions.last_payment_status)
+        ELSE ca_stripe_subscriptions.last_payment_status END,
+      last_payment_at=CASE WHEN ca_stripe_subscriptions.last_invoice_event_created=0
+        THEN COALESCE(EXCLUDED.last_payment_at,ca_stripe_subscriptions.last_payment_at)
+        ELSE ca_stripe_subscriptions.last_payment_at END,
       updated_at=now()
       WHERE ca_stripe_subscriptions.last_event_created <= EXCLUDED.last_event_created`, [
       intent.company_id,sub.customer,sub.id,intent.plan_slug,sub.status,
@@ -637,9 +643,21 @@ async function applyStripeEvent(event: any): Promise<void> {
     const subscriptionId = typeof object.subscription === "string" ? object.subscription :
       object.parent?.subscription_details?.subscription;
     if (typeof subscriptionId !== "string") return;
-    const updated=await pool.query(`UPDATE ca_stripe_subscriptions SET last_payment_status=$2,last_payment_at=now(),
-      updated_at=now() WHERE stripe_subscription_id=$1 RETURNING company_id,plan_slug,status`, [
-      subscriptionId,kind === "invoice.paid" ? "paid" : "failed"
+    const eventCreated=Number(event.created);
+    // Stripe timestamps have second precision. Reject older events, and never
+    // let a failed-payment notification reverse a paid event at the same second.
+    if(!Number.isSafeInteger(eventCreated)||eventCreated<=0)throw new Error("Invalid Stripe invoice event timestamp");
+    const paymentStatus=kind==="invoice.paid"?"paid":"failed";
+    const updated=await pool.query(`UPDATE ca_stripe_subscriptions
+      SET last_payment_status=$2,
+          last_payment_at=now(),
+          last_invoice_event_created=$3,
+          updated_at=now()
+      WHERE stripe_subscription_id=$1
+        AND (last_invoice_event_created<$3
+          OR (last_invoice_event_created=$3 AND ($2='paid' OR last_payment_status IS DISTINCT FROM 'paid')))
+      RETURNING company_id,plan_slug,status`, [
+      subscriptionId,paymentStatus,eventCreated
     ]);
     if(kind==="invoice.paid" && updated.rows[0]?.status==="active"){
       await pool.query(`INSERT INTO ca_billing_fulfillment(stripe_subscription_id,company_id,plan_slug)
@@ -654,8 +672,13 @@ async function applyStripeEvent(event: any): Promise<void> {
     if (!current.rowCount || Number(current.rows[0].last_event_created) > Number(event.created || 0)) return;
     const nextSlug = Object.entries(prices).find(([,id])=>id===subscriptionPriceId(object))?.[0];
     if (!nextSlug) return;
-    await pool.query(`UPDATE ca_stripe_subscriptions SET status=$2,plan_slug=$3,current_period_end=$4,
-      last_event_created=$5,updated_at=now()
+    await pool.query(`UPDATE ca_stripe_subscriptions
+      SET status=$2,plan_slug=$3,current_period_end=$4,
+      last_event_created=$5,updated_at=now(),
+      -- A previously paid invoice does not prove that a newly selected
+      -- package has been paid. Require new invoice evidence on plan changes.
+      last_payment_status=CASE WHEN plan_slug IS DISTINCT FROM $3 THEN NULL ELSE last_payment_status END,
+      last_invoice_event_created=CASE WHEN plan_slug IS DISTINCT FROM $3 THEN GREATEST(last_invoice_event_created,$5) ELSE last_invoice_event_created END
       WHERE stripe_subscription_id=$1 AND last_event_created<=$5`,[
       object.id,object.status,nextSlug,
       Number.isFinite(object.current_period_end) ? new Date(object.current_period_end*1000) : null,
