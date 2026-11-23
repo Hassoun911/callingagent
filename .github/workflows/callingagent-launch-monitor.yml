@@ -1,0 +1,48 @@
+name: CallingAgent 20-minute launch monitor
+
+on:
+  schedule:
+    - cron: '*/20 * * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/callingagent-launch-monitor.yml'
+      - '.github/scripts/callingagent-launch-monitor.mjs'
+      - '.github/scripts/callingagent-launch-monitor.test.mjs'
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: callingagent-launch-monitor
+  cancel-in-progress: false
+
+jobs:
+  validate-monitor:
+    name: Validate monitor code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check .github/scripts/callingagent-launch-monitor.mjs
+      - run: node --test .github/scripts/callingagent-launch-monitor.test.mjs
+
+  launch-check:
+    name: Check live plans and launch blockers
+    if: github.event_name != 'pull_request'
+    needs: validate-monitor
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect site and master checklist (no calls, payments or deploys)
+        run: node .github/scripts/callingagent-launch-monitor.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
