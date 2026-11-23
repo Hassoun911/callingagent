@@ -38,9 +38,25 @@ async function probe(name,path,check) {
     return {name,ok:true,detail:await check(res)};
   } catch(err) {return {name,ok:false,detail:String(err?.message||err).slice(0,140)};}
 }
+// Intentionally invalid, unsigned requests: these must never create a lead,
+// checkout session, charge or Stripe webhook event. These are negative smoke
+// checks only, not proof that real paid signup/fulfillment works.
+async function safeRejectProbe(name,path,body,expected) {
+  try {
+    const res=await fetch(site+path,{
+      method:"POST",redirect:"error",signal:AbortSignal.timeout(14000),
+      headers:{"Content-Type":"application/json","User-Agent":"CallingAgent-GitHub-Launch-Monitor"},
+      body:JSON.stringify(body),
+    });
+    if(res.status!==expected)throw Error("Expected HTTP "+expected+" but got "+res.status);
+    return {name,ok:true,detail:"Correctly rejected HTTP "+expected};
+  }catch(err){
+    return {name,ok:false,detail:String(err?.message||err).slice(0,140)};
+  }
+}
 async function main(){
   if(repository!=="Hassoun911/callingagent"||!token)throw Error("Expected CallingAgent repository and GitHub token");
-  const [issue,openPrs,health,plans,start,signup] = await Promise.all([
+  const [issue,openPrs,health,plans,start,signup,invalidLead,invalidWebhook] = await Promise.all([
     api("/issues/30"),api("/pulls?state=open&per_page=100"),
     probe("Health","/api/healthz",async r=>{
       const v=await r.json();if(v.status!=="ok")throw Error("Health is not ok");return "PASS";}),
@@ -54,10 +70,14 @@ async function main(){
       const data=await r.json();
       if(typeof data.enabled!=="boolean")throw Error("Missing signup feature gate");
       return data.enabled?"ENABLED — verify SMTP and abuse safeguards":"DISABLED — signup not publicly available";
-    })
+    }),
+    safeRejectProbe("Reject invalid lead","/api/launch-interest",
+      {plan:"ai-standalone",name:"X",email:"not-an-email"},400),
+    safeRejectProbe("Reject unsigned Stripe webhook","/api/billing/stripe-webhook",
+      {id:"evt_untrusted",type:"checkout.session.completed"},400)
   ]);
   const tasks=countChecklist(issue.body);
-  const probes=[health,plans,start,signup];
+  const probes=[health,plans,start,signup,invalidLead,invalidWebhook];
   const overall=probes.every(x=>x.ok);
   const row=x=>"| "+x.name+" | "+(x.ok?"OK":"FAIL")+" | "+x.detail.replace(/[|\r\n]/g," ")+" |";
   const state={
