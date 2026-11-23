@@ -121,8 +121,9 @@ router.post("/signup/verify",async(req,res)=>{
     req.log.error({error:error?.message},"Signup rate limit unavailable");
     res.status(503).json({error:"Verification temporarily unavailable."});return;
   }
-  const client=await pool.connect();
+  let client: Awaited<ReturnType<typeof pool.connect>> | undefined;
   try{
+    client=await pool.connect();
     await client.query("BEGIN");
     const row=await client.query(
       "SELECT email,company_name,contact_name,password_hash,code_hash,expires_at,failed_attempts FROM ca_company_signup_requests WHERE email=$1 FOR UPDATE",[email]);
@@ -151,9 +152,9 @@ router.post("/signup/verify",async(req,res)=>{
     await client.query("COMMIT");
     res.status(201).json({created:true,companyId:company.rows[0].id,message:"Account verified. Sign in to continue."});
   }catch(error:any){
-    await client.query("ROLLBACK").catch(()=>{});
+    if(client) await client.query("ROLLBACK").catch(()=>{});
     req.log.error({error:error?.message},"Company verification failed");
-    res.status(409).json({error:"Could not complete registration. Check if you already have an account."});
-  }finally{client.release();}
+    res.status(client ? 409 : 503).json({error:client ? "Could not complete registration. Check if you already have an account." : "Registration temporarily unavailable."});
+  }finally{client?.release();}
 });
 export default router;
