@@ -4,6 +4,7 @@ import nodemailer from "nodemailer";
 import { eq } from "drizzle-orm";
 import { db, phoneNumbersTable, companiesTable, callLogsTable, extensionsTable } from "@workspace/db";
 import { recordSignedTelnyxCost, attributeTelnyxSession } from "../lib/telnyx-carrier-usage";
+import { recordTelnyxOutboundStart } from "../lib/telnyx-cps-guard";
 
 const router: IRouter = Router();
 const seen = new Map<string, number>();
@@ -126,6 +127,7 @@ async function dialClickToCallLeg(to: string, from: string, label: string, timeo
   const key = process.env.TELNYX_API_KEY;
   const connection = process.env.TELNYX_CONNECTION_ID;
   if (!key || !connection) throw new Error("Telnyx outbound credentials are missing");
+  await recordTelnyxOutboundStart(label === "agent" ? "click_to_call" : "click_to_call_followup");
   const result = await fetch("https://api.telnyx.com/v2/calls", {
     method: "POST",
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
@@ -188,6 +190,7 @@ async function startControlledForward(inbound: string, line: typeof phoneNumbers
   const key = process.env.TELNYX_API_KEY;
   const connection = process.env.TELNYX_CONNECTION_ID;
   if (!key || !connection) throw new Error("Telnyx forwarding credentials unavailable");
+  await recordTelnyxOutboundStart("forwarding");
   const response = await fetch("https://api.telnyx.com/v2/calls", {
     method: "POST",
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
