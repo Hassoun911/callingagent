@@ -75,6 +75,25 @@ async function checkStripeTaxReadiness(): Promise<{
     return {status:null,missingFields:[],warning:"Stripe Tax settings could not be verified"};
   }
 }
+// Require a verified Stripe Tax configuration before paid subscriptions.
+ // A registered GST/HST account does not automatically register in Stripe Tax.
+async function requireCanadianTaxCheckoutReady():Promise<void> {
+  const key=stripeKey();
+  if(!key)throw new Error("Stripe billing key is not configured");
+  const headers={Authorization:"Bearer "+key};
+  const [settingsResponse, registrationsResponse] = await Promise.all([
+    fetch("https://api.stripe.com/v1/tax/settings",{headers,signal:AbortSignal.timeout(10000)}),
+    fetch("https://api.stripe.com/v1/tax/registrations?limit=100",{headers,signal:AbortSignal.timeout(10000)})
+  ]);
+  if(!settingsResponse.ok || !registrationsResponse.ok)throw new Error("Stripe Tax verification unavailable");
+  const settings:any=await settingsResponse.json();
+  const registrations:any=await registrationsResponse.json();
+  if(settings.status!=="active" || settings.defaults?.tax_behavior!=="exclusive")
+    throw new Error("Stripe Tax must be active with tax-exclusive pricing");
+  if(!Array.isArray(registrations.data) ||
+      !registrations.data.some((r:any)=>r.country==="CA"&&r.status==="active"))
+    throw new Error("Stripe Tax has no verified active Canadian registration");
+}
 async function checkTelnyxCostConfiguration(): Promise<{enabled:boolean|null;webhookCorrect:boolean|null;warning:string|null}> {
   const id=process.env.TELNYX_CONNECTION_ID;
   const key=process.env.TELNYX_API_KEY;
@@ -287,6 +306,7 @@ router.post("/billing/checkout", async (req, res) => {
   if (!priceId) { res.status(400).json({ error: "Unknown package" }); return; }
   try {
     await confirmCallingAgentMerchant();
+    await requireCanadianTaxCheckoutReady();
     const available = await pool.query("SELECT price_cents,is_enabled,is_published,checkout_enabled FROM ca_plans WHERE slug=$1", [slug]);
     if (!available.rows[0]?.is_enabled || !available.rows[0]?.is_published || !available.rows[0]?.checkout_enabled || Number(available.rows[0]?.price_cents) !== expectedCents[slug]) { res.status(403).json({error:"Plan unavailable for checkout"}); return; }
     // Serialize Checkout creation per company. The lock protects the pending-
@@ -307,6 +327,8 @@ router.post("/billing/checkout", async (req, res) => {
         mode: "subscription",
         "line_items[0][price]": priceId,
         "line_items[0][quantity]": "1",
+        "automatic_tax[enabled]": "true",
+        billing_address_collection: "required",
         client_reference_id: companyId,
         "metadata[company_id]": companyId,
         "metadata[plan_slug]": slug,
