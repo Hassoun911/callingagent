@@ -102,6 +102,36 @@ export default function CompanyDetail() {
   const { data: allNumbers } = useListPhoneNumbers();
   const linkedNumbers = allNumbers?.filter(n => n.companyId === companyId) ?? [];
   const linkedNumber = linkedNumbers[0] ?? null;
+  const [fullAccess,setFullAccess]=useState<boolean|null>(null);
+  const [fullAccessSaving,setFullAccessSaving]=useState(false);
+  const [fullAccessReason,setFullAccessReason]=useState("Administrator-approved feature access");
+  useEffect(()=>{
+    let active=true;
+    if(!Number.isSafeInteger(companyId)||companyId<=0)return;
+    fetch(`${BASE}/api/companies/${companyId}/full-access`,{credentials:"include",cache:"no-store"})
+      .then(async r=>{if(!r.ok)throw Error("Access status unavailable");return r.json()})
+      .then(data=>{if(active)setFullAccess(data.enabled===true)})
+      .catch(()=>{if(active)setFullAccess(null)});
+    return ()=>{active=false};
+  },[companyId]);
+  async function changeFullAccess(){
+    if(fullAccess===null||fullAccessSaving||fullAccessReason.trim().length<4)return;
+    setFullAccessSaving(true);
+    try{
+      const response=await fetch(`${BASE}/api/companies/${companyId}/full-access`,{
+        method:"PUT",credentials:"include",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({enabled:!fullAccess,reason:fullAccessReason.trim()})
+      });
+      const data=await response.json();
+      if(!response.ok)throw Error(data.error||"Full Access update failed");
+      setFullAccess(data.enabled===true);
+      qc.invalidateQueries();
+      toast({title:data.enabled?"Full Access enabled":"Full Access revoked"});
+    }catch(error:any){
+      toast({title:error?.message||"Full Access update failed",variant:"destructive"});
+    }finally{setFullAccessSaving(false)}
+  }
+
 
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [extsLoading, setExtsLoading] = useState(true);
@@ -385,6 +415,23 @@ export default function CompanyDetail() {
         </Button>
       </div>
 
+      {/* Full Access is a super-admin feature override, not a Stripe plan upgrade. */}
+      <section className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-bold">Administrator Full Access</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Unlocks available company portal features without changing prepaid/Stripe plans, payments, minute limits, AI credits or purchased phone numbers.</p>
+          </div>
+          <Badge variant={fullAccess===true?"default":"secondary"}>{fullAccess===null?"Unavailable":fullAccess?"Enabled":"Standard access"}</Badge>
+        </div>
+        <label className="block text-xs font-semibold">Reason for grant or revocation
+          <Input maxLength={500} minLength={4} value={fullAccessReason} onChange={event=>setFullAccessReason(event.target.value)} className="mt-1"/>
+        </label>
+        <Button disabled={fullAccess===null||fullAccessSaving||fullAccessReason.trim().length<4}
+          onClick={()=>void changeFullAccess()} variant={fullAccess?"destructive":"default"}>
+          {fullAccessSaving?"Saving…":fullAccess?"Revoke Full Access":"Grant Full Access"}
+        </Button>
+      </section>
       {/* Company info */}
       {((company as any).email || company.phone || company.website || (company as any).notes) && (
         <div className="bg-card border border-border rounded-lg overflow-hidden">
