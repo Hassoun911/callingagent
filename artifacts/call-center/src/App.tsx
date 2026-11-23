@@ -251,7 +251,7 @@ function AuthGate({ children }: { children?: React.ReactNode }) {
       // unvalidated next= value as a general-purpose redirect.
       const next = new URLSearchParams(window.location.search).get("next");
       if (next) {
-        const match = /^\\/start\\?plan=(payg|starter|business|plus|pro)$/.exec(next);
+        const match = /^\/start\?plan=(payg|starter|business|plus|pro)$/.exec(next);
         if (match) {
           navigate(next, { replace: true });
           return;
