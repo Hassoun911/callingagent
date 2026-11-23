@@ -29,6 +29,25 @@ export async function ensureCompanySignupSchema(): Promise<void> {
     failed_attempts integer NOT NULL DEFAULT 0,
     last_sent_at timestamptz NOT NULL DEFAULT now()
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS ca_signup_ip_limits (
+    ip_hash text NOT NULL, action text NOT NULL, hour_bucket timestamptz NOT NULL,
+    attempts integer NOT NULL DEFAULT 1,
+    PRIMARY KEY(ip_hash,action,hour_bucket)
+  )`);
+}
+
+/** Database-atomic across app instances. Never trust forwarded IP headers supplied by clients. */
+async function allowSignupAttempt(ip: string, action: "request"|"verify"): Promise<boolean> {
+  const ipHash=crypto.createHash("sha256").update(ip).digest("hex");
+  const limit=action==="request"?10:60;
+  const result=await pool.query(`
+    INSERT INTO ca_signup_ip_limits(ip_hash,action,hour_bucket,attempts)
+    VALUES($1,$2,date_trunc('hour',now()),1)
+    ON CONFLICT(ip_hash,action,hour_bucket)
+    DO UPDATE SET attempts=ca_signup_ip_limits.attempts+1
+    WHERE ca_signup_ip_limits.attempts<$3
+    RETURNING attempts`,[ipHash,action,limit]);
+  return Boolean(result.rowCount);
 }
 
 router.get("/signup/config",(_req,res)=>{
@@ -44,6 +63,9 @@ router.post("/signup/request",async(req,res)=>{
   const host=process.env.SMTP_HOST,user=process.env.SMTP_USER,pass=process.env.SMTP_PASS;
   if(!host||!user||!pass){res.status(503).json({error:"Email verification is temporarily unavailable."});return;}
   try{
+    if(!await allowSignupAttempt(req.ip||"unknown","request")){
+      res.status(429).json({error:"Too many registration attempts. Try again later."});return;
+    }
     const existing=await pool.query("SELECT 1 FROM platform_users WHERE lower(email)=$1 OR lower(username)=$1 LIMIT 1",[data.email]);
     if(existing.rowCount){res.status(409).json({error:"An account already exists. Please sign in."});return;}
     const code=crypto.randomInt(0,100000000).toString().padStart(8,"0");
@@ -91,6 +113,14 @@ router.post("/signup/verify",async(req,res)=>{
   const email=normalize(req.body?.email).toLowerCase();
   const code=normalize(req.body?.code);
   if(!validEmail(email)||!/^\d{8}$/.test(code)){res.status(400).json({error:"Invalid verification request."});return;}
+  try {
+    if(!await allowSignupAttempt(req.ip||"unknown","verify")){
+      res.status(429).json({error:"Too many verification attempts. Try again later."});return;
+    }
+  } catch(error:any) {
+    req.log.error({error:error?.message},"Signup rate limit unavailable");
+    res.status(503).json({error:"Verification temporarily unavailable."});return;
+  }
   const client=await pool.connect();
   try{
     await client.query("BEGIN");
