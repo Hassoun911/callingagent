@@ -2,6 +2,7 @@ import app from "./app";
 import { ensurePlanCatalog } from "./routes/plan-catalog";
 import { ensureStripeBillingSchema } from "./routes/stripe-billing";
 import { ensureCompanySignupSchema } from "./routes/company-signup";
+import { ensureCompanyFullAccessSchema } from "./lib/company-full-access";
 import { ensureAiCreditSchema } from "./lib/ai-credit-wallet";
 import { ensureTelnyxUsageSchema } from "./lib/telnyx-carrier-usage";
 import { ensureTelnyxCpsSchema } from "./lib/telnyx-cps-guard";
@@ -36,6 +37,7 @@ async function start(): Promise<void> {
   await ensurePlanCatalog();
   await ensureStripeBillingSchema();
   await ensureCompanySignupSchema();
+  await ensureCompanyFullAccessSchema();
   await ensureAiCreditSchema();
   await ensureTelnyxUsageSchema();
   await ensureTelnyxCpsSchema();
