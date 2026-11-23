@@ -12,7 +12,8 @@ import { logger } from "./logger";
  * OFF (default): no checks or DB writes on call attempts.
  * OBSERVE: record and warn, without changing voice behavior.
  * ENFORCE: reject excess initial user-initiated click-to-call starts only;
- *          ongoing click-to-call second legs and inbound-call forwarding stay\n *          available and are warned, so accepted callers are not stranded.
+ *          ongoing click-to-call second legs and inbound-call forwarding stay
+ *          available and are warned, so accepted callers are not stranded.
  *
  * Configure TELNYX_CPS_ACCOUNT_KEY consistently for every worker/connection
  * belonging to the same Telnyx account. If absent, the same API key hashes
@@ -61,6 +62,41 @@ export async function ensureTelnyxCpsSchema(): Promise<void> {
       click_attempts integer NOT NULL DEFAULT 0,
       PRIMARY KEY (account_hash, bucket_second)
     )`);
+}
+
+export async function getTelnyxCpsRecentHours(hours = 24): Promise<{
+  mode: CpsMode;
+  maxStarts: number;
+  source: "callingagent_outbound_attempts_not_provider_accepted";
+  hours: Array<{ hour: string; peakAttemptsInSecond: number; totalAttempts: number; forwardingAttempts: number; clickAttempts: number }>;
+}> {
+  const { mode, maxStarts } = readTelnyxCpsConfig();
+  const safeHours = Number.isSafeInteger(hours) ? Math.max(1, Math.min(hours, 720)) : 24;
+  const accountHash = accountScope(process.env);
+  const result = await pool.query<{
+    hour: Date;
+    peak_attempts: number | string;
+    total_attempts: number | string;
+    forwarding_attempts: number | string;
+    click_attempts: number | string;
+  }>(`SELECT date_trunc('hour', bucket_second) AS hour,
+      MAX(attempts) AS peak_attempts,
+      SUM(attempts) AS total_attempts,
+      SUM(forwarding_attempts) AS forwarding_attempts,
+      SUM(click_attempts) AS click_attempts
+    FROM ca_telnyx_outbound_cps_seconds
+    WHERE account_hash=$1 AND bucket_second >= now() - ($2::integer * interval '1 hour')
+    GROUP BY 1 ORDER BY 1 DESC`, [accountHash, safeHours]);
+  return {
+    mode, maxStarts, source: "callingagent_outbound_attempts_not_provider_accepted",
+    hours: result.rows.map(r => ({
+      hour: new Date(r.hour).toISOString(),
+      peakAttemptsInSecond: Number(r.peak_attempts),
+      totalAttempts: Number(r.total_attempts),
+      forwardingAttempts: Number(r.forwarding_attempts),
+      clickAttempts: Number(r.click_attempts),
+    })),
+  };
 }
 
 export async function recordTelnyxOutboundStart(
