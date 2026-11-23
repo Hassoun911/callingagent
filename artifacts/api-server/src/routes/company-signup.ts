@@ -6,7 +6,7 @@ import { hashPassword, verifyPassword } from "../lib/password";
 
 const router: IRouter = Router();
 const isEnabled = () => process.env.CALLINGAGENT_SELF_SIGNUP_ENABLED === "true";
-const validEmail = (email: string) => email.length <= 254 && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);
+const validEmail = (email: string) => email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const normalize = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const safeInput = (data: any) => {
   const email = normalize(data?.email).toLowerCase();
@@ -90,7 +90,7 @@ router.post("/signup/verify",async(req,res)=>{
   if(!isEnabled()){res.status(503).json({error:"Self-registration is not yet available."});return;}
   const email=normalize(req.body?.email).toLowerCase();
   const code=normalize(req.body?.code);
-  if(!validEmail(email)||!/^\\d{8}$/.test(code)){res.status(400).json({error:"Invalid verification request."});return;}
+  if(!validEmail(email)||!/^\d{8}$/.test(code)){res.status(400).json({error:"Invalid verification request."});return;}
   const client=await pool.connect();
   try{
     await client.query("BEGIN");
