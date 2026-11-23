@@ -781,19 +781,20 @@ async function applyStripeEvent(event: any): Promise<void> {
     if (!current.rowCount || Number(current.rows[0].last_event_created) > Number(event.created || 0)) return;
     const nextSlug = Object.entries(prices).find(([,id])=>id===subscriptionPriceId(object))?.[0];
     if (!nextSlug) return;
-    await pool.query(`UPDATE ca_stripe_subscriptions
+    const subscriptionUpdate=await pool.query(`UPDATE ca_stripe_subscriptions
       SET status=$2,plan_slug=$3,current_period_end=$4,
       last_event_created=$5,updated_at=now(),
       -- A previously paid invoice does not prove that a newly selected
       -- package has been paid. Require new invoice evidence on plan changes.
       last_payment_status=CASE WHEN plan_slug IS DISTINCT FROM $3 THEN NULL ELSE last_payment_status END,
       last_invoice_event_created=CASE WHEN plan_slug IS DISTINCT FROM $3 THEN GREATEST(last_invoice_event_created,$5) ELSE last_invoice_event_created END
-      WHERE stripe_subscription_id=$1 AND last_event_created<=$5`,[
+      WHERE stripe_subscription_id=$1 AND last_event_created<=$5
+      RETURNING stripe_subscription_id`,[
       object.id,object.status,nextSlug,
       Number.isFinite(object.current_period_end) ? new Date(object.current_period_end*1000) : null,
       event.created || 0,
     ]);
-    if(["canceled","unpaid","incomplete_expired"].includes(String(object.status))){
+    if(subscriptionUpdate.rowCount && ["canceled","unpaid","incomplete_expired"].includes(String(object.status))){
       await pool.query(`UPDATE ca_billing_fulfillment
         SET status='payment_hold',updated_at=now()
         WHERE stripe_subscription_id=$1 AND status='awaiting_review'`,[object.id]);
