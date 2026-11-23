@@ -291,7 +291,16 @@ router.get("/billing/fulfillment-queue",async(req,res)=>{
       LEFT JOIN ca_plans p ON p.slug=f.plan_slug
       ORDER BY f.created_at DESC LIMIT 100`);
     res.set("Cache-Control","no-store");
-    res.json({items:result.rows,automaticProvisioningEnabled:false});
+    res.json({
+      items:result.rows.map(row=>({
+        ...row,
+        eligibleForProvisioning:row.subscription_status==="active" &&
+          row.last_payment_status==="paid" &&
+          row.fulfillment_status==="awaiting_review",
+        requiresManualReview:true
+      })),
+      automaticProvisioningEnabled:false
+    });
   }catch(error:any){req.log.error({error:error?.message},"Fulfillment queue unavailable");res.status(503).json({error:"Fulfillment queue unavailable"});}
 });
 // Only authenticated company administrators can start their own company's checkout.
@@ -752,9 +761,18 @@ async function applyStripeEvent(event: any): Promise<void> {
     ]);
     if(kind==="invoice.paid" && updated.rows[0]?.status==="active"){
       await pool.query(`INSERT INTO ca_billing_fulfillment(stripe_subscription_id,company_id,plan_slug)
-        VALUES($1,$2,$3) ON CONFLICT(stripe_subscription_id) DO NOTHING`,[
+        VALUES($1,$2,$3) ON CONFLICT(stripe_subscription_id)
+        DO UPDATE SET status='awaiting_review',updated_at=now()
+        WHERE ca_billing_fulfillment.status='payment_hold'`,[
         subscriptionId,updated.rows[0].company_id,updated.rows[0].plan_slug
       ]);
+    }
+    if(kind==="invoice.payment_failed" && updated.rowCount){
+      // Hold requests still awaiting operator fulfillment. Existing lines
+      // are unchanged; no automatic suspension or deprovisioning.
+      await pool.query(`UPDATE ca_billing_fulfillment
+        SET status='payment_hold',updated_at=now()
+        WHERE stripe_subscription_id=$1 AND status='awaiting_review'`,[subscriptionId]);
     }
     return;
   }
@@ -775,6 +793,11 @@ async function applyStripeEvent(event: any): Promise<void> {
       Number.isFinite(object.current_period_end) ? new Date(object.current_period_end*1000) : null,
       event.created || 0,
     ]);
+    if(["canceled","unpaid","incomplete_expired"].includes(String(object.status))){
+      await pool.query(`UPDATE ca_billing_fulfillment
+        SET status='payment_hold',updated_at=now()
+        WHERE stripe_subscription_id=$1 AND status='awaiting_review'`,[object.id]);
+    }
   }
 }
 
