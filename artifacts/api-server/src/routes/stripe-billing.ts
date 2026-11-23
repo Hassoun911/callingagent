@@ -175,7 +175,7 @@ router.post("/launch-interest",async(req,res)=>{
   const company=String(payload.company||"").trim();
   // Honeypot; do not disclose why unsolicited submissions are ignored.
   if(payload.website){res.status(202).json({received:true});return;}
-  if(!Object.prototype.hasOwnProperty.call(prices,plan)||
+  if(!(Object.prototype.hasOwnProperty.call(prices,plan) || plan==="ai-standalone")||
      name.length<2||name.length>100||
      email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||
      phone.length>40||company.length>120){
