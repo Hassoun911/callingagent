@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import twilio from "twilio";
+import { verifiedCurrentPaidInvoice } from "../lib/stripe-paid-invoice-evidence";
 
 const router: IRouter = Router();
 const prices: Record<string, string> = {
@@ -748,6 +749,36 @@ async function applyStripeEvent(event: any): Promise<void> {
     // let a failed-payment notification reverse a paid event at the same second.
     if(!Number.isSafeInteger(eventCreated)||eventCreated<=0)throw new Error("Invalid Stripe invoice event timestamp");
     const paymentStatus=kind==="invoice.paid"?"paid":"failed";
+    if(kind==="invoice.paid"){
+      // A signed webhook alone does not prove that this invoice paid for
+      // the company's CURRENT plan. Plan upgrades can race old invoices.
+      const assigned=await pool.query(
+        "SELECT plan_slug FROM ca_stripe_subscriptions WHERE stripe_subscription_id=$1",
+        [subscriptionId]);
+      if(!assigned.rowCount)return; // Checkout completion can later reconcile its invoice.
+      const expectedPrice=prices[String(assigned.rows[0].plan_slug)];
+      if(!expectedPrice)return;
+      const key=stripeKey();
+      if(!key)throw Error("Stripe API unavailable for invoice verification");
+      const [invoiceResponse,subResponse]=await Promise.all([
+        fetch("https://api.stripe.com/v1/invoices/"+encodeURIComponent(object.id),{
+          headers:{Authorization:"Bearer "+key},signal:AbortSignal.timeout(15000)
+        }),
+        fetch("https://api.stripe.com/v1/subscriptions/"+encodeURIComponent(subscriptionId),{
+          headers:{Authorization:"Bearer "+key},signal:AbortSignal.timeout(15000)
+        })
+      ]);
+      if(!invoiceResponse.ok || !subResponse.ok)
+        throw Error("Unable to fetch verified Stripe invoice/subscription evidence");
+      const invoice:any=await invoiceResponse.json();
+      const subscription:any=await subResponse.json();
+      if(!verifiedCurrentPaidInvoice(invoice,subscription,subscriptionId,expectedPrice)){
+        // A genuine historical paid invoice cannot reactivate an old plan.
+        req.log?.warn?.({ invoiceId:object.id,subscriptionId },
+          "Ignoring paid invoice without matching current subscription evidence");
+        return;
+      }
+    }
     const updated=await pool.query(`UPDATE ca_stripe_subscriptions
       SET last_payment_status=$2,
           last_payment_at=now(),
