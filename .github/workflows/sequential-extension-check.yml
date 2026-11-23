@@ -18,6 +18,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: node --experimental-strip-types --test .github/scripts/stripe-paid-invoice-evidence.test.mjs
+      - run: node --experimental-strip-types --test .github/scripts/stripe-webhook-signature.test.mjs
       - run: pnpm --filter @workspace/api-server build
       - run: pnpm --filter @workspace/call-center build
         env:

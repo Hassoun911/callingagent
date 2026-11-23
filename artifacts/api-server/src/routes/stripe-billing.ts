@@ -4,6 +4,7 @@ import { Router, type IRouter } from "express";
 import { pool } from "@workspace/db";
 import twilio from "twilio";
 import { verifiedCurrentPaidInvoice } from "../lib/stripe-paid-invoice-evidence";
+import { verifyStripeWebhookSignature } from "../lib/stripe-webhook-signature";
 
 const router: IRouter = Router();
 const prices: Record<string, string> = {
@@ -674,16 +675,6 @@ router.post("/billing/portal", async (req, res) => {
     res.status(502).json({error:"Billing portal unavailable"});
   }
 });
-function verifySignature(raw: Buffer, header: string, secret: string) {
-  const chunks = Object.fromEntries(header.split(",").map(item => item.trim().split("=", 2)));
-  const timestamp = Number(chunks.t);
-  if (!Number.isSafeInteger(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300) return false;
-  const expected = crypto.createHmac("sha256", secret).update(timestamp + "." + raw.toString("utf8")).digest("hex");
-  return header.split(",").some(part => {
-    const value = part.trim().startsWith("v1=") ? part.trim().slice(3) : "";
-    return /^[a-f0-9]{64}$/.test(value) && crypto.timingSafeEqual(Buffer.from(value, "hex"), Buffer.from(expected, "hex"));
-  });
-}
 // Billing events update an internal status ledger only. They never provision, suspend,
 // purchase or release a phone number; that requires separately certified enforcement.
 function subscriptionPriceId(subscription: any): string | null {
@@ -834,7 +825,7 @@ async function applyStripeEvent(event: any): Promise<void> {
 router.post("/billing/stripe-webhook", async (req, res) => {
   const secret = process.env.CALLINGAGENT_STRIPE_WEBHOOK_SECRET;
   const raw = (req as typeof req & {rawBody?: Buffer}).rawBody;
-  if (!secret || !raw || !verifySignature(raw, String(req.headers["stripe-signature"] || ""), secret)) {
+  if (!secret || !raw || !verifyStripeWebhookSignature(raw, String(req.headers["stripe-signature"] || ""), secret)) {
     res.status(400).json({error:"Invalid signature"}); return;
   }
   try {
