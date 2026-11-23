@@ -151,6 +151,27 @@ export async function ensureStripeBillingSchema() {
 
 }
 
+// Safe delivery preflight: SMTP handshake + authentication only, no emails
+// sent and no contact records created. Admin-only diagnostics, not an
+// inbox-delivery or successful verification-code certification.
+async function checkSignupSmtpReadiness(): Promise<{configured:boolean;reachable:boolean;warning:string|null}> {
+  const host=process.env.SMTP_HOST;
+  const user=process.env.SMTP_USER;
+  const pass=process.env.SMTP_PASS;
+  if(!host||!user||!pass)return {configured:false,reachable:false,warning:"Signup email SMTP host/user/password are not fully configured"};
+  const transport=nodemailer.createTransport({
+    host,port:Number(process.env.SMTP_PORT||587),
+    secure:process.env.SMTP_SECURE==="true",
+    auth:{user,pass},connectionTimeout:5000,greetingTimeout:5000,socketTimeout:5000,
+  });
+  try {
+    await transport.verify();
+    return {configured:true,reachable:true,warning:null};
+  } catch {
+    return {configured:true,reachable:false,warning:"Signup SMTP authentication or connection failed"};
+  } finally {transport.close();}
+}
+
 // Best-effort sales alert: the saved database inquiry remains authoritative.
 // Email failure must never turn a successfully recorded lead into an API error.
 async function notifySalesOfLaunchInterest(lead: {plan:string;name:string;email:string;phone:string;company:string}): Promise<void> {
@@ -324,6 +345,7 @@ router.get("/billing/readiness", async(req,res)=>{
     const stripeTax=liveMerchantVerified
       ? await checkStripeTaxReadiness()
       : {status:null,missingFields:[],warning:"Stripe Tax merchant verification required"};
+    const signupEmail=await checkSignupSmtpReadiness();
     const telnyxCost=await checkTelnyxCostConfiguration();
     const plans=await pool.query("SELECT slug,checkout_enabled FROM ca_plans ORDER BY sort_order");
     const legacy=await pool.query(`SELECT
@@ -356,6 +378,10 @@ router.get("/billing/readiness", async(req,res)=>{
       telnyxVoiceWebhookCorrect:telnyxCost.webhookCorrect,
       telnyxConfigurationWarning:telnyxCost.warning,
       automaticProvisioningCertified:false,
+      signupEmailSmtpConfigured:signupEmail.configured,
+      signupEmailSmtpReachable:signupEmail.reachable,
+      signupEmailWarning:signupEmail.warning,
+      signupEmailInboxDeliveryTested:false,
       productionSnapshot:{
         existingCompanies:legacy.rows[0].companies,
         subscriptionsRecorded:legacy.rows[0].subscribed_companies,
@@ -378,6 +404,8 @@ router.get("/billing/launch-audit",async(req,res)=>{
     let merchantVerified=false;
     try{await confirmCallingAgentMerchant();merchantVerified=true;}
     catch{issues.push("Live Stripe merchant API access could not be verified");}
+    const signupEmail=await checkSignupSmtpReadiness();
+    if(signupEmail.warning)issues.push(signupEmail.warning);
     const catalog=await pool.query("SELECT slug,price_cents,monthly_minutes,included_numbers,is_enabled,is_published,checkout_enabled FROM ca_plans ORDER BY sort_order,id");
     const verifiedPrices=merchantVerified?await verifyLiveStripePrices():{ready:false,issues:["Stripe prices cannot be checked until merchant verification succeeds"]};
     issues.push(...verifiedPrices.issues);
@@ -417,6 +445,7 @@ router.get("/billing/launch-audit",async(req,res)=>{
     res.set("Cache-Control","no-store");
     res.json({merchantVerified,liveStripePricesVerified:verifiedPrices.ready,
       stripeTaxStatus:stripeTax.status,stripeTaxMissingFields:stripeTax.missingFields,stripeTaxWarning:stripeTax.warning,
+      signupEmailSmtpConfigured:signupEmail.configured,signupEmailSmtpReachable:signupEmail.reachable,signupEmailWarning:signupEmail.warning,signupEmailInboxDeliveryTested:false,
       checkoutEnabled:billingEnabled(),
       merchantId:expectedStripeAccountId,
       plans,metrics,issues,
