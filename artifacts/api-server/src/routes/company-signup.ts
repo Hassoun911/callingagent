@@ -29,6 +29,10 @@ export async function ensureCompanySignupSchema(): Promise<void> {
     failed_attempts integer NOT NULL DEFAULT 0,
     last_sent_at timestamptz NOT NULL DEFAULT now()
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS ca_self_registered_companies (
+    company_id integer PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+    verified_at timestamptz NOT NULL DEFAULT now()
+  )`);
   await pool.query(`CREATE TABLE IF NOT EXISTS ca_signup_ip_limits (
     ip_hash text NOT NULL, action text NOT NULL, hour_bucket timestamptz NOT NULL,
     attempts integer NOT NULL DEFAULT 1,
@@ -148,6 +152,10 @@ router.post("/signup/verify",async(req,res)=>{
     await client.query(
       "INSERT INTO platform_users(username,email,password_hash,role,company_id,is_active) VALUES($1,$1,$2,'company_admin',$3,true)",
       [email,pending.password_hash,company.rows[0].id]);
+    // Self-registered companies are not grandfathered legacy customers.
+    // This marker is committed atomically with the company/admin creation
+    // and requires a paid package before any phone number can be assigned.
+    await client.query("INSERT INTO ca_self_registered_companies(company_id) VALUES($1)",[company.rows[0].id]);
     await client.query("DELETE FROM ca_company_signup_requests WHERE email=$1",[email]);
     await client.query("COMMIT");
     res.status(201).json({created:true,companyId:company.rows[0].id,message:"Account verified. Sign in to continue."});
