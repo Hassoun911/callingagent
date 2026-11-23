@@ -3,6 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { db, companiesTable, phoneNumbersTable } from "@workspace/db";
 import { getCompanyScope } from "../lib/scope";
 import { initiateCompanyClickToCall } from "./telnyx-voice-webhooks";
+import { TelnyxCpsLimitError } from "../lib/telnyx-cps-guard";
 
 const router: IRouter = Router();
 function normalizePhone(value: unknown): string | null {
@@ -41,6 +42,11 @@ router.post("/companies/:id/call-out", async (req, res): Promise<void> => {
     res.status(202).json({ status: "agent_call_initiated", callControlId: id, displayedCallerId: line.number,
       message: "Answer your phone and press 1; CallingAgent will then dial the destination." });
   } catch (err: any) {
+    if (err instanceof TelnyxCpsLimitError) {
+      res.set("Retry-After", "1");
+      res.status(429).json({ error: "Outbound calling is busy. Please retry shortly.", code: err.code });
+      return;
+    }
     req.log.error({ companyId, error: err?.message }, "Company call-out failed");
     res.status(502).json({ error: err?.message || "Could not start outbound call" });
   }
