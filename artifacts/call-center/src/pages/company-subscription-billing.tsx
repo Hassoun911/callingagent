@@ -9,6 +9,15 @@ type BillingStatus = {
   planLimits?: { includedMonthlyMinutes:number; includedNumbers:number; features:string[] } | null;
   checkoutEnabled:boolean;
 };
+type AiCreditStatus = {
+  offer:"phone_pro"|"standalone_ai"|"phone_addon"|"not_eligible";
+  aiAccessAvailable:boolean;
+  creditsBalanceCents:number;
+  creditTopUpsAvailable:boolean;
+  includedCreditCents:number|null;
+  currency:"CAD";
+  note:string;
+};
 type EntitlementReport = {
   billingType:"stripe"|"legacy_unassigned";
   numbers:{assigned:number;active:number;included:number|null;withinAllowance:boolean|null};
@@ -18,6 +27,7 @@ type EntitlementReport = {
 
 export default function CompanySubscriptionBilling({ isAdmin }:{isAdmin:boolean}) {
   const [status,setStatus]=useState<BillingStatus|null>(null);
+  const [aiCredit,setAiCredit]=useState<AiCreditStatus|null>(null);
   const [audit,setAudit]=useState<EntitlementReport|null>(null);
   const [loading,setLoading]=useState(true);
   const [opening,setOpening]=useState(false);
@@ -32,6 +42,10 @@ export default function CompanySubscriptionBilling({ isAdmin }:{isAdmin:boolean}
       if(!statusResponse.ok||!auditResponse.ok)throw Error("Your subscription details could not be loaded.");
       setStatus(await statusResponse.json());
       setAudit(await auditResponse.json());
+      if(isAdmin){
+        const walletResponse=await fetch("/api/ai-credits/status",{credentials:"include",cache:"no-store"});
+        setAiCredit(walletResponse.ok?await walletResponse.json():null);
+      }
     }catch(e:any){setError(e.message||"Billing temporarily unavailable");}
     finally{setLoading(false);}
   }
@@ -76,6 +90,16 @@ export default function CompanySubscriptionBilling({ isAdmin }:{isAdmin:boolean}
         <p className="mt-3 text-xs text-muted-foreground">Package limits are not the same as verified remaining billable minutes.</p>
       </section>
     </div>}
+    {isAdmin&&aiCredit&&<section className="rounded-2xl border border-border bg-card p-5">
+      <h2 className="text-lg font-bold">AI Receptionist & credits</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{aiCredit.offer==="phone_pro"
+        ? "Your Pro package is planned to include AI access when activation is certified."
+        : aiCredit.offer==="phone_addon" ? "Your phone package can add AI as a separately priced option once released."
+        : "No AI entitlement is currently activated for this account."}</p>
+      <p className="mt-4 text-sm">Recorded AI credit balance: <strong>{new Intl.NumberFormat("en-CA",{style:"currency",currency:"CAD"}).format(aiCredit.creditsBalanceCents/100)}</strong></p>
+      <p className="mt-2 text-xs text-muted-foreground">AI access: {aiCredit.aiAccessAvailable?"Available":"Not activated"} · Credit top-ups: {aiCredit.creditTopUpsAvailable?"Available":"Not yet available"}</p>
+      <p className="mt-2 text-xs text-muted-foreground">AI credits are not phone minutes. Included-credit allocation, payment collection, usage debits and automatic AI fallbacks must pass end-to-end tests before launch.</p>
+    </section>}
     {audit&&<section className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">
       <div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4"/>Carrier usage is not certified</div>
       <p className="mt-1">The current internal log estimate may exclude forwarded carrier legs or calls without recorded duration. It is not an invoice or an enforceable remaining-minute balance.</p>

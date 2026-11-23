@@ -11,6 +11,7 @@ import companiesRouter from "./companies";
 import callLogsRouter from "./call-logs";
 import bookingAiExtractRouter from "./booking-ai-extract";
 import aiVoiceRouter from "./ai-voice";
+import aiCreditsRouter from "./ai-credits";
 import dashboardRouter from "./dashboard";
 import costsRouter from "./costs";
 import twilioWebhooksRouter from "./twilio-webhooks";
@@ -63,6 +64,7 @@ router.use(callLogsRouter);
 // Mount the corrected extraction handler before the legacy AI voice router.
 router.use(bookingAiExtractRouter);
 router.use(aiVoiceRouter);
+router.use(aiCreditsRouter);
 router.use(dashboardRouter);
 router.use(costsRouter);
 router.use(companyBillingOverviewRouter);
