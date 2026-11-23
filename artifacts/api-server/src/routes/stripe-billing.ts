@@ -678,7 +678,7 @@ async function applyStripeEvent(event: any): Promise<void> {
       -- A previously paid invoice does not prove that a newly selected
       -- package has been paid. Require new invoice evidence on plan changes.
       last_payment_status=CASE WHEN plan_slug IS DISTINCT FROM $3 THEN NULL ELSE last_payment_status END,
-      last_invoice_event_created=CASE WHEN plan_slug IS DISTINCT FROM $3 THEN 0 ELSE last_invoice_event_created END
+      last_invoice_event_created=CASE WHEN plan_slug IS DISTINCT FROM $3 THEN GREATEST(last_invoice_event_created,$5) ELSE last_invoice_event_created END
       WHERE stripe_subscription_id=$1 AND last_event_created<=$5`,[
       object.id,object.status,nextSlug,
       Number.isFinite(object.current_period_end) ? new Date(object.current_period_end*1000) : null,
