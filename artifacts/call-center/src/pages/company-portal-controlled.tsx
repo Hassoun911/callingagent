@@ -24,6 +24,7 @@ import type { AuthUser } from "@/App";
 import PortalNavigation from "@/components/portal-navigation";
 import PortalNumberDetail from "@/pages/portal-number-detail";
 import CompanySubscriptionBilling from "@/pages/company-subscription-billing";
+import DualServiceStatus from "@/components/dual-service-status";
 import Calls from "@/pages/calls";
 import Messages from "@/pages/messages";
 import Contacts from "@/pages/contacts";
@@ -112,7 +113,7 @@ function PhoneNumbersPage({ numbers }: { numbers: any[] }) {
   return <div className="mx-auto w-full max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8"><header><h1 className="text-2xl font-bold">Phone Numbers</h1><p className="mt-1 text-sm text-muted-foreground">Manage the phone lines assigned to this company.</p></header><div className="overflow-hidden rounded-2xl border border-border bg-card">{numbers.length === 0 ? <div className="px-5 py-14 text-center text-sm text-muted-foreground">No phone numbers are assigned.</div> : numbers.map((number, index) => <button key={number.id} type="button" onClick={() => navigate(`${PORTAL}/numbers/${number.id}`)} className={`flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-muted/30 ${index ? "border-t border-border" : ""}`}><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Phone className="h-4 w-4" /></div><div className="min-w-0 flex-1"><p className="font-mono text-sm font-medium">{formatPhone(number.number)}</p><p className="truncate text-xs text-muted-foreground">{number.friendlyName || "No friendly name"}</p></div><ChevronRight className="h-4 w-4 text-muted-foreground" /></button>)}</div></div>;
 }
 
-function Dashboard({ snapshot, visibility, connected, refreshing, refresh }: { snapshot: Snapshot; visibility: PortalVisibility; connected: boolean; refreshing: boolean; refresh: () => void }) {
+function Dashboard({ companyId, snapshot, visibility, connected, refreshing, refresh }: { companyId:number; snapshot: Snapshot; visibility: PortalVisibility; connected: boolean; refreshing: boolean; refresh: () => void }) {
   const numbers = snapshot.numbers;
   const numberIds = useMemo(() => new Set(numbers.map(item => Number(item.id))), [numbers]);
   const lines = useMemo(() => new Set(numbers.map(item => String(item.number))), [numbers]);
@@ -136,6 +137,8 @@ function Dashboard({ snapshot, visibility, connected, refreshing, refresh }: { s
 
   const d = visibility.dashboard;
   return <div className="mx-auto w-full max-w-[1600px] space-y-6 p-4 sm:p-6 lg:p-8"><header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-2xl font-bold sm:text-3xl">Live Operations</h1><p className="mt-1 text-sm text-muted-foreground">Calls, messages, bookings, and campaigns for your company.</p></div><div className="flex gap-2"><div className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${connected ? "border-emerald-500/20 text-emerald-300" : "border-amber-500/20 text-amber-300"}`}>{connected ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}{connected ? "Live" : "Reconnecting"}</div><button onClick={refresh} disabled={refreshing} className="h-10 w-10 rounded-xl border border-border"><RefreshCw className={`mx-auto h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /></button></div></header>
+
+  <DualServiceStatus companyId={companyId} />
 
   {d.liveCalls && activeCalls.length > 0 && <section className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.06] px-5 py-4"><div className="flex items-center gap-4"><PhoneCall className="h-6 w-6 animate-pulse text-emerald-300" /><div className="flex-1"><p className="font-semibold text-emerald-200">Active call</p><p className="text-xs text-emerald-300/70">{activeCalls.map(item => formatPhone(item.fromNumber)).join(", ")}</p></div></div></section>}
 
@@ -205,7 +208,7 @@ export default function CompanyPortalControlled({ user }: { user: AuthUser }) {
     <div className="hidden w-[272px] shrink-0 lg:block"><PortalNavigation companyName={companyName} liveStats={liveStats} connected={connected} lastUpdatedAt={snapshot.data ? new Date(snapshot.data.fetchedAt) : null} /></div>
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden"><header className="flex h-16 items-center border-b border-border px-4 sm:px-6"><button onClick={() => setMobileOpen(true)} className="mr-3 h-10 w-10 rounded-xl border border-border lg:hidden"><Menu className="mx-auto h-5 w-5" /></button><div className="flex min-w-0 items-center gap-5"><div className="min-w-0"><p className="text-sm font-semibold">Company Portal</p><p className="truncate text-[11px] text-muted-foreground">{companyName}</p></div>{companyPhone && <div className="flex items-center gap-2 whitespace-nowrap font-mono text-xl font-black tracking-tight text-cyan-300 sm:text-2xl"><Phone className="h-5 w-5 shrink-0" />{companyPhone}</div>}</div><div className="ml-auto flex items-center gap-2 rounded-full border border-emerald-500/20 px-3 py-1.5 text-xs text-emerald-300"><Wifi className="h-3.5 w-3.5" />Live{liveStats.activeCalls > 0 && <><Radio className="h-3 w-3 animate-pulse" />{liveStats.activeCalls}</>}</div></header>
       <main className="min-h-0 flex-1 overflow-y-auto"><Switch>
-        <Route path={PORTAL}>{() => allowed("dashboard", <Dashboard snapshot={{ ...data, numbers }} visibility={visibility} connected={connected} refreshing={snapshot.isFetching} refresh={() => void refresh()} />)}</Route>
+        <Route path={PORTAL}>{() => allowed("dashboard", <Dashboard companyId={companyId!} snapshot={{ ...data, numbers }} visibility={visibility} connected={connected} refreshing={snapshot.isFetching} refresh={() => void refresh()} />)}</Route>
         <Route path={`${PORTAL}/numbers/:id`}>{() => allowed("phoneNumbers", <PortalNumberDetail companyId={companyId} />)}</Route>
         <Route path={`${PORTAL}/numbers`}>{() => allowed("phoneNumbers", <PhoneNumbersPage numbers={numbers} />)}</Route>
         <Route path={`${PORTAL}/campaigns/:id`}>{() => allowed("campaigns", <CampaignDetail />)}</Route>
