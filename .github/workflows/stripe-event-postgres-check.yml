@@ -1,0 +1,41 @@
+name: Stripe Webhook PostgreSQL Integration Check
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "artifacts/api-server/src/lib/stripe-event-atomic.ts"
+      - "lib/db/tests/stripe-event-postgres.test.mjs"
+      - ".github/workflows/stripe-event-postgres-check.yml"
+  workflow_dispatch:
+jobs:
+  postgres-transactions:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: callingagent_test
+          POSTGRES_PASSWORD: temporary_test_only
+          POSTGRES_DB: callingagent_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U callingagent_test -d callingagent_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgres://callingagent_test:temporary_test_only@127.0.0.1:5432/callingagent_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @workspace/db exec node --experimental-strip-types --test tests/stripe-event-postgres.test.mjs
