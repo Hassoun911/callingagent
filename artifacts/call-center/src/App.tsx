@@ -269,12 +269,13 @@ function AuthGate({ children }: { children?: React.ReactNode }) {
 
   // The marketing website has an explicit route accessible even to signed-in users.
   // The root path retains the existing authenticated dashboard behavior.
-  if (currentPath === "/website") return <PublicHome />;
+  if (currentPath === "/website") return <PublicHome mode="ai" />;
+  if (currentPath === "/business-phone") return <PublicHome mode="phone" />;
 
   if (!isAuthenticated || !user) {
     if (window.location.pathname === "/start") return <PublicAccountShell section="Choose your package"><PublicStart /></PublicAccountShell>;
     if (window.location.pathname === "/signup") return <PublicAccountShell section="Create your business account"><CompanySignup /></PublicAccountShell>;
-    if (window.location.pathname !== "/login" && !window.location.pathname.startsWith("/portal")) return <PublicHome />;
+    if (window.location.pathname !== "/login" && !window.location.pathname.startsWith("/portal")) return <PublicHome mode="ai" />;
     const params = new URLSearchParams(window.location.search);
     const companyParam = params.get("company");
     const portalCompanyId = companyParam ? parseInt(companyParam, 10) : undefined;
