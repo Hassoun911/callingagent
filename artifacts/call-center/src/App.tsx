@@ -9,6 +9,7 @@ import { ContextualGuide } from "@/components/contextual-guide";
 import CompanyPortal from "@/pages/company-portal";
 import PublicHome, { PublicStart } from "@/pages/public-home";
 import CompanySignup from "@/pages/company-signup";
+import PublicAccountShell from "@/components/public-account-shell";
 
 import Dashboard from "@/pages/dashboard";
 import Numbers from "@/pages/numbers";
@@ -159,7 +160,7 @@ function LoginScreen({ onSuccess, portalCompanyId }: { onSuccess: () => void; po
   const isPortal = !!portalCompanyId;
 
   return (
-    <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
+    <div className="min-h-[calc(100dvh-150px)] bg-[#101a35] flex items-center justify-center py-10">
       <div className="w-full max-w-sm px-8">
         <div className="mb-10 text-center">
           {isPortal ? (
@@ -171,7 +172,7 @@ function LoginScreen({ onSuccess, portalCompanyId }: { onSuccess: () => void; po
           ) : (
             <>
               <div className="flex justify-center mb-4"><AnimatedLogo /></div>
-              <p className="text-sm text-slate-500">Call Center Management</p>
+              <p className="text-sm text-slate-400">Secure business account sign in</p>
             </>
           )}
         </div>
@@ -266,14 +267,18 @@ function AuthGate({ children }: { children?: React.ReactNode }) {
     return <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center"><div className="text-slate-600 text-sm tracking-widest uppercase">Loading...</div></div>;
   }
 
+  // The marketing website has an explicit route accessible even to signed-in users.
+  // The root path retains the existing authenticated dashboard behavior.
+  if (currentPath === "/website") return <PublicHome />;
+
   if (!isAuthenticated || !user) {
-    if (window.location.pathname === "/start") return <PublicStart />;
-    if (window.location.pathname === "/signup") return <CompanySignup />;
+    if (window.location.pathname === "/start") return <PublicAccountShell section="Choose your package"><PublicStart /></PublicAccountShell>;
+    if (window.location.pathname === "/signup") return <PublicAccountShell section="Create your business account"><CompanySignup /></PublicAccountShell>;
     if (window.location.pathname !== "/login" && !window.location.pathname.startsWith("/portal")) return <PublicHome />;
     const params = new URLSearchParams(window.location.search);
     const companyParam = params.get("company");
     const portalCompanyId = companyParam ? parseInt(companyParam, 10) : undefined;
-    return <LoginScreen onSuccess={refetch} portalCompanyId={portalCompanyId || undefined} />;
+    return <PublicAccountShell section={portalCompanyId ? "Company portal sign in" : "Secure sign in"}><LoginScreen onSuccess={refetch} portalCompanyId={portalCompanyId || undefined} /></PublicAccountShell>;
   }
 
   const isSuperAdmin = !user.role || user.role === "super_admin";
@@ -284,7 +289,7 @@ function AuthGate({ children }: { children?: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{ user, logout, refetch }}>
       {isSuperAdmin ? children : currentPath === "/start"
-        ? <PublicStart canCheckout={user.role === "company_admin"} />
+        ? <PublicAccountShell section="Choose your package"><PublicStart canCheckout={user.role === "company_admin"} /></PublicAccountShell>
         : <PortalRedirect user={user} />}
     </AuthContext.Provider>
   );
