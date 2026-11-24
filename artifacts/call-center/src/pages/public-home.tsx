@@ -61,6 +61,83 @@ function AiSalesInquiry() {
   </div>;
 }
 
+function HeroProductIllustration(){
+  return <svg role="img" aria-label="Illustration of CallingAgent's business phone and AI receptionist: a mobile call, a computer dashboard, an AI headset assistant, and a desk phone" viewBox="0 0 1100 560" className="h-auto w-full overflow-visible" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="caLaptop" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#172858"/><stop offset="1" stopColor="#3b2a97"/></linearGradient>
+      <linearGradient id="caDesk" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#475569"/><stop offset=".7" stopColor="#0f172a"/></linearGradient>
+      <linearGradient id="caRobot" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#fff"/><stop offset=".7" stopColor="#e2dcff"/><stop offset="1" stopColor="#a9a6ee"/></linearGradient>
+      <linearGradient id="caBotFace" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#161d43"/><stop offset="1" stopColor="#342371"/></linearGradient>
+      <linearGradient id="caScreen" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#101c43"/><stop offset="1" stopColor="#0b1633"/></linearGradient>
+      <linearGradient id="caPurple" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#408dff"/><stop offset="1" stopColor="#6939db"/></linearGradient>
+      <filter id="caShadow" x="-35%" y="-35%" width="170%" height="190%"><feDropShadow dx="0" dy="14" stdDeviation="14" floodColor="#1b2067" floodOpacity=".18"/></filter>
+      <filter id="caGlow"><feGaussianBlur stdDeviation="15"/></filter>
+    </defs>
+    <ellipse cx="555" cy="518" rx="475" ry="21" fill="#c3cdfa" opacity=".28"/>
+    <path d="M425 230C470 70 615 30 760 120S1020 370 950 485H290C190 390 268 280 425 230Z" fill="#eae4ff"/>
+    <path d="M535 180C655 80 824 110 940 235" fill="none" stroke="#d6caff" strokeWidth="25" strokeLinecap="round" opacity=".65"/>
+    <g filter="url(#caShadow)">
+      <rect x="245" y="188" width="490" height="293" rx="20" fill="#25284b"/>
+      <rect x="258" y="202" width="465" height="263" rx="11" fill="url(#caLaptop)"/>
+      <rect x="258" y="202" width="97" height="263" rx="10" fill="#151d47"/>
+      <circle cx="284" cy="228" r="10" fill="#6e64ef"/>
+      <path d="M276 228l5-5 8 9 5-3" fill="none" stroke="white" strokeWidth="2"/>
+      <text x="300" y="232" fill="white" fontWeight="bold" fontSize="13">CallingAgent</text>
+      {["Dashboard","Calls","Messages","Contacts","AI Receptionist"].map((label,i)=><g key={label}>
+        {i===0&&<rect x="270" y={250+i*31} width="77" height="24" rx="6" fill="#4a4caa"/>}
+        <circle cx="282" cy={263+i*31} r="3" fill={i===0?"#fff":"#929bc6"}/>
+        <text x="293" y={267+i*31} fill={i===0?"#fff":"#bec7e9"} fontSize="9">{label}</text>
+      </g>)}
+      <text x="385" y="244" fill="white" fontSize="22" fontWeight="bold">AI Receptionist</text>
+      <rect x="380" y="263" width="305" height="38" rx="12" fill="#fff" opacity=".10"/>
+      <path d="M394 283h10m10-6v12m10-19v26m10-22v17m10-26v31m10-22v17m10-27v33m10-21v19m10-14v10m10-19v29m10-25v21m10-14v8m10-24v28" stroke="#bba8ff" strokeWidth="4" strokeLinecap="round"/>
+      {["Answer incoming calls","Take customer messages","Capture new leads","Record appointment requests"].map((label,i)=><g key={label}>
+        <rect x="381" y={313+i*34} width="305" height="28" rx="11" fill="#f6f7ff"/>
+        <circle cx="399" cy={327+i*34} r="9" fill="#347de9"/>
+        <path d={`M395 ${327+i*34}l3 3 5-6`} fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+        <text x="418" y={331+i*34} fontSize="12" fill="#1a2450">{label}</text>
+      </g>)}
+      <path d="M235 480H747L789 510Q786 520 770 523H222Q199 521 204 512Z" fill="#c1c6dd" stroke="#a6aecb" strokeWidth="2"/>
+      <path d="M274 486H707L724 500H256Z" fill="#e8e9f3"/>
+    </g>
+    <g filter="url(#caShadow)" transform="translate(115 254) rotate(-7 75 130)">
+      <rect x="0" y="0" width="150" height="259" rx="26" fill="#252b47"/>
+      <rect x="8" y="9" width="134" height="240" rx="20" fill="url(#caScreen)"/>
+      <rect x="48" y="13" width="58" height="12" rx="7" fill="#060d24"/>
+      <text x="75" y="57" textAnchor="middle" fontSize="14" fontWeight="bold" fill="white">Business Call</text>
+      <circle cx="75" cy="110" r="28" fill="#2563eb" opacity=".65"/>
+      <path d="M61 100Q65 119 84 121L90 113 79 107 75 113Q69 110 68 105L74 99 65 93Z" fill="white"/>
+      <text x="75" y="159" fill="#cad5ef" textAnchor="middle" fontSize="12">Incoming call...</text>
+      <circle cx="46" cy="208" r="20" fill="#f04452"/><circle cx="105" cy="208" r="20" fill="#18b985"/>
+      <path d="M35 208Q46 201 57 208M94 208Q105 200 116 208" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+    </g>
+    <g filter="url(#caShadow)">
+      <path d="M550 443Q548 362 640 348Q733 351 738 444L755 495H531Z" fill="url(#caRobot)" stroke="#c8b9fc" strokeWidth="4"/>
+      <rect x="579" y="399" width="128" height="77" rx="35" fill="#f6f4ff"/>
+      <circle cx="642" cy="435" r="26" fill="url(#caPurple)"/><path d="M626 428Q631 444 649 446L654 438 645 433 641 439Q637 435 636 430L641 424 633 420Z" fill="white"/>
+      <path d="M562 266C562 196 597 171 647 171S732 196 732 266" fill="none" stroke="#7461d6" strokeWidth="22" strokeLinecap="round"/>
+      <rect x="555" y="260" width="27" height="69" rx="13" fill="#5b46c7"/><rect x="714" y="260" width="27" height="69" rx="13" fill="#5b46c7"/>
+      <rect x="567" y="202" width="158" height="145" rx="63" fill="url(#caRobot)" stroke="#9d8fee" strokeWidth="4"/>
+      <rect x="584" y="226" width="125" height="90" rx="40" fill="url(#caBotFace)"/>
+      <path d="M608 267q15-18 29 0m19 0q14-18 28 0" fill="none" stroke="#88d6ff" strokeWidth="7" strokeLinecap="round"/>
+      <path d="M632 290q17 12 31 0" fill="none" stroke="#b9a2ff" strokeWidth="5" strokeLinecap="round"/>
+      <path d="M728 312q20 22 0 30l-27-1" fill="none" stroke="#6755d2" strokeWidth="8" strokeLinecap="round"/>
+      <circle cx="700" cy="340" r="7" fill="#77acff"/>
+    </g>
+    <g filter="url(#caShadow)" transform="translate(812 316)">
+      <path d="M0 143L55 40H221L272 145Q276 167 258 169H18Q-4 165 0 143Z" fill="url(#caDesk)"/>
+      <path d="M27 126H245L263 152H10Z" fill="#27324b"/>
+      <rect x="106" y="60" width="104" height="54" rx="8" fill="#111b38"/>
+      <rect x="116" y="68" width="83" height="38" rx="5" fill="#4266a7"/>
+      <path d="M143 86q14-16 26 0" fill="none" stroke="white" strokeWidth="6"/>
+      {Array.from({length:12},(_,i)=><rect key={i} x={58+(i%4)*35} y={130+Math.floor(i/4)*11} width="21" height="7" rx="3" fill="#8291b5" />)}
+      <path d="M18 43Q27 8 57 4L85 27Q99 62 74 83L41 104Q21 105 11 87Z" fill="#293650" stroke="#101c34" strokeWidth="5"/>
+    </g>
+    <g fill="#85b95b" opacity=".9"><path d="M111 430Q52 328 80 309Q123 316 111 430Z"/><path d="M120 433Q122 319 159 318Q189 354 120 433Z"/><path d="M116 429Q60 367 36 384Q41 421 116 429Z"/></g>
+    <path d="M77 415H154L144 503H90Z" fill="#e4e6f0"/>
+  </svg>;
+}
+
 export default function PublicHome() {
   const {plans,loading,error}=usePublicPlans();
   const [mobile,setMobile]=useState(false);
@@ -82,24 +159,21 @@ export default function PublicHome() {
       {mobile&&<nav className="flex flex-col gap-4 border-t border-blue-100 bg-white px-6 py-5 text-sm font-semibold md:hidden"><a href="#solutions" onClick={()=>setMobile(false)}>Solutions</a><a href="#how-it-works" onClick={()=>setMobile(false)}>How it works</a><a href="#pricing" onClick={()=>setMobile(false)}>Phone Plans</a><a href="#ai" onClick={()=>setMobile(false)}>AI Receptionist</a><a href="#faq" onClick={()=>setMobile(false)}>FAQ</a><a href="/login">Sign in</a></nav>}
     </header>
     <main>
-      <section className="relative overflow-hidden bg-gradient-to-br from-white via-[#eaf7ff] to-[#d8edff]" style={{backgroundImage:"linear-gradient(90deg, rgba(255,255,255,.98) 0%, rgba(248,253,255,.95) 35%, rgba(230,247,255,.68) 66%, rgba(224,241,255,.35) 100%), url(https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=2200&q=85)",backgroundSize:"cover",backgroundPosition:"center center"}}>
-        <div className="pointer-events-none absolute -right-24 top-0 h-[500px] w-[500px] rounded-full bg-blue-200/70 blur-3xl"/>
-        <div className="mx-auto grid max-w-7xl gap-12 px-5 py-16 sm:px-8 lg:grid-cols-[0.86fr_1.14fr] lg:items-center lg:py-20">
-          <div className="relative z-10">
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-700">Business Phone + AI Receptionist · Two solutions, one platform</p>
-            <h1 className="mt-5 font-serif text-4xl font-bold leading-[1.09] tracking-tight sm:text-5xl xl:text-6xl">Your business phone. <span className="text-[#398bad]">Your AI receptionist.</span></h1>
-            <p className="mt-6 max-w-lg text-lg leading-relaxed text-slate-700">Keep business calls organized with Canadian numbers, forwarding and voicemail. Or explore an AI receptionist that answers inbound calls, helps with outbound follow-up and captures customer requests. Choose the phone system, AI, or a combination as AI packages launch.</p>
-            <div className="mt-8 grid gap-3 sm:grid-cols-2"><a href="#pricing" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#006a5c] px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-800/10 hover:bg-[#005447]"><PhoneCall className="h-4 w-4"/> Business Phone · From $9/mo</a><a href="#ai" className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-700 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-700/15 hover:bg-indigo-800"><Bot className="h-4 w-4"/> AI Receptionist · From $99/mo*</a></div><p className="mt-3 text-xs text-slate-600">*AI pricing is planned, and early-access requests are open. Taxes and usage credits are additional; live AI checkout is not yet available.</p>
-            <div className="mt-8 grid max-w-lg grid-cols-2 gap-4 text-sm font-semibold text-slate-700">{[["Incoming AI calls","Receptionist early access"],["Outbound AI calls","Planned AI follow-up"],["Business forwarding","Answer on your mobile"],["SMS messaging","Manual now · AI replies coming soon"]].map(([title,subtitle])=><div key={title} className="flex items-start gap-2"><span className="rounded-full bg-emerald-100 p-1 text-emerald-700"><Check className="h-4 w-4"/></span><span>{title}<span className="mt-0.5 block text-xs font-normal text-slate-500">{subtitle}</span></span></div>)}</div>
+      <section className="relative overflow-hidden bg-white">
+        <div className="pointer-events-none absolute -left-32 top-16 h-72 w-72 rounded-full bg-blue-100/50 blur-3xl"/>
+        <div className="pointer-events-none absolute -right-24 top-48 h-80 w-80 rounded-full bg-violet-100/70 blur-3xl"/>
+        <div className="relative mx-auto max-w-7xl px-5 pb-10 pt-12 text-center sm:px-8 sm:pt-16 lg:pt-20">
+          <h1 className="mx-auto max-w-5xl text-4xl font-extrabold leading-[1.09] tracking-tight text-[#10152f] sm:text-5xl lg:text-7xl">Your business phone.<span className="block bg-gradient-to-r from-blue-600 to-violet-700 bg-clip-text text-transparent">Your AI receptionist.</span></h1>
+          <p className="mx-auto mt-5 max-w-3xl text-base leading-relaxed text-slate-600 sm:mt-6 sm:text-xl">A modern business phone system with an AI receptionist that answers calls, handles inquiries, captures leads, and keeps your business connected.</p>
+          <div className="mx-auto mt-7 grid max-w-xl gap-3 sm:grid-cols-2">
+            <div><a href="#pricing" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700"><PhoneCall className="h-5 w-5"/>Business Phone <ArrowRight className="h-4 w-4"/></a><p className="mt-1.5 text-sm font-medium text-slate-600">From $9 CAD/month</p></div>
+            <div><a href="#ai-inquiry" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-700 px-5 py-3 font-bold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-800"><Bot className="h-5 w-5"/>AI Receptionist <ArrowRight className="h-4 w-4"/></a><p className="mt-1.5 text-sm font-medium text-slate-600">From $99 CAD/month · planned</p></div>
           </div>
-          <div className="relative mx-auto flex min-h-[430px] w-full max-w-[720px] items-center justify-center sm:min-h-[540px] lg:min-h-[650px]">
-            <div className="absolute inset-6 rounded-full bg-gradient-to-tr from-blue-200/65 to-white/20 blur-2xl"/>
-            <div className="absolute left-0 top-[12%] z-10 max-w-[190px] rounded-2xl border border-blue-100 bg-white/95 p-3 shadow-xl sm:left-2"><p className="text-xs text-slate-400">Customer calls your business</p><p className="mt-1 text-sm font-bold">Can I book a consultation?</p><div className="mt-2 flex items-center gap-1 text-xs font-semibold text-blue-600"><PhoneCall className="h-3.5 w-3.5"/> New customer inquiry</div></div>
-            <div className="absolute right-1 top-[7%] z-10 max-w-[185px] rounded-2xl border border-blue-100 bg-white/95 p-3 shadow-xl"><p className="text-xs font-bold text-blue-600">AI assistant</p><p className="mt-1 text-xs leading-relaxed text-slate-600">I can help answer questions and record appointment requests.</p></div>
-            <div className="relative z-0 w-[275px] rotate-[6deg] rounded-[48px] border-[9px] border-slate-900 bg-slate-950 p-2 shadow-[0_35px_90px_rgba(18,67,105,.42)] sm:w-[310px]"><div className="relative h-[475px] overflow-hidden rounded-[34px] bg-gradient-to-b from-[#0d263b] via-[#123c57] to-[#081b2e] px-5 pb-7 pt-12 text-white sm:h-[520px]"><div className="absolute left-1/2 top-2 h-6 w-24 -translate-x-1/2 rounded-full bg-black"/><div className="text-center text-xs text-slate-300">9:41 · CallingAgent</div><div className="mt-12 text-center"><div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-blue-500/20 shadow-[0_0_42px_rgba(56,189,248,.45)]"><Bot className="h-11 w-11 text-sky-300"/></div><p className="mt-5 text-xl font-bold">AI Receptionist</p><p className="mt-1 text-sm text-emerald-300">On a call · 00:24</p></div><div className="mt-8 rounded-2xl bg-white/10 p-4 text-sm leading-relaxed">“Thanks for calling! How can I help you today?”</div><div className="mt-4 flex h-12 items-center justify-center gap-1">{[8,16,24,36,22,42,26,15,29,18,8].map((height,i)=><span key={i} className="w-1.5 rounded-full bg-sky-400" style={{height}}/>)}</div><div className="mt-6 flex justify-around"><span className="rounded-full bg-white/10 p-4">●</span><span className="rounded-full bg-red-500 p-4"><PhoneCall className="h-5 w-5 rotate-[135deg]"/></span><span className="rounded-full bg-white/10 p-4"><MessageSquare className="h-5 w-5"/></span></div></div></div>
-            <div className="absolute bottom-[18%] left-1 z-10 max-w-[180px] rounded-2xl border border-blue-100 bg-white/95 p-3 shadow-xl"><p className="flex items-center gap-1 text-xs font-bold text-emerald-700"><Check className="h-4 w-4"/> Customer inquiry captured</p><p className="mt-1 text-xs text-slate-600">Details recorded for follow-up.</p></div>
-            <div className="absolute bottom-[8%] right-1 z-10 max-w-[188px] rounded-2xl border border-blue-100 bg-white/95 p-3 shadow-xl"><p className="flex items-center gap-1 text-xs font-bold text-blue-700"><Clock3 className="h-4 w-4"/> Appointment request</p><p className="mt-1 text-xs text-slate-600">Request saved for your team</p></div>
+          <div className="mx-auto mt-6 max-w-5xl"><HeroProductIllustration /></div>
+          <div className="mx-auto mt-3 grid max-w-5xl grid-cols-2 gap-4 border-t border-slate-200 py-5 text-left sm:grid-cols-4">
+            {[[PhoneCall,"Business numbers","Local Canadian options"],[Bot,"AI call handling","Early access available"],[Clock3,"Appointment requests","Capture customer details"],[Building2,"Organized communication","Calls, messages and leads"]].map(([Icon,title,subtitle])=><div className="flex items-center gap-3" key={String(title)}><span className="rounded-xl bg-violet-50 p-2.5 text-violet-700"><Icon className="h-5 w-5"/></span><div><p className="text-sm font-bold text-slate-900">{title}</p><p className="text-xs text-slate-500">{subtitle}</p></div></div>)}
           </div>
+          <p className="text-xs text-slate-500">AI service and $99 pricing are planned. Early-access inquiries are open; automated AI checkout and activation are not yet available. Taxes and usage credits are additional.</p>
         </div>
       </section>
       <section id="solutions" className="scroll-mt-20 bg-white py-16">
