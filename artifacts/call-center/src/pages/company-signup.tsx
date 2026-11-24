@@ -53,9 +53,9 @@ export default function CompanySignup() {
     }catch(e:any){setError(e?.message||"Verification failed")}
     finally{setBusy(false)}
   }
-  return <div className="min-h-screen bg-[#f7faff] px-4 py-12 text-slate-900">
+  return <div className="min-h-[calc(100dvh-140px)] bg-[#f3f6fc] px-4 py-12 text-slate-900">
     <main className="mx-auto max-w-lg rounded-2xl border border-blue-100 bg-white p-6 shadow-sm sm:p-9">
-      <a href="/#pricing" className="text-sm font-medium text-blue-700">← CallingAgent packages</a>
+      <a href="/website#pricing" className="text-sm font-medium text-blue-700">← Public website · CallingAgent packages</a>
       <div className="mt-6 flex items-center gap-3"><ShieldCheck className="h-7 w-7 text-blue-600"/><h1 className="text-2xl font-extrabold">Create your business account</h1></div>
       {enabled===null?<p className="mt-5 text-sm text-slate-600">Checking registration availability…</p>:
       !enabled?<div className="mt-6 space-y-3"><p className="text-sm text-slate-700">Online registration is not available during final launch checks. You can request access from the package page.</p><a href={"/start?plan="+plan} className="block rounded-xl bg-blue-600 p-3 text-center font-semibold text-white">Request early access</a></div>:
