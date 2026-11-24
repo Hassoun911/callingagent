@@ -193,7 +193,7 @@ function AiLanding(){
     `}</style>
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 text-[#10233e] backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
-        <a href="/website" className="flex shrink-0 items-center" aria-label="CallingAgent AI Receptionist home"><span className="inline-flex items-center gap-2 whitespace-nowrap text-xl font-black tracking-tight text-[#10233e]"><PhoneCall className="h-7 w-7 text-blue-600"/>CALLING<span className="-ml-2 text-blue-600">AGENT</span></span></a>
+        <a href="/website" className="flex shrink-0 items-center" aria-label="CallingAgent AI Receptionist home"><span className="inline-flex items-center rounded-xl bg-[#10233e] px-3 py-2"><img src="/logo.png" alt="CallingAgent" className="h-9 w-auto max-w-[170px] object-contain"/></span></a>
         <nav aria-label="Main website" className="hidden items-center gap-8 text-sm font-semibold text-slate-800 lg:flex">
           <a href="/website" aria-current="page" className="rounded-full bg-blue-50 px-4 py-2 text-blue-700">AI Receptionist</a><a href="/business-phone" className="hover:text-blue-700">Business Phone</a><a href="#benefits" className="hover:text-sky-700">Benefits</a><a href="#how-ai-works" className="hover:text-sky-700">How it works</a>
         </nav>
@@ -203,24 +203,36 @@ function AiLanding(){
       {menuOpen&&<nav aria-label="Mobile website navigation" className="flex flex-col gap-5 border-t border-slate-200 bg-white px-6 py-5 text-sm font-semibold text-slate-800 lg:hidden"><a href="/website" aria-current="page" onClick={()=>setMenuOpen(false)} className="text-sky-700">AI Receptionist</a><a href="/business-phone">Business Phone</a><a href="#benefits" onClick={()=>setMenuOpen(false)}>Benefits</a><a href="#how-ai-works" onClick={()=>setMenuOpen(false)}>How it works</a><a href="#ai-inquiry" onClick={()=>setMenuOpen(false)}>Request early access</a><a href="/login">Account sign in</a></nav>}
     </header>
     <main>
-      <section className="relative isolate overflow-hidden bg-[#081a3e] text-white">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-32 top-10 h-[34rem] w-[34rem] rounded-full bg-blue-600/30 blur-[100px]"/>
-        <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-5 pb-24 pt-16 sm:px-8 lg:grid-cols-[1fr_1.05fr] lg:gap-16 lg:pb-32 lg:pt-28">
+      <section className="relative isolate overflow-hidden bg-white">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-44 top-20 h-[34rem] w-[34rem] rounded-full bg-blue-100/60 blur-[90px]"/>
+        <div className="relative mx-auto grid max-w-7xl items-center gap-6 px-5 pb-10 pt-8 sm:px-8 md:pb-20 lg:grid-cols-[.89fr_1.11fr] lg:gap-10 lg:pb-16 lg:pt-16">
           <div className="ca-entrance relative z-10">
-            <span className="inline-flex items-center gap-2 rounded-full border border-blue-300/30 bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-sky-200"><span className="h-2 w-2 rounded-full bg-emerald-300"/> Meet your new first impression</span>
-            <h1 className="mt-7 max-w-2xl text-[clamp(2.8rem,5.5vw,5.9rem)] font-black leading-[1.04] tracking-[-.06em]">Your business is busy. <span className="text-[#86c4ff]">Your phone shouldn't be.</span></h1>
-            <p className="mt-7 max-w-xl text-base leading-8 text-blue-100 sm:text-lg">Discover a more thoughtful way to welcome callers, understand what they need and turn their requests into clear next steps for your team.</p>
-            <div className="mt-8 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-14 items-center gap-2 rounded-full bg-white px-7 py-4 font-bold text-blue-700 hover:bg-blue-100">Request early access <ArrowRight className="h-5 w-5"/></a><a href="#how-ai-works" className="inline-flex min-h-14 items-center rounded-full border border-white/40 px-6 py-4 font-bold hover:bg-white/10">Explore the experience</a></div>
-            <p className="mt-6 max-w-lg text-xs leading-5 text-blue-200">Currently accepting AI inquiries. Planned from $99 CAD/month plus taxes and usage credits. No payment or automatic activation yet.</p>
-          </div>
-          <div className="relative mx-auto w-full max-w-[570px]" aria-label="Illustrative CallingAgent receptionist call interface">
-            <div className="relative overflow-hidden rounded-[2rem] border border-white/25 bg-white/10 p-5 shadow-[0_30px_90px_rgba(0,0,0,.32)] backdrop-blur-xl sm:p-8">
-              <div className="flex items-center justify-between gap-2 border-b border-white/15 pb-5"><div className="flex items-center gap-3"><span className="rounded-2xl bg-blue-600 p-3"><PhoneCall className="h-6 w-6"/></span><div><p className="text-sm font-black">CallingAgent AI</p><p className="mt-1 text-xs text-sky-200">Concept experience</p></div></div><span className="rounded-full bg-emerald-400/20 px-3 py-1 text-xs font-bold text-emerald-200">● Answering</span></div>
-              <div className="py-9 text-center"><div className="ca-float-a mx-auto flex h-28 w-28 items-center justify-center rounded-full border-2 border-sky-300/60 bg-blue-500/25 shadow-[0_0_65px_rgba(56,189,248,.22)]"><Bot className="h-12 w-12 text-white"/></div><p className="mt-6 text-2xl font-black">“Thanks for calling!”</p><p className="mt-2 text-sm text-blue-200">Every great experience starts with hello.</p><div aria-hidden="true" className="mt-7 flex h-12 items-center justify-center gap-1.5">{Array.from({length:23},(_,i)=><span key={i} className="ca-wave w-1.5 rounded-full bg-sky-300" style={{height:12+((i*17)%35),animationDelay:(i*65)+"ms"}}/>)}</div></div>
-              <div className="grid grid-cols-3 gap-2 border-t border-white/15 pt-5 text-center text-[11px] font-semibold text-blue-100"><span className="rounded-xl bg-white/10 p-3">01 · Welcome</span><span className="rounded-xl bg-white/10 p-3">02 · Understand</span><span className="rounded-xl bg-white/10 p-3">03 · Follow up</span></div>
+            <span className="inline-flex rounded-full bg-blue-100 px-4 py-2 text-xs font-extrabold uppercase tracking-[.2em] text-blue-800">AI Receptionist · CallingAgent</span>
+            <h1 className="mt-6 max-w-2xl text-[clamp(2.65rem,5.3vw,5.4rem)] font-black leading-[1.055] tracking-[-.055em] text-[#121836]">Your 24/7 <span className="block bg-gradient-to-r from-[#1454e5] via-[#2563eb] to-[#0284c7] bg-clip-text text-transparent">AI Receptionist.</span></h1>
+            <p className="mt-7 max-w-xl text-base leading-8 text-slate-600 sm:text-xl">Give customers a helpful first response, capture new leads and appointment requests, and give your team more time to focus on your business.</p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <a href="#ai-inquiry" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#234be8] to-[#0369a1] px-7 py-4 text-base font-bold text-white shadow-[0_14px_40px_rgba(83,47,198,.22)] transition hover:brightness-110">Request AI Early Access <ArrowRight className="h-5 w-5"/></a>
+              <a href="#how-ai-works" className="inline-flex min-h-14 items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm font-bold text-slate-800 hover:bg-slate-50">See how it works</a>
             </div>
-            <div className="ca-float-b absolute -bottom-5 right-0 flex items-center gap-3 rounded-2xl border border-blue-100 bg-white px-4 py-3 text-[#13234b] shadow-2xl sm:-right-5"><span className="rounded-full bg-emerald-100 p-2 text-emerald-600"><Check className="h-5 w-5"/></span><div><p className="text-sm font-black">Request captured</p><p className="text-xs text-slate-500">Ready for your team</p></div></div>
+            <p className="mt-5 text-xs leading-5 text-slate-500">AI plans are in early access. Standalone service is planned from $99 CAD/month; billing and activation are not available yet.</p>
           </div>
+          {/* The original source is a full-page design reference. Show ONLY its right-hand
+              photographic subject; never embed its existing header, title or buttons
+              inside the live site's own hero. */}
+          <div className="ca-photo-card relative isolate aspect-[5/4] w-full overflow-hidden rounded-[1.8rem] bg-[#edf5ff] shadow-[0_30px_90px_rgba(46,36,112,.14)] sm:aspect-[5/4] lg:aspect-[5/4]">
+            <img
+              src="/CallingAgent%20AI%20Receptionist%20Hero.png?v=photo-crop-20261124"
+              alt="Photorealistic AI receptionist concept: a headset-wearing professional beside call and lead-request interface elements"
+              className="pointer-events-none absolute right-0 top-[-26%] h-auto w-[215%] max-w-none select-none"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+            />
+            <span className="absolute bottom-3 right-3 rounded-lg bg-white/90 px-3 py-1.5 text-[10px] font-semibold text-slate-600 shadow-sm">AI Receptionist · visual concept</span>
+          </div>
+        </div>
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 border-t border-slate-100 px-5 py-7 sm:grid-cols-3 sm:px-8">
+          {[[PhoneCall,"Answer customers","Explore AI-assisted answering"],[Sparkles,"Capture more opportunities","Record caller details and requests"],[Clock3,"Save your team's time","Focus on important work"]].map(([Icon,title,detail])=><div key={String(title)} className="flex items-center gap-3"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700"><Icon className="h-5 w-5"/></span><div><p className="text-sm font-extrabold text-[#141a38]">{title}</p><p className="text-xs leading-5 text-slate-500">{detail}</p></div></div>)}
         </div>
       </section>
       <section id="benefits" className="scroll-mt-24 bg-gradient-to-b from-white to-[#edf5ff] py-12 lg:py-20">
@@ -268,7 +280,7 @@ export default function PublicHome({mode="ai"}:{mode?:"ai"|"phone"}={}) {
     </div>
     <header className="sticky top-0 z-30 border-b border-blue-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
-        <a href="/website" className="flex shrink-0 items-center gap-2 text-lg font-extrabold tracking-tight sm:text-xl"><span className="rounded-xl bg-blue-600 p-2 text-white"><PhoneCall className="h-5 w-5"/></span>CALLING<span className="text-blue-600">AGENT</span></a>
+        <a href="/website" className="flex shrink-0 items-center"><span className="inline-flex items-center rounded-xl bg-[#10233e] px-3 py-2"><img src="/logo.png" alt="CallingAgent" className="h-9 w-auto max-w-[170px] object-contain"/></span></a>
         <nav className="hidden items-center gap-4 text-sm font-semibold text-slate-600 lg:flex xl:gap-7" aria-label="Public services"><a href="/website" aria-current={!isPhone?"page":undefined} className={!isPhone?"rounded-lg bg-violet-50 px-3 py-2 text-violet-800":"hover:text-violet-700"}>AI Receptionist</a><a href="/business-phone" aria-current={isPhone?"page":undefined} className={isPhone?"rounded-lg bg-blue-50 px-3 py-2 text-blue-800":"hover:text-blue-700"}>Business Phone</a><a href="#how-it-works" className="hover:text-blue-600">How it works</a><a href={isPhone?"#pricing":"#ai-inquiry"} className="hover:text-blue-600">{isPhone?"Phone Plans":"AI Early Access"}</a><a href="#faq" className="hover:text-blue-600">FAQ</a></nav>
         <div className="hidden items-center gap-3 lg:flex"><a href="/login" className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold hover:bg-slate-50">Sign in</a><a href={isPhone?"/business-phone#pricing":"/website#ai-inquiry"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-800">{isPhone?<PhoneCall className="h-4 w-4"/>:<Bot className="h-4 w-4"/>}{isPhone?"View phone plans":"AI early access"}</a></div>
         <button aria-label="Toggle menu" onClick={()=>setMobile(!mobile)} className="p-2 lg:hidden">{mobile?<X/>:<Menu/>}</button>
