@@ -106,6 +106,14 @@ router.get("/billing/company-overview", async (req, res): Promise<void> => {
   }
 });
 /**
+ * Existing company account snapshot confirmed to hold BOTH legacy VoIP and
+ * legacy AI service. This affects DISPLAY ONLY; it never grants, charges,
+ * removes, or modifies any service. New IDs do not inherit grandfathering.
+ * Snapshot captured 2026-11-23, company IDs confirmed in production.
+ */
+const existingDualServiceCompanyIds=new Set([3,4,5,6,7,8,9,10,11]);
+
+/**
  * Pure read-only product map for the dual-service dashboard.
  * Important: a legacy number or AI answer mode is NOT evidence of a
  * purchased Stripe subscription. Existing line routing is never mutated.
@@ -151,23 +159,25 @@ router.get("/billing/service-status", async (req, res): Promise<void> => {
     res.set("Cache-Control","private, no-store");
     res.json({readOnly:true,currency:"CAD",companies:records.rows.map(row=>{
       const verifiedPaidPhone=row.phoneSubscriptionStatus==="active"&&row.phonePaymentStatus==="paid";
-      const legacyVoip=row.activeNumbers>0&&!verifiedPaidPhone;
+      const isLegacyDual=existingDualServiceCompanyIds.has(row.companyId);
+      const legacyVoip=(isLegacyDual||row.activeNumbers>0)&&!verifiedPaidPhone;
       return {
         ...row,
         businessPhone:{
-          state:verifiedPaidPhone?"paid":legacyVoip?"existing_service":row.phoneSubscriptionStatus?"subscription_review":"not_assigned",
-          paid:verifiedPaidPhone,existingService:row.activeNumbers>0,
+          state:verifiedPaidPhone?"paid":isLegacyDual?"legacy_dual":legacyVoip?"existing_service":row.phoneSubscriptionStatus?"subscription_review":"not_assigned",
+          paid:verifiedPaidPhone,existingService:isLegacyDual||row.activeNumbers>0,legacyDualService:isLegacyDual,
           activeNumbers:row.activeNumbers,assignedNumbers:row.assignedNumbers,
           plan:verifiedPaidPhone?row.phonePlan:null,
         },
         aiReceptionist:{
           // AI voice routing predates paid AI plans. It stays configured.
-          state:row.aiConfiguredNumbers>0?"existing_configuration":"not_purchased",
-          paid:false,existingConfiguration:row.aiConfiguredNumbers>0,
+          state:isLegacyDual?"legacy_dual":row.aiConfiguredNumbers>0?"existing_configuration":"not_purchased",
+          paid:false,existingService:isLegacyDual||row.aiConfiguredNumbers>0,
+          legacyDualService:isLegacyDual,existingConfiguration:row.aiConfiguredNumbers>0,
           configuredNumbers:row.aiConfiguredNumbers,
           purchaseVerification:"No separate paid AI subscription ledger is connected yet",
         },
-        note:"Read-only service classification. Existing VoIP routing and AI answer modes are unchanged; configured AI voice does not prove a purchased AI plan.",
+        note:isLegacyDual?"Existing company has legacy VoIP and AI service. AI answering mode may currently be configured on only some lines. Existing service, credits, routing, and bills are untouched.": "Read-only classification; configured AI voice alone does not prove a purchased AI plan.",
       };
     })});
   } catch(error:any) {
