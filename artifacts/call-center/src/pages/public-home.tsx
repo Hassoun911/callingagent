@@ -146,15 +146,6 @@ function HeroProductIllustration(){
  */
 function AiLanding(){
   const [menuOpen,setMenuOpen]=useState(false);
-  // Tilt is limited to the hero visual. Reduced-motion visitors get a static layout.
-  const [heroTilt,setHeroTilt]=useState({x:0,y:0});
-  const [tiltEnabled,setTiltEnabled]=useState(false);
-  useEffect(()=>{
-    const media=window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update=()=>setTiltEnabled(!media.matches);
-    update();media.addEventListener("change",update);
-    return()=>media.removeEventListener("change",update);
-  },[]);
   useEffect(()=>{
     const root=document.querySelector("[data-ca-landing]");
     if(!root || !("IntersectionObserver" in window))return;
@@ -175,7 +166,6 @@ function AiLanding(){
     return()=>{observer.disconnect();media.removeEventListener("change",sync);nodes.forEach(node=>node.classList.remove("ca-reveal-ready","ca-in-view"));};
   },[]);
   const photos={
-    hero:"https://images.pexels.com/photos/8192015/pexels-photo-8192015.jpeg?auto=compress&cs=tinysrgb&w=1300",
     support:"https://images.pexels.com/photos/7971724/pexels-photo-7971724.jpeg?auto=compress&cs=tinysrgb&w=1200",
     team:"https://images.pexels.com/photos/7971724/pexels-photo-7971724.jpeg?auto=compress&cs=tinysrgb&w=900"
   };
@@ -218,40 +208,17 @@ function AiLanding(){
     </header>
     <main>
       <section className="overflow-hidden bg-gradient-to-r from-white via-sky-50/40 to-sky-100/70">
-        <div className="mx-auto grid max-w-7xl items-center gap-9 px-5 pb-16 pt-12 sm:px-8 lg:grid-cols-[.95fr_1.05fr] lg:gap-16 lg:py-24">
+        <div className="mx-auto grid max-w-7xl items-center gap-9 px-5 pb-16 pt-12 sm:px-8 lg:grid-cols-[.95fr_1.05fr] lg:gap-8 lg:py-14">
           <div className="ca-entrance">
             <p className="text-xs font-extrabold uppercase tracking-[.2em] text-sky-700">AI Receptionist</p>
-            <h1 className="mt-5 max-w-xl text-[clamp(2.7rem,5vw,4.6rem)] font-black leading-[1.08] tracking-[-.05em] text-[#111936]">Your 24/7 <span className="block text-sky-600">AI Receptionist</span></h1>
+            <h1 className="mt-5 max-w-xl text-[clamp(2.7rem,5vw,4.6rem)] font-black leading-[1.08] tracking-[-.05em] text-[#111936]">Your 24/7 <span className="block text-blue-600 italic">AI Receptionist</span></h1>
             <p className="mt-6 max-w-xl text-base leading-8 text-slate-600 sm:text-lg">Answer calls, handle customer inquiries, capture appointment requests and new leads — so your team can focus on growing your business.</p>
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">{["Answer calls 24/7","Appointment requests","Handle inquiries","Capture new leads"].map(label=><div key={label} className="flex flex-col items-center gap-2 rounded-xl bg-white/80 p-3 text-center text-xs font-bold text-[#14213d]"><span className="rounded-xl bg-sky-100 p-2 text-sky-600"><Check className="h-5 w-5"/></span>{label}</div>)}</div><div className="mt-6 flex items-baseline gap-2 rounded-2xl border border-sky-200 bg-white/90 p-4 shadow-sm"><span className="text-4xl font-black tracking-tight text-[#111936]">$99</span><span className="text-sm text-slate-600">CAD/month · planned starting price</span></div><div className="mt-6 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-sky-700 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-sky-700/15 hover:bg-sky-800">Get AI Receptionist access <ArrowRight className="h-4 w-4"/></a><a href="#how-ai-works" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-slate-800 hover:bg-slate-50">See how it works</a></div>
             <p className="mt-5 text-xs leading-5 text-slate-500">Early access · No payment required. Usage credits and taxes are separate; automatic paid activation is not yet available.</p>
           </div>
-          <div className="ca-hero-stage relative isolate min-h-[340px] pb-8 sm:min-h-[440px] lg:min-h-[500px]" onPointerMove={event=>{
-            if(!tiltEnabled || event.pointerType!=="mouse")return;
-            const rect=event.currentTarget.getBoundingClientRect();
-            const x=((event.clientX-rect.left)/rect.width-.5)*9;
-            const y=((event.clientY-rect.top)/rect.height-.5)*-9;
-            setHeroTilt({x,y});
-          }} onPointerLeave={()=>setHeroTilt({x:0,y:0})}>
-            <div className="ca-orbit absolute -right-7 top-[4%] h-[78%] w-[92%] rounded-[44%] border-[18px] border-sky-100 opacity-65 sm:border-[24px]" aria-hidden="true"/>
-            <div className="ca-orbit-delayed absolute -left-5 bottom-[5%] h-48 w-48 rounded-full border-[22px] border-blue-100/90 opacity-70" aria-hidden="true"/>
-            <div className="relative z-10 mx-auto w-[91%] max-w-[560px] [perspective:1400px]">
-              <div className="ca-hero-tilt relative" style={{transform:tiltEnabled?`rotateY(${heroTilt.x}deg) rotateX(${heroTilt.y}deg)`:undefined}}>
-                <div className="ca-photo-card relative overflow-hidden rounded-[2rem] bg-[#ebe7ff] shadow-[0_35px_90px_rgba(33,27,81,.22)] [transform:translateZ(32px)]">
-                  <img src={photos.hero} loading="eager" decoding="async" fetchPriority="high" alt="Customer support professional at a workstation" className="aspect-[4/5] w-full object-cover object-center sm:aspect-[5/5] lg:aspect-[5/5]"/>
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#101936]/45 via-transparent to-transparent"/>
-                  <div className="absolute bottom-7 left-7 right-7 text-white"><span className="text-xs font-bold uppercase tracking-[.2em] text-sky-100">Your business, always connected.</span><p className="mt-2 max-w-sm text-xl font-bold sm:text-2xl">Give every caller a better first impression.</p></div>
-                </div>
-                <div className="ca-float-a absolute -left-6 top-[12%] z-20 flex items-center gap-3 rounded-2xl border border-sky-300 bg-[#12355a]/95 px-4 py-3 shadow-[0_0_30px_rgba(14,165,233,.55)] backdrop-blur sm:-left-12 [transform:translateZ(100px)]" aria-label="Potential AI use case: inbound inquiries">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-700"><PhoneCall className="h-5 w-5"/></span><span><span className="block text-xs font-extrabold text-white">Incoming call</span><span className="block text-xs text-sky-100">AI receptionist answering</span></span>
-                </div>
-                <div className="ca-float-b absolute -bottom-4 -right-3 z-20 max-w-[235px] rounded-2xl border border-sky-100 bg-[#12355a]/95 p-4 shadow-[0_0_30px_rgba(14,165,233,.45)] backdrop-blur sm:-bottom-6 sm:-right-10 [transform:translateZ(135px)]" aria-label="Potential AI use case: organized lead capture">
-                  <div className="flex items-center gap-2 text-sky-200"><Sparkles className="h-4 w-4"/><span className="text-xs font-bold uppercase tracking-wider">Designed to help</span></div>
-                  <p className="mt-2 text-base font-extrabold text-white">Capture leads. Take messages.</p>
-                  <p className="mt-1 text-xs leading-5 text-sky-100">Illustrative call workflow</p>
-                </div>
-              </div>
-            </div>
+          <div className="ca-photo-card relative overflow-hidden rounded-2xl bg-sky-50 shadow-xl" style={{aspectRatio:"1.12"}}>
+            <img src="/CallingAgent%20AI%20Receptionist%20Hero.png" alt="CallingAgent branded AI receptionist concept illustration" className="absolute max-w-none" style={{width:"174%",height:"auto",right:0,top:"-10%"}} fetchPriority="high"/>
+            <div className="absolute bottom-0 right-0 rounded-tl-lg bg-white/95 px-3 py-2 text-xs text-slate-600">Illustrative concept · features subject to availability</div>
           </div>
         </div>
       </section>
