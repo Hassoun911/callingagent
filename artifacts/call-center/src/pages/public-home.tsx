@@ -165,10 +165,6 @@ function AiLanding(){
     sync();media.addEventListener("change",sync);
     return()=>{observer.disconnect();media.removeEventListener("change",sync);nodes.forEach(node=>node.classList.remove("ca-reveal-ready","ca-in-view"));};
   },[]);
-  const photos={
-    support:"https://images.pexels.com/photos/7971724/pexels-photo-7971724.jpeg?auto=compress&cs=tinysrgb&w=1200",
-    team:"https://images.pexels.com/photos/7971724/pexels-photo-7971724.jpeg?auto=compress&cs=tinysrgb&w=900"
-  };
   const benefits=[
     {number:"01",title:"Be there when customers call",description:"Explore an AI answering experience designed for moments when your team is busy, closed, or already on another call."},
     {number:"02",title:"Turn conversations into opportunities",description:"Capture new inquiries, callers' details and the next step they are looking for, instead of relying on memory."},
@@ -176,7 +172,7 @@ function AiLanding(){
   ];
   return <div data-ca-landing className="min-h-screen bg-white font-sans text-[#14213d]">
     <style>{`
-      @keyframes ca-entrance {from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes ca-wave-pulse {0%,100%{transform:scaleY(.65)}50%{transform:scaleY(1.1)}}\n      .ca-wave{animation:ca-wave-pulse 1.25s ease-in-out infinite;box-shadow:0 0 12px #38bdf8}\n      @media(prefers-reduced-motion:reduce){.ca-wave{animation:none}}\n      @keyframes ca-entrance {from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
       @keyframes ca-levitate {0%,100%{translate:0 0}50%{translate:0 -13px}}
       @keyframes ca-levitate-opposite {0%,100%{translate:0 0}50%{translate:0 12px}}
       @keyframes ca-orbit-soft {0%,100%{transform:rotate(-10deg) scale(1)}50%{transform:rotate(8deg) scale(1.035)}}
@@ -222,31 +218,29 @@ function AiLanding(){
           </div>
         </div>
       </section>
-      <section id="benefits" className="scroll-mt-24 border-y border-slate-100 bg-[#f2f8ff] py-20">
+      <section id="benefits" className="scroll-mt-24 bg-gradient-to-b from-white to-[#edf5ff] py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <div data-ca-reveal className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-700">The business advantage</p><h2 className="mt-3 text-3xl font-black leading-tight tracking-tight text-[#111936] sm:text-5xl">Better conversations. Better business.</h2><p className="mt-5 text-lg leading-8 text-slate-600">The goal isn't to replace your team. It's to make it easier for customers to reach your business and for your team to respond.</p></div>
-          <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-3">{benefits.map(b=><article data-ca-reveal key={b.number} className="ca-motion-card rounded-3xl border border-sky-100 bg-white p-8 shadow-[0_12px_40px_rgba(14,116,144,.08)]"><span className="text-sm font-extrabold text-sky-700">{b.number}</span><h3 className="mt-9 text-2xl font-extrabold leading-tight text-[#15213e]">{b.title}</h3><p className="mt-4 text-sm leading-7 text-slate-600">{b.description}</p></article>)}</div>
+          <div data-ca-reveal className="mx-auto max-w-3xl text-center"><p className="inline-block rounded-full bg-blue-100 px-4 py-2 text-xs font-bold uppercase tracking-widest text-blue-700">Built for your business</p><h2 className="mt-5 text-4xl font-black tracking-tight text-[#10233e] sm:text-5xl">Every call. <span className="text-blue-600">A new opportunity.</span></h2><p className="mt-5 text-lg leading-8 text-slate-600">Give customers a helpful first response while your team focuses on the work that matters.</p></div>
+          <div className="mt-12 grid gap-5 lg:grid-cols-3">{benefits.map((b,i)=><article data-ca-reveal key={b.number} className="ca-motion-card relative overflow-hidden rounded-[2rem] border border-blue-100 bg-white p-8 shadow-[0_18px_55px_rgba(37,99,235,.09)]"><div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-blue-50" aria-hidden="true"/><div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-500/25">{i===0?<PhoneCall className="h-7 w-7"/>:i===1?<Sparkles className="h-7 w-7"/>:<Check className="h-7 w-7"/>}</div><h3 className="relative mt-8 text-2xl font-black tracking-tight text-[#10233e]">{b.title}</h3><p className="relative mt-4 text-sm leading-7 text-slate-600">{b.description}</p></article>)}</div>
         </div>
       </section>
-      <section id="how-ai-works" className="scroll-mt-24 bg-white py-20 lg:py-28">
-        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2 lg:gap-20">
-          <div data-ca-reveal className="overflow-hidden rounded-[2rem] shadow-[0_25px_70px_rgba(19,31,64,.13)]"><img src={photos.support} alt="Real customer support professional working with a headset at a computer" loading="lazy" decoding="async" className="aspect-[5/4] w-full object-cover"/></div>
-          <div data-ca-reveal><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-700">Designed around your customer experience</p><h2 className="mt-4 text-3xl font-black leading-tight tracking-tight sm:text-5xl">A helpful first response can change everything.</h2><p className="mt-6 text-base leading-8 text-slate-600">Think of the inquiries that arrive when you're on a job, serving another customer, or closed for the evening. An AI receptionist is designed to help your business respond more consistently.</p>
-            <div className="mt-8 space-y-5">{[["Answer common questions","Explore inbound AI answering for basic customer questions."],["Record what callers need","Capture lead details, messages and appointment requests."],["Support timely follow-up","Pass the right information to your team for the next conversation."]].map(([t,d])=><div key={t} className="flex gap-4 border-b border-slate-100 pb-5"><span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700"><Check className="h-4 w-4"/></span><div><h3 className="font-bold text-slate-900">{t}</h3><p className="mt-1 text-sm leading-6 text-slate-600">{d}</p></div></div>)}</div>
-          </div>
+      <section id="how-ai-works" className="scroll-mt-24 overflow-hidden bg-[#081c36] py-20 text-white lg:py-28">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2">
+          <div data-ca-reveal><p className="text-xs font-bold uppercase tracking-widest text-sky-300">How it works</p><h2 className="mt-5 text-4xl font-black tracking-tight sm:text-5xl">From incoming call <span className="text-sky-400">to next steps.</span></h2><p className="mt-6 leading-8 text-blue-100">An AI receptionist can help answer common questions, collect caller details and organize requests for your team.</p><a href="#ai-inquiry" className="mt-8 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-4 font-bold text-white hover:bg-blue-500">Explore early access <ArrowRight className="h-4 w-4"/></a></div>
+          <div data-ca-reveal className="relative rounded-[2rem] border border-sky-400/40 bg-gradient-to-br from-[#173d68] to-[#0a203d] p-6 shadow-[0_0_55px_rgba(56,189,248,.18)] sm:p-9"><div className="flex items-center gap-4"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 shadow-lg shadow-blue-500/50"><PhoneCall className="h-6 w-6"/></span><div><p className="font-black">Incoming customer call</p><p className="text-sm text-sky-200">Illustrative AI call workflow</p></div></div><div aria-hidden="true" className="my-8 flex h-16 items-center justify-center gap-1.5">{Array.from({length:25},(_,i)=><span key={i} className="ca-wave w-1.5 rounded-full bg-sky-300" style={{height:12+((i*17)%48),animationDelay:`${i*65}ms`}}/>)}</div><div className="space-y-3">{["Answer common questions","Capture caller details and appointment requests","Organize information for follow-up"].map((t,i)=><div key={t} className="flex items-center gap-3 rounded-xl border border-sky-300/20 bg-white/5 p-4"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/30 text-sky-200">{i+1}</span><span className="text-sm font-semibold">{t}</span></div>)}</div></div>
         </div>
       </section>
       <section className="bg-gradient-to-br from-[#10233e] to-[#075985] py-16 text-white">
         <div data-ca-reveal className="mx-auto flex max-w-7xl flex-col gap-7 px-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-300">A separate option for traditional calling</p><h2 className="mt-3 text-2xl font-extrabold sm:text-3xl">Just need a professional business phone?</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">CallingAgent Business Phone offers Canadian business numbers, forwarding and voicemail. It has its own plans and does not require an AI receptionist.</p></div><a href="/business-phone" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-slate-900 hover:bg-slate-100">Explore Business Phone <ArrowRight className="h-4 w-4"/></a></div>
       </section>
-      <section className="scroll-mt-24 bg-[#f8f9fd] py-20" id="ai-inquiry">
+      <section className="scroll-mt-24 bg-gradient-to-br from-[#edf5ff] via-white to-blue-50 py-24" id="ai-inquiry">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
-          <div data-ca-reveal><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-700">Join the early-access list</p><h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">See how AI could fit your business.</h2><p className="mt-5 text-base leading-8 text-slate-600">Tell us what type of calls your business handles. We can follow up when AI setup and pricing details are ready.</p><div className="mt-8 overflow-hidden rounded-2xl"><img src={photos.team} alt="Customer support professional working at a laptop and talking through a headset" loading="lazy" decoding="async" className="aspect-[5/3] w-full object-cover"/></div></div>
+          <div data-ca-reveal><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-700">Join the early-access list</p><h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">See how AI could fit your business.</h2><p className="mt-5 text-base leading-8 text-slate-600">Tell us what type of calls your business handles. We can follow up when AI setup and pricing details are ready.</p><div className="mt-8 rounded-2xl border border-blue-200 bg-white p-6 shadow-lg shadow-blue-100"><p className="text-4xl font-black text-blue-600">$99 <span className="text-sm font-semibold text-slate-600">CAD / month</span></p><p className="mt-2 text-sm text-slate-600">Planned starting price. Usage credits and taxes separate. No payment required for early access.</p></div></div>
           <div><AiSalesInquiry /></div>
         </div>
       </section>
     </main>
-    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Photography: Kampus Production and Antoni Shkraba / Pexels (free license). Photos illustrate business situations, not verified product users.</p></div>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Product illustrations are conceptual. Features and paid activation are subject to availability.</p></div>
   </div>;
 }
 
