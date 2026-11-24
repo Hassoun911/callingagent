@@ -81,7 +81,7 @@ app.use(express.static(frontendDist, {
     if (filePath.endsWith(".html")) {
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.setHeader("Pragma", "no-cache");
-    } else if (/\\/assets\\/[^/]+\\.[a-f0-9]{8,}\\./i.test(filePath)) {
+    } else if (filePath.includes("/assets/") && /\.[a-f0-9]{8,}\./i.test(filePath)) {
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     } else {
       // Avoid stale public images and branding across fast redesign iterations.
