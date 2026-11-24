@@ -138,6 +138,85 @@ function HeroProductIllustration(){
   </svg>;
 }
 
+/**
+ * Editorial, photography-first AI marketing experience.
+ * Photographs depict real work environments, not a rendered product UI,
+ * fabricated company staff, or a claim that a specific individual uses AI.
+ * Photo credits: Vagaro / Unsplash (Unsplash License),
+ * Kampus Production / Pexels (Pexels free license).
+ */
+function AiLanding(){
+  const [menuOpen,setMenuOpen]=useState(false);
+  const photos={
+    hero:"https://images.pexels.com/photos/7289726/pexels-photo-7289726.jpeg?auto=compress&cs=tinysrgb&w=1300",
+    support:"https://images.unsplash.com/photo-1712159018726-4564d92f3ec2?auto=format&fit=crop&w=1200&q=85",
+    team:"https://images.unsplash.com/photo-1714079761488-e0c9b9ac4138?auto=format&fit=crop&w=900&q=85"
+  };
+  const benefits=[
+    {number:"01",title:"Be there when customers call",description:"Explore an AI answering experience designed for moments when your team is busy, closed, or already on another call."},
+    {number:"02",title:"Turn conversations into opportunities",description:"Capture new inquiries, callers' details and the next step they are looking for, instead of relying on memory."},
+    {number:"03",title:"Give your team time to do great work",description:"Spend less time on repeat questions and phone interruptions, with requests organized for follow-up."}
+  ];
+  return <div className="min-h-screen bg-white font-sans text-[#14213d]">
+    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 backdrop-blur">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
+        <a href="/website" className="inline-flex items-center gap-2 text-xl font-black tracking-tight text-[#111936]" aria-label="CallingAgent AI Receptionist home"><span className="rounded-xl bg-gradient-to-br from-blue-600 to-violet-700 p-2 text-white"><PhoneCall className="h-5 w-5"/></span>Calling<span className="-ml-2 text-blue-600">Agent</span></a>
+        <nav aria-label="Main website" className="hidden items-center gap-8 text-sm font-semibold text-slate-700 lg:flex">
+          <a href="/website" aria-current="page" className="text-violet-700">AI Receptionist</a><a href="/business-phone" className="hover:text-blue-700">Business Phone</a><a href="#benefits" className="hover:text-violet-700">Benefits</a><a href="#how-ai-works" className="hover:text-violet-700">How it works</a>
+        </nav>
+        <div className="hidden items-center gap-3 lg:flex"><a href="/login" className="rounded-xl px-4 py-3 text-sm font-bold text-slate-800 hover:bg-slate-100">Sign in</a><a href="#ai-inquiry" className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-5 py-3 text-sm font-bold text-white hover:bg-violet-800">Request early access <ArrowRight className="ml-2 h-4 w-4"/></a></div>
+        <button type="button" aria-label={menuOpen?"Close navigation":"Open navigation"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(v=>!v)} className="rounded-xl border border-slate-200 p-2 lg:hidden">{menuOpen?<X className="h-6 w-6"/>:<Menu className="h-6 w-6"/>}</button>
+      </div>
+      {menuOpen&&<nav aria-label="Mobile website navigation" className="flex flex-col gap-5 border-t border-slate-200 bg-white px-6 py-5 text-sm font-semibold text-slate-800 lg:hidden"><a href="/website" aria-current="page" onClick={()=>setMenuOpen(false)} className="text-violet-700">AI Receptionist</a><a href="/business-phone">Business Phone</a><a href="#benefits" onClick={()=>setMenuOpen(false)}>Benefits</a><a href="#how-ai-works" onClick={()=>setMenuOpen(false)}>How it works</a><a href="#ai-inquiry" onClick={()=>setMenuOpen(false)}>Request early access</a><a href="/login">Account sign in</a></nav>}
+    </header>
+    <main>
+      <section className="bg-white">
+        <div className="mx-auto grid max-w-7xl items-center gap-9 px-5 pb-16 pt-12 sm:px-8 lg:grid-cols-[.95fr_1.05fr] lg:gap-16 lg:py-24">
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-[.2em] text-violet-700">A smarter way to answer your business calls</p>
+            <h1 className="mt-5 max-w-xl text-[clamp(2.7rem,5.4vw,5.2rem)] font-black leading-[1.08] tracking-[-.05em] text-[#111936]">Your business never stops. <span className="text-violet-700">Neither should your first impression.</span></h1>
+            <p className="mt-6 max-w-xl text-base leading-8 text-slate-600 sm:text-lg">Customers call when they're ready. Explore an AI receptionist that can help answer questions, capture inquiries and keep conversations moving, even while you're focused on running your business.</p>
+            <div className="mt-8 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-700 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-violet-700/15 hover:bg-violet-800">Get AI early access <ArrowRight className="h-4 w-4"/></a><a href="#benefits" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-slate-800 hover:bg-slate-50">See what AI could do</a></div>
+            <p className="mt-5 text-xs leading-5 text-slate-500">Early-access inquiries only. AI service and standalone pricing from $99 CAD/month are planned; automatic paid activation is not yet available.</p>
+          </div>
+          <div className="relative">
+            <img src={photos.hero} loading="eager" decoding="async" fetchPriority="high" alt="Small business owner taking a customer phone call while working at her desk" className="aspect-[5/5] w-full rounded-[2rem] object-cover object-center shadow-[0_28px_80px_rgba(28,32,79,.16)] sm:aspect-[5/4] lg:aspect-[4/5]"/>
+            <div className="absolute -bottom-5 left-4 right-4 rounded-2xl border border-white/90 bg-white/95 p-5 shadow-xl backdrop-blur sm:bottom-6 sm:left-auto sm:right-[-12px] sm:max-w-[255px]">
+              <p className="text-xs font-bold uppercase tracking-widest text-violet-700">Make every inquiry count</p>
+              <p className="mt-2 text-base font-extrabold text-[#15213e]">Less phone tag. More time for your customers.</p>
+              <p className="mt-2 text-xs text-slate-500">Business photography for illustration; not a CallingAgent customer testimonial.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section id="benefits" className="scroll-mt-24 border-y border-slate-100 bg-[#f8f9fd] py-20">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8">
+          <div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-violet-700">The business advantage</p><h2 className="mt-3 text-3xl font-black leading-tight tracking-tight text-[#111936] sm:text-5xl">Better conversations. Better business.</h2><p className="mt-5 text-lg leading-8 text-slate-600">The goal isn't to replace your team. It's to make it easier for customers to reach your business and for your team to respond.</p></div>
+          <div className="mt-12 grid gap-5 md:grid-cols-3">{benefits.map(b=><article key={b.number} className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm"><span className="text-sm font-extrabold text-violet-700">{b.number}</span><h3 className="mt-9 text-2xl font-extrabold leading-tight text-[#15213e]">{b.title}</h3><p className="mt-4 text-sm leading-7 text-slate-600">{b.description}</p></article>)}</div>
+        </div>
+      </section>
+      <section id="how-ai-works" className="scroll-mt-24 bg-white py-20 lg:py-28">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2 lg:gap-20">
+          <div className="overflow-hidden rounded-[2rem] shadow-[0_25px_70px_rgba(19,31,64,.13)]"><img src={photos.support} alt="Real customer support professional working with a headset at a computer" loading="lazy" decoding="async" className="aspect-[5/4] w-full object-cover"/></div>
+          <div><p className="text-xs font-bold uppercase tracking-[.2em] text-violet-700">Designed around your customer experience</p><h2 className="mt-4 text-3xl font-black leading-tight tracking-tight sm:text-5xl">A helpful first response can change everything.</h2><p className="mt-6 text-base leading-8 text-slate-600">Think of the inquiries that arrive when you're on a job, serving another customer, or closed for the evening. An AI receptionist is designed to help your business respond more consistently.</p>
+            <div className="mt-8 space-y-5">{[["Answer common questions","Explore inbound AI answering for basic customer questions."],["Record what callers need","Capture lead details, messages and appointment requests."],["Support timely follow-up","Pass the right information to your team for the next conversation."]].map(([t,d])=><div key={t} className="flex gap-4 border-b border-slate-100 pb-5"><span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700"><Check className="h-4 w-4"/></span><div><h3 className="font-bold text-slate-900">{t}</h3><p className="mt-1 text-sm leading-6 text-slate-600">{d}</p></div></div>)}</div>
+          </div>
+        </div>
+      </section>
+      <section className="bg-[#131c37] py-16 text-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-7 px-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-violet-300">A separate option for traditional calling</p><h2 className="mt-3 text-2xl font-extrabold sm:text-3xl">Just need a professional business phone?</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">CallingAgent Business Phone offers Canadian business numbers, forwarding and voicemail. It has its own plans and does not require an AI receptionist.</p></div><a href="/business-phone" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-slate-900 hover:bg-slate-100">Explore Business Phone <ArrowRight className="h-4 w-4"/></a></div>
+      </section>
+      <section className="bg-[#f8f9fd] py-20" id="early-access">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
+          <div><p className="text-xs font-bold uppercase tracking-[.2em] text-violet-700">Join the early-access list</p><h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">See how AI could fit your business.</h2><p className="mt-5 text-base leading-8 text-slate-600">Tell us what type of calls your business handles. We can follow up when AI setup and pricing details are ready.</p><div className="mt-8 overflow-hidden rounded-2xl"><img src={photos.team} alt="Customer support professional working at a laptop and talking through a headset" loading="lazy" decoding="async" className="aspect-[5/3] w-full object-cover"/></div></div>
+          <div><AiSalesInquiry /></div>
+        </div>
+      </section>
+    </main>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-violet-700 underline">Business Phone</a> · <a href="/login" className="text-violet-700 underline">Account sign in</a></p><p className="mt-2">Photography: Kampus Production/Pexels and Vagaro/Unsplash. Photos illustrate business situations, not verified product users.</p></div>
+  </div>;
+}
+
 export default function PublicHome({mode="ai"}:{mode?:"ai"|"phone"}={}) {
   const isPhone=mode==="phone";
   const {plans,loading,error}=usePublicPlans();
@@ -149,6 +228,7 @@ export default function PublicHome({mode="ai"}:{mode?:"ai"|"phone"}={}) {
     ["Does AI respond to text messages?","Businesses can use manual SMS. AI-written automatic text replies are planned, not yet live."],
     ["Can I still use a traditional business phone?","Yes. Our dedicated Business Phone page offers Canadian numbers, forwarding, voicemail and five published packages. Payments and automatic activation are still undergoing launch checks."],
   ];
+  if(!isPhone)return <AiLanding />;
   return <div className="min-h-screen bg-[#f7faff] text-[#0a1830]">
     <div className="border-b border-blue-100 bg-[#eef4ff]">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-2 text-[11px] font-semibold text-blue-900 sm:px-8">
