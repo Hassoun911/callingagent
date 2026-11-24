@@ -175,8 +175,8 @@ function AiLanding(){
     return()=>{observer.disconnect();media.removeEventListener("change",sync);nodes.forEach(node=>node.classList.remove("ca-reveal-ready","ca-in-view"));};
   },[]);
   const photos={
-    hero:"https://images.pexels.com/photos/7289726/pexels-photo-7289726.jpeg?auto=compress&cs=tinysrgb&w=1300",
-    support:"https://images.pexels.com/photos/8192015/pexels-photo-8192015.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    hero:"https://images.pexels.com/photos/8192015/pexels-photo-8192015.jpeg?auto=compress&cs=tinysrgb&w=1300",
+    support:"https://images.pexels.com/photos/7971724/pexels-photo-7971724.jpeg?auto=compress&cs=tinysrgb&w=1200",
     team:"https://images.pexels.com/photos/7971724/pexels-photo-7971724.jpeg?auto=compress&cs=tinysrgb&w=900"
   };
   const benefits=[
@@ -205,13 +205,13 @@ function AiLanding(){
       @media (hover:hover) and (pointer:fine){.ca-motion-card:hover{transform:translateY(-9px) rotateX(2deg);box-shadow:0 28px 65px rgba(31,28,73,.12)}}
       @media (prefers-reduced-motion:reduce){.ca-entrance,.ca-photo-card,.ca-float-a,.ca-float-b,.ca-orbit,.ca-orbit-delayed{animation:none!important}.ca-hero-tilt,.ca-motion-card{transform:none!important;transition:none!important}}
     `}</style>
-    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-[#10233e] text-white backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
         <a href="/website" className="inline-flex items-center gap-2 text-xl font-black tracking-tight text-[#111936]" aria-label="CallingAgent AI Receptionist home"><img src="/logo.png" alt="CallingAgent" className="h-12 w-auto max-w-[190px] object-contain"/></a>
-        <nav aria-label="Main website" className="hidden items-center gap-8 text-sm font-semibold text-slate-700 lg:flex">
-          <a href="/website" aria-current="page" className="text-sky-700">AI Receptionist</a><a href="/business-phone" className="hover:text-blue-700">Business Phone</a><a href="#benefits" className="hover:text-sky-700">Benefits</a><a href="#how-ai-works" className="hover:text-sky-700">How it works</a>
+        <nav aria-label="Main website" className="hidden items-center gap-8 text-sm font-semibold text-white lg:flex">
+          <a href="/website" aria-current="page" className="text-sky-300">AI Receptionist</a><a href="/business-phone" className="hover:text-blue-700">Business Phone</a><a href="#benefits" className="hover:text-sky-700">Benefits</a><a href="#how-ai-works" className="hover:text-sky-700">How it works</a>
         </nav>
-        <div className="hidden items-center gap-3 lg:flex"><a href="/login" className="rounded-xl px-4 py-3 text-sm font-bold text-slate-800 hover:bg-slate-100">Sign in</a><a href="#ai-inquiry" className="inline-flex items-center justify-center rounded-xl bg-sky-700 px-5 py-3 text-sm font-bold text-white hover:bg-sky-800">Request early access <ArrowRight className="ml-2 h-4 w-4"/></a></div>
+        <div className="hidden items-center gap-3 lg:flex"><a href="/login" className="rounded-xl px-4 py-3 text-sm font-bold text-white hover:bg-white/10">Sign in</a><a href="#ai-inquiry" className="inline-flex items-center justify-center rounded-xl bg-sky-700 px-5 py-3 text-sm font-bold text-white hover:bg-sky-800">Request early access <ArrowRight className="ml-2 h-4 w-4"/></a></div>
         <button type="button" aria-label={menuOpen?"Close navigation":"Open navigation"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(v=>!v)} className="rounded-xl border border-slate-200 p-2 lg:hidden">{menuOpen?<X className="h-6 w-6"/>:<Menu className="h-6 w-6"/>}</button>
       </div>
       {menuOpen&&<nav aria-label="Mobile website navigation" className="flex flex-col gap-5 border-t border-slate-200 bg-white px-6 py-5 text-sm font-semibold text-slate-800 lg:hidden"><a href="/website" aria-current="page" onClick={()=>setMenuOpen(false)} className="text-sky-700">AI Receptionist</a><a href="/business-phone">Business Phone</a><a href="#benefits" onClick={()=>setMenuOpen(false)}>Benefits</a><a href="#how-ai-works" onClick={()=>setMenuOpen(false)}>How it works</a><a href="#ai-inquiry" onClick={()=>setMenuOpen(false)}>Request early access</a><a href="/login">Account sign in</a></nav>}
@@ -223,7 +223,7 @@ function AiLanding(){
             <p className="text-xs font-extrabold uppercase tracking-[.2em] text-sky-700">AI Receptionist</p>
             <h1 className="mt-5 max-w-xl text-[clamp(2.7rem,5vw,4.6rem)] font-black leading-[1.08] tracking-[-.05em] text-[#111936]">Your 24/7 <span className="block text-sky-600">AI Receptionist</span></h1>
             <p className="mt-6 max-w-xl text-base leading-8 text-slate-600 sm:text-lg">Answer calls, handle customer inquiries, capture appointment requests and new leads — so your team can focus on growing your business.</p>
-            <div className="mt-6 flex items-baseline gap-2"><span className="text-4xl font-black tracking-tight text-[#111936]">$99</span><span className="text-sm text-slate-600">CAD/month · planned starting price</span></div><div className="mt-6 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-sky-700 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-sky-700/15 hover:bg-sky-800">Get AI Receptionist access <ArrowRight className="h-4 w-4"/></a><a href="#how-ai-works" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-slate-800 hover:bg-slate-50">See how it works</a></div>
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">{["Answer calls 24/7","Appointment requests","Handle inquiries","Capture new leads"].map(label=><div key={label} className="flex flex-col items-center gap-2 rounded-xl bg-white/80 p-3 text-center text-xs font-bold text-[#14213d]"><span className="rounded-xl bg-sky-100 p-2 text-sky-600"><Check className="h-5 w-5"/></span>{label}</div>)}</div><div className="mt-6 flex items-baseline gap-2 rounded-2xl border border-sky-200 bg-white/90 p-4 shadow-sm"><span className="text-4xl font-black tracking-tight text-[#111936]">$99</span><span className="text-sm text-slate-600">CAD/month · planned starting price</span></div><div className="mt-6 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-sky-700 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-sky-700/15 hover:bg-sky-800">Get AI Receptionist access <ArrowRight className="h-4 w-4"/></a><a href="#how-ai-works" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-slate-800 hover:bg-slate-50">See how it works</a></div>
             <p className="mt-5 text-xs leading-5 text-slate-500">Early access · No payment required. Usage credits and taxes are separate; automatic paid activation is not yet available.</p>
           </div>
           <div className="ca-hero-stage relative isolate min-h-[340px] pb-8 sm:min-h-[440px] lg:min-h-[500px]" onPointerMove={event=>{
@@ -238,14 +238,14 @@ function AiLanding(){
             <div className="relative z-10 mx-auto w-[91%] max-w-[560px] [perspective:1400px]">
               <div className="ca-hero-tilt relative" style={{transform:tiltEnabled?`rotateY(${heroTilt.x}deg) rotateX(${heroTilt.y}deg)`:undefined}}>
                 <div className="ca-photo-card relative overflow-hidden rounded-[2rem] bg-[#ebe7ff] shadow-[0_35px_90px_rgba(33,27,81,.22)] [transform:translateZ(32px)]">
-                  <img src={photos.hero} loading="eager" decoding="async" fetchPriority="high" alt="Real small-business owner taking a customer call while managing work at a laptop" className="aspect-[4/5] w-full object-cover object-center sm:aspect-[5/5] lg:aspect-[5/5]"/>
+                  <img src={photos.hero} loading="eager" decoding="async" fetchPriority="high" alt="Customer support professional at a workstation" className="aspect-[4/5] w-full object-cover object-center sm:aspect-[5/5] lg:aspect-[5/5]"/>
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#101936]/45 via-transparent to-transparent"/>
                   <div className="absolute bottom-7 left-7 right-7 text-white"><span className="text-xs font-bold uppercase tracking-[.2em] text-sky-100">Your business, always connected.</span><p className="mt-2 max-w-sm text-xl font-bold sm:text-2xl">Give every caller a better first impression.</p></div>
                 </div>
-                <div className="ca-float-a absolute -left-6 top-[12%] z-20 flex items-center gap-3 rounded-2xl border border-white/90 bg-[#12355a]/95 px-4 py-3 shadow-[0_22px_48px_rgba(38,37,90,.16)] backdrop-blur sm:-left-12 [transform:translateZ(100px)]" aria-label="Potential AI use case: inbound inquiries">
+                <div className="ca-float-a absolute -left-6 top-[12%] z-20 flex items-center gap-3 rounded-2xl border border-sky-300 bg-[#12355a]/95 px-4 py-3 shadow-[0_0_30px_rgba(14,165,233,.55)] backdrop-blur sm:-left-12 [transform:translateZ(100px)]" aria-label="Potential AI use case: inbound inquiries">
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-sky-100 text-sky-700"><PhoneCall className="h-5 w-5"/></span><span><span className="block text-xs font-extrabold text-white">Incoming call</span><span className="block text-xs text-sky-100">AI receptionist answering</span></span>
                 </div>
-                <div className="ca-float-b absolute -bottom-4 -right-3 z-20 max-w-[235px] rounded-2xl border border-sky-100 bg-[#12355a]/95 p-4 shadow-[0_25px_55px_rgba(36,25,81,.19)] backdrop-blur sm:-bottom-6 sm:-right-10 [transform:translateZ(135px)]" aria-label="Potential AI use case: organized lead capture">
+                <div className="ca-float-b absolute -bottom-4 -right-3 z-20 max-w-[235px] rounded-2xl border border-sky-100 bg-[#12355a]/95 p-4 shadow-[0_0_30px_rgba(14,165,233,.45)] backdrop-blur sm:-bottom-6 sm:-right-10 [transform:translateZ(135px)]" aria-label="Potential AI use case: organized lead capture">
                   <div className="flex items-center gap-2 text-sky-200"><Sparkles className="h-4 w-4"/><span className="text-xs font-bold uppercase tracking-wider">Designed to help</span></div>
                   <p className="mt-2 text-base font-extrabold text-white">Capture leads. Take messages.</p>
                   <p className="mt-1 text-xs leading-5 text-sky-100">Illustrative call workflow</p>
@@ -258,7 +258,7 @@ function AiLanding(){
       <section id="benefits" className="scroll-mt-24 border-y border-slate-100 bg-[#f2f8ff] py-20">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
           <div data-ca-reveal className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-700">The business advantage</p><h2 className="mt-3 text-3xl font-black leading-tight tracking-tight text-[#111936] sm:text-5xl">Better conversations. Better business.</h2><p className="mt-5 text-lg leading-8 text-slate-600">The goal isn't to replace your team. It's to make it easier for customers to reach your business and for your team to respond.</p></div>
-          <div className="mt-12 grid gap-5 md:grid-cols-3">{benefits.map(b=><article data-ca-reveal key={b.number} className="ca-motion-card rounded-3xl border border-sky-100 bg-white p-8 shadow-[0_12px_40px_rgba(14,116,144,.08)]"><span className="text-sm font-extrabold text-sky-700">{b.number}</span><h3 className="mt-9 text-2xl font-extrabold leading-tight text-[#15213e]">{b.title}</h3><p className="mt-4 text-sm leading-7 text-slate-600">{b.description}</p></article>)}</div>
+          <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-3">{benefits.map(b=><article data-ca-reveal key={b.number} className="ca-motion-card rounded-3xl border border-sky-100 bg-white p-8 shadow-[0_12px_40px_rgba(14,116,144,.08)]"><span className="text-sm font-extrabold text-sky-700">{b.number}</span><h3 className="mt-9 text-2xl font-extrabold leading-tight text-[#15213e]">{b.title}</h3><p className="mt-4 text-sm leading-7 text-slate-600">{b.description}</p></article>)}</div>
         </div>
       </section>
       <section id="how-ai-works" className="scroll-mt-24 bg-white py-20 lg:py-28">
