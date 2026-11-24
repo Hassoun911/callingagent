@@ -3,7 +3,7 @@ import { Plus, Save, Trash2, ShieldCheck, AlertTriangle, RefreshCw } from "lucid
 
 type Plan={id:number;slug:string;name:string;priceCents:number;monthlyMinutes:number;includedNumbers:number;features:string[];description:string;isPublished:boolean;isEnabled:boolean;checkoutEnabled:boolean;sortOrder:number};
 type BillingReadiness={stripePriceVerificationIssues?:string[];telnyxCallCostWebhookEnabled:boolean|null;telnyxVoiceWebhookCorrect:boolean|null;telnyxConfigurationWarning:string|null;liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;liveMerchantVerified:boolean;merchantVerificationWarning:string|null;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;carrierUsageVerified:boolean;automaticProvisioningCertified:boolean;productionSnapshot:{existingCompanies:number;subscriptionsRecorded:number;activePhoneLines:number;activeTwilioLines:number;activeUnattributedLines:number;currentMonthCallRecords:number;currentMonthCallsMissingDuration:number};plans:{slug:string;checkoutEnabled:boolean}[]};
-type LaunchInterest={id:number;plan_slug:string;contact_name:string;email:string;phone:string|null;company_name:string|null;created_at:string};
+type LaunchInterest={id:number;plan_slug:string;contact_name:string;email:string;phone:string|null;company_name:string|null;created_at:string;sales_status:"new"|"contacted"|"qualified"|"closed_won"|"closed_lost";sales_notes:string;sales_updated_at:string|null};
 type FulfillmentItem={company_id:number;company_name:string;plan_slug:string;fulfillment_status:string;created_at:string;subscription_status:string|null;last_payment_status:string|null;active_numbers:number;included_numbers:number|null};
 type LaunchAudit={merchantVerified:boolean;liveStripePricesVerified:boolean;checkoutEnabled:boolean;plans:{slug:string;amountMatchesStripeMapping:boolean;stripePriceVerified:boolean;monthlyMinutes:number;includedNumbers:number;checkoutApproved:boolean}[];metrics:{subscriptions:number;checkout_intents:number;telnyx_cost_legs:number;monthly_calls:number;missing_call_durations:number};issues:string[];verdict:string;chargeAttempted:boolean;phoneProvisioningAttempted:boolean};
 const featureNames:Record<string,string>={numbers:"Phone numbers",forwarding:"Call forwarding",voicemail:"Voicemail",email_alerts:"Email alerts",call_logs:"Call logs",extensions:"Extensions",ai_receptionist:"AI receptionist",sms:"SMS",appointments:"Appointments"};
@@ -28,6 +28,22 @@ export default function PlanManagement(){
  const [interestRequests,setInterestRequests]=useState<LaunchInterest[]|null>(null);
  const [interestBusy,setInterestBusy]=useState(false);
  const [interestError,setInterestError]=useState("");
+ const [interestSaving,setInterestSaving]=useState<number|null>(null);
+ const [leadNoteDrafts,setLeadNoteDrafts]=useState<Record<number,string>>({});
+ async function saveLeadStatus(item:LaunchInterest,status:LaunchInterest["sales_status"]){
+   setInterestSaving(item.id);setInterestError("");
+   try{
+     const response=await fetch("/api/admin/launch-interest/"+item.id,{
+       method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json"},
+       body:JSON.stringify({status,notes:leadNoteDrafts[item.id]??item.sales_notes??""})
+     });
+     const data=await response.json();
+     if(!response.ok||!data.lead)throw Error(data.error||"Unable to save follow-up");
+     setInterestRequests(prev=>prev?.map(x=>x.id===item.id?data.lead:x)??null);
+   }catch(e:any){setInterestError(e?.message||"Could not save lead");}
+   finally{setInterestSaving(null);}
+ }
+
  async function loadInterestRequests(){
    setInterestBusy(true);setInterestError("");
    try {
@@ -80,7 +96,7 @@ export default function PlanManagement(){
   }finally{setReadinessLoading(false)}
  }
  async function load(){try{const r=await fetch("/api/admin/plans",{credentials:"include"});const j=await r.json();if(!r.ok)throw Error(j.error||"Unable to fetch plans");setPlans(j);}catch(e:any){setError(e.message)}}
- useEffect(()=>{void load();void loadReadiness()},[]);
+ useEffect(()=>{void load();void loadReadiness();void loadInterestRequests()},[]);
  async function save(plan:Plan){
   setBusy(true);setError("");setNotice("");
   try {
@@ -128,12 +144,25 @@ export default function PlanManagement(){
       {queueError&&<p role="alert" className="mt-2 text-xs text-red-700">{queueError}</p>}
       <button type="button" disabled={interestBusy} onClick={()=>void loadInterestRequests()} className="ml-2 mt-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold disabled:opacity-60">{interestBusy?"Loading inquiries…":"View package inquiries"}</button>
       {interestError&&<p role="alert" className="mt-2 text-xs text-red-700">{interestError}</p>}
-      {interestRequests&&<div className="mt-2 rounded-lg bg-white/90 p-3">
-        <p className="text-sm font-semibold">Early-access inquiries ({interestRequests.length} most recent)</p>
-        {interestRequests.length===0?<p className="mt-2 text-xs">No new inquiries yet.</p>:<div className="mt-2 max-h-72 space-y-2 overflow-auto">
-          {interestRequests.map(item=><div key={item.id} className="rounded border p-2 text-xs">
-            <strong>{item.contact_name}</strong> · {item.plan_slug} · {item.company_name||"Business not specified"}
-            <p><a className="underline" href={"mailto:"+item.email}>{item.email}</a>{item.phone?" · "+item.phone:""} · {new Date(item.created_at).toLocaleString()}</p>
+      {interestRequests&&<div className="mt-2 rounded-lg border border-blue-200 bg-white p-3">
+        <p className="text-sm font-semibold">CallingAgent sales inbox · {interestRequests.length} recent inquiries</p>
+        <p className="mt-1 text-xs text-slate-600">Follow up manually while checkout is under certification. “Closed won” tracks a conversation, not a Stripe payment.</p>
+        {interestRequests.length===0?<p className="mt-2 text-xs">No inquiries yet. Share <a className="text-blue-700 underline" href="https://callingagent.ca/#pricing" target="_blank" rel="noreferrer">Business Phone plans</a> and <a className="text-blue-700 underline" href="https://callingagent.ca/#ai-inquiry" target="_blank" rel="noreferrer">AI Receptionist early access</a>.</p>:
+        <div className="mt-3 max-h-[560px] space-y-3 overflow-auto">
+          {interestRequests.map(item=><div key={item.id} className="rounded-lg border border-slate-200 p-3 text-xs">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div><strong className="text-sm">{item.contact_name}</strong> · {item.plan_slug}<p className="mt-1 text-slate-600">{item.company_name||"Business not specified"} · {new Date(item.created_at).toLocaleString()}</p></div>
+              <label className="text-xs font-semibold">Follow-up
+                <select aria-label={"Follow-up status for "+item.contact_name} disabled={interestSaving===item.id} value={item.sales_status} onChange={e=>void saveLeadStatus(item,e.target.value as LaunchInterest["sales_status"])} className="ml-2 rounded border bg-white p-2 text-slate-900">
+                  <option value="new">New</option><option value="contacted">Contacted</option><option value="qualified">Qualified</option><option value="closed_won">Closed — won</option><option value="closed_lost">Closed — lost</option>
+                </select>
+              </label>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2"><a className="font-semibold text-blue-700 underline" href={"mailto:"+item.email}>{item.email}</a>{item.phone&&<a className="font-semibold text-blue-700 underline" href={"tel:"+item.phone}>{item.phone}</a>}</div>
+            <label className="mt-3 block font-semibold">Follow-up notes
+              <textarea maxLength={1500} rows={2} className="mt-1 w-full rounded border border-slate-300 p-2 font-normal" value={leadNoteDrafts[item.id]??item.sales_notes??""} onChange={e=>setLeadNoteDrafts(prev=>({...prev,[item.id]:e.target.value}))}/>
+            </label>
+            <button type="button" disabled={interestSaving===item.id} onClick={()=>void saveLeadStatus(item,item.sales_status)} className="mt-2 rounded bg-blue-700 px-3 py-2 font-semibold text-white disabled:opacity-50">{interestSaving===item.id?"Saving…":"Save notes"}</button>
           </div>)}
         </div>}
       </div>}
