@@ -169,6 +169,17 @@ export async function ensureStripeBillingSchema() {
     CONSTRAINT ca_launch_interest_email_len CHECK(length(email)<=254)
   )`);
   await pool.query("CREATE INDEX IF NOT EXISTS ca_launch_interest_created_idx ON ca_launch_interest(created_at DESC)");
+  await pool.query("ALTER TABLE ca_launch_interest ADD COLUMN IF NOT EXISTS sales_status text NOT NULL DEFAULT 'new'");
+  await pool.query("ALTER TABLE ca_launch_interest ADD COLUMN IF NOT EXISTS sales_notes text NOT NULL DEFAULT ''");
+  await pool.query("ALTER TABLE ca_launch_interest ADD COLUMN IF NOT EXISTS sales_updated_at timestamptz");
+  await pool.query("ALTER TABLE ca_launch_interest ADD COLUMN IF NOT EXISTS sales_updated_by integer");
+  await pool.query("CREATE INDEX IF NOT EXISTS ca_launch_interest_sales_status_idx ON ca_launch_interest(sales_status,created_at DESC)");
+  await pool.query(`CREATE TABLE IF NOT EXISTS ca_launch_interest_audit (
+    id bigserial PRIMARY KEY,lead_id bigint NOT NULL REFERENCES ca_launch_interest(id) ON DELETE CASCADE,
+    previous_status text NOT NULL,new_status text NOT NULL,
+    changed_by integer,changed_at timestamptz NOT NULL DEFAULT now()
+  )`);
+
 
 
 }
@@ -271,10 +282,44 @@ router.post("/launch-interest",async(req,res)=>{
     res.status(503).json({error:"We could not save your request. Please try again."});
   }
 });
+// Only the platform super administrator may change sales follow-up state.
+// A lead status is NOT a verified purchase, invoice or subscription.
+router.patch("/admin/launch-interest/:id",async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Platform administrator required"});return;}
+  const id=Number(req.params.id);
+  const status=req.body?.status;
+  const notes=req.body?.notes;
+  const choices=new Set(["new","contacted","qualified","closed_won","closed_lost"]);
+  if(!Number.isSafeInteger(id)||id<=0||!choices.has(status)||
+    typeof notes!=="string"||notes.length>1500){
+    res.status(400).json({error:"Valid lead ID, follow-up status, and notes (maximum 1500 characters) required"});return;
+  }
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    const prev=await client.query("SELECT sales_status FROM ca_launch_interest WHERE id=$1 FOR UPDATE",[id]);
+    if(!prev.rowCount){await client.query("ROLLBACK");res.status(404).json({error:"Inquiry not found"});return;}
+    const updated=await client.query(`UPDATE ca_launch_interest SET sales_status=$2,sales_notes=$3,
+      sales_updated_at=now(),sales_updated_by=$4 WHERE id=$1
+      RETURNING id,plan_slug,contact_name,email,phone,company_name,created_at,sales_status,sales_notes,sales_updated_at`,
+      [id,status,notes,Number(req.user.id)||null]);
+    if(prev.rows[0].sales_status!==status){
+      await client.query(`INSERT INTO ca_launch_interest_audit(lead_id,previous_status,new_status,changed_by)
+        VALUES($1,$2,$3,$4)`,[id,prev.rows[0].sales_status,status,Number(req.user.id)||null]);
+    }
+    await client.query("COMMIT");
+    res.set("Cache-Control","private, no-store");
+    res.json({lead:updated.rows[0],paymentTaken:false,subscriptionActivated:false});
+  }catch(err:any){
+    await client.query("ROLLBACK").catch(()=>{});
+    req.log.error({message:err?.message},"Inquiry follow-up update failed");
+    res.status(503).json({error:"Unable to update sales inquiry"});
+  }finally{client.release();}
+});
 router.get("/admin/launch-interest",async(req,res)=>{
   if(req.user?.role!=="super_admin"){res.status(403).json({error:"Platform administrator required"});return;}
   try{
-    const data=await pool.query("SELECT id,plan_slug,contact_name,email,phone,company_name,created_at FROM ca_launch_interest ORDER BY created_at DESC LIMIT 100");
+    const data=await pool.query("SELECT id,plan_slug,contact_name,email,phone,company_name,created_at,sales_status,sales_notes,sales_updated_at FROM ca_launch_interest ORDER BY CASE WHEN sales_status IN (\'new\',\'contacted\',\'qualified\') THEN 0 ELSE 1 END,created_at DESC LIMIT 100");
     res.set("Cache-Control","no-store");
     res.json({requests:data.rows});
   }catch(err:any){req.log.error({message:err?.message},"Launch interest list failed");res.status(503).json({error:"Requests unavailable"});}
