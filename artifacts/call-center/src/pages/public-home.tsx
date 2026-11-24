@@ -193,7 +193,7 @@ function AiLanding(){
     `}</style>
     <header className="sticky top-0 z-40 border-b border-[#e3ebf9] bg-white/95 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-5 py-3 sm:px-8">
-        <a href="/website" className="relative block h-[46px] w-[214px] shrink-0 overflow-hidden rounded-lg bg-black sm:h-[54px] sm:w-[255px]" aria-label="CallingAgent home"><img src="/logo.png" alt="CallingAgent" className="pointer-events-none absolute left-[-24px] top-[-31px] w-[263px] max-w-none select-none sm:left-[-29px] sm:top-[-37px] sm:w-[313px]"/></a>
+        <a href="/website" className="relative block h-[52px] w-[252px] shrink-0 overflow-hidden rounded-md bg-black sm:h-[56px] sm:w-[270px]" aria-label="CallingAgent home"><img src="/logo.png" alt="CallingAgent" className="pointer-events-none absolute left-[-29px] top-[-24px] w-[300px] max-w-none select-none sm:left-[-29px] sm:top-[-27px] sm:w-[322px]"/></a>
         <nav aria-label="Main website" className="hidden items-center gap-7 text-sm font-semibold text-[#102549] lg:flex"><a href="#how-ai-works" className="hover:text-blue-600">How it works</a><a href="#benefits" className="hover:text-blue-600">Features</a><a href="#ai-inquiry" className="hover:text-blue-600">Pricing</a><a href="/business-phone" className="hover:text-blue-600">Business Phone</a></nav>
         <div className="hidden items-center gap-3 lg:flex"><a href="/login" className="rounded-full border border-[#c6d5ed] px-5 py-2.5 text-sm font-bold text-[#102549] hover:bg-blue-50">Sign in</a><a href="#ai-inquiry" className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#079ffc] to-[#0750d8] px-6 py-3 text-sm font-bold text-white shadow-[0_8px_22px_rgba(20,89,245,.2)] hover:brightness-110">Request Early Access <ArrowRight className="h-4 w-4"/></a></div>
         <button type="button" aria-label={menuOpen?"Close navigation":"Open navigation"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(v=>!v)} className="rounded-xl border border-slate-200 p-2 lg:hidden">{menuOpen?<X className="h-6 w-6"/>:<Menu className="h-6 w-6"/>}</button>
@@ -215,15 +215,14 @@ function AiLanding(){
             <div className="mt-7 grid max-w-lg grid-cols-3 gap-3 border-t border-blue-100 pt-6 text-[#124caa]">{[[PhoneCall,"24/7 Answering"],[Clock3,"Book Appointments"],[Sparkles,"Capture New Leads"]].map(([Icon,title])=><div key={String(title)} className="flex flex-col items-start gap-2 border-r border-blue-100 last:border-0"><Icon className="h-6 w-6"/><span className="text-xs font-bold text-[#102549]">{title}</span></div>)}</div>
             <p className="mt-5 max-w-lg text-[11px] leading-5 text-slate-500">AI Receptionist is taking early-access inquiries. Planned starting price $99 CAD/month, plus applicable taxes and usage credits. No payment required yet.</p>
           </div>
-          {/* Crop the supplied source to the portrait only. The source is a full website
-              composition, so displaying it uncropped duplicates UI and text. Never
-              overlay the old screenshot's cards with another set of cards. */}
-          <div className="relative mx-auto w-full max-w-[620px] overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#c7eaff] to-[#f5fbff] shadow-[0_18px_50px_rgba(15,92,180,.12)] sm:rounded-[3.2rem]">
-            <div className="relative aspect-[1.17/1] w-full overflow-hidden sm:aspect-[1.25/1] lg:aspect-[.98/1]">
+          {/* Original approved-style artwork, framed at normal scale on both breakpoints.
+              Never add HTML cards over the cards embedded inside the source image. */}
+          <div className="relative mx-auto w-full max-w-[650px]">
+            <div className="relative aspect-[5/4] w-full overflow-hidden rounded-[2rem] bg-[#e3f3ff] shadow-[0_18px_55px_rgba(15,92,180,.13)] sm:aspect-[5/4] lg:aspect-[5/4] lg:rounded-[2.7rem]">
               <img
-                src="/CallingAgent%20AI%20Receptionist%20Hero.png?v=portrait-only-20261124"
-                alt="Professional receptionist wearing a headset"
-                className="pointer-events-none absolute left-[-305%] top-[-58%] h-auto w-[500%] max-w-none select-none sm:left-[-305%] sm:top-[-68%] lg:left-[-305%] lg:top-[-73%]"
+                src="/CallingAgent%20AI%20Receptionist%20Hero.png?v=wide-framing-20261124"
+                alt="CallingAgent receptionist and illustrated appointment and lead-capture features"
+                className="pointer-events-none absolute right-0 top-[-26%] h-auto w-[215%] max-w-none select-none"
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
@@ -254,7 +253,7 @@ function AiLanding(){
         </div>
       </section>
     </main>
-    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-24-F</p></div>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-24-G</p></div>
   </div>;
 }
 
