@@ -34,3 +34,33 @@ export function verifiedCurrentPaidInvoice(
     return price === expectedPriceId;
   });
 }
+
+/**
+ * A signed invoice.payment_failed event is not proof the CURRENT plan is
+ * unpaid: Stripe may retry an older invoice after a later invoice was paid.
+ * Require the current live subscription and latest invoice to match.
+ */
+export function verifiedCurrentFailedInvoice(
+  invoice: any, subscription: any, subscriptionId: string,
+  expectedPriceId: string,
+): boolean {
+  if (!invoice || invoice.livemode !== true ||
+      invoice.paid !== false || invoice.status === "paid" ||
+      !subscription || subscription.livemode !== true ||
+      subscription.id !== subscriptionId ||
+      !["active","past_due","unpaid","incomplete"].includes(subscription.status)) return false;
+  const parent = typeof invoice.subscription === "string"
+    ? invoice.subscription : invoice.parent?.subscription_details?.subscription;
+  if(parent !== subscriptionId)return false;
+  const latest=typeof subscription.latest_invoice==="string"
+    ? subscription.latest_invoice : subscription.latest_invoice?.id;
+  if(latest!==invoice.id)return false;
+  const items=subscription.items?.data;
+  if(!Array.isArray(items)||items.length!==1||items[0]?.price?.id!==expectedPriceId)return false;
+  const lines=invoice.lines?.data;
+  if(!Array.isArray(lines)||!lines.length)return false;
+  return lines.some((line:any)=>{
+    const price=line?.pricing?.price_details?.price||line?.price?.id||line?.plan?.id;
+    return price===expectedPriceId;
+  });
+}
