@@ -353,10 +353,10 @@ export default function Companies() {
                 <TableCell><div className="flex flex-col gap-1.5 text-xs font-semibold">
                   {statusByCompany.has(company.id)?<>
                     <span className={statusByCompany.get(company.id)!.businessPhone.paid?"text-emerald-700":"text-blue-700"}>
-                      VoIP: {statusByCompany.get(company.id)!.businessPhone.paid?"Paid":statusByCompany.get(company.id)!.businessPhone.existingService?"Existing service":"No verified package"}
+                      VoIP: {statusByCompany.get(company.id)!.businessPhone.paid?"Paid":statusByCompany.get(company.id)!.businessPhone.legacyDualService?"Existing VoIP":statusByCompany.get(company.id)!.businessPhone.existingService?"Existing service":"No verified package"}
                     </span>
                     <span className="text-violet-700">
-                      AI: {statusByCompany.get(company.id)!.aiReceptionist.existingConfiguration?"Configured on existing line":"No paid AI plan"}
+                      AI: {statusByCompany.get(company.id)!.aiReceptionist.legacyDualService?"Existing AI":statusByCompany.get(company.id)!.aiReceptionist.existingConfiguration?"Configured on existing line":"No paid AI plan"}
                     </span>
                   </>:<span className="text-amber-600">{serviceError?"Unverified":"Checking…"}</span>}
                 </div></TableCell>
