@@ -7,9 +7,9 @@ export default function SiteFooter({ compact = false }: FooterProps) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <span>© {new Date().getFullYear()} CallingAgent. Business communications made simple.</span>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-          <a href="/" className="hover:text-primary">Website</a>
-          <a href="/#pricing" className="hover:text-primary">Plans</a>
-          <a href="/#faq" className="hover:text-primary">Help & FAQ</a>
+          <a href="/website" className="hover:text-primary">Website</a>
+          <a href="/website#pricing" className="hover:text-primary">Plans</a>
+          <a href="/website#faq" className="hover:text-primary">Help & FAQ</a>
         </div>
       </div>
     </footer>

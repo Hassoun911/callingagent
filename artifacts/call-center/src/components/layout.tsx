@@ -268,7 +268,7 @@ export function Layout({ children }: { children: ReactNode }) {
               <span className="flex items-baseline whitespace-nowrap text-[15px] font-extrabold tracking-[-0.04em] sm:text-[16px]">
                 <span className="text-foreground">CALLING</span><span className="text-blue-600 dark:text-sky-400">AGENT</span>
               </span>
-              <span className="block text-[10px] font-medium tracking-wide text-muted-foreground">AI calling platform</span>
+              <span className="block text-[10px] font-medium tracking-wide text-muted-foreground">ADMIN WORKSPACE</span>
             </span>
           </Link>
           {onClose && (
@@ -360,7 +360,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
 
         <div className="flex-shrink-0 border-t border-border bg-card">
-          <div className={`${compact ? "px-2 py-1.5" : "px-3 py-2"}`}>
+          <div className={`${compact ? "px-2 py-1.5" : "px-3 py-2"}`}><a href="/website" className="mb-1 flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-500/10"><PhoneCall className="h-4 w-4"/> View public website</a>
             <Link href="/plans-admin" onClick={onNav} className={navClass("/plans-admin", compact)}><CreditCard className="h-4 w-4 flex-shrink-0" /> Packages</Link>
             <Link href="/billing" onClick={onNav} className={navClass("/billing", compact)}>
               <CreditCard className="h-4 w-4 flex-shrink-0" /> Billing
@@ -412,6 +412,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <a href="/website" className="hidden rounded-lg border border-blue-500/30 px-3 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-500/10 sm:inline-flex">Public website</a>
             {mainAdminPortal && (
               <button type="button" onClick={toggleAdminTheme} aria-label={`Switch to ${adminTheme === "light" ? "dark" : "light"} mode`} title={`Switch to ${adminTheme === "light" ? "dark" : "light"} mode`} className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground hover:bg-secondary">
                 {adminTheme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
