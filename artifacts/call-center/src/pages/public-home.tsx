@@ -142,8 +142,7 @@ function HeroProductIllustration(){
  * Editorial, photography-first AI marketing experience.
  * Photographs depict real work environments, not a rendered product UI,
  * fabricated company staff, or a claim that a specific individual uses AI.
- * Photo credits: Vagaro / Unsplash (Unsplash License),
- * Kampus Production / Pexels (Pexels free license).
+ * Photo credits: Kampus Production and Antoni Shkraba (Pexels free license).
  */
 function AiLanding(){
   const [menuOpen,setMenuOpen]=useState(false);
@@ -158,8 +157,8 @@ function AiLanding(){
   },[]);
   const photos={
     hero:"https://images.pexels.com/photos/7289726/pexels-photo-7289726.jpeg?auto=compress&cs=tinysrgb&w=1300",
-    support:"https://images.unsplash.com/photo-1712159018726-4564d92f3ec2?auto=format&fit=crop&w=1200&q=85",
-    team:"https://images.unsplash.com/photo-1714079761488-e0c9b9ac4138?auto=format&fit=crop&w=900&q=85"
+    support:"https://images.pexels.com/photos/8192015/pexels-photo-8192015.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    team:"https://images.pexels.com/photos/7971724/pexels-photo-7971724.jpeg?auto=compress&cs=tinysrgb&w=900"
   };
   const benefits=[
     {number:"01",title:"Be there when customers call",description:"Explore an AI answering experience designed for moments when your team is busy, closed, or already on another call."},
@@ -258,7 +257,7 @@ function AiLanding(){
         </div>
       </section>
     </main>
-    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-violet-700 underline">Business Phone</a> · <a href="/login" className="text-violet-700 underline">Account sign in</a></p><p className="mt-2">Photography: Kampus Production/Pexels and Vagaro/Unsplash. Photos illustrate business situations, not verified product users.</p></div>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-violet-700 underline">Business Phone</a> · <a href="/login" className="text-violet-700 underline">Account sign in</a></p><p className="mt-2">Photography: Kampus Production and Antoni Shkraba / Pexels (free license). Photos illustrate business situations, not verified product users.</p></div>
   </div>;
 }
 
