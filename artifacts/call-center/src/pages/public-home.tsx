@@ -149,14 +149,20 @@ export default function PublicHome() {
     ["Is payment available yet?","Not yet. Package selection is available for preview; payments and automatic activation remain disabled during launch testing."],
   ];
   return <div className="min-h-screen bg-[#f7faff] text-[#0a1830]">
+    <div className="border-b border-blue-100 bg-[#eef4ff]">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-2 text-[11px] font-semibold text-blue-900 sm:px-8">
+        <span>CALLINGAGENT · PUBLIC WEBSITE</span>
+        <a href="/login" className="text-indigo-700 underline-offset-4 hover:underline">Existing customer? Open account area →</a>
+      </div>
+    </div>
     <header className="sticky top-0 z-30 border-b border-blue-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
-        <a href="/" className="flex items-center gap-2 text-xl font-extrabold tracking-tight"><span className="rounded-xl bg-blue-600 p-2 text-white"><PhoneCall className="h-5 w-5"/></span>Calling<span className="text-blue-600">Agent</span></a>
-        <nav className="hidden items-center gap-7 text-sm font-semibold text-slate-600 md:flex"><a href="#solutions" className="hover:text-blue-600">Solutions</a><a href="#how-it-works" className="hover:text-blue-600">How it works</a><a href="#pricing" className="hover:text-blue-600">Phone Plans</a><a href="#ai" className="hover:text-blue-600">AI Receptionist</a><a href="#faq" className="hover:text-blue-600">FAQ</a></nav>
-        <div className="hidden items-center gap-3 md:flex"><a href="/login" className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold hover:bg-slate-50">Sign in</a><a href="#ai-inquiry" className="inline-flex items-center gap-2 rounded-xl bg-indigo-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-800"><Bot className="h-4 w-4"/> AI early access</a></div>
-        <button aria-label="Toggle menu" onClick={()=>setMobile(!mobile)} className="p-2 md:hidden">{mobile?<X/>:<Menu/>}</button>
+        <a href="/website" className="flex shrink-0 items-center gap-2 text-lg font-extrabold tracking-tight sm:text-xl"><span className="rounded-xl bg-blue-600 p-2 text-white"><PhoneCall className="h-5 w-5"/></span>Calling<span className="text-blue-600">Agent</span></a>
+        <nav className="hidden items-center gap-4 text-sm font-semibold text-slate-600 lg:flex xl:gap-7"><a href="#solutions" className="hover:text-blue-600">Solutions</a><a href="#how-it-works" className="hover:text-blue-600">How it works</a><a href="#pricing" className="hover:text-blue-600">Phone Plans</a><a href="#ai" className="hover:text-blue-600">AI Receptionist</a><a href="#faq" className="hover:text-blue-600">FAQ</a></nav>
+        <div className="hidden items-center gap-3 lg:flex"><a href="/login" className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold hover:bg-slate-50">Sign in</a><a href="#ai-inquiry" className="inline-flex items-center gap-2 rounded-xl bg-indigo-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-indigo-800"><Bot className="h-4 w-4"/> AI early access</a></div>
+        <button aria-label="Toggle menu" onClick={()=>setMobile(!mobile)} className="p-2 lg:hidden">{mobile?<X/>:<Menu/>}</button>
       </div>
-      {mobile&&<nav className="flex flex-col gap-4 border-t border-blue-100 bg-white px-6 py-5 text-sm font-semibold md:hidden"><a href="#solutions" onClick={()=>setMobile(false)}>Solutions</a><a href="#how-it-works" onClick={()=>setMobile(false)}>How it works</a><a href="#pricing" onClick={()=>setMobile(false)}>Phone Plans</a><a href="#ai" onClick={()=>setMobile(false)}>AI Receptionist</a><a href="#faq" onClick={()=>setMobile(false)}>FAQ</a><a href="/login">Sign in</a></nav>}
+      {mobile&&<nav className="flex flex-col gap-4 border-t border-blue-100 bg-white px-6 py-5 text-sm font-semibold lg:hidden"><a href="#solutions" onClick={()=>setMobile(false)}>Solutions</a><a href="#how-it-works" onClick={()=>setMobile(false)}>How it works</a><a href="#pricing" onClick={()=>setMobile(false)}>Phone Plans</a><a href="#ai" onClick={()=>setMobile(false)}>AI Receptionist</a><a href="#faq" onClick={()=>setMobile(false)}>FAQ</a><a href="/login">Account sign in</a><a href="/website" onClick={()=>setMobile(false)}>Main website</a></nav>}
     </header>
     <main>
       <section className="relative overflow-hidden bg-white">
