@@ -155,6 +155,25 @@ function AiLanding(){
     update();media.addEventListener("change",update);
     return()=>media.removeEventListener("change",update);
   },[]);
+  useEffect(()=>{
+    const root=document.querySelector("[data-ca-landing]");
+    if(!root || !("IntersectionObserver" in window))return;
+    const media=window.matchMedia("(prefers-reduced-motion: reduce)");
+    const nodes=Array.from(root.querySelectorAll("[data-ca-reveal]"));
+    const observer=new IntersectionObserver(entries=>{
+      for(const entry of entries)entry.target.classList.toggle("ca-in-view",entry.isIntersecting);
+    },{threshold:0.12});
+    const sync=()=>{
+      observer.disconnect();
+      nodes.forEach(node=>{
+        node.classList.toggle("ca-reveal-ready",!media.matches);
+        if(!media.matches)observer.observe(node);
+        else node.classList.remove("ca-in-view");
+      });
+    };
+    sync();media.addEventListener("change",sync);
+    return()=>{observer.disconnect();media.removeEventListener("change",sync);nodes.forEach(node=>node.classList.remove("ca-reveal-ready","ca-in-view"));};
+  },[]);
   const photos={
     hero:"https://images.pexels.com/photos/7289726/pexels-photo-7289726.jpeg?auto=compress&cs=tinysrgb&w=1300",
     support:"https://images.pexels.com/photos/8192015/pexels-photo-8192015.jpeg?auto=compress&cs=tinysrgb&w=1200",
@@ -165,7 +184,7 @@ function AiLanding(){
     {number:"02",title:"Turn conversations into opportunities",description:"Capture new inquiries, callers' details and the next step they are looking for, instead of relying on memory."},
     {number:"03",title:"Give your team time to do great work",description:"Spend less time on repeat questions and phone interruptions, with requests organized for follow-up."}
   ];
-  return <div className="min-h-screen bg-white font-sans text-[#14213d]">
+  return <div data-ca-landing className="min-h-screen bg-white font-sans text-[#14213d]">
     <style>{`
       @keyframes ca-entrance {from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
       @keyframes ca-levitate {0%,100%{translate:0 0}50%{translate:0 -13px}}
@@ -179,6 +198,9 @@ function AiLanding(){
       .ca-float-b{animation:ca-levitate-opposite 7s ease-in-out infinite}
       .ca-orbit{animation:ca-orbit-soft 15s ease-in-out infinite}
       .ca-orbit-delayed{animation:ca-orbit-soft 20s ease-in-out infinite reverse}
+      .ca-reveal-ready{opacity:0;transform:translateY(22px);transition:opacity .65s ease,transform .65s cubic-bezier(.2,.75,.2,1)}
+      .ca-reveal-ready.ca-in-view,.ca-reveal-ready:focus-within{opacity:1;transform:translateY(0)}
+      @media(prefers-reduced-motion:reduce){.ca-reveal-ready{opacity:1;transform:none;transition:none}}
       .ca-motion-card{transition:transform .45s cubic-bezier(.2,.75,.2,1),box-shadow .45s ease}
       @media (hover:hover) and (pointer:fine){.ca-motion-card:hover{transform:translateY(-9px) rotateX(2deg);box-shadow:0 28px 65px rgba(31,28,73,.12)}}
       @media (prefers-reduced-motion:reduce){.ca-entrance,.ca-photo-card,.ca-float-a,.ca-float-b,.ca-orbit,.ca-orbit-delayed{animation:none!important}.ca-hero-tilt,.ca-motion-card{transform:none!important;transition:none!important}}
@@ -233,26 +255,26 @@ function AiLanding(){
           </div>
         </div>
       </section>
-      <section id="benefits" className="scroll-mt-24 border-y border-slate-100 bg-[#f8f9fd] py-20">
+      <section id="benefits" className="scroll-mt-24 border-y border-slate-100 bg-[#f2f8ff] py-20">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-700">The business advantage</p><h2 className="mt-3 text-3xl font-black leading-tight tracking-tight text-[#111936] sm:text-5xl">Better conversations. Better business.</h2><p className="mt-5 text-lg leading-8 text-slate-600">The goal isn't to replace your team. It's to make it easier for customers to reach your business and for your team to respond.</p></div>
-          <div className="mt-12 grid gap-5 md:grid-cols-3">{benefits.map(b=><article key={b.number} className="ca-motion-card rounded-2xl border border-slate-200 bg-white p-7 shadow-sm"><span className="text-sm font-extrabold text-sky-700">{b.number}</span><h3 className="mt-9 text-2xl font-extrabold leading-tight text-[#15213e]">{b.title}</h3><p className="mt-4 text-sm leading-7 text-slate-600">{b.description}</p></article>)}</div>
+          <div data-ca-reveal className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-700">The business advantage</p><h2 className="mt-3 text-3xl font-black leading-tight tracking-tight text-[#111936] sm:text-5xl">Better conversations. Better business.</h2><p className="mt-5 text-lg leading-8 text-slate-600">The goal isn't to replace your team. It's to make it easier for customers to reach your business and for your team to respond.</p></div>
+          <div className="mt-12 grid gap-5 md:grid-cols-3">{benefits.map(b=><article data-ca-reveal key={b.number} className="ca-motion-card rounded-3xl border border-sky-100 bg-white p-8 shadow-[0_12px_40px_rgba(14,116,144,.08)]"><span className="text-sm font-extrabold text-sky-700">{b.number}</span><h3 className="mt-9 text-2xl font-extrabold leading-tight text-[#15213e]">{b.title}</h3><p className="mt-4 text-sm leading-7 text-slate-600">{b.description}</p></article>)}</div>
         </div>
       </section>
       <section id="how-ai-works" className="scroll-mt-24 bg-white py-20 lg:py-28">
         <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2 lg:gap-20">
-          <div className="overflow-hidden rounded-[2rem] shadow-[0_25px_70px_rgba(19,31,64,.13)]"><img src={photos.support} alt="Real customer support professional working with a headset at a computer" loading="lazy" decoding="async" className="aspect-[5/4] w-full object-cover"/></div>
-          <div><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-700">Designed around your customer experience</p><h2 className="mt-4 text-3xl font-black leading-tight tracking-tight sm:text-5xl">A helpful first response can change everything.</h2><p className="mt-6 text-base leading-8 text-slate-600">Think of the inquiries that arrive when you're on a job, serving another customer, or closed for the evening. An AI receptionist is designed to help your business respond more consistently.</p>
+          <div data-ca-reveal className="overflow-hidden rounded-[2rem] shadow-[0_25px_70px_rgba(19,31,64,.13)]"><img src={photos.support} alt="Real customer support professional working with a headset at a computer" loading="lazy" decoding="async" className="aspect-[5/4] w-full object-cover"/></div>
+          <div data-ca-reveal><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-700">Designed around your customer experience</p><h2 className="mt-4 text-3xl font-black leading-tight tracking-tight sm:text-5xl">A helpful first response can change everything.</h2><p className="mt-6 text-base leading-8 text-slate-600">Think of the inquiries that arrive when you're on a job, serving another customer, or closed for the evening. An AI receptionist is designed to help your business respond more consistently.</p>
             <div className="mt-8 space-y-5">{[["Answer common questions","Explore inbound AI answering for basic customer questions."],["Record what callers need","Capture lead details, messages and appointment requests."],["Support timely follow-up","Pass the right information to your team for the next conversation."]].map(([t,d])=><div key={t} className="flex gap-4 border-b border-slate-100 pb-5"><span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700"><Check className="h-4 w-4"/></span><div><h3 className="font-bold text-slate-900">{t}</h3><p className="mt-1 text-sm leading-6 text-slate-600">{d}</p></div></div>)}</div>
           </div>
         </div>
       </section>
-      <section className="bg-[#131c37] py-16 text-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-7 px-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-300">A separate option for traditional calling</p><h2 className="mt-3 text-2xl font-extrabold sm:text-3xl">Just need a professional business phone?</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">CallingAgent Business Phone offers Canadian business numbers, forwarding and voicemail. It has its own plans and does not require an AI receptionist.</p></div><a href="/business-phone" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-slate-900 hover:bg-slate-100">Explore Business Phone <ArrowRight className="h-4 w-4"/></a></div>
+      <section className="bg-gradient-to-br from-[#10233e] to-[#075985] py-16 text-white">
+        <div data-ca-reveal className="mx-auto flex max-w-7xl flex-col gap-7 px-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-300">A separate option for traditional calling</p><h2 className="mt-3 text-2xl font-extrabold sm:text-3xl">Just need a professional business phone?</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">CallingAgent Business Phone offers Canadian business numbers, forwarding and voicemail. It has its own plans and does not require an AI receptionist.</p></div><a href="/business-phone" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-slate-900 hover:bg-slate-100">Explore Business Phone <ArrowRight className="h-4 w-4"/></a></div>
       </section>
       <section className="scroll-mt-24 bg-[#f8f9fd] py-20" id="ai-inquiry">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
-          <div><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-700">Join the early-access list</p><h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">See how AI could fit your business.</h2><p className="mt-5 text-base leading-8 text-slate-600">Tell us what type of calls your business handles. We can follow up when AI setup and pricing details are ready.</p><div className="mt-8 overflow-hidden rounded-2xl"><img src={photos.team} alt="Customer support professional working at a laptop and talking through a headset" loading="lazy" decoding="async" className="aspect-[5/3] w-full object-cover"/></div></div>
+          <div data-ca-reveal><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-700">Join the early-access list</p><h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">See how AI could fit your business.</h2><p className="mt-5 text-base leading-8 text-slate-600">Tell us what type of calls your business handles. We can follow up when AI setup and pricing details are ready.</p><div className="mt-8 overflow-hidden rounded-2xl"><img src={photos.team} alt="Customer support professional working at a laptop and talking through a headset" loading="lazy" decoding="async" className="aspect-[5/3] w-full object-cover"/></div></div>
           <div><AiSalesInquiry /></div>
         </div>
       </section>
