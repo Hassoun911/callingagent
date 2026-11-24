@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { verifiedCurrentPaidInvoice } from "../../artifacts/api-server/src/lib/stripe-paid-invoice-evidence.ts";
+import { verifiedCurrentPaidInvoice, verifiedCurrentFailedInvoice } from "../../artifacts/api-server/src/lib/stripe-paid-invoice-evidence.ts";
 
 const subscriptionId="sub_verified_123";
 const priceId="price_expected";
@@ -52,3 +52,12 @@ test("rejects mismatched subscription package even if invoice price matches",()=
   const s=subscription();s.items.data[0].price.id="price_other";
   assert.equal(verifiedCurrentPaidInvoice(invoice(),s,subscriptionId,priceId),false);
 });
+
+test("current unpaid invoice matches active package",()=>{const i=invoice();i.paid=false;i.status="open";assert.equal(verifiedCurrentFailedInvoice(i,subscription(),subscriptionId,priceId),true)});
+test("old failed invoice cannot hold newer paid invoice",()=>{const i=invoice();i.paid=false;i.status="open";const sub=subscription();sub.latest_invoice="in_newer_paid";assert.equal(verifiedCurrentFailedInvoice(i,sub,subscriptionId,priceId),false)});
+test("failed invoice from prior plan cannot hold upgraded plan",()=>{const i=invoice();i.paid=false;i.status="open";i.lines={data:[{pricing:{price_details:{price:"price_old"}}}]};assert.equal(verifiedCurrentFailedInvoice(i,subscription(),subscriptionId,priceId),false)});
+test("paid invoice cannot be misclassified as failed",()=>{assert.equal(verifiedCurrentFailedInvoice(invoice(),subscription(),subscriptionId,priceId),false)});
+test("failed invoice from another company is ignored",()=>{const i=invoice();i.paid=false;i.status="open";i.subscription="sub_other";assert.equal(verifiedCurrentFailedInvoice(i,subscription(),subscriptionId,priceId),false)});
+test("testmode failed invoice cannot hold live account",()=>{const i=invoice();i.paid=false;i.status="open";i.livemode=false;assert.equal(verifiedCurrentFailedInvoice(i,subscription(),subscriptionId,priceId),false)});
+test("canceled subscription does not accept failed invoice verification",()=>{const i=invoice();i.paid=false;i.status="open";const sub=subscription();sub.status="canceled";assert.equal(verifiedCurrentFailedInvoice(i,sub,subscriptionId,priceId),false)});
+test("missing invoice price evidence cannot hold account",()=>{const i=invoice();i.paid=false;i.status="open";delete i.lines;assert.equal(verifiedCurrentFailedInvoice(i,subscription(),subscriptionId,priceId),false)});
