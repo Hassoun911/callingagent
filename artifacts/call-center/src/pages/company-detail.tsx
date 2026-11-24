@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import DualServiceStatus from "@/components/dual-service-status";
 import { useParams, useLocation } from "wouter";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
@@ -414,6 +415,8 @@ export default function CompanyDetail() {
           <Edit className="h-4 w-4" />
         </Button>
       </div>
+
+      <DualServiceStatus companyId={companyId}/>
 
       {/* Full Access is a super-admin feature override, not a Stripe plan upgrade. */}
       <section className="rounded-xl border border-border bg-card p-4 space-y-3">
