@@ -207,7 +207,7 @@ function AiLanding(){
     `}</style>
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
-        <a href="/website" className="inline-flex items-center gap-2 text-xl font-black tracking-tight text-[#111936]" aria-label="CallingAgent AI Receptionist home"><span className="rounded-xl bg-gradient-to-br from-blue-600 to-sky-700 p-2 text-white"><PhoneCall className="h-5 w-5"/></span>Calling<span className="-ml-2 text-blue-600">Agent</span></a>
+        <a href="/website" className="inline-flex items-center gap-2 text-xl font-black tracking-tight text-[#111936]" aria-label="CallingAgent AI Receptionist home"><img src="/logo.png" alt="CallingAgent" className="h-12 w-auto max-w-[190px] object-contain"/></a>
         <nav aria-label="Main website" className="hidden items-center gap-8 text-sm font-semibold text-slate-700 lg:flex">
           <a href="/website" aria-current="page" className="text-sky-700">AI Receptionist</a><a href="/business-phone" className="hover:text-blue-700">Business Phone</a><a href="#benefits" className="hover:text-sky-700">Benefits</a><a href="#how-ai-works" className="hover:text-sky-700">How it works</a>
         </nav>
