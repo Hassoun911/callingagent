@@ -198,13 +198,13 @@ function AiLanding(){
       <section className="bg-white">
         <div className="mx-auto grid max-w-7xl items-center gap-9 px-5 pb-16 pt-12 sm:px-8 lg:grid-cols-[.95fr_1.05fr] lg:gap-16 lg:py-24">
           <div className="ca-entrance">
-            <p className="text-xs font-extrabold uppercase tracking-[.2em] text-violet-700">A smarter way to answer your business calls</p>
-            <h1 className="mt-5 max-w-xl text-[clamp(2.7rem,5.4vw,5.2rem)] font-black leading-[1.08] tracking-[-.05em] text-[#111936]">Your business never stops. <span className="text-violet-700">Neither should your first impression.</span></h1>
-            <p className="mt-6 max-w-xl text-base leading-8 text-slate-600 sm:text-lg">Customers call when they're ready. Explore an AI receptionist that can help answer questions, capture inquiries and keep conversations moving, even while you're focused on running your business.</p>
-            <div className="mt-8 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-700 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-violet-700/15 hover:bg-violet-800">Get AI early access <ArrowRight className="h-4 w-4"/></a><a href="#benefits" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-slate-800 hover:bg-slate-50">See what AI could do</a></div>
-            <p className="mt-5 text-xs leading-5 text-slate-500">Early-access inquiries only. AI service and standalone pricing from $99 CAD/month are planned; automatic paid activation is not yet available.</p>
+            <p className="text-xs font-extrabold uppercase tracking-[.2em] text-violet-700">Your AI receptionist</p>
+            <h1 className="mt-5 max-w-xl text-[clamp(2.7rem,5vw,4.6rem)] font-black leading-[1.08] tracking-[-.05em] text-[#111936]">Never miss another <span className="text-violet-700">business opportunity.</span></h1>
+            <p className="mt-6 max-w-xl text-base leading-8 text-slate-600 sm:text-lg">Give callers a helpful first response, capture customer inquiries and keep your team focused on running your business.</p>
+            <div className="mt-6 flex items-baseline gap-2"><span className="text-4xl font-black tracking-tight text-[#111936]">$99</span><span className="text-sm text-slate-600">CAD/month · planned starting price</span></div><div className="mt-6 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-700 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-violet-700/15 hover:bg-violet-800">Get AI early access <ArrowRight className="h-4 w-4"/></a><a href="#how-ai-works" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-slate-800 hover:bg-slate-50">See how it works</a></div>
+            <p className="mt-5 text-xs leading-5 text-slate-500">Early access · No payment required. Usage credits and taxes are separate; automatic paid activation is not yet available.</p>
           </div>
-          <div className="ca-hero-stage relative isolate min-h-[380px] pb-8 sm:min-h-[500px] lg:min-h-[620px]" onPointerMove={event=>{
+          <div className="ca-hero-stage relative isolate min-h-[340px] pb-8 sm:min-h-[440px] lg:min-h-[500px]" onPointerMove={event=>{
             if(!tiltEnabled || event.pointerType!=="mouse")return;
             const rect=event.currentTarget.getBoundingClientRect();
             const x=((event.clientX-rect.left)/rect.width-.5)*9;
@@ -216,9 +216,9 @@ function AiLanding(){
             <div className="relative z-10 mx-auto w-[91%] max-w-[560px] [perspective:1400px]">
               <div className="ca-hero-tilt relative" style={{transform:tiltEnabled?`rotateY(${heroTilt.x}deg) rotateX(${heroTilt.y}deg)`:undefined}}>
                 <div className="ca-photo-card relative overflow-hidden rounded-[2rem] bg-[#ebe7ff] shadow-[0_35px_90px_rgba(33,27,81,.22)] [transform:translateZ(32px)]">
-                  <img src={photos.hero} loading="eager" decoding="async" fetchPriority="high" alt="Real small-business owner taking a customer call while managing work at a laptop" className="aspect-[4/5] w-full object-cover object-center sm:aspect-[5/5] lg:aspect-[4/5]"/>
+                  <img src={photos.hero} loading="eager" decoding="async" fetchPriority="high" alt="Real small-business owner taking a customer call while managing work at a laptop" className="aspect-[4/5] w-full object-cover object-center sm:aspect-[5/5] lg:aspect-[5/5]"/>
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#101936]/45 via-transparent to-transparent"/>
-                  <div className="absolute bottom-7 left-7 right-7 text-white"><span className="text-xs font-bold uppercase tracking-[.2em] text-violet-100">Real people. Real business moments.</span><p className="mt-2 max-w-sm text-xl font-bold sm:text-2xl">Give every caller a better first impression.</p></div>
+                  <div className="absolute bottom-7 left-7 right-7 text-white"><span className="text-xs font-bold uppercase tracking-[.2em] text-violet-100">Your business, always connected.</span><p className="mt-2 max-w-sm text-xl font-bold sm:text-2xl">Give every caller a better first impression.</p></div>
                 </div>
                 <div className="ca-float-a absolute -left-6 top-[12%] z-20 flex items-center gap-3 rounded-2xl border border-white/90 bg-white/95 px-4 py-3 shadow-[0_22px_48px_rgba(38,37,90,.16)] backdrop-blur sm:-left-12 [transform:translateZ(100px)]" aria-label="Potential AI use case: inbound inquiries">
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700"><PhoneCall className="h-5 w-5"/></span><span><span className="block text-xs font-extrabold text-[#1b2242]">Incoming inquiries</span><span className="block text-xs text-slate-500">Never overlook a request</span></span>
@@ -250,7 +250,7 @@ function AiLanding(){
       <section className="bg-[#131c37] py-16 text-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-7 px-5 sm:px-8 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-violet-300">A separate option for traditional calling</p><h2 className="mt-3 text-2xl font-extrabold sm:text-3xl">Just need a professional business phone?</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">CallingAgent Business Phone offers Canadian business numbers, forwarding and voicemail. It has its own plans and does not require an AI receptionist.</p></div><a href="/business-phone" className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-slate-900 hover:bg-slate-100">Explore Business Phone <ArrowRight className="h-4 w-4"/></a></div>
       </section>
-      <section className="bg-[#f8f9fd] py-20" id="early-access">
+      <section className="scroll-mt-24 bg-[#f8f9fd] py-20" id="ai-inquiry">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
           <div><p className="text-xs font-bold uppercase tracking-[.2em] text-violet-700">Join the early-access list</p><h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">See how AI could fit your business.</h2><p className="mt-5 text-base leading-8 text-slate-600">Tell us what type of calls your business handles. We can follow up when AI setup and pricing details are ready.</p><div className="mt-8 overflow-hidden rounded-2xl"><img src={photos.team} alt="Customer support professional working at a laptop and talking through a headset" loading="lazy" decoding="async" className="aspect-[5/3] w-full object-cover"/></div></div>
           <div><AiSalesInquiry /></div>
