@@ -71,8 +71,27 @@ app.use("/api", bookingFlowSettingsRouter);
 app.use("/api", router);
 
 const frontendDist = path.resolve(process.cwd(), "artifacts/call-center/dist/public");
-app.use(express.static(frontendDist));
+
+// Never cache the SPA document: stale index.html can keep an old React bundle
+// visible after a successful production deployment. Vite's fingerprinted
+// assets remain safely cacheable. This does not affect API or telephony routes.
+app.use(express.static(frontendDist, {
+  index: false,
+  setHeaders(res, filePath) {
+    if (filePath.endsWith(".html")) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+    } else if (filePath.includes("/assets/") && /\.[a-f0-9]{8,}\./i.test(filePath)) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    } else {
+      // Avoid stale public images and branding across fast redesign iterations.
+      res.setHeader("Cache-Control", "public, max-age=300");
+    }
+  }
+}));
 app.get("/{*splat}", (_req, res) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.set("Pragma", "no-cache");
   res.sendFile(path.join(frontendDist, "index.html"));
 });
 
