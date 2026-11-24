@@ -147,6 +147,15 @@ function HeroProductIllustration(){
  */
 function AiLanding(){
   const [menuOpen,setMenuOpen]=useState(false);
+  // Tilt is limited to the hero visual. Reduced-motion visitors get a static layout.
+  const [heroTilt,setHeroTilt]=useState({x:0,y:0});
+  const [tiltEnabled,setTiltEnabled]=useState(false);
+  useEffect(()=>{
+    const media=window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update=()=>setTiltEnabled(!media.matches);
+    update();media.addEventListener("change",update);
+    return()=>media.removeEventListener("change",update);
+  },[]);
   const photos={
     hero:"https://images.pexels.com/photos/7289726/pexels-photo-7289726.jpeg?auto=compress&cs=tinysrgb&w=1300",
     support:"https://images.unsplash.com/photo-1712159018726-4564d92f3ec2?auto=format&fit=crop&w=1200&q=85",
@@ -158,6 +167,23 @@ function AiLanding(){
     {number:"03",title:"Give your team time to do great work",description:"Spend less time on repeat questions and phone interruptions, with requests organized for follow-up."}
   ];
   return <div className="min-h-screen bg-white font-sans text-[#14213d]">
+    <style>{`
+      @keyframes ca-entrance {from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+      @keyframes ca-levitate {0%,100%{translate:0 0}50%{translate:0 -13px}}
+      @keyframes ca-levitate-opposite {0%,100%{translate:0 0}50%{translate:0 12px}}
+      @keyframes ca-orbit-soft {0%,100%{transform:rotate(-10deg) scale(1)}50%{transform:rotate(8deg) scale(1.035)}}
+      .ca-hero-stage{perspective:1400px;transform-style:preserve-3d}
+      .ca-hero-tilt{transform-style:preserve-3d;transition:transform 420ms cubic-bezier(.2,.7,.2,1)}
+      .ca-entrance{animation:ca-entrance 950ms cubic-bezier(.2,.8,.2,1) both}
+      .ca-photo-card{animation:ca-entrance 1150ms cubic-bezier(.2,.8,.2,1) both}
+      .ca-float-a{animation:ca-levitate 6s ease-in-out infinite}
+      .ca-float-b{animation:ca-levitate-opposite 7s ease-in-out infinite}
+      .ca-orbit{animation:ca-orbit-soft 15s ease-in-out infinite}
+      .ca-orbit-delayed{animation:ca-orbit-soft 20s ease-in-out infinite reverse}
+      .ca-motion-card{transition:transform .45s cubic-bezier(.2,.75,.2,1),box-shadow .45s ease}
+      @media (hover:hover) and (pointer:fine){.ca-motion-card:hover{transform:translateY(-9px) rotateX(2deg);box-shadow:0 28px 65px rgba(31,28,73,.12)}}
+      @media (prefers-reduced-motion:reduce){.ca-entrance,.ca-photo-card,.ca-float-a,.ca-float-b,.ca-orbit,.ca-orbit-delayed{animation:none!important}.ca-hero-tilt,.ca-motion-card{transform:none!important;transition:none!important}}
+    `}</style>
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
         <a href="/website" className="inline-flex items-center gap-2 text-xl font-black tracking-tight text-[#111936]" aria-label="CallingAgent AI Receptionist home"><span className="rounded-xl bg-gradient-to-br from-blue-600 to-violet-700 p-2 text-white"><PhoneCall className="h-5 w-5"/></span>Calling<span className="-ml-2 text-blue-600">Agent</span></a>
@@ -172,19 +198,38 @@ function AiLanding(){
     <main>
       <section className="bg-white">
         <div className="mx-auto grid max-w-7xl items-center gap-9 px-5 pb-16 pt-12 sm:px-8 lg:grid-cols-[.95fr_1.05fr] lg:gap-16 lg:py-24">
-          <div>
+          <div className="ca-entrance">
             <p className="text-xs font-extrabold uppercase tracking-[.2em] text-violet-700">A smarter way to answer your business calls</p>
             <h1 className="mt-5 max-w-xl text-[clamp(2.7rem,5.4vw,5.2rem)] font-black leading-[1.08] tracking-[-.05em] text-[#111936]">Your business never stops. <span className="text-violet-700">Neither should your first impression.</span></h1>
             <p className="mt-6 max-w-xl text-base leading-8 text-slate-600 sm:text-lg">Customers call when they're ready. Explore an AI receptionist that can help answer questions, capture inquiries and keep conversations moving, even while you're focused on running your business.</p>
             <div className="mt-8 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-700 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-violet-700/15 hover:bg-violet-800">Get AI early access <ArrowRight className="h-4 w-4"/></a><a href="#benefits" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-bold text-slate-800 hover:bg-slate-50">See what AI could do</a></div>
             <p className="mt-5 text-xs leading-5 text-slate-500">Early-access inquiries only. AI service and standalone pricing from $99 CAD/month are planned; automatic paid activation is not yet available.</p>
           </div>
-          <div className="relative">
-            <img src={photos.hero} loading="eager" decoding="async" fetchPriority="high" alt="Small business owner taking a customer phone call while working at her desk" className="aspect-[5/5] w-full rounded-[2rem] object-cover object-center shadow-[0_28px_80px_rgba(28,32,79,.16)] sm:aspect-[5/4] lg:aspect-[4/5]"/>
-            <div className="absolute -bottom-5 left-4 right-4 rounded-2xl border border-white/90 bg-white/95 p-5 shadow-xl backdrop-blur sm:bottom-6 sm:left-auto sm:right-[-12px] sm:max-w-[255px]">
-              <p className="text-xs font-bold uppercase tracking-widest text-violet-700">Make every inquiry count</p>
-              <p className="mt-2 text-base font-extrabold text-[#15213e]">Less phone tag. More time for your customers.</p>
-              <p className="mt-2 text-xs text-slate-500">Business photography for illustration; not a CallingAgent customer testimonial.</p>
+          <div className="ca-hero-stage relative isolate min-h-[380px] pb-8 sm:min-h-[500px] lg:min-h-[620px]" onPointerMove={event=>{
+            if(!tiltEnabled || event.pointerType!=="mouse")return;
+            const rect=event.currentTarget.getBoundingClientRect();
+            const x=((event.clientX-rect.left)/rect.width-.5)*9;
+            const y=((event.clientY-rect.top)/rect.height-.5)*-9;
+            setHeroTilt({x,y});
+          }} onPointerLeave={()=>setHeroTilt({x:0,y:0})}>
+            <div className="ca-orbit absolute -right-7 top-[4%] h-[78%] w-[92%] rounded-[44%] border-[18px] border-violet-100 opacity-65 sm:border-[24px]" aria-hidden="true"/>
+            <div className="ca-orbit-delayed absolute -left-5 bottom-[5%] h-48 w-48 rounded-full border-[22px] border-blue-100/90 opacity-70" aria-hidden="true"/>
+            <div className="relative z-10 mx-auto w-[91%] max-w-[560px] [perspective:1400px]">
+              <div className="ca-hero-tilt relative" style={{transform:tiltEnabled?`rotateY(${heroTilt.x}deg) rotateX(${heroTilt.y}deg)`:undefined}}>
+                <div className="ca-photo-card relative overflow-hidden rounded-[2rem] bg-[#ebe7ff] shadow-[0_35px_90px_rgba(33,27,81,.22)] [transform:translateZ(32px)]">
+                  <img src={photos.hero} loading="eager" decoding="async" fetchPriority="high" alt="Real small-business owner taking a customer call while managing work at a laptop" className="aspect-[4/5] w-full object-cover object-center sm:aspect-[5/5] lg:aspect-[4/5]"/>
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#101936]/45 via-transparent to-transparent"/>
+                  <div className="absolute bottom-7 left-7 right-7 text-white"><span className="text-xs font-bold uppercase tracking-[.2em] text-violet-100">Real people. Real business moments.</span><p className="mt-2 max-w-sm text-xl font-bold sm:text-2xl">Give every caller a better first impression.</p></div>
+                </div>
+                <div className="ca-float-a absolute -left-6 top-[12%] z-20 flex items-center gap-3 rounded-2xl border border-white/90 bg-white/95 px-4 py-3 shadow-[0_22px_48px_rgba(38,37,90,.16)] backdrop-blur sm:-left-12 [transform:translateZ(100px)]" aria-label="Potential AI use case: inbound inquiries">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700"><PhoneCall className="h-5 w-5"/></span><span><span className="block text-xs font-extrabold text-[#1b2242]">Incoming inquiries</span><span className="block text-xs text-slate-500">Never overlook a request</span></span>
+                </div>
+                <div className="ca-float-b absolute -bottom-4 -right-3 z-20 max-w-[235px] rounded-2xl border border-violet-100 bg-white/95 p-4 shadow-[0_25px_55px_rgba(36,25,81,.19)] backdrop-blur sm:-bottom-6 sm:-right-10 [transform:translateZ(135px)]" aria-label="Potential AI use case: organized lead capture">
+                  <div className="flex items-center gap-2 text-violet-700"><Sparkles className="h-4 w-4"/><span className="text-xs font-bold uppercase tracking-wider">Designed to help</span></div>
+                  <p className="mt-2 text-base font-extrabold text-[#162142]">Capture leads. Stay responsive.</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Planned AI capability · early access</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -192,7 +237,7 @@ function AiLanding(){
       <section id="benefits" className="scroll-mt-24 border-y border-slate-100 bg-[#f8f9fd] py-20">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
           <div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-violet-700">The business advantage</p><h2 className="mt-3 text-3xl font-black leading-tight tracking-tight text-[#111936] sm:text-5xl">Better conversations. Better business.</h2><p className="mt-5 text-lg leading-8 text-slate-600">The goal isn't to replace your team. It's to make it easier for customers to reach your business and for your team to respond.</p></div>
-          <div className="mt-12 grid gap-5 md:grid-cols-3">{benefits.map(b=><article key={b.number} className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm"><span className="text-sm font-extrabold text-violet-700">{b.number}</span><h3 className="mt-9 text-2xl font-extrabold leading-tight text-[#15213e]">{b.title}</h3><p className="mt-4 text-sm leading-7 text-slate-600">{b.description}</p></article>)}</div>
+          <div className="mt-12 grid gap-5 md:grid-cols-3">{benefits.map(b=><article key={b.number} className="ca-motion-card rounded-2xl border border-slate-200 bg-white p-7 shadow-sm"><span className="text-sm font-extrabold text-violet-700">{b.number}</span><h3 className="mt-9 text-2xl font-extrabold leading-tight text-[#15213e]">{b.title}</h3><p className="mt-4 text-sm leading-7 text-slate-600">{b.description}</p></article>)}</div>
         </div>
       </section>
       <section id="how-ai-works" className="scroll-mt-24 bg-white py-20 lg:py-28">
