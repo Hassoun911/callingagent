@@ -216,10 +216,19 @@ function AiLanding(){
             </div>
             <p className="mt-5 text-xs leading-5 text-slate-500">AI plans are in early access. Standalone service is planned from $99 CAD/month; billing and activation are not available yet.</p>
           </div>
-          <div className="ca-photo-card relative isolate min-h-[320px] overflow-hidden rounded-[2rem] bg-[#f4f0ff] shadow-[0_30px_90px_rgba(46,36,112,.14)] sm:min-h-[420px] lg:min-h-[570px]">
-            <img src="/CallingAgent%20AI%20Receptionist%20Hero.png?v=whitepremium-20261124" alt="CallingAgent premium AI reception concept with customer call, receptionist, and lead capture graphics" className="absolute inset-y-0 right-0 h-full w-full object-cover" style={{objectPosition:"81% 48%"}} fetchPriority="high" decoding="async"/>
-            <div className="absolute inset-0 bg-gradient-to-r from-white/30 via-transparent to-transparent" aria-hidden="true"/>
-            <span className="absolute bottom-4 right-4 rounded-full bg-white/95 px-4 py-2 text-[11px] font-semibold text-slate-700 shadow-lg">Visual concept · AI early access</span>
+          {/* The original source is a full-page design reference. Show ONLY its right-hand
+              photographic subject; never embed its existing header, title or buttons
+              inside the live site's own hero. */}
+          <div className="ca-photo-card relative isolate aspect-[5/4] w-full overflow-hidden rounded-[1.8rem] bg-[#f4f0ff] shadow-[0_30px_90px_rgba(46,36,112,.14)] sm:aspect-[5/4] lg:aspect-[5/4]">
+            <img
+              src="/CallingAgent%20AI%20Receptionist%20Hero.png?v=photo-crop-20261124"
+              alt="Photorealistic AI receptionist concept: a headset-wearing professional beside call and lead-request interface elements"
+              className="pointer-events-none absolute right-0 top-[-26%] h-auto w-[215%] max-w-none select-none"
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
+            />
+            <span className="absolute bottom-3 right-3 rounded-lg bg-white/90 px-3 py-1.5 text-[10px] font-semibold text-slate-600 shadow-sm">AI Receptionist · visual concept</span>
           </div>
         </div>
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-5 border-t border-slate-100 px-5 py-7 sm:grid-cols-3 sm:px-8">
@@ -246,7 +255,7 @@ function AiLanding(){
         </div>
       </section>
     </main>
-    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-24-B</p></div>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-24-C</p></div>
   </div>;
 }
 
