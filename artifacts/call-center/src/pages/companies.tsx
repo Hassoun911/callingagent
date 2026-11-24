@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useCompanyServiceStatus } from "@/components/dual-service-status";
 import { useLocation, Link } from "wouter";
 import { 
   useListCompanies, 
@@ -40,6 +41,8 @@ async function linkPhoneNumber(phoneNumberId: number, companyId: number) {
 
 export default function Companies() {
   const { data: companies, isLoading } = useListCompanies();
+  const {data:serviceStatus, isError:serviceError}=useCompanyServiceStatus();
+  const statusByCompany=new Map((serviceStatus?.companies??[]).map(x=>[x.companyId,x]));
   const { data: allNumbers } = useListPhoneNumbers();
   const companyLines = (id: number) => (allNumbers ?? []).filter(n => n.companyId === id);
   const industryTone = (industry?: string | null) => {
@@ -275,6 +278,7 @@ export default function Companies() {
               <TableHead>Website</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Line Status</TableHead>
+              <TableHead>Services (read-only)</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -291,7 +295,7 @@ export default function Companies() {
               ))
             ) : filteredCompanies.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                   <div className="flex flex-col items-center justify-center">
                     <Building2 className="h-8 w-8 mb-4 opacity-50" />
                     <p>{search ? `No companies match "${search}"` : "No companies found."}</p>
@@ -346,6 +350,16 @@ export default function Companies() {
                   })()}
                 </TableCell>
                 <TableCell><div className="flex flex-wrap gap-1.5">{companyLines(company.id).length ? companyLines(company.id).map(n => <span key={n.id} className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${n.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}><span className={`h-1.5 w-1.5 rounded-full ${n.isActive ? "bg-emerald-500" : "bg-slate-400"}`}/>{n.isActive ? "Active" : "Inactive"}</span>) : <span className="text-xs text-slate-400">No linked line</span>}</div></TableCell>
+                <TableCell><div className="flex flex-col gap-1.5 text-xs font-semibold">
+                  {statusByCompany.has(company.id)?<>
+                    <span className={statusByCompany.get(company.id)!.businessPhone.paid?"text-emerald-700":"text-blue-700"}>
+                      VoIP: {statusByCompany.get(company.id)!.businessPhone.paid?"Paid":statusByCompany.get(company.id)!.businessPhone.legacyDualService?"Existing VoIP":statusByCompany.get(company.id)!.businessPhone.existingService?"Existing service":"No verified package"}
+                    </span>
+                    <span className="text-violet-700">
+                      AI: {statusByCompany.get(company.id)!.aiReceptionist.legacyDualService?"Existing AI":statusByCompany.get(company.id)!.aiReceptionist.existingConfiguration?"Configured on existing line":"No paid AI plan"}
+                    </span>
+                  </>:<span className="text-amber-600">{serviceError?"Unverified":"Checking…"}</span>}
+                </div></TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
                     <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleOpenDialog(company); }}>

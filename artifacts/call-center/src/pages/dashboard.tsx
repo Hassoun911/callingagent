@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useCompanyServiceStatus } from "@/components/dual-service-status";
 import { useQuery } from "@tanstack/react-query";
 import { useGetDashboardStats, useGetRecentCalls, useListPhoneNumbers, useListCompanies } from "@workspace/api-client-react";
 import { Activity, ArrowDownLeft, ArrowUpRight, Building2, ChevronRight, Clock, CreditCard, MessageSquare, Phone, Plus, Users, Zap } from "lucide-react";
@@ -36,6 +37,7 @@ export default function Dashboard() {
   });
   const { data: numbers = [] } = useListPhoneNumbers();
   const { data: companies = [] } = useListCompanies();
+  const {data:services,isError:serviceError}=useCompanyServiceStatus();
   const companyNames = new Map(companies.map(company => [company.id, company.name]));
   const { data: costs } = useQuery<any>({
     queryKey: ["main-admin-costs"],
@@ -72,6 +74,15 @@ export default function Dashboard() {
         <Link href="/campaigns" className="inline-flex items-center rounded-lg border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground">Campaigns</Link>
       </div>
     </header>
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-bold">Company services · VoIP and AI</h2><p className="mt-1 text-xs text-muted-foreground">Read-only product overview. Existing companies keep their original VoIP and AI service; no plan change or billing is applied.</p></div><Link href="/companies" className="text-xs font-semibold text-primary hover:underline">All company services →</Link></div>
+      {services?<div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4"><p className="text-sm font-semibold">Companies with VoIP service</p><p className="mt-2 text-2xl font-extrabold">{services.companies.filter(c=>c.businessPhone.existingService).length}</p></div>
+        <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4"><p className="text-sm font-semibold">Companies with AI service</p><p className="mt-2 text-2xl font-extrabold">{services.companies.filter(c=>c.aiReceptionist.existingService).length}</p></div>
+        <div className="rounded-xl border border-border bg-muted/20 p-4"><p className="text-sm font-semibold">Legacy dual-service companies</p><p className="mt-2 text-2xl font-extrabold">{services.companies.filter(c=>c.businessPhone.legacyDualService&&c.aiReceptionist.legacyDualService).length}</p></div>
+      </div>:<p className="mt-4 text-sm text-muted-foreground">{serviceError?"Company product status unavailable; existing services remain untouched.":"Checking service records…"}</p>}
+      <p className="mt-3 text-xs text-muted-foreground">Existing AI service is not proof of a new paid AI subscription. Call answer modes are configured per line.</p>
+    </section>
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       {kpis.map(({title,value,sub,Icon,tone,href},idx)=><Link key={title} href={href} className="admin-kpi min-w-0 rounded-2xl border border-border bg-card p-4 sm:p-6 min-h-[160px] sm:min-h-[188px] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
         <div className="flex items-center justify-between gap-2"><span className="text-sm sm:text-base font-semibold text-muted-foreground">{title}</span><span className={`rounded-lg p-2 ${tone}`}><Icon className="h-6 w-6"/></span></div>
