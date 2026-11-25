@@ -228,73 +228,81 @@ function AiLanding(){
         </div>
         <div className="border-t border-[#e2eefb] bg-white/90"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-5 px-5 py-7 sm:grid-cols-4 sm:px-8">{[[Clock3,"Save time","Fewer interruptions"],[Sparkles,"New opportunities","Capture inquiries"],[ShieldCheck,"Professional welcome","Consistent experience"],[PhoneCall,"Business phone","Explore call handling"]].map(([Icon,title,subtitle])=><div key={String(title)} className="flex items-start gap-2.5"><Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#0876ed]"/><div><p className="text-xs font-extrabold text-[#102549] sm:text-sm">{title}</p><p className="mt-1 text-[11px] leading-4 text-slate-500">{subtitle}</p></div></div>)}</div></div>
       </section>
-      <section id="benefits" className="scroll-mt-20 overflow-hidden bg-white py-16 sm:py-24">
+      <section id="benefits" className="scroll-mt-20 overflow-hidden bg-white py-14 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <div data-ca-reveal className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-            <div className="max-w-3xl"><p className="text-xs font-black uppercase tracking-[.2em] text-[#0875eb]">The cost of a missed connection</p>
-              <h2 className="mt-4 text-[clamp(2.25rem,4.5vw,4.7rem)] font-black leading-[1.08] tracking-[-.055em] text-[#0b2147]">When you can't answer, <span className="text-[#0875eb]">your business still can.</span></h2></div>
-            <p className="max-w-md text-base leading-8 text-slate-600">Whether your team is with a customer, on another call, or finished for the day, a missed conversation shouldn't mean missing the details.</p>
+          <div data-ca-reveal className="max-w-3xl">
+            <p className="text-xs font-black uppercase tracking-[.2em] text-blue-600">From missed calls to next steps</p>
+            <h2 className="mt-3 text-[clamp(2.2rem,4.2vw,4.4rem)] font-black leading-[1.09] tracking-[-.05em] text-[#09204a]">Your calls, <span className="text-blue-600">beautifully organized.</span></h2>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">Instead of another voicemail, picture an organized request your team can follow up on.</p>
           </div>
-          <div className="mt-11 grid gap-4 md:grid-cols-2 lg:grid-cols-[1.08fr_.92fr]">
-            <article data-ca-reveal className="relative flex min-h-[355px] flex-col justify-between overflow-hidden rounded-[2rem] bg-[#0a214b] p-7 text-white sm:p-10">
-              <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-80 w-80 rounded-full border-[50px] border-blue-400/20"/>
-              <div className="relative z-10"><span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold text-sky-200"><PhoneCall className="h-4 w-4"/> A better first response</span>
-              <h3 className="mt-7 max-w-md text-3xl font-black leading-tight tracking-[-.04em] sm:text-4xl">Give every caller a warm welcome.</h3>
-              <p className="mt-4 max-w-md text-base leading-7 text-blue-100">Explore AI assistance for routine questions and new requests, even when your team can't get to the phone.</p></div>
-              <div className="relative z-10 mt-9 flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1678ff]"><PhoneCall className="h-6 w-6"/></span><div><p className="text-sm font-bold">Incoming business call</p><p className="mt-1 text-xs text-sky-200">AI receptionist concept</p></div><span className="ml-auto rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-semibold text-emerald-200">Welcome</span>
+          <div data-ca-reveal className="mt-9 overflow-hidden rounded-[2rem] border border-blue-100 bg-[#f5f9ff] shadow-[0_20px_60px_rgba(13,62,130,.08)] lg:grid lg:grid-cols-[.95fr_1.05fr]">
+            <div className="relative min-h-[320px] overflow-hidden bg-[#08224e] p-6 text-white sm:min-h-[450px] sm:p-10">
+              <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full border-[70px] border-blue-500/20"/>
+              <div className="relative flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-bold"><PhoneCall className="h-5 w-5 text-sky-300"/> Incoming call</span><span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-bold text-emerald-200">Illustrative</span></div>
+              <div className="relative mx-auto mt-9 flex h-28 w-28 items-center justify-center rounded-full border border-sky-300/50 bg-[#144c93] shadow-[0_0_90px_rgba(56,189,248,.24)] sm:mt-12 sm:h-36 sm:w-36"><PhoneCall className="h-12 w-12 text-white sm:h-16 sm:w-16"/></div>
+              <div aria-hidden="true" className="relative mx-auto mt-7 flex h-12 justify-center gap-1.5">{Array.from({length:19},(_,i)=><span key={i} className="ca-wave w-1.5 rounded-full bg-cyan-300" style={{height:10+(i*11)%34,animationDelay:(i*59)+"ms"}}/>)}</div>
+              <p className="relative mt-6 text-center text-xl font-bold sm:text-2xl">“Can someone call me back?”</p>
+            </div>
+            <div className="p-5 sm:p-9">
+              <div className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-[0_15px_35px_rgba(9,48,105,.07)]">
+                <div className="flex items-center justify-between border-b border-blue-100 bg-[#f8fbff] px-5 py-4"><span className="flex items-center gap-2 font-extrabold text-[#0e2853]"><span className="rounded-lg bg-blue-600 p-2 text-white"><MessageSquare className="h-4 w-4"/></span> Inquiry inbox</span><span className="text-xs font-bold text-blue-600">CONCEPT PREVIEW</span></div>
+                <div className="p-5 sm:p-7"><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">Callback requested</span><h3 className="mt-5 text-2xl font-black text-[#102549]">New customer inquiry</h3>
+                  <div className="mt-5 grid gap-3">{[["Request","Speak with your team"],["Preferred next step","Return the call"],["Status","Ready for review"]].map(([label,value])=><div key={label} className="flex justify-between gap-4 border-b border-slate-100 pb-3 text-sm"><span className="text-slate-500">{label}</span><span className="text-right font-bold text-[#102549]">{value}</span></div>)}</div>
+                  <div className="mt-6 flex items-center gap-3 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800"><Check className="h-5 w-5 shrink-0"/> Organized for follow-up</div>
+                </div>
+              </div>
+              <p className="mt-4 text-center text-xs text-slate-500">Conceptual interface · Not a screenshot of a live customer account</p>
+            </div>
+          </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <article data-ca-reveal className="overflow-hidden rounded-[1.7rem] border border-blue-100 bg-[#eaf4ff] p-6 sm:p-8">
+              <div className="flex items-center gap-3"><span className="rounded-xl bg-white p-3 text-blue-600"><Clock3 className="h-6 w-6"/></span><div><h3 className="text-xl font-black text-[#102549]">Appointment requests</h3><p className="text-sm text-slate-600">Capture what your caller needs.</p></div></div>
+              <div className="mt-6 rounded-2xl bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between"><span className="text-sm font-extrabold text-[#14284d]">Schedule request</span><span className="rounded-full bg-[#e4f1ff] px-3 py-1 text-xs font-bold text-blue-700">New</span></div>
+                <div className="mt-4 flex gap-2">{["MON","TUE","WED","THU"].map((day,i)=><div key={day} className={"flex-1 rounded-xl py-3 text-center text-xs font-black "+(i===2?"bg-blue-600 text-white":"bg-[#f1f6ff] text-[#3d628d]")}>{day}<span className="mt-1 block text-lg">{17+i}</span></div>)}</div>
+                <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-[#102549]"><Check className="h-4 w-4 text-emerald-600"/> Request ready for scheduling review</p>
               </div>
             </article>
-            <div className="grid gap-4">
-              <article data-ca-reveal className="group relative overflow-hidden rounded-[2rem] border border-[#dceafa] bg-gradient-to-br from-[#e5f3ff] to-[#f4faff] p-7 sm:p-9">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm"><MessageSquare className="h-6 w-6"/></div>
-                <h3 className="mt-6 text-2xl font-black tracking-tight text-[#0b2147]">Capture the details that matter.</h3>
-                <p className="mt-3 max-w-md leading-7 text-slate-600">Caller names, questions, and appointment requests can be organized for your team to review.</p>
-                <div className="mt-6 flex flex-wrap gap-2"><span className="rounded-full bg-white px-4 py-2 text-xs font-bold text-blue-700">New inquiry</span><span className="rounded-full bg-white px-4 py-2 text-xs font-bold text-blue-700">Callback requested</span><span className="rounded-full bg-white px-4 py-2 text-xs font-bold text-blue-700">Appointment interest</span></div>
-              </article>
-              <article data-ca-reveal className="rounded-[2rem] border border-[#e3eaf5] bg-[#f8faff] p-7 sm:p-9">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e3efff] text-blue-600"><Clock3 className="h-6 w-6"/></div>
-                <h3 className="mt-5 text-2xl font-black tracking-tight text-[#0b2147]">More time for the work only you can do.</h3><p className="mt-3 leading-7 text-slate-600">Let your staff focus on customers in front of them, while new callers have a clear way to leave their requests.</p>
-              </article>
-            </div>
+            <article data-ca-reveal className="overflow-hidden rounded-[1.7rem] bg-[#102c5f] p-6 text-white sm:p-8">
+              <div className="flex items-center gap-3"><span className="rounded-xl bg-white/10 p-3 text-cyan-200"><Sparkles className="h-6 w-6"/></span><div><h3 className="text-xl font-black">A calmer workday</h3><p className="text-sm text-blue-200">Spend less time chasing requests.</p></div></div>
+              <div className="mt-6 space-y-2.5">{[["New inquiry","Ready to review"],["Appointment interest","Follow-up needed"],["Callback request","Organized"]].map(([title,status],i)=><div key={title} className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-sm"><span className="flex items-center gap-2 font-bold"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/70"><Check className="h-4 w-4"/></span>{title}</span><span className="text-right text-xs text-sky-200">{status}</span></div>)}</div>
+            </article>
           </div>
         </div>
       </section>
-      <section id="how-ai-works" className="scroll-mt-16 overflow-hidden bg-[#eef6ff] py-16 sm:py-24">
+      <section id="how-ai-works" className="scroll-mt-20 overflow-hidden bg-[#edf5ff] py-14 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <div data-ca-reveal className="max-w-3xl"><p className="text-xs font-black uppercase tracking-[.2em] text-blue-700">See it in action</p><h2 className="mt-4 text-[clamp(2.2rem,4.4vw,4.4rem)] font-black leading-[1.1] tracking-[-.045em] text-[#0b2147]">From an incoming call to a <span className="text-blue-600">clear next step.</span></h2>
-            <p className="mt-5 text-base leading-8 text-slate-600">Choose a scenario to see how CallingAgent's planned workflow could organize a conversation. This is an interactive illustration, not a live call.</p>
-          </div>
-          <div data-ca-reveal className="mt-10 overflow-hidden rounded-[2rem] border border-blue-100 bg-white shadow-[0_30px_70px_rgba(12,65,135,.09)] lg:grid lg:grid-cols-[.8fr_1.2fr]">
-            <div className="p-6 sm:p-9 lg:border-r lg:border-blue-100"><p className="text-xs font-extrabold uppercase tracking-widest text-blue-700">Choose an incoming call</p>
-              <div className="mt-5 flex flex-col gap-3">{[["New customer","Interested in your services"],["After-hours call","Needs a callback"],["Appointment request","Wants to book a time"]].map(([title,detail],i)=><button key={title} type="button" aria-pressed={demoCase===i} onClick={()=>setDemoCase(i)} className={"flex min-h-20 items-center justify-between gap-4 rounded-2xl border p-4 text-left transition "+(demoCase===i?"border-blue-500 bg-[#edf5ff] shadow-[0_6px_22px_rgba(27,96,202,.09)]":"border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50")}><span className="flex items-center gap-3"><span className={"flex h-11 w-11 items-center justify-center rounded-xl "+(demoCase===i?"bg-blue-600 text-white":"bg-blue-50 text-blue-600")}><PhoneCall className="h-5 w-5"/></span><span><span className="block text-sm font-extrabold text-[#112b54]">{title}</span><span className="mt-1 block text-xs text-slate-500">{detail}</span></span></span><ArrowRight className="h-5 w-5 shrink-0 text-blue-600"/></button>)}</div>
-              <p className="mt-6 text-xs leading-6 text-slate-500">Actual capabilities, scheduling integrations, and message delivery will be confirmed before activation.</p>
+          <div data-ca-reveal className="max-w-2xl"><p className="text-xs font-black uppercase tracking-[.2em] text-blue-600">Try the experience</p><h2 className="mt-3 text-[clamp(2.1rem,4vw,4rem)] font-black leading-[1.1] tracking-[-.05em] text-[#09204a]">One call. <span className="text-blue-600">A clear next step.</span></h2><p className="mt-4 text-base text-slate-600">Tap a call type to preview its outcome.</p></div>
+          <div data-ca-reveal className="mt-8 overflow-hidden rounded-[2rem] border border-blue-100 bg-white shadow-[0_20px_50px_rgba(13,62,130,.08)] lg:grid lg:grid-cols-[.72fr_1.28fr]">
+            <div className="p-5 sm:p-8"><p className="mb-4 text-xs font-extrabold uppercase tracking-wider text-blue-600">Choose an example</p>
+              <div className="grid gap-3">{[["New customer","Service inquiry"],["After hours","Callback request"],["Appointment","Scheduling request"]].map(([title,subtitle],i)=><button key={title} type="button" aria-pressed={demoCase===i} onClick={()=>setDemoCase(i)} className={"flex items-center justify-between gap-3 rounded-xl border p-4 text-left transition "+(demoCase===i?"border-blue-500 bg-blue-50 shadow-sm":"border-slate-200 hover:bg-slate-50")}><span className="flex items-center gap-3"><PhoneCall className="h-5 w-5 shrink-0 text-blue-600"/><span><strong className="block text-sm text-[#102549]">{title}</strong><span className="text-xs text-slate-500">{subtitle}</span></span></span><ArrowRight className="h-5 w-5 text-blue-600"/></button>)}</div>
             </div>
-            <div className="bg-[#091e47] p-6 text-white sm:p-9">
-              <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600"><PhoneCall className="h-5 w-5"/></span><span className="text-sm font-extrabold">Call preview</span></div><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-sky-200">Example {demoCase+1}/3</span></div>
-              <div className="mt-7 rounded-2xl border border-white/15 bg-white/10 px-5 py-7"><p className="text-xs font-bold uppercase tracking-widest text-sky-300">Caller says</p><p className="mt-4 min-h-20 text-xl font-semibold leading-8 sm:text-2xl">{["“Hi, I’d like to learn more about your services.”","“I know you're closed, but could someone call me back?”","“Can I arrange a time to talk with someone?”"][demoCase]}</p></div>
-              <div className="my-5 flex justify-center"><span className="flex h-11 w-11 items-center justify-center rounded-full border border-blue-400/30 bg-blue-600"><ArrowRight className="h-5 w-5 rotate-90"/></span></div>
-              <div className="rounded-2xl bg-white p-6 text-[#102549] sm:p-8"><div className="flex items-center justify-between gap-4"><p className="text-xs font-black uppercase tracking-wider text-blue-600">Organized for your team</p><Check className="h-5 w-5 text-emerald-600"/></div><h3 className="mt-3 text-2xl font-black">{["New sales inquiry","Callback request","Appointment inquiry"][demoCase]}</h3><div className="mt-5 space-y-3 text-sm text-slate-600"><p className="flex items-center gap-3"><Check className="h-5 w-5 shrink-0 text-emerald-600"/>{["Service interest recorded","Callback requested after hours","Meeting time requested"][demoCase]}</p><p className="flex items-center gap-3"><Check className="h-5 w-5 shrink-0 text-emerald-600"/>{["Ready for sales follow-up","Ready for next-business-day review","Ready for schedule review"][demoCase]}</p></div></div>
+            <div className="bg-[#081f4a] p-5 text-white sm:p-9"><div className="flex items-center justify-between"><span className="text-sm font-bold text-blue-100">Example call</span><span className="rounded-full bg-white/10 px-3 py-1 text-xs">0{demoCase+1} / 03</span></div>
+              <div className="mt-5 rounded-2xl border border-white/15 bg-white/10 p-5 sm:p-7"><p className="text-xs font-bold uppercase tracking-wider text-sky-300">Caller says</p><p className="mt-3 text-xl font-bold leading-8 sm:text-2xl">{["“Can you tell me about your services?”","“Could someone call me back tomorrow?”","“I'd like to schedule a meeting.”"][demoCase]}</p></div>
+              <div className="my-4 flex justify-center"><ArrowRight className="h-6 w-6 rotate-90 text-sky-300"/></div>
+              <div className="rounded-2xl bg-white p-5 text-[#0d2751] sm:p-7"><div className="flex items-center gap-3"><span className="rounded-xl bg-emerald-50 p-2 text-emerald-600"><Check className="h-5 w-5"/></span><span className="text-sm font-bold text-blue-600">Request organized</span></div><h3 className="mt-3 text-2xl font-black">{["New inquiry","Callback to arrange","Appointment interest"][demoCase]}</h3><p className="mt-2 text-sm text-slate-600">{["Ready for sales follow-up","Ready for callback review","Ready for scheduling review"][demoCase]}</p></div>
             </div>
           </div>
+          <p className="mt-5 text-xs text-slate-500">Illustrative interface only. Live AI capabilities, integrations and usage terms are subject to availability.</p>
         </div>
       </section>
-      <section className="bg-[#09204a] px-5 py-12 text-white sm:py-16">
-        <div data-ca-reveal className="mx-auto flex max-w-7xl flex-col gap-6 sm:px-3 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-extrabold uppercase tracking-[.2em] text-sky-300">Built for real businesses</p><h2 className="mt-3 max-w-2xl text-2xl font-black tracking-tight sm:text-3xl">Your AI receptionist and business phone options, in one place.</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-blue-100">Prefer a traditional VoIP phone system? Explore CallingAgent Business Phone without changing your current services.</p></div><a href="/business-phone" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 self-start rounded-full border border-white/30 bg-white px-6 py-3 font-bold text-blue-800 transition hover:bg-blue-100">Explore Business Phone <ArrowRight className="h-4 w-4"/></a></div>
+      <section className="bg-white py-14 sm:py-20">
+        <div data-ca-reveal className="mx-auto grid max-w-7xl gap-7 px-5 sm:px-8 lg:grid-cols-[1fr_1fr] lg:items-center">
+          <div><p className="text-xs font-black uppercase tracking-[.2em] text-blue-600">One place for business calls</p><h2 className="mt-3 text-3xl font-black tracking-tight text-[#09204a] sm:text-5xl">Need a full <span className="text-blue-600">business phone system?</span></h2><p className="mt-4 max-w-md text-base leading-7 text-slate-600">Explore CallingAgent Business Phone and VoIP options for your team.</p><a href="/business-phone" className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#075ee6] px-6 py-3 font-bold text-white hover:bg-blue-800">Explore Business Phone <ArrowRight className="h-5 w-5"/></a></div>
+          <div className="overflow-hidden rounded-[2rem] bg-[#e9f4ff] p-6 sm:p-9"><div className="mx-auto max-w-md rounded-[1.7rem] bg-[#09224d] p-5 shadow-[0_26px_50px_rgba(9,38,83,.18)] sm:p-8"><div className="mb-5 flex items-center justify-between"><span className="text-sm font-bold text-white">Business Phone</span><span className="rounded-full bg-blue-500/20 px-3 py-1 text-xs text-blue-100">Concept</span></div><div className="flex items-center justify-center py-5"><span className="flex h-24 w-24 items-center justify-center rounded-full bg-blue-600 text-white shadow-[0_0_40px_rgba(59,130,246,.45)]"><PhoneCall className="h-11 w-11"/></span></div><div className="mt-4 grid grid-cols-3 gap-3 text-center">{["Forward","Voicemail","Extensions"].map(x=><span key={x} className="rounded-xl bg-white/10 px-2 py-4 text-xs font-bold text-white">{x}</span>)}</div></div></div>
+        </div>
       </section>
-      <section id="ai-inquiry" className="scroll-mt-20 bg-gradient-to-br from-white via-[#f5faff] to-[#e5f2ff] py-16 sm:py-24">
-        <div className="mx-auto grid max-w-7xl items-start gap-10 px-5 sm:px-8 lg:grid-cols-[.83fr_1.17fr] lg:gap-16">
-          <div data-ca-reveal className="lg:pt-8"><p className="text-xs font-black uppercase tracking-[.2em] text-blue-700">Take the next step</p><h2 className="mt-4 text-[clamp(2.4rem,4.5vw,4.7rem)] font-black leading-[1.08] tracking-[-.055em] text-[#0b2147]">Better calls start with <span className="text-blue-600">better first impressions.</span></h2>
-            <p className="mt-5 max-w-lg text-base leading-8 text-slate-600">Tell us how your business handles incoming calls. We'll reach out when AI availability and setup details are ready.</p>
-            <div className="mt-8 flex items-end gap-2 border-b border-blue-200 pb-5"><span className="text-6xl font-black leading-none text-[#0869ed]">$99</span><div className="pb-1"><p className="font-extrabold text-[#102549]">CAD / month</p><p className="text-xs text-slate-500">Planned starting price</p></div></div>
-            <p className="mt-4 max-w-lg text-sm leading-7 text-slate-600">Usage credits and applicable taxes are separate. Availability, included usage, and final terms will be confirmed before purchase. There's no payment required to request early access.</p>
-            <div className="mt-7 flex items-center gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#e4f1ff] text-blue-600"><ShieldCheck className="h-5 w-5"/></span><p className="text-sm font-bold text-[#102549]">An inquiry only. No checkout or automatic enrollment.</p></div>
+      <section id="ai-inquiry" className="scroll-mt-20 bg-gradient-to-br from-[#e5f2ff] via-white to-[#eff6ff] py-14 sm:py-24">
+        <div className="mx-auto grid max-w-7xl items-start gap-8 px-5 sm:px-8 lg:grid-cols-[.88fr_1.12fr] lg:gap-16">
+          <div data-ca-reveal className="lg:pt-5"><p className="text-xs font-black uppercase tracking-[.2em] text-blue-600">Get early access</p><h2 className="mt-4 text-[clamp(2.2rem,4vw,4.2rem)] font-black leading-[1.1] tracking-[-.05em] text-[#09204a]">Make your next caller <span className="text-blue-600">feel heard.</span></h2><p className="mt-4 text-base leading-7 text-slate-600">Tell us about your business. We'll contact you when setup options are ready.</p>
+            <div className="mt-7 rounded-[1.6rem] border border-blue-100 bg-white p-6 shadow-sm"><div className="flex items-end gap-2"><span className="text-6xl font-black leading-none text-blue-600">$99</span><span className="pb-1 font-bold text-[#0c2752]">CAD / month</span></div><p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-500">Planned starting price · Not yet available to purchase</p><div className="mt-5 grid gap-3 border-t border-blue-100 pt-5 text-sm font-semibold text-[#102549]">{["No payment today","Early access inquiry only","Terms and usage confirmed before purchase"].map(x=><p key={x} className="flex items-center gap-3"><Check className="h-5 w-5 shrink-0 text-emerald-600"/>{x}</p>)}</div></div>
+            <p className="mt-4 text-xs leading-6 text-slate-500">Taxes and usage credits are separate. Features and paid activation are subject to availability.</p>
           </div>
-          <div data-ca-reveal><AiSalesInquiry /></div>
+          <div data-ca-reveal><AiSalesInquiry/></div>
         </div>
       </section>
     </main>
-    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-M</p></div>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-N</p></div>
   </div>;
 }
 
