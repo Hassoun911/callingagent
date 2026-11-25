@@ -1,2 +1,9 @@
 User-agent: *
 Allow: /
+Disallow: /login
+Disallow: /portal
+Disallow: /billing
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /companies
+Sitemap: https://callingagent.ca/sitemap.xml
