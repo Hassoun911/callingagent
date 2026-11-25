@@ -207,20 +207,22 @@ function AiLanding(){
           </nav>}
         </header>
 
-        <div className="relative mx-auto grid max-w-7xl items-center gap-4 px-5 pb-9 pt-32 sm:px-8 sm:pt-36 lg:min-h-[720px] lg:grid-cols-[.96fr_1.04fr] lg:gap-8 lg:pb-16 lg:pt-36">
-          <div className="ca-entrance relative z-10">
-            <span className="inline-flex items-center gap-2 rounded-full bg-[#e7f1ff] px-4 py-2 text-[11px] font-extrabold uppercase tracking-[.12em] text-[#1253a9]"><span className="h-2 w-2 rounded-full bg-blue-500"/> AI phone answering for businesses</span>
-            <h1 className="mt-5 max-w-2xl text-[clamp(2.45rem,5.2vw,5.7rem)] font-black leading-[1.06] tracking-[-.055em] text-[#091d43]">Your AI receptionist that never misses <span className="text-[#0876ed]">a call.</span></h1>
-            <p className="mt-5 max-w-xl text-base leading-8 text-slate-600 sm:text-lg">Designed to help answer customers, collect inquiries and appointment requests, and give your team more time to focus on business.</p>
+        {/* Unified hero: responsive artwork is a background, not a second photo card. */}
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+          <img src="/callingagent-clean-hero.webp" alt="" className="absolute inset-0 h-full w-full object-cover object-[72%_center] md:object-[78%_center]" loading="eager" fetchPriority="high" decoding="async"/>
+          <div className="absolute inset-0 bg-gradient-to-b from-white via-white/95 via-[53%] to-white/0 md:bg-gradient-to-r md:from-white md:via-white/95 md:via-[40%] md:to-white/0"/>
+        </div>
+        <div className="relative z-10 mx-auto flex min-h-[930px] max-w-7xl flex-col px-5 pb-10 pt-28 sm:px-8 sm:min-h-[960px] sm:pt-32 md:min-h-[670px] md:justify-center md:pb-24 md:pt-32 lg:min-h-[735px]">
+          <div className="ca-entrance max-w-xl lg:max-w-[53%]">
+            <span className="inline-flex items-center gap-2 rounded-full bg-[#e7f1ff]/95 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[.12em] text-[#1253a9]"><span className="h-2 w-2 rounded-full bg-blue-500"/> AI phone answering for businesses</span>
+            <h1 className="mt-5 text-[clamp(2.45rem,5.2vw,5.7rem)] font-black leading-[1.06] tracking-[-.055em] text-[#091d43]">Your AI receptionist that never misses <span className="text-[#0876ed]">a call.</span></h1>
+            <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">Designed to help answer customers, collect inquiries and appointment requests, and give your team more time to focus on business.</p>
             <div className="mt-6 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#0a9efe] to-[#0757e5] px-6 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(22,104,226,.18)] hover:brightness-110">Request early access <ArrowRight className="h-5 w-5"/></a><a href="#how-ai-works" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#aac0df] bg-white px-5 py-3.5 text-sm font-bold text-[#102549] hover:bg-blue-50">See how it works</a></div>
-            <div className="mt-6 grid max-w-xl grid-cols-3 gap-3 border-t border-blue-100 pt-4">{[[PhoneCall,"Answer calls"],[Clock3,"Appointments"],[Sparkles,"Capture leads"]].map(([Icon,title])=><div key={String(title)} className="flex flex-col gap-2 text-blue-600"><Icon className="h-6 w-6"/><span className="text-[11px] font-bold leading-4 text-[#14284d]">{title}</span></div>)}</div>
+            <div className="mt-6 grid max-w-lg grid-cols-3 gap-3 border-t border-blue-100 pt-4">{[[PhoneCall,"Answer calls"],[Clock3,"Appointments"],[Sparkles,"Capture leads"]].map(([Icon,title])=><div key={String(title)} className="flex flex-col gap-2 text-blue-600"><Icon className="h-6 w-6"/><span className="text-[11px] font-bold leading-4 text-[#14284d]">{title}</span></div>)}</div>
             <p className="mt-4 max-w-lg text-xs leading-5 text-slate-500">Early-access inquiries only. Standalone AI planned from $99 CAD/month, plus taxes and usage credits. No payment is taken yet.</p>
           </div>
-          <div className="relative min-w-0 pt-3 lg:pt-0">
-            <div className="relative aspect-[1.5/1] overflow-hidden rounded-[1.4rem] bg-[#e6f3ff] shadow-[0_16px_48px_rgba(10,83,173,.15)] sm:aspect-[1.6/1] lg:aspect-[1.05/1] lg:rounded-[2.6rem]">
-              <img src="/callingagent-clean-hero.webp" alt="Smiling headset-wearing professional at a laptop, illustrating CallingAgent's AI receptionist" className="absolute inset-0 h-full w-full object-cover object-[77%_center] sm:object-[80%_center] lg:object-[78%_center]" loading="eager" fetchPriority="high" decoding="async"/>
-            </div>
-            <div className="absolute -bottom-3 right-3 flex max-w-[220px] items-center gap-2.5 rounded-2xl border border-blue-100 bg-white/95 px-3 py-2.5 shadow-lg shadow-blue-900/10 sm:bottom-5 sm:right-[-1%] sm:max-w-none sm:px-4 sm:py-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e9f3ff] text-blue-600"><Check className="h-5 w-5"/></span><div><p className="text-xs font-extrabold text-[#102549] sm:text-sm">Request organized</p><p className="text-[10px] text-slate-500 sm:text-xs">Illustrative AI workflow</p></div></div>
+          <div className="mt-auto flex justify-end pb-1 md:absolute md:bottom-14 md:right-9">
+            <div className="flex max-w-[210px] items-center gap-2.5 rounded-2xl border border-blue-100 bg-white/90 px-3 py-2.5 shadow-lg shadow-blue-900/10 backdrop-blur-md"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e9f3ff] text-blue-600"><Check className="h-5 w-5"/></span><div><p className="text-xs font-extrabold text-[#102549]">Request organized</p><p className="text-[10px] text-slate-500">Illustrative AI workflow</p></div></div>
           </div>
         </div>
         <div className="border-t border-[#e2eefb] bg-white/90"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-5 px-5 py-7 sm:grid-cols-4 sm:px-8">{[[Clock3,"Save time","Fewer interruptions"],[Sparkles,"New opportunities","Capture inquiries"],[ShieldCheck,"Professional welcome","Consistent experience"],[PhoneCall,"Business phone","Explore call handling"]].map(([Icon,title,subtitle])=><div key={String(title)} className="flex items-start gap-2.5"><Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#0876ed]"/><div><p className="text-xs font-extrabold text-[#102549] sm:text-sm">{title}</p><p className="mt-1 text-[11px] leading-4 text-slate-500">{subtitle}</p></div></div>)}</div></div>
@@ -252,7 +254,7 @@ function AiLanding(){
         </div>
       </section>
     </main>
-    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-K</p></div>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-L</p></div>
   </div>;
 }
 
