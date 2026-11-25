@@ -44,18 +44,18 @@ function AiSalesInquiry() {
     }catch(e:any){setError(e?.message||"Please try again later.");}
     finally{setBusy(false);}
   }
-  return <div id="ai-inquiry" className="mt-6 rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm">
-    <h3 className="text-lg font-bold text-indigo-950">Request AI Receptionist early access</h3>
-    <p className="mt-2 text-sm text-slate-600">Planned from $99 CAD/month. Share your details and we can contact you when your setup and usage options are ready. This is an inquiry, not an order or payment.</p>
+  return <div className="relative rounded-[2rem] border border-[#e0ecfc] bg-white p-6 shadow-[0_28px_70px_rgba(4,42,111,.12)] sm:p-9">
+    <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-extrabold uppercase tracking-wider text-blue-700"><span className="h-2 w-2 rounded-full bg-blue-500"/> Early access inquiry</div><h3 className="text-2xl font-black leading-tight tracking-tight text-[#0c2147] sm:text-3xl">Ready to make a better first impression?</h3>
+    <p className="mt-3 text-sm leading-7 text-slate-600">Tell us about your business and we’ll contact you when AI setup and usage options are available. No commitment and no payment today.</p>
     {done?<p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">Your request has been recorded. No payment was taken.</p>:
     <form onSubmit={submit} className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <label className="text-xs font-semibold text-slate-700">Your name <input required minLength={2} maxLength={100} autoComplete="name" value={name} onChange={e=>setName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"/></label>
-      <label className="text-xs font-semibold text-slate-700">Email <input required type="email" maxLength={254} autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"/></label>
-      <label className="text-xs font-semibold text-slate-700">Business name (optional) <input maxLength={120} autoComplete="organization" value={company} onChange={e=>setCompany(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"/></label>
-      <label className="text-xs font-semibold text-slate-700">Phone (optional) <input type="tel" maxLength={40} autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"/></label>
+      <label className="text-xs font-semibold text-slate-700">Your name <input required minLength={2} maxLength={100} autoComplete="name" value={name} onChange={e=>setName(e.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-slate-200 bg-[#f8fbff] px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"/></label>
+      <label className="text-xs font-semibold text-slate-700">Email <input required type="email" maxLength={254} autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-slate-200 bg-[#f8fbff] px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"/></label>
+      <label className="text-xs font-semibold text-slate-700">Business name (optional) <input maxLength={120} autoComplete="organization" value={company} onChange={e=>setCompany(e.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-slate-200 bg-[#f8fbff] px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"/></label>
+      <label className="text-xs font-semibold text-slate-700">Phone (optional) <input type="tel" maxLength={40} autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-slate-200 bg-[#f8fbff] px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"/></label>
       <label className="hidden" aria-hidden="true">Website <input tabIndex={-1} autoComplete="off" value={website} onChange={e=>setWebsite(e.target.value)}/></label>
       {error&&<p role="alert" className="text-sm text-red-700 lg:col-span-2">{error}</p>}
-      <button type="submit" disabled={busy} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50 lg:col-span-2">{busy?"Sending…":"Request AI early access — no payment"}</button>
+      <button type="submit" disabled={busy} className="inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-gradient-to-r from-[#088fff] to-[#0752db] px-6 py-4 text-base font-extrabold text-white shadow-[0_12px_26px_rgba(13,93,215,.2)] transition hover:brightness-110 disabled:opacity-50 lg:col-span-2">{busy?"Sending…":"Request early access — no payment"}</button>
       <p className="text-xs text-slate-500 lg:col-span-2">By sending this request, you agree to be contacted about your CallingAgent inquiry. AI usage costs, included credits and availability will be confirmed before purchase.</p>
     </form>}
   </div>;
@@ -146,6 +146,7 @@ function HeroProductIllustration(){
  */
 function AiLanding(){
   const [menuOpen,setMenuOpen]=useState(false);
+  const [demoCase,setDemoCase]=useState(0);
   useEffect(()=>{
     const root=document.querySelector("[data-ca-landing]");
     if(!root || !("IntersectionObserver" in window))return;
@@ -227,34 +228,73 @@ function AiLanding(){
         </div>
         <div className="border-t border-[#e2eefb] bg-white/90"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-5 px-5 py-7 sm:grid-cols-4 sm:px-8">{[[Clock3,"Save time","Fewer interruptions"],[Sparkles,"New opportunities","Capture inquiries"],[ShieldCheck,"Professional welcome","Consistent experience"],[PhoneCall,"Business phone","Explore call handling"]].map(([Icon,title,subtitle])=><div key={String(title)} className="flex items-start gap-2.5"><Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#0876ed]"/><div><p className="text-xs font-extrabold text-[#102549] sm:text-sm">{title}</p><p className="mt-1 text-[11px] leading-4 text-slate-500">{subtitle}</p></div></div>)}</div></div>
       </section>
-      <section id="benefits" className="scroll-mt-24 bg-white py-16 lg:py-24">
+      <section id="benefits" className="scroll-mt-20 overflow-hidden bg-white py-16 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <div data-ca-reveal className="max-w-3xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-[#0875eb]">More than answering calls</p><h2 className="mt-4 text-4xl font-black leading-[1.12] tracking-tight text-[#102549] sm:text-5xl">Make every conversation <span className="text-[#0875eb]">count.</span></h2><p className="mt-5 max-w-2xl text-base leading-8 text-slate-600">Give customers a thoughtful first response, even when your team is occupied.</p></div>
-          <div className="mt-9 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {benefits.map((b,i)=><article data-ca-reveal key={b.number} className={"ca-motion-card relative overflow-hidden rounded-[1.7rem] p-6 shadow-[0_12px_36px_rgba(17,52,100,.07)] sm:p-8 "+(i===0?"bg-[#eaf4ff]":i===1?"bg-[#112955] text-white":"bg-[#f4f7fc]")}>
-              <div className="flex items-center justify-between gap-3"><span className={"flex h-12 w-12 items-center justify-center rounded-2xl "+(i===1?"bg-white/15 text-white":"bg-white text-blue-600")}>{i===0?<PhoneCall className="h-6 w-6"/>:i===1?<Sparkles className="h-6 w-6"/>:<Check className="h-6 w-6"/>}</span><span className={"text-xs font-bold tracking-widest "+(i===1?"text-sky-200":"text-blue-600")}>{b.number} / 03</span></div>
-              <h3 className="mt-6 text-xl font-extrabold leading-snug sm:text-2xl">{b.title}</h3>
-              <p className={"mt-3 text-sm leading-7 "+(i===1?"text-blue-100":"text-slate-600")}>{b.description}</p>
-            </article>)}
+          <div data-ca-reveal className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+            <div className="max-w-3xl"><p className="text-xs font-black uppercase tracking-[.2em] text-[#0875eb]">The cost of a missed connection</p>
+              <h2 className="mt-4 text-[clamp(2.25rem,4.5vw,4.7rem)] font-black leading-[1.08] tracking-[-.055em] text-[#0b2147]">When you can't answer, <span className="text-[#0875eb]">your business still can.</span></h2></div>
+            <p className="max-w-md text-base leading-8 text-slate-600">Whether your team is with a customer, on another call, or finished for the day, a missed conversation shouldn't mean missing the details.</p>
+          </div>
+          <div className="mt-11 grid gap-4 md:grid-cols-2 lg:grid-cols-[1.08fr_.92fr]">
+            <article data-ca-reveal className="relative flex min-h-[355px] flex-col justify-between overflow-hidden rounded-[2rem] bg-[#0a214b] p-7 text-white sm:p-10">
+              <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-80 w-80 rounded-full border-[50px] border-blue-400/20"/>
+              <div className="relative z-10"><span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs font-bold text-sky-200"><PhoneCall className="h-4 w-4"/> A better first response</span>
+              <h3 className="mt-7 max-w-md text-3xl font-black leading-tight tracking-[-.04em] sm:text-4xl">Give every caller a warm welcome.</h3>
+              <p className="mt-4 max-w-md text-base leading-7 text-blue-100">Explore AI assistance for routine questions and new requests, even when your team can't get to the phone.</p></div>
+              <div className="relative z-10 mt-9 flex items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1678ff]"><PhoneCall className="h-6 w-6"/></span><div><p className="text-sm font-bold">Incoming business call</p><p className="mt-1 text-xs text-sky-200">AI receptionist concept</p></div><span className="ml-auto rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-semibold text-emerald-200">Welcome</span>
+              </div>
+            </article>
+            <div className="grid gap-4">
+              <article data-ca-reveal className="group relative overflow-hidden rounded-[2rem] border border-[#dceafa] bg-gradient-to-br from-[#e5f3ff] to-[#f4faff] p-7 sm:p-9">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-sm"><MessageSquare className="h-6 w-6"/></div>
+                <h3 className="mt-6 text-2xl font-black tracking-tight text-[#0b2147]">Capture the details that matter.</h3>
+                <p className="mt-3 max-w-md leading-7 text-slate-600">Caller names, questions, and appointment requests can be organized for your team to review.</p>
+                <div className="mt-6 flex flex-wrap gap-2"><span className="rounded-full bg-white px-4 py-2 text-xs font-bold text-blue-700">New inquiry</span><span className="rounded-full bg-white px-4 py-2 text-xs font-bold text-blue-700">Callback requested</span><span className="rounded-full bg-white px-4 py-2 text-xs font-bold text-blue-700">Appointment interest</span></div>
+              </article>
+              <article data-ca-reveal className="rounded-[2rem] border border-[#e3eaf5] bg-[#f8faff] p-7 sm:p-9">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#e3efff] text-blue-600"><Clock3 className="h-6 w-6"/></div>
+                <h3 className="mt-5 text-2xl font-black tracking-tight text-[#0b2147]">More time for the work only you can do.</h3><p className="mt-3 leading-7 text-slate-600">Let your staff focus on customers in front of them, while new callers have a clear way to leave their requests.</p>
+              </article>
+            </div>
           </div>
         </div>
       </section>
-      <section id="how-ai-works" className="scroll-mt-24 bg-[#edf5ff] py-16 lg:py-24">
+      <section id="how-ai-works" className="scroll-mt-16 overflow-hidden bg-[#eef6ff] py-16 sm:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <div data-ca-reveal className="max-w-3xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-blue-700">How it works</p><h2 className="mt-4 text-4xl font-black tracking-tight text-[#102549] sm:text-5xl">From first hello to <span className="text-blue-600">next step.</span></h2><p className="mt-5 text-base leading-8 text-slate-600">The proposed experience keeps a caller's needs organized for your team.</p></div>
-          <div className="mt-10 grid grid-cols-1 gap-4 lg:grid-cols-3">{[["01","Welcome","A friendly first response, including when your staff is busy."],["02","Understand","Gather caller details, questions and appointment requests."],["03","Follow up","Organize inquiries so your team can decide what happens next."]].map(([n,title,desc])=><article data-ca-reveal key={n} className="rounded-3xl border border-blue-100 bg-white p-6 sm:p-8"><p className="text-4xl font-black text-blue-600">{n}</p><div className="mt-7 h-[2px] bg-blue-100"/><h3 className="mt-6 text-2xl font-black text-[#102549]">{title}</h3><p className="mt-3 text-sm leading-7 text-slate-600">{desc}</p></article>)}</div>
-          <p className="mt-7 text-xs text-slate-500">Illustrative workflow. AI availability, configuration and usage rates will be confirmed before activation.</p>
+          <div data-ca-reveal className="max-w-3xl"><p className="text-xs font-black uppercase tracking-[.2em] text-blue-700">See it in action</p><h2 className="mt-4 text-[clamp(2.2rem,4.4vw,4.4rem)] font-black leading-[1.1] tracking-[-.045em] text-[#0b2147]">From an incoming call to a <span className="text-blue-600">clear next step.</span></h2>
+            <p className="mt-5 text-base leading-8 text-slate-600">Choose a scenario to see how CallingAgent's planned workflow could organize a conversation. This is an interactive illustration, not a live call.</p>
+          </div>
+          <div data-ca-reveal className="mt-10 overflow-hidden rounded-[2rem] border border-blue-100 bg-white shadow-[0_30px_70px_rgba(12,65,135,.09)] lg:grid lg:grid-cols-[.8fr_1.2fr]">
+            <div className="p-6 sm:p-9 lg:border-r lg:border-blue-100"><p className="text-xs font-extrabold uppercase tracking-widest text-blue-700">Choose an incoming call</p>
+              <div className="mt-5 flex flex-col gap-3">{[["New customer","Interested in your services"],["After-hours call","Needs a callback"],["Appointment request","Wants to book a time"]].map(([title,detail],i)=><button key={title} type="button" aria-pressed={demoCase===i} onClick={()=>setDemoCase(i)} className={"flex min-h-20 items-center justify-between gap-4 rounded-2xl border p-4 text-left transition "+(demoCase===i?"border-blue-500 bg-[#edf5ff] shadow-[0_6px_22px_rgba(27,96,202,.09)]":"border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50")}><span className="flex items-center gap-3"><span className={"flex h-11 w-11 items-center justify-center rounded-xl "+(demoCase===i?"bg-blue-600 text-white":"bg-blue-50 text-blue-600")}><PhoneCall className="h-5 w-5"/></span><span><span className="block text-sm font-extrabold text-[#112b54]">{title}</span><span className="mt-1 block text-xs text-slate-500">{detail}</span></span></span><ArrowRight className="h-5 w-5 shrink-0 text-blue-600"/></button>)}</div>
+              <p className="mt-6 text-xs leading-6 text-slate-500">Actual capabilities, scheduling integrations, and message delivery will be confirmed before activation.</p>
+            </div>
+            <div className="bg-[#091e47] p-6 text-white sm:p-9">
+              <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600"><PhoneCall className="h-5 w-5"/></span><span className="text-sm font-extrabold">Call preview</span></div><span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-sky-200">Example {demoCase+1}/3</span></div>
+              <div className="mt-7 rounded-2xl border border-white/15 bg-white/10 px-5 py-7"><p className="text-xs font-bold uppercase tracking-widest text-sky-300">Caller says</p><p className="mt-4 min-h-20 text-xl font-semibold leading-8 sm:text-2xl">{["“Hi, I’d like to learn more about your services.”","“I know you're closed, but could someone call me back?”","“Can I arrange a time to talk with someone?”"][demoCase]}</p></div>
+              <div className="my-5 flex justify-center"><span className="flex h-11 w-11 items-center justify-center rounded-full border border-blue-400/30 bg-blue-600"><ArrowRight className="h-5 w-5 rotate-90"/></span></div>
+              <div className="rounded-2xl bg-white p-6 text-[#102549] sm:p-8"><div className="flex items-center justify-between gap-4"><p className="text-xs font-black uppercase tracking-wider text-blue-600">Organized for your team</p><Check className="h-5 w-5 text-emerald-600"/></div><h3 className="mt-3 text-2xl font-black">{["New sales inquiry","Callback request","Appointment inquiry"][demoCase]}</h3><div className="mt-5 space-y-3 text-sm text-slate-600"><p className="flex items-center gap-3"><Check className="h-5 w-5 shrink-0 text-emerald-600"/>{["Service interest recorded","Callback requested after hours","Meeting time requested"][demoCase]}</p><p className="flex items-center gap-3"><Check className="h-5 w-5 shrink-0 text-emerald-600"/>{["Ready for sales follow-up","Ready for next-business-day review","Ready for schedule review"][demoCase]}</p></div></div>
+            </div>
+          </div>
         </div>
       </section>
-      <div className="bg-white px-5 py-8 text-center sm:px-8"><p className="text-sm text-slate-600">Need a traditional phone system instead? <a href="/business-phone" className="font-bold text-blue-700 underline underline-offset-4">Explore CallingAgent Business Phone</a></p></div>
-      <section className="scroll-mt-24 bg-gradient-to-br from-[#edf5ff] via-white to-blue-50 py-12 lg:py-20" id="ai-inquiry">
-        <div className="mx-auto grid max-w-7xl gap-10 px-5 sm:px-8 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
-          <div data-ca-reveal><p className="text-xs font-bold uppercase tracking-[.2em] text-sky-700">Join the early-access list</p><h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">See how AI could fit your business.</h2><p className="mt-5 text-base leading-8 text-slate-600">Tell us what type of calls your business handles. We can follow up when AI setup and pricing details are ready.</p><div className="mt-8 rounded-2xl border border-blue-200 bg-white p-6 shadow-lg shadow-blue-100"><p className="text-4xl font-black text-blue-600">$99 <span className="text-sm font-semibold text-slate-600">CAD / month</span></p><p className="mt-2 text-sm text-slate-600">Planned starting price. Usage credits and taxes separate. No payment required for early access.</p></div></div>
-          <div><AiSalesInquiry /></div>
+      <section className="bg-[#09204a] px-5 py-12 text-white sm:py-16">
+        <div data-ca-reveal className="mx-auto flex max-w-7xl flex-col gap-6 sm:px-3 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-xs font-extrabold uppercase tracking-[.2em] text-sky-300">Built for real businesses</p><h2 className="mt-3 max-w-2xl text-2xl font-black tracking-tight sm:text-3xl">Your AI receptionist and business phone options, in one place.</h2><p className="mt-3 max-w-2xl text-sm leading-7 text-blue-100">Prefer a traditional VoIP phone system? Explore CallingAgent Business Phone without changing your current services.</p></div><a href="/business-phone" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 self-start rounded-full border border-white/30 bg-white px-6 py-3 font-bold text-blue-800 transition hover:bg-blue-100">Explore Business Phone <ArrowRight className="h-4 w-4"/></a></div>
+      </section>
+      <section id="ai-inquiry" className="scroll-mt-20 bg-gradient-to-br from-white via-[#f5faff] to-[#e5f2ff] py-16 sm:py-24">
+        <div className="mx-auto grid max-w-7xl items-start gap-10 px-5 sm:px-8 lg:grid-cols-[.83fr_1.17fr] lg:gap-16">
+          <div data-ca-reveal className="lg:pt-8"><p className="text-xs font-black uppercase tracking-[.2em] text-blue-700">Take the next step</p><h2 className="mt-4 text-[clamp(2.4rem,4.5vw,4.7rem)] font-black leading-[1.08] tracking-[-.055em] text-[#0b2147]">Better calls start with <span className="text-blue-600">better first impressions.</span></h2>
+            <p className="mt-5 max-w-lg text-base leading-8 text-slate-600">Tell us how your business handles incoming calls. We'll reach out when AI availability and setup details are ready.</p>
+            <div className="mt-8 flex items-end gap-2 border-b border-blue-200 pb-5"><span className="text-6xl font-black leading-none text-[#0869ed]">$99</span><div className="pb-1"><p className="font-extrabold text-[#102549]">CAD / month</p><p className="text-xs text-slate-500">Planned starting price</p></div></div>
+            <p className="mt-4 max-w-lg text-sm leading-7 text-slate-600">Usage credits and applicable taxes are separate. Availability, included usage, and final terms will be confirmed before purchase. There's no payment required to request early access.</p>
+            <div className="mt-7 flex items-center gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#e4f1ff] text-blue-600"><ShieldCheck className="h-5 w-5"/></span><p className="text-sm font-bold text-[#102549]">An inquiry only. No checkout or automatic enrollment.</p></div>
+          </div>
+          <div data-ca-reveal><AiSalesInquiry /></div>
         </div>
       </section>
     </main>
-    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-L</p></div>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-M</p></div>
   </div>;
 }
 
