@@ -193,7 +193,7 @@ function AiLanding(){
     `}</style>
     <header className="sticky top-0 z-40 border-b border-[#e7eef8] bg-white/95 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-3 sm:px-8">
-        <a href="/website" aria-label="CallingAgent home" className="block w-[188px] shrink-0 rounded-md bg-black p-1.5 sm:w-[226px]"><img src="/callingagent-logo-tight.webp" alt="CallingAgent" className="block h-auto w-full" loading="eager"/></a>
+        <a href="/website" aria-label="CallingAgent home" className="block w-[196px] shrink-0 rounded-md bg-black px-2 py-1.5 sm:w-[226px]"><img src="/callingagent-logo-tight.webp" alt="CallingAgent" className="block h-auto w-full" loading="eager"/></a>
         <nav aria-label="Main website" className="hidden items-center gap-8 text-sm font-semibold text-[#12284b] lg:flex"><a href="#benefits" className="hover:text-blue-600">Features</a><a href="#how-ai-works" className="hover:text-blue-600">How it works</a><a href="/business-phone" className="hover:text-blue-600">Business Phone</a><a href="#ai-inquiry" className="hover:text-blue-600">Pricing</a></nav>
         <div className="hidden items-center gap-3 lg:flex"><a href="/login" className="rounded-full border border-[#cbd8eb] px-5 py-2.5 text-sm font-bold text-[#12284b]">Sign in</a><a href="#ai-inquiry" className="inline-flex items-center gap-2 rounded-full bg-[#0869ed] px-5 py-3 text-sm font-bold text-white hover:bg-blue-800">Request early access <ArrowRight className="h-4 w-4"/></a></div>
         <button type="button" aria-label={menuOpen?"Close navigation":"Open navigation"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(v=>!v)} className="rounded-xl border border-slate-200 p-2 lg:hidden">{menuOpen?<X className="h-6 w-6"/>:<Menu className="h-6 w-6"/>}</button>
@@ -202,20 +202,20 @@ function AiLanding(){
     </header>
     <main>
       <section className="relative isolate overflow-hidden bg-gradient-to-br from-white via-[#fafdff] to-[#eaf5ff]">
-        <div className="relative mx-auto grid max-w-7xl items-center gap-6 px-5 pb-12 pt-9 sm:px-8 lg:min-h-[640px] lg:grid-cols-[.96fr_1.04fr] lg:gap-8 lg:pb-16 lg:pt-16">
+        <div className="relative mx-auto grid max-w-7xl items-center gap-4 px-5 pb-9 pt-10 sm:px-8 lg:min-h-[640px] lg:grid-cols-[.96fr_1.04fr] lg:gap-8 lg:pb-16 lg:pt-16">
           <div className="ca-entrance relative z-10">
             <span className="inline-flex items-center gap-2 rounded-full bg-[#e7f1ff] px-4 py-2 text-[11px] font-extrabold uppercase tracking-[.12em] text-[#1253a9]"><span className="h-2 w-2 rounded-full bg-blue-500"/> AI phone answering for businesses</span>
-            <h1 className="mt-6 max-w-2xl text-[clamp(2.5rem,5.2vw,5.7rem)] font-black leading-[1.06] tracking-[-.055em] text-[#091d43]">Your AI receptionist that never misses <span className="text-[#0876ed]">a call.</span></h1>
+            <h1 className="mt-5 max-w-2xl text-[clamp(2.45rem,5.2vw,5.7rem)] font-black leading-[1.06] tracking-[-.055em] text-[#091d43]">Your AI receptionist that never misses <span className="text-[#0876ed]">a call.</span></h1>
             <p className="mt-5 max-w-xl text-base leading-8 text-slate-600 sm:text-lg">Designed to help answer customers, collect inquiries and appointment requests, and give your team more time to focus on business.</p>
-            <div className="mt-8 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#0a9efe] to-[#0757e5] px-6 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(22,104,226,.18)] hover:brightness-110">Request early access <ArrowRight className="h-5 w-5"/></a><a href="#how-ai-works" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#aac0df] bg-white px-5 py-3.5 text-sm font-bold text-[#102549] hover:bg-blue-50">See how it works</a></div>
-            <div className="mt-8 grid max-w-xl grid-cols-3 gap-3 border-t border-blue-100 pt-5">{[[PhoneCall,"Answer calls"],[Clock3,"Appointments"],[Sparkles,"Capture leads"]].map(([Icon,title])=><div key={String(title)} className="flex flex-col gap-2 text-blue-600"><Icon className="h-6 w-6"/><span className="text-[11px] font-bold leading-4 text-[#14284d]">{title}</span></div>)}</div>
-            <p className="mt-5 max-w-lg text-xs leading-5 text-slate-500">Early-access inquiries only. Standalone AI planned from $99 CAD/month, plus taxes and usage credits. No payment is taken yet.</p>
+            <div className="mt-6 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#0a9efe] to-[#0757e5] px-6 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(22,104,226,.18)] hover:brightness-110">Request early access <ArrowRight className="h-5 w-5"/></a><a href="#how-ai-works" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#aac0df] bg-white px-5 py-3.5 text-sm font-bold text-[#102549] hover:bg-blue-50">See how it works</a></div>
+            <div className="mt-6 grid max-w-xl grid-cols-3 gap-3 border-t border-blue-100 pt-4">{[[PhoneCall,"Answer calls"],[Clock3,"Appointments"],[Sparkles,"Capture leads"]].map(([Icon,title])=><div key={String(title)} className="flex flex-col gap-2 text-blue-600"><Icon className="h-6 w-6"/><span className="text-[11px] font-bold leading-4 text-[#14284d]">{title}</span></div>)}</div>
+            <p className="mt-4 max-w-lg text-xs leading-5 text-slate-500">Early-access inquiries only. Standalone AI planned from $99 CAD/month, plus taxes and usage credits. No payment is taken yet.</p>
           </div>
-          <div className="relative min-w-0">
-            <div className="relative aspect-[1.4/1] overflow-hidden rounded-[1.7rem] bg-[#e6f3ff] shadow-[0_24px_60px_rgba(10,83,173,.12)] sm:aspect-[1.6/1] lg:aspect-[1.05/1] lg:rounded-[2.6rem]">
-              <img src="/callingagent-clean-hero.webp" alt="Smiling headset-wearing professional at a laptop, illustrated receptionist concept" className="absolute inset-0 h-full w-full object-cover object-[84%_center] lg:object-[78%_center]" loading="eager" fetchPriority="high" decoding="async"/>
+          <div className="relative min-w-0 pt-3 lg:pt-0">
+            <div className="relative aspect-[1.5/1] overflow-hidden rounded-[1.4rem] bg-[#e6f3ff] shadow-[0_16px_48px_rgba(10,83,173,.15)] sm:aspect-[1.6/1] lg:aspect-[1.05/1] lg:rounded-[2.6rem]">
+              <img src="/callingagent-clean-hero.webp" alt="Smiling headset-wearing professional at a laptop, illustrating CallingAgent's AI receptionist" className="absolute inset-0 h-full w-full object-cover object-[77%_center] sm:object-[80%_center] lg:object-[78%_center]" loading="eager" fetchPriority="high" decoding="async"/>
             </div>
-            <div className="absolute -bottom-4 left-3 right-3 flex items-center gap-3 rounded-2xl border border-blue-100 bg-white/95 px-4 py-3 shadow-xl shadow-blue-900/10 sm:left-auto sm:right-[-1%] sm:w-[235px]"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e9f3ff] text-blue-600"><Check className="h-5 w-5"/></span><div><p className="text-sm font-extrabold text-[#102549]">Caller request organized</p><p className="text-xs text-slate-500">Illustrative AI workflow</p></div></div>
+            <div className="absolute -bottom-3 right-3 flex max-w-[220px] items-center gap-2.5 rounded-2xl border border-blue-100 bg-white/95 px-3 py-2.5 shadow-lg shadow-blue-900/10 sm:bottom-5 sm:right-[-1%] sm:max-w-none sm:px-4 sm:py-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e9f3ff] text-blue-600"><Check className="h-5 w-5"/></span><div><p className="text-xs font-extrabold text-[#102549] sm:text-sm">Request organized</p><p className="text-[10px] text-slate-500 sm:text-xs">Illustrative AI workflow</p></div></div>
           </div>
         </div>
         <div className="border-t border-[#e2eefb] bg-white/90"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-5 px-5 py-7 sm:grid-cols-4 sm:px-8">{[[Clock3,"Save time","Fewer interruptions"],[Sparkles,"New opportunities","Capture inquiries"],[ShieldCheck,"Professional welcome","Consistent experience"],[PhoneCall,"Business phone","Explore call handling"]].map(([Icon,title,subtitle])=><div key={String(title)} className="flex items-start gap-2.5"><Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#0876ed]"/><div><p className="text-xs font-extrabold text-[#102549] sm:text-sm">{title}</p><p className="mt-1 text-[11px] leading-4 text-slate-500">{subtitle}</p></div></div>)}</div></div>
@@ -223,8 +223,12 @@ function AiLanding(){
       <section id="benefits" className="scroll-mt-24 bg-white py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
           <div data-ca-reveal className="max-w-3xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-[#0875eb]">More than answering calls</p><h2 className="mt-4 text-4xl font-black leading-[1.12] tracking-tight text-[#102549] sm:text-5xl">Make every conversation <span className="text-[#0875eb]">count.</span></h2><p className="mt-5 max-w-2xl text-base leading-8 text-slate-600">Give customers a thoughtful first response, even when your team is occupied.</p></div>
-          <div className="mt-10 grid gap-4 lg:grid-cols-3">
-            {benefits.map((b,i)=><article data-ca-reveal key={b.number} className={"ca-motion-card rounded-[1.7rem] p-7 sm:p-9 "+(i===0?"bg-[#eaf4ff]":i===1?"bg-[#112955] text-white":"bg-[#f4f7fc]")}><p className={"text-xs font-bold tracking-widest "+(i===1?"text-sky-200":"text-blue-600")}>{b.number} / 03</p><div className={"mt-7 flex h-14 w-14 items-center justify-center rounded-2xl "+(i===1?"bg-white/15 text-white":"bg-white text-blue-600")}>{i===0?<PhoneCall className="h-7 w-7"/>:i===1?<Sparkles className="h-7 w-7"/>:<Check className="h-7 w-7"/>}</div><h3 className="mt-9 text-2xl font-extrabold leading-tight">{b.title}</h3><p className={"mt-4 text-sm leading-7 "+(i===1?"text-blue-100":"text-slate-600")}>{b.description}</p></article>)}
+          <div className="mt-9 grid gap-4 md:grid-cols-3">
+            {benefits.map((b,i)=><article data-ca-reveal key={b.number} className={"ca-motion-card relative overflow-hidden rounded-[1.7rem] p-6 shadow-[0_12px_36px_rgba(17,52,100,.07)] sm:p-8 "+(i===0?"bg-[#eaf4ff]":i===1?"bg-[#112955] text-white":"bg-[#f4f7fc]")}>
+              <div className="flex items-center justify-between gap-3"><span className={"flex h-12 w-12 items-center justify-center rounded-2xl "+(i===1?"bg-white/15 text-white":"bg-white text-blue-600")}>{i===0?<PhoneCall className="h-6 w-6"/>:i===1?<Sparkles className="h-6 w-6"/>:<Check className="h-6 w-6"/>}</span><span className={"text-xs font-bold tracking-widest "+(i===1?"text-sky-200":"text-blue-600")}>{b.number} / 03</span></div>
+              <h3 className="mt-6 text-xl font-extrabold leading-snug sm:text-2xl">{b.title}</h3>
+              <p className={"mt-3 text-sm leading-7 "+(i===1?"text-blue-100":"text-slate-600")}>{b.description}</p>
+            </article>)}
           </div>
         </div>
       </section>
@@ -243,7 +247,7 @@ function AiLanding(){
         </div>
       </section>
     </main>
-    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-H</p></div>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-I</p></div>
   </div>;
 }
 
