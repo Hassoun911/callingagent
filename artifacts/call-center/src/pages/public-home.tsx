@@ -144,7 +144,7 @@ function HeroProductIllustration(){
  * fabricated company staff, or a claim that a specific individual uses AI.
  * Photo credits: Kampus Production and Antoni Shkraba (Pexels free license).
  */
-function AiLandfunction AiLanding(){
+function AiLanding(){
   const [menuOpen,setMenuOpen]=useState(false);
   const [demoCase,setDemoCase]=useState(0);
   useEffect(()=>{
@@ -297,7 +297,7 @@ function AiLandfunction AiLanding(){
   </div>;
 }
 
-function PublicHome({mode="ai"}:{mode?:"ai"|"phone"}={}) {
+export default function PublicHome({mode="ai"}:{mode?:"ai"|"phone"}={}) {
   const isPhone=mode==="phone";
   const {plans,loading,error}=usePublicPlans();
   const [mobile,setMobile]=useState(false);
