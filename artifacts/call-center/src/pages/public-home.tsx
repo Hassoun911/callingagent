@@ -191,18 +191,23 @@ function AiLanding(){
       @media (hover:hover) and (pointer:fine){.ca-motion-card:hover{transform:translateY(-9px) rotateX(2deg);box-shadow:0 28px 65px rgba(31,28,73,.12)}}
       @media (prefers-reduced-motion:reduce){.ca-entrance,.ca-photo-card,.ca-float-a,.ca-float-b,.ca-orbit,.ca-orbit-delayed{animation:none!important}.ca-hero-tilt,.ca-motion-card{transform:none!important;transition:none!important}}
     `}</style>
-    <header className="sticky top-0 z-40 border-b border-[#e7eef8] bg-white/95 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-3 sm:px-8">
-        <a href="/website" aria-label="CallingAgent home" className="block w-[196px] shrink-0 rounded-md bg-black px-2 py-1.5 sm:w-[226px]"><img src="/callingagent-logo-tight.webp" alt="CallingAgent" className="block h-auto w-full" loading="eager"/></a>
-        <nav aria-label="Main website" className="hidden items-center gap-8 text-sm font-semibold text-[#12284b] lg:flex"><a href="#benefits" className="hover:text-blue-600">Features</a><a href="#how-ai-works" className="hover:text-blue-600">How it works</a><a href="/business-phone" className="hover:text-blue-600">Business Phone</a><a href="#ai-inquiry" className="hover:text-blue-600">Pricing</a></nav>
-        <div className="hidden items-center gap-3 lg:flex"><a href="/login" className="rounded-full border border-[#cbd8eb] px-5 py-2.5 text-sm font-bold text-[#12284b]">Sign in</a><a href="#ai-inquiry" className="inline-flex items-center gap-2 rounded-full bg-[#0869ed] px-5 py-3 text-sm font-bold text-white hover:bg-blue-800">Request early access <ArrowRight className="h-4 w-4"/></a></div>
-        <button type="button" aria-label={menuOpen?"Close navigation":"Open navigation"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(v=>!v)} className="rounded-xl border border-slate-200 p-2 lg:hidden">{menuOpen?<X className="h-6 w-6"/>:<Menu className="h-6 w-6"/>}</button>
-      </div>
-      {menuOpen&&<nav aria-label="Mobile website navigation" className="flex flex-col gap-5 border-t border-slate-200 bg-white px-6 py-5 text-sm font-semibold text-[#12284b] lg:hidden"><a href="#benefits" onClick={()=>setMenuOpen(false)}>Features</a><a href="#how-ai-works" onClick={()=>setMenuOpen(false)}>How it works</a><a href="/business-phone">Business Phone</a><a href="#ai-inquiry" onClick={()=>setMenuOpen(false)}>Pricing / Early access</a><a href="/login">Sign in</a></nav>}
-    </header>
     <main>
       <section className="relative isolate overflow-hidden bg-gradient-to-br from-white via-[#fafdff] to-[#eaf5ff]">
-        <div className="relative mx-auto grid max-w-7xl items-center gap-4 px-5 pb-9 pt-10 sm:px-8 lg:min-h-[640px] lg:grid-cols-[.96fr_1.04fr] lg:gap-8 lg:pb-16 lg:pt-16">
+        <header className="absolute inset-x-0 top-0 z-40">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4 sm:px-8 lg:py-6">
+            <a href="/website" aria-label="CallingAgent home" className="block w-[196px] shrink-0 rounded-md bg-black px-2 py-1.5 sm:w-[226px]"><img src="/callingagent-logo-tight.webp" alt="CallingAgent" className="block h-auto w-full" loading="eager"/></a>
+            <button type="button" aria-label={menuOpen?"Close navigation":"Open navigation"} aria-expanded={menuOpen} aria-controls="ca-hero-menu" onClick={()=>setMenuOpen(v=>!v)} className="flex h-11 w-11 items-center justify-center rounded-full border border-blue-100 bg-white/90 text-[#102549] shadow-sm backdrop-blur-md transition hover:bg-blue-50">{menuOpen?<X className="h-6 w-6"/>:<Menu className="h-6 w-6"/>}</button>
+          </div>
+          {menuOpen&&<nav id="ca-hero-menu" aria-label="Website navigation" className="absolute right-5 top-[76px] flex w-[min(310px,calc(100vw-40px))] flex-col gap-1 rounded-2xl border border-blue-100 bg-white p-3 text-sm font-semibold text-[#12284b] shadow-2xl sm:right-8 lg:top-[88px]">
+            <a href="#benefits" onClick={()=>setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-blue-50">Features</a>
+            <a href="#how-ai-works" onClick={()=>setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-blue-50">How it works</a>
+            <a href="/business-phone" className="rounded-xl px-4 py-3 hover:bg-blue-50">Business Phone</a>
+            <a href="#ai-inquiry" onClick={()=>setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-blue-50">Pricing / Early access</a>
+            <a href="/login" className="rounded-xl px-4 py-3 hover:bg-blue-50">Sign in</a>
+          </nav>}
+        </header>
+
+        <div className="relative mx-auto grid max-w-7xl items-center gap-4 px-5 pb-9 pt-32 sm:px-8 sm:pt-36 lg:min-h-[720px] lg:grid-cols-[.96fr_1.04fr] lg:gap-8 lg:pb-16 lg:pt-36">
           <div className="ca-entrance relative z-10">
             <span className="inline-flex items-center gap-2 rounded-full bg-[#e7f1ff] px-4 py-2 text-[11px] font-extrabold uppercase tracking-[.12em] text-[#1253a9]"><span className="h-2 w-2 rounded-full bg-blue-500"/> AI phone answering for businesses</span>
             <h1 className="mt-5 max-w-2xl text-[clamp(2.45rem,5.2vw,5.7rem)] font-black leading-[1.06] tracking-[-.055em] text-[#091d43]">Your AI receptionist that never misses <span className="text-[#0876ed]">a call.</span></h1>
@@ -247,7 +252,7 @@ function AiLanding(){
         </div>
       </section>
     </main>
-    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-J</p></div>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-K</p></div>
   </div>;
 }
 
