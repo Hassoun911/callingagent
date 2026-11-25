@@ -48,15 +48,15 @@ function AiSalesInquiry() {
     <h3 className="text-lg font-bold text-indigo-950">Request AI Receptionist early access</h3>
     <p className="mt-2 text-sm text-slate-600">Planned from $99 CAD/month. Share your details and we can contact you when your setup and usage options are ready. This is an inquiry, not an order or payment.</p>
     {done?<p role="status" className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-900">Your request has been recorded. No payment was taken.</p>:
-    <form onSubmit={submit} className="mt-4 grid gap-3 sm:grid-cols-2">
+    <form onSubmit={submit} className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
       <label className="text-xs font-semibold text-slate-700">Your name <input required minLength={2} maxLength={100} autoComplete="name" value={name} onChange={e=>setName(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"/></label>
       <label className="text-xs font-semibold text-slate-700">Email <input required type="email" maxLength={254} autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"/></label>
       <label className="text-xs font-semibold text-slate-700">Business name (optional) <input maxLength={120} autoComplete="organization" value={company} onChange={e=>setCompany(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"/></label>
       <label className="text-xs font-semibold text-slate-700">Phone (optional) <input type="tel" maxLength={40} autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"/></label>
       <label className="hidden" aria-hidden="true">Website <input tabIndex={-1} autoComplete="off" value={website} onChange={e=>setWebsite(e.target.value)}/></label>
-      {error&&<p role="alert" className="text-sm text-red-700 sm:col-span-2">{error}</p>}
-      <button type="submit" disabled={busy} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50 sm:col-span-2">{busy?"Sending…":"Request AI early access — no payment"}</button>
-      <p className="text-xs text-slate-500 sm:col-span-2">By sending this request, you agree to be contacted about your CallingAgent inquiry. AI usage costs, included credits and availability will be confirmed before purchase.</p>
+      {error&&<p role="alert" className="text-sm text-red-700 lg:col-span-2">{error}</p>}
+      <button type="submit" disabled={busy} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white hover:bg-blue-800 disabled:opacity-50 lg:col-span-2">{busy?"Sending…":"Request AI early access — no payment"}</button>
+      <p className="text-xs text-slate-500 lg:col-span-2">By sending this request, you agree to be contacted about your CallingAgent inquiry. AI usage costs, included credits and availability will be confirmed before purchase.</p>
     </form>}
   </div>;
 }
@@ -172,7 +172,7 @@ function AiLanding(){
   ];
   return <div data-ca-landing className="min-h-screen bg-white font-sans text-[#14213d]">
     <style>{`
-      .ca-hero-features{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}\n      [data-ca-landing] #ai-inquiry button[type=submit]{background:#155eef;color:white}\n      @media(max-width:640px){[data-ca-landing] h1{font-size:clamp(2.1rem,9vw,3rem)}[data-ca-landing] .ca-hero-features svg{width:18px;height:18px}[data-ca-landing] #ai-inquiry form{display:block}[data-ca-landing] #ai-inquiry input{min-height:44px}}\n      @keyframes ca-wave-pulse {0%,100%{transform:scaleY(.65)}50%{transform:scaleY(1.1)}}\n      .ca-wave{animation:ca-wave-pulse 1.25s ease-in-out infinite;box-shadow:0 0 12px #38bdf8}\n      @media(prefers-reduced-motion:reduce){.ca-wave{animation:none}}\n      @keyframes ca-entrance {from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+      .ca-hero-features{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}\n      [data-ca-landing] #ai-inquiry button[type=submit]{background:#155eef;color:white}\n      @media(max-width:640px){[data-ca-landing] h1{font-size:clamp(2.1rem,9vw,3rem)}[data-ca-landing] .ca-hero-features svg{width:18px;height:18px}[data-ca-landing] #ai-inquiry form{display:grid;grid-template-columns:minmax(0,1fr)}[data-ca-landing] #ai-inquiry input{min-height:48px;width:100%}}\n      @keyframes ca-wave-pulse {0%,100%{transform:scaleY(.65)}50%{transform:scaleY(1.1)}}\n      .ca-wave{animation:ca-wave-pulse 1.25s ease-in-out infinite;box-shadow:0 0 12px #38bdf8}\n      @media(prefers-reduced-motion:reduce){.ca-wave{animation:none}}\n      @keyframes ca-entrance {from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
       @keyframes ca-levitate {0%,100%{translate:0 0}50%{translate:0 -13px}}
       @keyframes ca-levitate-opposite {0%,100%{translate:0 0}50%{translate:0 12px}}
       @keyframes ca-orbit-soft {0%,100%{transform:rotate(-10deg) scale(1)}50%{transform:rotate(8deg) scale(1.035)}}
@@ -223,7 +223,7 @@ function AiLanding(){
       <section id="benefits" className="scroll-mt-24 bg-white py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
           <div data-ca-reveal className="max-w-3xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-[#0875eb]">More than answering calls</p><h2 className="mt-4 text-4xl font-black leading-[1.12] tracking-tight text-[#102549] sm:text-5xl">Make every conversation <span className="text-[#0875eb]">count.</span></h2><p className="mt-5 max-w-2xl text-base leading-8 text-slate-600">Give customers a thoughtful first response, even when your team is occupied.</p></div>
-          <div className="mt-9 grid gap-4 md:grid-cols-3">
+          <div className="mt-9 grid grid-cols-1 gap-4 lg:grid-cols-3">
             {benefits.map((b,i)=><article data-ca-reveal key={b.number} className={"ca-motion-card relative overflow-hidden rounded-[1.7rem] p-6 shadow-[0_12px_36px_rgba(17,52,100,.07)] sm:p-8 "+(i===0?"bg-[#eaf4ff]":i===1?"bg-[#112955] text-white":"bg-[#f4f7fc]")}>
               <div className="flex items-center justify-between gap-3"><span className={"flex h-12 w-12 items-center justify-center rounded-2xl "+(i===1?"bg-white/15 text-white":"bg-white text-blue-600")}>{i===0?<PhoneCall className="h-6 w-6"/>:i===1?<Sparkles className="h-6 w-6"/>:<Check className="h-6 w-6"/>}</span><span className={"text-xs font-bold tracking-widest "+(i===1?"text-sky-200":"text-blue-600")}>{b.number} / 03</span></div>
               <h3 className="mt-6 text-xl font-extrabold leading-snug sm:text-2xl">{b.title}</h3>
@@ -235,7 +235,7 @@ function AiLanding(){
       <section id="how-ai-works" className="scroll-mt-24 bg-[#edf5ff] py-16 lg:py-24">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
           <div data-ca-reveal className="max-w-3xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-blue-700">How it works</p><h2 className="mt-4 text-4xl font-black tracking-tight text-[#102549] sm:text-5xl">From first hello to <span className="text-blue-600">next step.</span></h2><p className="mt-5 text-base leading-8 text-slate-600">The proposed experience keeps a caller's needs organized for your team.</p></div>
-          <div className="mt-12 grid gap-5 md:grid-cols-3">{[["01","Welcome","A friendly first response, including when your staff is busy."],["02","Understand","Gather caller details, questions and appointment requests."],["03","Follow up","Organize inquiries so your team can decide what happens next."]].map(([n,title,desc])=><article data-ca-reveal key={n} className="rounded-3xl border border-blue-100 bg-white p-7 sm:p-9"><p className="text-4xl font-black text-blue-600">{n}</p><div className="mt-7 h-[2px] bg-blue-100"/><h3 className="mt-6 text-2xl font-black text-[#102549]">{title}</h3><p className="mt-3 text-sm leading-7 text-slate-600">{desc}</p></article>)}</div>
+          <div className="mt-10 grid grid-cols-1 gap-4 lg:grid-cols-3">{[["01","Welcome","A friendly first response, including when your staff is busy."],["02","Understand","Gather caller details, questions and appointment requests."],["03","Follow up","Organize inquiries so your team can decide what happens next."]].map(([n,title,desc])=><article data-ca-reveal key={n} className="rounded-3xl border border-blue-100 bg-white p-6 sm:p-8"><p className="text-4xl font-black text-blue-600">{n}</p><div className="mt-7 h-[2px] bg-blue-100"/><h3 className="mt-6 text-2xl font-black text-[#102549]">{title}</h3><p className="mt-3 text-sm leading-7 text-slate-600">{desc}</p></article>)}</div>
           <p className="mt-7 text-xs text-slate-500">Illustrative workflow. AI availability, configuration and usage rates will be confirmed before activation.</p>
         </div>
       </section>
@@ -247,7 +247,7 @@ function AiLanding(){
         </div>
       </section>
     </main>
-    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-I</p></div>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-J</p></div>
   </div>;
 }
 
