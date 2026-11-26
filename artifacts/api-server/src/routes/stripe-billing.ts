@@ -958,7 +958,7 @@ async function applyStripeEvent(event: any, client: Awaited<ReturnType<typeof po
   const object = event?.data?.object;
   if (!object?.id) return;
   if(kind==="charge.refunded"){
-    await revokeRefundedIncomingAiTopup(String(object.id),client,stripeKey());
+    await revokeRefundedIncomingAiTopup(String(object.id),String(object.payment_intent||""),client,stripeKey());
     return;
   }
   if (kind === "checkout.session.completed") {
