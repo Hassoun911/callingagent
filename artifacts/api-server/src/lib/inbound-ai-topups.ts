@@ -86,10 +86,47 @@ export async function fulfillVerifiedIncomingAiTopup(
     Number(pi.amount_received)!==Number(session.amount_total))
     throw Error("Payment intent does not prove full top-up charge");
 
+  // A payment already fully/partially refunded must NEVER create minutes.
+  if(typeof pi.latest_charge!=="string")throw Error("Missing payment charge evidence");
+  const chargeResponse=await fetch("https://api.stripe.com/v1/charges/"+encodeURIComponent(pi.latest_charge),{
+    headers:{Authorization:"Bearer "+stripeKey},signal:AbortSignal.timeout(15000)
+  });
+  if(!chargeResponse.ok)throw Error("Charge verification unavailable");
+  const charge:any=await chargeResponse.json();
+  if(charge.livemode!==true||charge.paid!==true||
+    charge.payment_intent!==pi.id||charge.currency!=="cad"||
+    Number(charge.amount_refunded)!==0||charge.refunded===true)
+    throw Error("Top-up charge has not been verified as paid and unrefunded");
   // An intent row constitutes the month-scoped grant after this atomic update.
   // The existing Stripe event transaction serializes duplicate notifications.
   const updated=await client.query(`UPDATE ca_inbound_ai_topup_intents
     SET status='paid',stripe_payment_intent_id=$2,verified_paid_at=now()
     WHERE session_id=$1 AND status='pending' RETURNING session_id`,[sessionId,pi.id]);
   return updated.rowCount?"credited":"ignored";
+}
+
+/**
+ * Signed Stripe charge.refunded path: verify the actual Stripe charge and
+ * revoke ALL unused entitlement from any matching partially/full refunded
+ * charge. Prior consumed calls remain in the immutable usage record.
+ */
+export async function revokeRefundedIncomingAiTopup(
+  chargeId:string,
+  client:{query:(sql:string,params?:unknown[])=>Promise<{rows:any[];rowCount:number|null}>},
+  stripeKey:string,
+):Promise<"ignored"|"revoked"> {
+  if(!/^ch_[a-zA-Z0-9_]{8,255}$/.test(chargeId))return "ignored";
+  const response=await fetch("https://api.stripe.com/v1/charges/"+encodeURIComponent(chargeId),{
+    headers:{Authorization:"Bearer "+stripeKey},signal:AbortSignal.timeout(15000)
+  });
+  if(!response.ok)throw Error("Charge refund verification unavailable");
+  const charge:any=await response.json();
+  if(charge.livemode!==true||typeof charge.payment_intent!=="string"||
+    !Number.isSafeInteger(charge.amount_refunded)||charge.amount_refunded<=0)return "ignored";
+  const row=await client.query(`SELECT session_id FROM ca_inbound_ai_topup_intents
+    WHERE stripe_payment_intent_id=$1 AND status='paid' FOR UPDATE`,[charge.payment_intent]);
+  if(!row.rowCount)return "ignored";
+  const updated=await client.query(`UPDATE ca_inbound_ai_topup_intents SET status='refunded'
+    WHERE session_id=$1 AND status='paid' RETURNING session_id`,[row.rows[0].session_id]);
+  return updated.rowCount?"revoked":"ignored";
 }
