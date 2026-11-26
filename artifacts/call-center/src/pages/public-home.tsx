@@ -317,18 +317,52 @@ function AiLanding(){
           <div className="mt-7 divide-y divide-blue-100 overflow-hidden rounded-[1.5rem] border border-blue-100 bg-white">
             {[
               ["Can I buy the AI receptionist today?","Not yet. This form is an early-access inquiry. We will contact you when AI plans and activation options are ready."],
-              ["Is the $99 monthly price final?","$99 CAD/month is a planned starting price, not a checkout offer. Usage credits, taxes, included allowances and final terms will be confirmed before purchase."],
-              ["Will I be charged if I join the list?","No. Requesting early access does not take payment or create a paid subscription."],
+              ["What is included in the proposed $99 package?","Our proposed launch package is 150 AI call minutes per month with optional additional usage at a proposed $0.45 CAD per minute. These are planning figures, not final included entitlements or rates. Actual terms will be confirmed before any paid activation."],
+              ["Will I be charged if I join the list?","No. Requesting early access does not take payment or create a paid subscription. There are no automatic usage top-ups from this page."],
               ["Do you offer a regular business phone system?","Yes. Visit Business Phone to explore VoIP options. Availability and activation terms are shown separately from the planned standalone AI package."]
             ].map(([q,a])=><details key={q} className="group px-5 py-5 open:bg-[#f8fbff] sm:px-8"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-extrabold text-[#102549] sm:text-lg">{q}<ChevronDown className="h-5 w-5 shrink-0 text-blue-600 transition-transform group-open:rotate-180"/></summary><p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">{a}</p></details>)}
           </div>
         </div>
       </section>
-      <section id="ai-inquiry" className="scroll-mt-20 bg-gradient-to-br from-[#e6f3ff] to-white py-14 sm:py-20">
-        <div className="mx-auto grid max-w-7xl items-start gap-8 px-5 sm:px-8 lg:grid-cols-[.84fr_1.16fr] lg:gap-16">
-          <div data-ca-reveal className="lg:pt-7"><p className="text-xs font-black uppercase tracking-[.2em] text-blue-600">Get on the list</p><h2 className="mt-4 text-[clamp(2.4rem,4vw,4.2rem)] font-black leading-[1.1] tracking-[-.05em] text-[#09204a]">Be ready for <span className="text-blue-600">your next opportunity.</span></h2><p className="mt-4 text-base leading-7 text-slate-600">Request early access and we'll contact you when AI setup options are available.</p>
-            <div className="mt-8 rounded-[1.5rem] border border-blue-100 bg-white p-6 shadow-sm"><div className="flex items-baseline gap-2"><span className="text-6xl font-black text-blue-600">$99</span><span className="font-bold text-[#09204a]">CAD / month</span></div><p className="mt-2 text-sm font-semibold text-slate-600">Planned starting price · usage credits and taxes separate</p><div className="mt-5 grid gap-3 border-t border-blue-100 pt-5">{["No payment today","Early-access inquiry only","Final terms confirmed before purchase"].map(item=><p key={item} className="flex items-center gap-3 text-sm font-bold text-[#102549]"><Check className="h-5 w-5 shrink-0 text-emerald-600"/>{item}</p>)}</div></div>
-          </div><div data-ca-reveal><AiSalesInquiry/></div>
+      <section id="ai-inquiry" className="scroll-mt-20 bg-gradient-to-br from-[#e9f4ff] via-white to-[#f4f9ff] py-14 sm:py-20">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8">
+          <div className="mb-8 max-w-3xl">
+            <p className="text-xs font-black uppercase tracking-[.2em] text-blue-600">Simple, transparent AI pricing</p>
+            <h2 className="mt-3 text-[clamp(2.2rem,4.1vw,4.2rem)] font-black leading-tight tracking-[-.045em] text-[#09204a]">A receptionist that works for your business. <span className="text-blue-600">Usage you control.</span></h2>
+            <p className="mt-4 text-base leading-7 text-slate-600">See the proposed monthly package, understand how additional minutes could work, and request early access without paying today.</p>
+          </div>
+          <div className="grid items-start gap-6 lg:grid-cols-[.92fr_1.08fr] lg:gap-8">
+            <div className="space-y-5">
+              <div className="overflow-hidden rounded-[1.8rem] border border-blue-200 bg-white shadow-[0_20px_55px_rgba(14,64,137,.10)]">
+                <div className="border-b border-blue-100 bg-[#f3f8ff] px-6 py-5 sm:px-8">
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-blue-700">AI Receptionist · Proposed launch package</p>
+                  <div className="mt-3 flex flex-wrap items-end gap-2"><span className="text-6xl font-black leading-none text-[#075fe8]">$99</span><span className="pb-1 font-semibold text-[#102549]">CAD / month + tax</span></div>
+                  <p className="mt-2 text-sm text-slate-600">Price target for early access. Final allowances and charges will be confirmed before purchase.</p>
+                </div>
+                <div className="space-y-5 p-6 sm:p-8">
+                  <div className="rounded-2xl border border-blue-100 bg-[#eff6ff] p-5">
+                    <p className="text-xs font-extrabold uppercase tracking-wide text-blue-700">Suggested starting allowance</p>
+                    <p className="mt-1 text-3xl font-black text-[#09204a]">150 <span className="text-base font-semibold">AI call minutes / month</span></p>
+                    <p className="mt-2 text-xs leading-5 text-slate-600">Illustrative package proposal—not yet included in active customer subscriptions. AI minutes are separate from Business Phone voice minutes.</p>
+                  </div>
+                  <div className="grid gap-3">
+                    {["AI phone answering for incoming inquiries","Caller details and lead summaries","Appointment requests organized for follow-up","Usage visibility and planned spend controls"].map(item=><p key={item} className="flex items-start gap-3 text-sm font-semibold text-[#102549]"><Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600"/>{item}</p>)}
+                  </div>
+                  <div className="border-t border-blue-100 pt-5">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2"><p className="font-extrabold text-[#09204a]">Extra AI usage</p><p className="text-lg font-black text-blue-700">$0.45 CAD / minute <span className="text-xs font-medium text-slate-500">proposed</span></p></div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">Illustrative top-up pricing: 50 extra minutes for $22.50 or 100 for $45, before tax. No automatic charges or new credit purchases are enabled by this page.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-[1.5rem] border border-blue-100 bg-white/95 p-5 sm:p-6">
+                <h3 className="text-base font-black text-[#102549]">How the usage allowance would work</h3>
+                <div className="mt-4 h-3 overflow-hidden rounded-full bg-blue-100"><div className="h-full w-[60%] rounded-full bg-blue-600"/></div>
+                <div className="mt-2 flex justify-between text-xs font-semibold text-slate-600"><span>90 of 150 minutes used</span><span>60 remaining</span></div>
+                <p className="mt-4 text-sm leading-6 text-slate-600">Example dashboard only. We recommend alerts at 80% and 100%, optional prepaid top-ups, and a spending cap to prevent surprises. These controls must be verified before launch.</p>
+              </div>
+            </div>
+            <div><AiSalesInquiry/></div>
+          </div>
         </div>
       </section>
     </main>
