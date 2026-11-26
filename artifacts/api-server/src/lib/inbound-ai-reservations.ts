@@ -62,7 +62,12 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
     const used=await client.query(`SELECT COALESCE(SUM(COALESCE(consumed_minutes,reserved_minutes)),0)::integer AS minutes
       FROM ca_inbound_ai_reservations WHERE company_id=$1
         AND period_start=date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`,[companyId]);
-    const total=Number(plan.rows[0].included_minutes)+Number(plan.rows[0].verified_prepaid_minutes);
+    // Only verified paid top-ups from the CURRENT UTC month count here.
+    // Paid top-ups cannot accidentally carry into a future subscription month.
+    const topups=await client.query(`SELECT COALESCE(SUM(minutes),0)::integer AS minutes
+      FROM ca_inbound_ai_topup_intents WHERE company_id=$1 AND status='paid'
+      AND period_start=date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`,[companyId]);
+    const total=Number(plan.rows[0].included_minutes)+Number(plan.rows[0].verified_prepaid_minutes)+Number(topups.rows[0].minutes);
     const remaining=total-Number(used.rows[0].minutes);
     if(remaining<=0){await client.query("COMMIT");return {decision:"exhausted",maxCallSeconds:0};}
     const reserved=Math.min(5,remaining);

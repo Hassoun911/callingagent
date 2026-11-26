@@ -6,6 +6,7 @@ import { ensureCompanyFullAccessSchema } from "./lib/company-full-access";
 import { ensureAiCreditSchema } from "./lib/ai-credit-wallet";
 import { ensureInboundAiUsageSchema } from "./lib/inbound-ai-usage";
 import { ensureInboundAiReservationSchema } from "./lib/inbound-ai-reservations";
+import { ensureInboundAiTopupSchema } from "./lib/inbound-ai-topups";
 import { ensureTelnyxUsageSchema, reconcileVerifiedTelnyxInboundDurations } from "./lib/telnyx-carrier-usage";
 import { ensureTelnyxCpsSchema } from "./lib/telnyx-cps-guard";
 import { db } from "@workspace/db";
@@ -43,6 +44,7 @@ async function start(): Promise<void> {
   await ensureAiCreditSchema();
   await ensureInboundAiUsageSchema();
   await ensureInboundAiReservationSchema();
+  await ensureInboundAiTopupSchema();
   await ensureTelnyxUsageSchema();
   // Safe, idempotent historical duration repair. Failure cannot interrupt VoIP:
   // signed carrier evidence may arrive late or some records may be unmatched.
