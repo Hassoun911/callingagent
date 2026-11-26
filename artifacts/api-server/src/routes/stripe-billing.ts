@@ -450,6 +450,36 @@ router.post("/billing/reconcile-twilio-durations", async(req,res)=>{
     res.status(503).json({error:"Carrier reconciliation unavailable; checkout unchanged"});
   }
 });
+// Super-admin initiated repair: copy durable, signed Telnyx call.cost evidence
+// into previously unmeasured matching inbound call logs. No estimates or charges.
+router.post("/billing/reconcile-telnyx-durations", async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
+  try{
+    const result=await pool.query(`WITH uniquely_verified AS (
+      SELECT l.id AS log_id,MIN(c.billed_duration_secs)::integer AS carrier_seconds
+      FROM call_logs l
+      JOIN phone_numbers n ON n.id=l.phone_number_id
+      JOIN ca_telnyx_cost_legs c ON l.twilio_call_sid='telnyx:' || c.call_control_id
+      WHERE l.duration IS NULL AND l.direction=$1
+        AND c.company_id=n.company_id
+        AND c.billed_duration_secs IS NOT NULL
+        AND c.billed_duration_secs BETWEEN 0 AND 86400
+        AND l.created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+      GROUP BY l.id HAVING COUNT(*)=1
+    ), updated AS (
+      UPDATE call_logs l SET duration=v.carrier_seconds
+      FROM uniquely_verified v WHERE l.id=v.log_id AND l.duration IS NULL
+      RETURNING l.id
+    ) SELECT COUNT(*)::integer AS recovered FROM updated`,["inbound"]);
+    res.set("Cache-Control","no-store");
+    res.json({recovered:Number(result.rows[0]?.recovered||0),carrier:"Telnyx",
+      customerCharges:false,billingCertified:false,
+      message:"Only measured inbound durations from uniquely matched signed Telnyx carrier cost events and verified company ownership were restored. No other records, bills, accounts or call routes changed."});
+  }catch(error:any){
+    req.log.error({message:error?.message},"Telnyx carrier duration reconciliation unavailable");
+    res.status(503).json({error:"Telnyx duration recovery unavailable; checkout unchanged"});
+  }
+});
 router.get("/billing/readiness", async(req,res)=>{
   if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
   try{
