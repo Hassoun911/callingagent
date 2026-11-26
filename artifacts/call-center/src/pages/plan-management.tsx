@@ -4,6 +4,7 @@ import AiMarginSimulator from "@/components/ai-margin-simulator";
 
 type Plan={id:number;slug:string;name:string;priceCents:number;monthlyMinutes:number;includedNumbers:number;features:string[];description:string;isPublished:boolean;isEnabled:boolean;checkoutEnabled:boolean;sortOrder:number};
 type BillingReadiness={stripePriceVerificationIssues?:string[];telnyxCallCostWebhookEnabled:boolean|null;telnyxVoiceWebhookCorrect:boolean|null;telnyxConfigurationWarning:string|null;liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;liveMerchantVerified:boolean;merchantVerificationWarning:string|null;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;carrierUsageVerified:boolean;automaticProvisioningCertified:boolean;productionSnapshot:{existingCompanies:number;subscriptionsRecorded:number;activePhoneLines:number;activeTwilioLines:number;activeUnattributedLines:number;currentMonthCallRecords:number;currentMonthCallsMissingDuration:number;callDurationCoverage?:{total:number;measured:number;missing:number;missingWithTwilioSid:number;missingWithoutTwilioSid:number;missingTerminal:number;missingNonterminal:number};telnyxCarrierEvidence?:{costLegs:number;measuredLegs:number;missingLegDurations:number;unattributedLegs:number;attributedMeasuredLegs:number}};plans:{slug:string;checkoutEnabled:boolean}[]};
+type InboundAiMonitor={incomingAiCalls:number;measuredCalls:number;missingDurations:number;roundedParentMinutes:number;terminalCalls:number;terminalMissingDuration:number;billableUsageCertified:boolean;hardCapEnforced:boolean;note:string};
 type LaunchInterest={id:number;plan_slug:string;contact_name:string;email:string;phone:string|null;company_name:string|null;created_at:string;sales_status:"new"|"contacted"|"qualified"|"closed_won"|"closed_lost";sales_notes:string;sales_updated_at:string|null};
 type FulfillmentItem={company_id:number;company_name:string;plan_slug:string;fulfillment_status:string;created_at:string;subscription_status:string|null;last_payment_status:string|null;active_numbers:number;included_numbers:number|null};
 type LaunchAudit={merchantVerified:boolean;liveStripePricesVerified:boolean;checkoutEnabled:boolean;plans:{slug:string;amountMatchesStripeMapping:boolean;stripePriceVerified:boolean;monthlyMinutes:number;includedNumbers:number;checkoutApproved:boolean}[];metrics:{subscriptions:number;checkout_intents:number;telnyx_cost_legs:number;monthly_calls:number;missing_call_durations:number};issues:string[];verdict:string;chargeAttempted:boolean;phoneProvisioningAttempted:boolean};
@@ -20,6 +21,8 @@ export default function PlanManagement(){
  const [readinessLoading,setReadinessLoading]=useState(false);
  const [readinessCheckedAt,setReadinessCheckedAt]=useState("");
  const [readinessMessage,setReadinessMessage]=useState("");
+ const [inboundAiMonitor,setInboundAiMonitor]=useState<InboundAiMonitor|null>(null);
+ const [inboundAiError,setInboundAiError]=useState("");
  const [durationRepairBusy,setDurationRepairBusy]=useState(false);
  const [durationRepairReport,setDurationRepairReport]=useState("");
  const [telnyxRepairBusy,setTelnyxRepairBusy]=useState(false);
@@ -80,6 +83,14 @@ export default function PlanManagement(){
   }catch(e:any){setLaunchAuditError(e?.message||"Launch audit unavailable");}
   finally{setLaunchAuditBusy(false);}
  }
+ async function loadInboundAiMonitor(){
+    try{
+      const r=await fetch("/api/billing/inbound-ai-usage-monitor",{credentials:"include",cache:"no-store"});
+      const data=await r.json();
+      if(!r.ok||typeof data.incomingAiCalls!=="number")throw Error(data.error||"Usage data unavailable");
+      setInboundAiMonitor(data);setInboundAiError("");
+    }catch(error:any){setInboundAiError(error?.message||"Usage monitor unavailable")}
+  }
  async function loadReadiness(){
   setReadinessLoading(true);setReadinessMessage("");
   try{
@@ -128,7 +139,7 @@ export default function PlanManagement(){
    finally{setDurationRepairBusy(false)}
  }
  async function load(){try{const r=await fetch("/api/admin/plans",{credentials:"include"});const j=await r.json();if(!r.ok)throw Error(j.error||"Unable to fetch plans");setPlans(j);}catch(e:any){setError(e.message)}}
- useEffect(()=>{void load();void loadReadiness();void loadInterestRequests()},[]);
+ useEffect(()=>{void load();void loadReadiness();void loadInterestRequests();void loadInboundAiMonitor()},[]);
  async function save(plan:Plan){
   setBusy(true);setError("");setNotice("");
   try {
@@ -145,6 +156,15 @@ export default function PlanManagement(){
  }
  return <div className="space-y-6">
    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-3xl font-bold">Package Manager</h1><p className="mt-1 text-sm text-muted-foreground">Create, edit, publish, disable, or remove CallingAgent packages.</p></div><button onClick={()=>setEditing({...empty})} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white"><Plus className="h-4 w-4"/>New plan</button></div>
+   <section className="rounded-xl border border-sky-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Current incoming AI call usage evidence">
+     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-black text-slate-900">New incoming AI call monitoring</h2><p className="mt-1 text-xs text-slate-600">Rolling 24 hours · incoming AI receptionist calls only · read-only evidence, not customer billing</p></div><button type="button" onClick={()=>void loadInboundAiMonitor()} className="min-h-11 rounded-lg border border-sky-300 px-4 py-2 text-sm font-bold text-blue-800">Refresh live usage</button></div>
+     {inboundAiMonitor&&<div className="mt-4 grid gap-3 sm:grid-cols-4">
+       {([["Incoming AI calls",inboundAiMonitor.incomingAiCalls],["Measured calls",inboundAiMonitor.measuredCalls],["Rounded call-log minutes",inboundAiMonitor.roundedParentMinutes],["Missing durations",inboundAiMonitor.missingDurations]] as [string,number][]).map(([name,value])=><div key={name} className="rounded-xl bg-sky-50 p-4"><p className="text-xs font-semibold text-slate-600">{name}</p><p className="mt-1 text-2xl font-black tabular-nums text-slate-900">{value}</p></div>)}
+     </div>}
+     {inboundAiMonitor&&<p className="mt-3 text-sm font-medium text-slate-700">Terminal calls still missing measured duration: <strong>{inboundAiMonitor.terminalMissingDuration}</strong>. Hard usage cap: <strong>Not enabled</strong>. Customer AI billing: <strong>Not certified</strong>.</p>}
+     {inboundAiError&&<p role="alert" className="mt-3 text-sm text-red-700">{inboundAiError}</p>}
+     <p className="mt-3 text-xs leading-5 text-slate-600">This is operational monitoring, not a verified billable-minutes ledger. The 80 incoming minute offer is still proposed. We must validate provider AI costs and implement an enforceable prepaid reservation/cutoff flow before activating paid AI usage. Outgoing calls, forwarding legs, and ordinary VoIP are not counted here.</p>
+   </section>
    <AiMarginSimulator />
    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
      <div className="flex items-center gap-2 font-bold"><AlertTriangle className="h-5 w-5 shrink-0"/>Live billing readiness</div>
