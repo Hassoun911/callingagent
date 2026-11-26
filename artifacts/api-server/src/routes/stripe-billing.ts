@@ -481,6 +481,34 @@ router.post("/billing/reconcile-telnyx-durations", async(req,res)=>{
   }
 });
 // Forward-looking inbound AI evidence; strictly reporting-only, not a billable wallet.
+// Evidence from terminal incoming AI calls, scoped to the current UTC month.
+// No paid minutes, wallet grants, or false remaining balances are exposed.
+router.get("/billing/inbound-ai-monthly-evidence",async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
+  try{
+    const rows=await pool.query(`SELECT
+      COUNT(*)::integer AS calls,
+      COUNT(DISTINCT company_id)::integer AS companies,
+      COUNT(*) FILTER(WHERE duration_seconds IS NOT NULL)::integer AS measured_calls,
+      COUNT(*) FILTER(WHERE duration_seconds IS NULL)::integer AS unmeasured_calls,
+      COALESCE(SUM(CASE WHEN duration_seconds IS NOT NULL
+        THEN CEIL(duration_seconds::numeric/60) ELSE 0 END),0)::integer AS rounded_measured_minutes
+      FROM ca_inbound_ai_usage_evidence
+      WHERE call_started_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`);
+    res.set("Cache-Control","no-store");
+    const m=rows.rows[0];
+    res.json({direction:"inbound",mode:"ai_receptionist",period:"current_utc_month",
+      companies:Number(m.companies),calls:Number(m.calls),
+      measuredCalls:Number(m.measured_calls),unmeasuredCalls:Number(m.unmeasured_calls),
+      roundedMeasuredMinutes:Number(m.rounded_measured_minutes),
+      proposal:{monthlySubscriptionCad:99,includedIncomingMinutes:80,additionalIncomingMinuteCad:0.85,contributionTargetPercent:70},
+      entitlementActive:false,topupsActive:false,hardCapEnforced:false,billableUsageCertified:false,
+      note:"An evidence monitor, not a billable balance or an approved offer. Missing calls never count as zero; outgoing AI and regular VoIP are excluded."});
+  }catch(error:any){
+    req.log.error({message:error?.message},"Inbound AI monthly evidence unavailable");
+    res.status(503).json({error:"Incoming AI monthly evidence unavailable"});
+  }
+});
 router.get("/billing/inbound-ai-usage-monitor",async(req,res)=>{
   if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
   try {
