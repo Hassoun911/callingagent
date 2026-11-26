@@ -173,7 +173,25 @@ function AiLanding(){
   ];
   return <div data-ca-landing className="min-h-screen bg-white font-sans text-[#14213d]">
     <style>{`
-      .ca-hero-features{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}\n      [data-ca-landing] #ai-inquiry button[type=submit]{background:#155eef;color:white}\n      @media(max-width:640px){[data-ca-landing] h1{font-size:clamp(2.1rem,9vw,3rem)}[data-ca-landing] .ca-hero-features svg{width:18px;height:18px}[data-ca-landing] #ai-inquiry form{display:grid;grid-template-columns:minmax(0,1fr)}[data-ca-landing] #ai-inquiry input{min-height:48px;width:100%}}\n      @keyframes ca-wave-pulse {0%,100%{transform:scaleY(.65)}50%{transform:scaleY(1.1)}}\n      .ca-wave{animation:ca-wave-pulse 1.25s ease-in-out infinite;box-shadow:0 0 12px #38bdf8}\n      @media(prefers-reduced-motion:reduce){.ca-wave{animation:none}}\n      @keyframes ca-entrance {from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+      .ca-hero-features{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}\n      [data-ca-landing] #ai-inquiry button[type=submit]{background:#155eef;color:white}\n      @media(max-width:640px){[data-ca-landing] h1{font-size:clamp(2.1rem,9vw,3rem)}[data-ca-landing] .ca-hero-features svg{width:18px;height:18px}[data-ca-landing] #ai-inquiry form{display:grid;grid-template-columns:minmax(0,1fr)}[data-ca-landing] #ai-inquiry input{min-height:48px;width:100%}}\n      @keyframes ca-wave-pulse {0%,100%{transform:scaleY(.65)}50%{transform:scaleY(1.1)}}\n      .ca-wave{animation:ca-wave-pulse 1.25s ease-in-out infinite;box-shadow:0 0 12px #38bdf8}\n      @media(prefers-reduced-motion:reduce){.ca-wave{animation:none}}\n
+      @media(max-width:767px){
+        .ca-home-hero>header{position:relative;inset:auto;background:white}
+        .ca-home-hero{display:flex;flex-direction:column}
+        .ca-home-content{order:1;min-height:0;animation:none}
+        .ca-home-content .ca-entrance{animation:none}
+        .ca-home-art{position:relative;inset:auto;order:2;width:100%;height:clamp(180px,52vw,320px)}
+        .ca-home-art img{object-position:right center;object-fit:cover}
+        .ca-home-art>div{background:linear-gradient(to bottom,#fafdff 0%,transparent 28%)}
+        .ca-home-status{display:none}
+        .ca-home-hero>div:last-child{order:3}
+        .ca-home-content h1{font-size:clamp(2rem,7.6vw,3rem);line-height:1.1;margin-top:14px}
+        .ca-home-content h1+p{margin-top:14px;line-height:1.55}
+        .ca-home-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:20px}
+        .ca-home-actions>a{width:100%;min-height:48px}
+        .ca-home-content>div>span:first-child{font-size:10px;letter-spacing:.06em}
+      }
+      @media(min-width:768px){.ca-home-content{padding-top:8rem}}
+      @keyframes ca-entrance {from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
       @keyframes ca-levitate {0%,100%{translate:0 0}50%{translate:0 -13px}}
       @keyframes ca-levitate-opposite {0%,100%{translate:0 0}50%{translate:0 12px}}
       @keyframes ca-orbit-soft {0%,100%{transform:rotate(-10deg) scale(1)}50%{transform:rotate(8deg) scale(1.035)}}
@@ -193,7 +211,7 @@ function AiLanding(){
       @media (prefers-reduced-motion:reduce){.ca-entrance,.ca-photo-card,.ca-float-a,.ca-float-b,.ca-orbit,.ca-orbit-delayed{animation:none!important}.ca-hero-tilt,.ca-motion-card{transform:none!important;transition:none!important}}
     `}</style>
     <main>
-      <section className="relative isolate overflow-hidden bg-gradient-to-br from-white via-[#fafdff] to-[#eaf5ff]">
+      <section className="ca-home-hero relative isolate overflow-hidden bg-gradient-to-br from-white via-[#fafdff] to-[#eaf5ff]">
         <header className="absolute inset-x-0 top-0 z-40">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4 sm:px-8 lg:py-6">
             <a href="/website" aria-label="CallingAgent home" className="block w-[196px] shrink-0 rounded-md bg-black px-2 py-1.5 sm:w-[226px]"><img src="/callingagent-logo-tight.webp" alt="CallingAgent" className="block h-auto w-full" loading="eager"/></a>
@@ -211,20 +229,20 @@ function AiLanding(){
         </header>
 
         {/* Unified hero: responsive artwork is a background, not a second photo card. */}
-        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+        <div className="ca-home-art pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
           <img src="/callingagent-clean-hero.webp" alt="" className="absolute inset-0 h-full w-full object-cover object-[72%_center] md:object-[78%_center]" loading="eager" fetchPriority="high" decoding="async"/>
           <div className="absolute inset-0 bg-gradient-to-b from-white via-white/95 via-[53%] to-white/0 md:bg-gradient-to-r md:from-white md:via-white/95 md:via-[40%] md:to-white/0"/>
         </div>
-        <div className="relative z-10 mx-auto flex min-h-[930px] max-w-7xl flex-col px-5 pb-10 pt-28 sm:px-8 sm:min-h-[960px] sm:pt-32 md:min-h-[670px] md:justify-center md:pb-24 md:pt-32 lg:min-h-[735px]">
+        <div className="ca-home-content relative z-10 mx-auto flex max-w-7xl flex-col px-5 pb-6 pt-6 sm:px-8 md:min-h-[670px] md:justify-center md:pb-24 md:pt-32 lg:min-h-[735px]">
           <div className="ca-entrance max-w-xl lg:max-w-[53%]">
             <span className="inline-flex items-center gap-2 rounded-full bg-[#e7f1ff]/95 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[.12em] text-[#1253a9]"><span className="h-2 w-2 rounded-full bg-blue-500"/> AI phone answering for businesses</span>
             <h1 className="mt-5 text-[clamp(2.45rem,5.2vw,5.7rem)] font-black leading-[1.06] tracking-[-.055em] text-[#091d43]">Your AI receptionist that never misses <span className="text-[#0876ed]">a call.</span></h1>
             <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">Designed to help answer customers, collect inquiries and appointment requests, and give your team more time to focus on business.</p>
-            <div className="mt-6 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#0a9efe] to-[#0757e5] px-6 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(22,104,226,.18)] hover:brightness-110">Request early access <ArrowRight className="h-5 w-5"/></a><a href="#realtor-demo" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#aac0df] bg-white px-5 py-3.5 text-sm font-bold text-[#102549] hover:bg-blue-50">Watch demo</a></div>
+            <div className="ca-home-actions mt-6 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#0a9efe] to-[#0757e5] px-6 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(22,104,226,.18)] hover:brightness-110">Request early access <ArrowRight className="h-5 w-5"/></a><a href="#realtor-demo" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#aac0df] bg-white px-5 py-3.5 text-sm font-bold text-[#102549] hover:bg-blue-50">Watch demo</a></div>
             <div className="mt-6 grid max-w-lg grid-cols-3 gap-3 border-t border-blue-100 pt-4">{[[PhoneCall,"Answer calls"],[Clock3,"Appointments"],[Sparkles,"Capture leads"]].map(([Icon,title])=><div key={String(title)} className="flex flex-col gap-2 text-blue-600"><Icon className="h-6 w-6"/><span className="text-[11px] font-bold leading-4 text-[#14284d]">{title}</span></div>)}</div>
             <p className="mt-4 max-w-lg text-xs leading-5 text-slate-500">Early-access inquiries only. Standalone AI planned from $99 CAD/month, plus taxes and usage credits. No payment is taken yet.</p>
           </div>
-          <div className="mt-auto flex justify-end pb-1 md:absolute md:bottom-14 md:right-9">
+          <div className="ca-home-status mt-auto flex justify-end pb-1 md:absolute md:bottom-14 md:right-9">
             <div className="flex max-w-[210px] items-center gap-2.5 rounded-2xl border border-blue-100 bg-white/90 px-3 py-2.5 shadow-lg shadow-blue-900/10 backdrop-blur-md"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e9f3ff] text-blue-600"><Check className="h-5 w-5"/></span><div><p className="text-xs font-extrabold text-[#102549]">Request organized</p><p className="text-[10px] text-slate-500">Illustrative AI workflow</p></div></div>
           </div>
         </div>
@@ -314,7 +332,7 @@ function AiLanding(){
         </div>
       </section>
     </main>
-    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-Q</p></div>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-26-R</p></div>
   </div>;
 }
 
