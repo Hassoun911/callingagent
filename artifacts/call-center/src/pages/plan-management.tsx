@@ -3,7 +3,7 @@ import { Plus, Save, Trash2, ShieldCheck, AlertTriangle, RefreshCw } from "lucid
 import AiMarginSimulator from "@/components/ai-margin-simulator";
 
 type Plan={id:number;slug:string;name:string;priceCents:number;monthlyMinutes:number;includedNumbers:number;features:string[];description:string;isPublished:boolean;isEnabled:boolean;checkoutEnabled:boolean;sortOrder:number};
-type BillingReadiness={stripePriceVerificationIssues?:string[];telnyxCallCostWebhookEnabled:boolean|null;telnyxVoiceWebhookCorrect:boolean|null;telnyxConfigurationWarning:string|null;liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;liveMerchantVerified:boolean;merchantVerificationWarning:string|null;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;carrierUsageVerified:boolean;automaticProvisioningCertified:boolean;productionSnapshot:{existingCompanies:number;subscriptionsRecorded:number;activePhoneLines:number;activeTwilioLines:number;activeUnattributedLines:number;currentMonthCallRecords:number;currentMonthCallsMissingDuration:number};plans:{slug:string;checkoutEnabled:boolean}[]};
+type BillingReadiness={stripePriceVerificationIssues?:string[];telnyxCallCostWebhookEnabled:boolean|null;telnyxVoiceWebhookCorrect:boolean|null;telnyxConfigurationWarning:string|null;liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;liveMerchantVerified:boolean;merchantVerificationWarning:string|null;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;carrierUsageVerified:boolean;automaticProvisioningCertified:boolean;productionSnapshot:{existingCompanies:number;subscriptionsRecorded:number;activePhoneLines:number;activeTwilioLines:number;activeUnattributedLines:number;currentMonthCallRecords:number;currentMonthCallsMissingDuration:number;callDurationCoverage?:{total:number;measured:number;missing:number;missingWithTwilioSid:number;missingWithoutTwilioSid:number;missingTerminal:number;missingNonterminal:number};telnyxCarrierEvidence?:{costLegs:number;measuredLegs:number;missingLegDurations:number;unattributedLegs:number;attributedMeasuredLegs:number}};plans:{slug:string;checkoutEnabled:boolean}[]};
 type LaunchInterest={id:number;plan_slug:string;contact_name:string;email:string;phone:string|null;company_name:string|null;created_at:string;sales_status:"new"|"contacted"|"qualified"|"closed_won"|"closed_lost";sales_notes:string;sales_updated_at:string|null};
 type FulfillmentItem={company_id:number;company_name:string;plan_slug:string;fulfillment_status:string;created_at:string;subscription_status:string|null;last_payment_status:string|null;active_numbers:number;included_numbers:number|null};
 type LaunchAudit={merchantVerified:boolean;liveStripePricesVerified:boolean;checkoutEnabled:boolean;plans:{slug:string;amountMatchesStripeMapping:boolean;stripePriceVerified:boolean;monthlyMinutes:number;includedNumbers:number;checkoutApproved:boolean}[];metrics:{subscriptions:number;checkout_intents:number;telnyx_cost_legs:number;monthly_calls:number;missing_call_durations:number};issues:string[];verdict:string;chargeAttempted:boolean;phoneProvisioningAttempted:boolean};
@@ -132,6 +132,30 @@ export default function PlanManagement(){
       <p className="mt-2 text-xs">Carrier coverage: <strong>{readiness.productionSnapshot?.activeTwilioLines ?? "—"} Twilio</strong> and <strong>{readiness.productionSnapshot?.activeUnattributedLines ?? "—"} not linked to Twilio</strong>. Current UTC month: <strong>{readiness.productionSnapshot?.currentMonthCallsMissingDuration ?? "—"}/{readiness.productionSnapshot?.currentMonthCallRecords ?? "—"}</strong> call records missing measured duration.</p>
       <p className="mt-2 text-xs">Telnyx call-cost events: <strong>{readiness.telnyxCallCostWebhookEnabled===true?"Enabled":readiness.telnyxCallCostWebhookEnabled===false?"Disabled":"Not verified"}</strong>. Telnyx voice webhook URL: <strong>{readiness.telnyxVoiceWebhookCorrect===true?"Matches CallingAgent":readiness.telnyxVoiceWebhookCorrect===false?"Review configuration":"Not verified"}</strong>.</p>
       {readiness.telnyxConfigurationWarning&&<p className="mt-1 text-xs text-amber-900">{readiness.telnyxConfigurationWarning}</p>}
+      <div className="mt-4 rounded-xl border border-orange-200 bg-white p-3 text-slate-900">
+        <h3 className="text-base font-black">Carrier usage evidence · current UTC month</h3>
+        <p className="mt-1 text-xs text-slate-600">Read-only diagnostics. A missing call-log duration is not a zero-minute call. Provider event records and internal call logs are separate sources and their counts should not be added together.</p>
+        {readiness.productionSnapshot?.callDurationCoverage&&<div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="font-semibold">Internal call-log coverage</p>
+            <p className="mt-2 text-xs">Measured: <strong>{readiness.productionSnapshot.callDurationCoverage.measured}</strong> of <strong>{readiness.productionSnapshot.callDurationCoverage.total}</strong></p>
+            <p className="mt-1 text-xs">Missing with Twilio Call SID: <strong>{readiness.productionSnapshot.callDurationCoverage.missingWithTwilioSid}</strong></p>
+            <p className="mt-1 text-xs">Missing without Twilio Call SID: <strong>{readiness.productionSnapshot.callDurationCoverage.missingWithoutTwilioSid}</strong></p>
+            <p className="mt-1 text-xs">Terminal status, duration missing: <strong>{readiness.productionSnapshot.callDurationCoverage.missingTerminal}</strong></p>
+            <p className="mt-1 text-xs">Other or unknown status, duration missing: <strong>{readiness.productionSnapshot.callDurationCoverage.missingNonterminal}</strong></p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <p className="font-semibold">Telnyx signed call-cost event coverage</p>
+            <p className="mt-2 text-xs">Carrier cost-leg events: <strong>{readiness.productionSnapshot.telnyxCarrierEvidence?.costLegs??"—"}</strong></p>
+            <p className="mt-1 text-xs">Events with billed duration: <strong>{readiness.productionSnapshot.telnyxCarrierEvidence?.measuredLegs??"—"}</strong></p>
+            <p className="mt-1 text-xs">Events missing billed duration: <strong>{readiness.productionSnapshot.telnyxCarrierEvidence?.missingLegDurations??"—"}</strong></p>
+            <p className="mt-1 text-xs">Events without company attribution: <strong>{readiness.productionSnapshot.telnyxCarrierEvidence?.unattributedLegs??"—"}</strong></p>
+            <p className="mt-1 text-xs">Attributed events with duration: <strong>{readiness.productionSnapshot.telnyxCarrierEvidence?.attributedMeasuredLegs??"—"}</strong></p>
+          </div>
+        </div>}
+        <p className="mt-3 text-xs font-semibold text-amber-900">Next checks: verify terminal Twilio callbacks and their matching call SIDs; reconcile Telnyx cost legs to companies; validate historical carrier CDRs and forwarding legs before enabling minute caps, customer charges or subscriptions.</p>
+      </div>
+
       {readiness.telnyxCallCostWebhookEnabled===false&&<p className="mt-2 text-xs">Enable “Call Cost Webhook Event” under the existing Voice API application in <a href="https://portal.telnyx.com/" target="_blank" rel="noreferrer" className="underline">Telnyx Mission Control</a>. Do not change its voice webhook URL or routing.</p>}
      </div>}
      {readiness?.merchantVerificationWarning&&<p className="mt-3 text-xs text-red-700" role="status">{readiness.merchantVerificationWarning}</p>}
