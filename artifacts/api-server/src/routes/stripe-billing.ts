@@ -6,6 +6,7 @@ import twilio from "twilio";
 import { verifiedCurrentPaidInvoice, verifiedCurrentFailedInvoice } from "../lib/stripe-paid-invoice-evidence";
 import { verifyStripeWebhookSignature } from "../lib/stripe-webhook-signature";
 import { applyStripeEventAtomically } from "../lib/stripe-event-atomic";
+import { fulfillVerifiedIncomingAiTopup, INBOUND_AI_TOPUPS_CERTIFIED, PROPOSED_INBOUND_TOPUPS, validateInboundTopupMinutes } from "../lib/inbound-ai-topups";
 
 const router: IRouter = Router();
 const prices: Record<string, string> = {
@@ -537,6 +538,61 @@ router.get("/billing/inbound-ai-usage-monitor",async(req,res)=>{
     res.status(503).json({error:"Incoming AI usage evidence unavailable"});
   }
 });
+
+/**
+ * Live purchase path remains disabled until the owner's complete cost,
+ * Canadian-tax, refund and carrier usage certification is approved.
+ * This is intentionally independent of legacy VoIP subscription checkout.
+ */
+router.post("/billing/inbound-ai-topup-checkout",async(req,res)=>{
+  if(!INBOUND_AI_TOPUPS_CERTIFIED || !billingEnabled()){
+    res.status(503).json({error:"Prepaid incoming AI top-ups are not available yet"});return;
+  }
+  if(req.user?.role!=="company_admin" || !Number.isSafeInteger(req.user.companyId)){
+    res.status(403).json({error:"Company administrator access required"});return;
+  }
+  const requested=validateInboundTopupMinutes(req.body?.minutes);
+  if(!requested){res.status(400).json({error:"Choose a supported prepaid package"});return;}
+  const companyId=Number(req.user.companyId);
+  try {
+    await confirmCallingAgentMerchant();
+    await requireCanadianTaxCheckoutReady();
+    const company=await pool.query(`SELECT e.company_id,s.stripe_customer_id
+      FROM ca_inbound_ai_enrollment e
+      JOIN ca_stripe_subscriptions s ON s.company_id=e.company_id
+      WHERE e.company_id=$1 AND e.enabled IS TRUE AND e.billing_certified IS TRUE
+      AND s.status='active' AND s.last_payment_status='paid'`,[companyId]);
+    if(!company.rowCount){res.status(403).json({error:"A certified active and paid AI subscription is required"});return;}
+    const subtotal=PROPOSED_INBOUND_TOPUPS[requested];
+    const params=new URLSearchParams({
+      mode:"payment",
+      "line_items[0][price_data][currency]":"cad",
+      "line_items[0][price_data][unit_amount]":String(subtotal),
+      "line_items[0][price_data][product_data][name]":String(requested)+" incoming AI receptionist minutes (current month)",
+      "line_items[0][quantity]":"1",
+      "automatic_tax[enabled]":"true",
+      billing_address_collection:"required",
+      customer:String(company.rows[0].stripe_customer_id),
+      client_reference_id:String(companyId),
+      "metadata[company_id]":String(companyId),
+      "metadata[incoming_ai_minutes]":String(requested),
+      success_url:"https://callingagent.ca/portal/billing?topup=return",
+      cancel_url:"https://callingagent.ca/portal/billing?topup=cancel",
+      expires_at:String(Math.floor(Date.now()/1000)+1800)
+    });
+    const checkout=await stripeRequest("checkout/sessions",params);
+    if(typeof checkout?.id!=="string"||typeof checkout?.url!=="string")throw Error("Top-up checkout session unavailable");
+    await pool.query(`INSERT INTO ca_inbound_ai_topup_intents(
+      session_id,company_id,period_start,minutes,subtotal_cents,stripe_customer_id)
+      VALUES($1,$2,date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',$3,$4,$5)`,[
+        checkout.id,companyId,requested,subtotal,company.rows[0].stripe_customer_id
+      ]);
+    res.json({url:checkout.url});
+  } catch(error:any) {
+    req.log.error({message:error?.message},"Prepaid incoming AI checkout unavailable");
+    res.status(503).json({error:"Prepaid top-up could not be started; no minutes granted"});
+  }
+});
 router.get("/billing/readiness", async(req,res)=>{
   if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
   try{
@@ -894,6 +950,12 @@ async function applyStripeEvent(event: any, client: Awaited<ReturnType<typeof po
   const object = event?.data?.object;
   if (!object?.id) return;
   if (kind === "checkout.session.completed") {
+    if (object.mode === "payment") {
+      // Never treat a Stripe redirect or arbitrary session metadata as funded
+      // minutes. Fulfillment requires registered intent + verified live payment.
+      await fulfillVerifiedIncomingAiTopup(String(object.id),client,stripeKey());
+      return;
+    }
     if (object.mode !== "subscription" || !object.subscription || !object.customer) return;
     const pending = await client.query("SELECT company_id,plan_slug,subscription_id FROM ca_stripe_checkout_intents WHERE session_id=$1", [object.id]);
     const intent = pending.rows[0];
