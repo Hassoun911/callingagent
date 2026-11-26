@@ -436,6 +436,27 @@ router.get("/billing/readiness", async(req,res)=>{
       (SELECT COUNT(*)::integer FROM call_logs WHERE created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS current_month_call_records,
       (SELECT COUNT(*)::integer FROM call_logs WHERE created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AND duration IS NULL) AS current_month_missing_durations
     `);
+    // Diagnostics only: classify call-log completeness separately from signed
+    // Telnyx evidence. Do not infer zero-minute calls from missing durations.
+    // Current phone-number carrier assignment is a hint, not historic proof.
+    const coverage = await pool.query(`SELECT
+      COUNT(*)::integer AS total,
+      COUNT(*) FILTER (WHERE l.duration IS NOT NULL AND l.duration >= 0)::integer AS measured,
+      COUNT(*) FILTER (WHERE l.duration IS NULL)::integer AS missing,
+      COUNT(*) FILTER (WHERE l.duration IS NULL AND l.twilio_call_sid IS NOT NULL)::integer AS missing_twilio_sid,
+      COUNT(*) FILTER (WHERE l.duration IS NULL AND l.twilio_call_sid IS NULL)::integer AS missing_without_twilio_sid,
+      COUNT(*) FILTER (WHERE l.duration IS NULL AND l.status IN ('completed','failed','busy','no-answer','canceled'))::integer AS missing_terminal,
+      COUNT(*) FILTER (WHERE l.duration IS NULL AND (l.status IS NULL OR l.status NOT IN ('completed','failed','busy','no-answer','canceled')))::integer AS missing_nonterminal
+      FROM call_logs l
+      WHERE l.created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`);
+    const carrierLegs = await pool.query(`SELECT
+      COUNT(*)::integer AS total,
+      COUNT(*) FILTER (WHERE billed_duration_secs IS NOT NULL)::integer AS measured,
+      COUNT(*) FILTER (WHERE billed_duration_secs IS NULL)::integer AS missing,
+      COUNT(*) FILTER (WHERE company_id IS NULL)::integer AS unattributed,
+      COUNT(*) FILTER (WHERE company_id IS NOT NULL AND billed_duration_secs IS NOT NULL)::integer AS attributed_measured
+      FROM ca_telnyx_cost_legs
+      WHERE occurred_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`);
     res.set("Cache-Control","no-store");
     res.json({
       liveStripePricesMapped:stripePrices.ready,
@@ -468,7 +489,23 @@ router.get("/billing/readiness", async(req,res)=>{
         activeTwilioLines:legacy.rows[0].active_twilio_lines,
         activeUnattributedLines:legacy.rows[0].active_unattributed_lines,
         currentMonthCallRecords:legacy.rows[0].current_month_call_records,
-        currentMonthCallsMissingDuration:legacy.rows[0].current_month_missing_durations
+        currentMonthCallsMissingDuration:legacy.rows[0].current_month_missing_durations,
+        callDurationCoverage:{
+          total:Number(coverage.rows[0].total),
+          measured:Number(coverage.rows[0].measured),
+          missing:Number(coverage.rows[0].missing),
+          missingWithTwilioSid:Number(coverage.rows[0].missing_twilio_sid),
+          missingWithoutTwilioSid:Number(coverage.rows[0].missing_without_twilio_sid),
+          missingTerminal:Number(coverage.rows[0].missing_terminal),
+          missingNonterminal:Number(coverage.rows[0].missing_nonterminal)
+        },
+        telnyxCarrierEvidence:{
+          costLegs:Number(carrierLegs.rows[0].total),
+          measuredLegs:Number(carrierLegs.rows[0].measured),
+          missingLegDurations:Number(carrierLegs.rows[0].missing),
+          unattributedLegs:Number(carrierLegs.rows[0].unattributed),
+          attributedMeasuredLegs:Number(carrierLegs.rows[0].attributed_measured)
+        }
       },
       plans:plans.rows.map(p=>({slug:p.slug,checkoutEnabled:Boolean(p.checkout_enabled)}))
     });
