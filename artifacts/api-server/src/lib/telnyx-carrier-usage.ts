@@ -1,4 +1,5 @@
 import { pool } from "@workspace/db";
+import { logger } from "./logger";
 
 /**
  * Carrier evidence ingestion. Telnyx call.cost is signed by the existing voice
@@ -45,6 +46,14 @@ export async function recordSignedTelnyxCost(event:any):Promise<void>{
       leg,session,typeof payload.call_control_id==="string"?payload.call_control_id:null,
       typeof event.id==="string"?event.id:null,duration,date
     ]);
+  // Cost webhooks happen after calls; reconcile only exact, signed, company-matched
+  // inbound evidence. A failed history repair must never reject the carrier event.
+  try {
+    const restored = await reconcileVerifiedTelnyxInboundDurations();
+    if(restored) logger.info({ restored }, "Signed Telnyx event restored inbound call durations");
+  } catch(error:any) {
+    logger.warn({ message:error?.message }, "Telnyx duration reconciliation deferred");
+  }
 }
 
 /**
