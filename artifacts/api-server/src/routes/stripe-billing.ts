@@ -6,7 +6,7 @@ import twilio from "twilio";
 import { verifiedCurrentPaidInvoice, verifiedCurrentFailedInvoice } from "../lib/stripe-paid-invoice-evidence";
 import { verifyStripeWebhookSignature } from "../lib/stripe-webhook-signature";
 import { applyStripeEventAtomically } from "../lib/stripe-event-atomic";
-import { fulfillVerifiedIncomingAiTopup, INBOUND_AI_TOPUPS_CERTIFIED, PROPOSED_INBOUND_TOPUPS, validateInboundTopupMinutes } from "../lib/inbound-ai-topups";
+import { fulfillVerifiedIncomingAiTopup, revokeRefundedIncomingAiTopup, INBOUND_AI_TOPUPS_CERTIFIED, PROPOSED_INBOUND_TOPUPS, validateInboundTopupMinutes } from "../lib/inbound-ai-topups";
 
 const router: IRouter = Router();
 const prices: Record<string, string> = {
@@ -17,7 +17,7 @@ const prices: Record<string, string> = {
   pro: "price_1UXTBfK5sDJyhAaeZIKCCcG2",
 };
 const expectedCents: Record<string,number> = {payg:900,starter:1900,business:3900,plus:6900,pro:11900};
-const supported = new Set(["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted", "invoice.paid", "invoice.payment_failed"]);
+const supported = new Set(["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted", "invoice.paid", "invoice.payment_failed", "charge.refunded"]);
 const billingEnabled = () =>
   process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED === "true" &&
   process.env.CALLINGAGENT_STRIPE_ENTITLEMENTS_CERTIFIED === "true" &&
@@ -563,9 +563,17 @@ router.post("/billing/inbound-ai-topup-checkout",async(req,res)=>{
       WHERE e.company_id=$1 AND e.enabled IS TRUE AND e.billing_certified IS TRUE
       AND s.status='active' AND s.last_payment_status='paid'`,[companyId]);
     if(!company.rowCount){res.status(403).json({error:"A certified active and paid AI subscription is required"});return;}
+    // Avoid charging for a current-month allowance just before UTC rollover.
+    // Sessions expire within 30 minutes, so reserve a 60-minute safety margin.
+    const now=new Date();
+    const monthEnd=Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,1);
+    if(monthEnd-now.getTime()<60*60*1000){
+      res.status(409).json({error:"Current-month top-ups pause during the final hour of the month"});return;
+    }
     const subtotal=PROPOSED_INBOUND_TOPUPS[requested];
     const params=new URLSearchParams({
       mode:"payment",
+      "payment_method_types[0]":"card",
       "line_items[0][price_data][currency]":"cad",
       "line_items[0][price_data][unit_amount]":String(subtotal),
       "line_items[0][price_data][product_data][name]":String(requested)+" incoming AI receptionist minutes (current month)",
@@ -949,6 +957,10 @@ async function applyStripeEvent(event: any, client: Awaited<ReturnType<typeof po
   const kind = String(event.type || "");
   const object = event?.data?.object;
   if (!object?.id) return;
+  if(kind==="charge.refunded"){
+    await revokeRefundedIncomingAiTopup(String(object.id),client,stripeKey());
+    return;
+  }
   if (kind === "checkout.session.completed") {
     if (object.mode === "payment") {
       // Never treat a Stripe redirect or arbitrary session metadata as funded
