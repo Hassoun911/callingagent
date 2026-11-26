@@ -411,6 +411,580 @@ router.post("/billing/checkout", async (req, res) => {
     res.status(502).json({ error: "Checkout could not be started" });
   }
 });
+// Bounded, administrator-initiated repair of historic internal Twilio call durations.
+// Retrieves authoritative completed-call duration from the configured Twilio account.
+// Never estimates a duration, changes call routing, touches Telnyx legs or bills anyone.
+// Calls without valid Twilio SIDs, or without a final Twilio duration, stay unmetered.
+router.post("/billing/reconcile-twilio-durations", async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
+  const sid=process.env.TWILIO_ACCOUNT_SID;
+  const token=process.env.TWILIO_AUTH_TOKEN;
+  if(!sid||!token){res.status(503).json({error:"Twilio credentials unavailable; no records changed"});return;}
+  const MAX_BATCH=15;
+  try{
+    const rows=await pool.query<{id:number;twilio_call_sid:string}>(`SELECT id,twilio_call_sid
+      FROM call_logs
+      WHERE duration IS NULL
+        AND twilio_call_sid ~ '^CA[0-9a-fA-F]{32}
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
+  try{
+    let liveMerchantVerified=false;
+    let merchantVerificationWarning: string|null=null;
+    try { await confirmCallingAgentMerchant(); liveMerchantVerified=true; }
+    catch { merchantVerificationWarning="The CallingAgent merchant could not be verified with the configured API key."; }
+    const stripePrices=liveMerchantVerified
+      ? await verifyLiveStripePrices()
+      : {ready:false,issues:["Live Stripe merchant verification required"]};
+    const stripeTax=liveMerchantVerified
+      ? await checkStripeTaxReadiness()
+      : {status:null,missingFields:[],warning:"Stripe Tax merchant verification required"};
+    const signupEmail=await checkSignupSmtpReadiness();
+    const telnyxCost=await checkTelnyxCostConfiguration();
+    const plans=await pool.query("SELECT slug,checkout_enabled FROM ca_plans ORDER BY sort_order");
+    const legacy=await pool.query(`SELECT
+      (SELECT COUNT(*)::integer FROM companies) AS companies,
+      (SELECT COUNT(*)::integer FROM ca_stripe_subscriptions) AS subscribed_companies,
+      (SELECT COUNT(*)::integer FROM phone_numbers WHERE is_active IS TRUE) AS active_lines,
+      (SELECT COUNT(*)::integer FROM phone_numbers WHERE is_active IS TRUE AND twilio_sid IS NOT NULL) AS active_twilio_lines,
+      (SELECT COUNT(*)::integer FROM phone_numbers WHERE is_active IS TRUE AND twilio_sid IS NULL) AS active_unattributed_lines,
+      (SELECT COUNT(*)::integer FROM call_logs WHERE created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS current_month_call_records,
+      (SELECT COUNT(*)::integer FROM call_logs WHERE created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AND duration IS NULL) AS current_month_missing_durations
+    `);
+    // Diagnostics only: classify call-log completeness separately from signed
+    // Telnyx evidence. Do not infer zero-minute calls from missing durations.
+    // Current phone-number carrier assignment is a hint, not historic proof.
+    const coverage = await pool.query(`SELECT
+      COUNT(*)::integer AS total,
+      COUNT(*) FILTER (WHERE l.duration IS NOT NULL AND l.duration >= 0)::integer AS measured,
+      COUNT(*) FILTER (WHERE l.duration IS NULL)::integer AS missing,
+      COUNT(*) FILTER (WHERE l.duration IS NULL AND l.twilio_call_sid IS NOT NULL)::integer AS missing_twilio_sid,
+      COUNT(*) FILTER (WHERE l.duration IS NULL AND l.twilio_call_sid IS NULL)::integer AS missing_without_twilio_sid,
+      COUNT(*) FILTER (WHERE l.duration IS NULL AND l.status IN ('completed','failed','busy','no-answer','canceled'))::integer AS missing_terminal,
+      COUNT(*) FILTER (WHERE l.duration IS NULL AND (l.status IS NULL OR l.status NOT IN ('completed','failed','busy','no-answer','canceled')))::integer AS missing_nonterminal
+      FROM call_logs l
+      WHERE l.created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`);
+    const carrierLegs = await pool.query(`SELECT
+      COUNT(*)::integer AS total,
+      COUNT(*) FILTER (WHERE billed_duration_secs IS NOT NULL)::integer AS measured,
+      COUNT(*) FILTER (WHERE billed_duration_secs IS NULL)::integer AS missing,
+      COUNT(*) FILTER (WHERE company_id IS NULL)::integer AS unattributed,
+      COUNT(*) FILTER (WHERE company_id IS NOT NULL AND billed_duration_secs IS NOT NULL)::integer AS attributed_measured
+      FROM ca_telnyx_cost_legs
+      WHERE occurred_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`);
+    res.set("Cache-Control","no-store");
+    res.json({
+      liveStripePricesMapped:stripePrices.ready,
+      stripePriceVerificationIssues:stripePrices.issues,
+      secretKeyConfigured:Boolean(stripeKey()),
+      liveKeyFormatValid:/^(sk_live_|rk_live_)/.test(stripeKey()),
+      expectedMerchant:expectedStripeAccountId,
+      liveMerchantVerified,
+      merchantVerificationWarning,
+      stripeTaxStatus:stripeTax.status,
+      stripeTaxMissingFields:stripeTax.missingFields,
+      stripeTaxWarning:stripeTax.warning,
+      webhookSecretConfigured:Boolean(process.env.CALLINGAGENT_STRIPE_WEBHOOK_SECRET),
+      entitlementEnforcementCertified:process.env.CALLINGAGENT_STRIPE_ENTITLEMENTS_CERTIFIED==="true",
+      globalCheckoutApproved:process.env.CALLINGAGENT_STRIPE_CHECKOUT_ENABLED==="true",
+      checkoutEnabled:billingEnabled(),
+      carrierUsageVerified:false,
+      telnyxCallCostWebhookEnabled:telnyxCost.enabled,
+      telnyxVoiceWebhookCorrect:telnyxCost.webhookCorrect,
+      telnyxConfigurationWarning:telnyxCost.warning,
+      automaticProvisioningCertified:false,
+      signupEmailSmtpConfigured:signupEmail.configured,
+      signupEmailSmtpReachable:signupEmail.reachable,
+      signupEmailWarning:signupEmail.warning,
+      signupEmailInboxDeliveryTested:false,
+      productionSnapshot:{
+        existingCompanies:legacy.rows[0].companies,
+        subscriptionsRecorded:legacy.rows[0].subscribed_companies,
+        activePhoneLines:legacy.rows[0].active_lines,
+        activeTwilioLines:legacy.rows[0].active_twilio_lines,
+        activeUnattributedLines:legacy.rows[0].active_unattributed_lines,
+        currentMonthCallRecords:legacy.rows[0].current_month_call_records,
+        currentMonthCallsMissingDuration:legacy.rows[0].current_month_missing_durations,
+        callDurationCoverage:{
+          total:Number(coverage.rows[0].total),
+          measured:Number(coverage.rows[0].measured),
+          missing:Number(coverage.rows[0].missing),
+          missingWithTwilioSid:Number(coverage.rows[0].missing_twilio_sid),
+          missingWithoutTwilioSid:Number(coverage.rows[0].missing_without_twilio_sid),
+          missingTerminal:Number(coverage.rows[0].missing_terminal),
+          missingNonterminal:Number(coverage.rows[0].missing_nonterminal)
+        },
+        telnyxCarrierEvidence:{
+          costLegs:Number(carrierLegs.rows[0].total),
+          measuredLegs:Number(carrierLegs.rows[0].measured),
+          missingLegDurations:Number(carrierLegs.rows[0].missing),
+          unattributedLegs:Number(carrierLegs.rows[0].unattributed),
+          attributedMeasuredLegs:Number(carrierLegs.rows[0].attributed_measured)
+        }
+      },
+      plans:plans.rows.map(p=>({slug:p.slug,checkoutEnabled:Boolean(p.checkout_enabled)}))
+    });
+  }catch(err:any){req.log.error({error:err.message},"Billing readiness check failed");res.status(503).json({error:"Readiness unavailable"});}
+});
+// Verify each published product against the live Stripe account, catalog,
+// and delivery readiness without creating charges or subscriptions.
+router.get("/billing/launch-audit",async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Platform administrator access required"});return;}
+  try{
+    const issues:string[]=[];
+    let merchantVerified=false;
+    try{await confirmCallingAgentMerchant();merchantVerified=true;}
+    catch{issues.push("Live Stripe merchant API access could not be verified");}
+    const signupEmail=await checkSignupSmtpReadiness();
+    if(signupEmail.warning)issues.push(signupEmail.warning);
+    const catalog=await pool.query("SELECT slug,price_cents,monthly_minutes,included_numbers,is_enabled,is_published,checkout_enabled FROM ca_plans ORDER BY sort_order,id");
+    const verifiedPrices=merchantVerified?await verifyLiveStripePrices():{ready:false,issues:["Stripe prices cannot be checked until merchant verification succeeds"]};
+    issues.push(...verifiedPrices.issues);
+    const stripeTax=merchantVerified
+      ? await checkStripeTaxReadiness()
+      : {status:null,missingFields:[],warning:"Stripe Tax merchant verification required"};
+    if(stripeTax.warning)issues.push(stripeTax.warning);
+    if(stripeTax.missingFields.length)issues.push(
+      "Stripe Tax missing configuration fields: "+stripeTax.missingFields.join(", ")
+    );
+    const totals=await pool.query(`SELECT
+      (SELECT COUNT(*)::integer FROM ca_stripe_subscriptions) AS subscriptions,
+      (SELECT COUNT(*)::integer FROM ca_stripe_checkout_intents) AS checkout_intents,
+      (SELECT COUNT(*)::integer FROM ca_telnyx_cost_legs) AS telnyx_cost_legs,
+      (SELECT COUNT(*)::integer FROM ca_telnyx_cost_legs WHERE billed_duration_secs IS NULL) AS telnyx_missing_durations,
+      (SELECT COUNT(*)::integer FROM ca_telnyx_cost_legs WHERE company_id IS NULL) AS telnyx_unattributed_legs,
+      (SELECT COUNT(*)::integer FROM ca_telnyx_cost_legs WHERE company_id IS NOT NULL) AS telnyx_attributed_legs,
+      (SELECT COALESCE(SUM(billed_duration_secs),0)::bigint FROM ca_telnyx_cost_legs WHERE company_id IS NOT NULL) AS telnyx_attributed_billed_seconds,
+      (SELECT COUNT(*)::integer FROM call_logs WHERE created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS monthly_calls,
+      (SELECT COUNT(*)::integer FROM call_logs WHERE created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AND duration IS NULL) AS missing_call_durations`);
+    const metrics=totals.rows[0];
+    if(Number(metrics.missing_call_durations)>0)issues.push("Unmeasured call-log durations prevent reliable minute accounting");
+    if(!Number(metrics.telnyx_cost_legs))issues.push("No signed Telnyx carrier cost-leg records have been reconciled");
+    if(Number(metrics.telnyx_unattributed_legs)>0)
+      issues.push(`${metrics.telnyx_unattributed_legs} Telnyx cost legs are missing verified company ownership; usage cannot be fully invoiced or enforced`);
+    if(Number(metrics.telnyx_missing_durations)>0)
+      issues.push(`${metrics.telnyx_missing_durations} Telnyx cost legs are missing carrier-rated duration`);
+    issues.push("Verified carrier-leg minute enforcement has not been certified");
+    issues.push("Automatic paid-customer number selection and provisioning has not been certified");
+    const plans=catalog.rows.map(p=>({
+      slug:p.slug,livePriceId:prices[p.slug]||null,amountMatchesStripeMapping:expectedCents[p.slug]===Number(p.price_cents),
+      monthlyMinutes:Number(p.monthly_minutes),includedNumbers:Number(p.included_numbers),
+      published:Boolean(p.is_published),enabled:Boolean(p.is_enabled),checkoutApproved:Boolean(p.checkout_enabled),
+      stripePriceVerified:merchantVerified&&verifiedPrices.ready&&Boolean(prices[p.slug])
+    }));
+    if(plans.some(p=>!p.amountMatchesStripeMapping))issues.push("At least one catalog amount differs from its mapped live Stripe price");
+    res.set("Cache-Control","no-store");
+    res.json({merchantVerified,liveStripePricesVerified:verifiedPrices.ready,
+      stripeTaxStatus:stripeTax.status,stripeTaxMissingFields:stripeTax.missingFields,stripeTaxWarning:stripeTax.warning,
+      signupEmailSmtpConfigured:signupEmail.configured,signupEmailSmtpReachable:signupEmail.reachable,signupEmailWarning:signupEmail.warning,signupEmailInboxDeliveryTested:false,
+      checkoutEnabled:billingEnabled(),
+      merchantId:expectedStripeAccountId,
+      plans,metrics,issues,
+      chargeAttempted:false,phoneProvisioningAttempted:false,
+      verdict:"not_certified_for_live_checkout"});
+  }catch(err:any){
+    req.log.error({message:err?.message},"Live billing launch audit failed");
+    res.status(503).json({error:"Launch audit unavailable"});
+  }
+});
+// Independent read-only Twilio call-leg audit. This deliberately does NOT
+// alter service access or certify customer billable minutes. Twilio's rated
+// invoice is still the financial source of truth.
+router.get("/billing/twilio-diagnostic", async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Platform administrator access required"});return;}
+  const sid=process.env.TWILIO_ACCOUNT_SID,token=process.env.TWILIO_AUTH_TOKEN;
+  if(!sid||!token){res.status(503).json({error:"Twilio billing credentials unavailable"});return;}
+  try {
+    const assigned=await pool.query("SELECT number,company_id FROM phone_numbers WHERE twilio_sid IS NOT NULL AND company_id IS NOT NULL");
+    const assignedNumbers=new Map<string,number>(assigned.rows.map(x=>[String(x.number),Number(x.company_id)]));
+    const monthStart=new Date(Date.UTC(new Date().getUTCFullYear(),new Date().getUTCMonth(),1));
+    const calls=await twilio(sid,token).calls.list({startTimeAfter:monthStart,pageSize:100,limit:300});
+    const found=new Map<string,number>();
+    // Parent inbound calls identify the company by its business number.
+    for(const call of calls){
+      const company=assignedNumbers.get(String(call.to));
+      if(company)found.set(String(call.sid),company);
+    }
+    // Child forwarding legs inherit the company of their parent call.
+    for(let pass=0;pass<4;pass++){
+      for(const call of calls){
+        const parent=String(call.parentCallSid||"");
+        if(!found.has(String(call.sid))&&found.has(parent))found.set(String(call.sid),found.get(parent)!);
+      }
+    }
+    const groups=new Map<number,{legs:number;withDuration:number;missingDuration:number;approxRoundedLegMinutes:number;childLegs:number}>();
+    for(const call of calls){
+      const company=found.get(String(call.sid));
+      if(!company)continue;
+      const stat=groups.get(company)||{legs:0,withDuration:0,missingDuration:0,approxRoundedLegMinutes:0,childLegs:0};
+      stat.legs++;
+      if(call.parentCallSid)stat.childLegs++;
+      const raw=call.duration;
+      const value=raw===null||raw===undefined?NaN:Number(raw);
+      if(Number.isSafeInteger(value)&&value>=0){
+        stat.withDuration++;stat.approxRoundedLegMinutes+=Math.ceil(value/60);
+      }else stat.missingDuration++;
+      groups.set(company,stat);
+    }
+    res.set("Cache-Control","no-store");
+    res.json({
+      periodStartUTC:monthStart.toISOString(),
+      accountCallRecordsFetched:calls.length,
+      truncated:calls.length===300,
+      assignedTwilioNumbers:assigned.rows.length,
+      attributionComplete:false,
+      financialBillingCertified:false,
+      warning:"Read-only partial carrier call-leg audit; 300-record cap, calendar-month period and possible missing child legs. Not an invoice or enforceable remaining-minute balance.",
+      companies:Array.from(groups.entries()).map(([companyId,data])=>({companyId,...data}))
+    });
+  }catch(error:any){
+    req.log.error({message:error?.message},"Twilio carrier diagnostic failed");
+    res.status(503).json({error:"Twilio carrier diagnostic unavailable"});
+  }
+});
+// Read-only entitlement audit. This does not meter billable carrier legs or
+// activate service: existing customers without Stripe rows remain untouched.
+router.get("/billing/entitlements", async (req,res) => {
+  const role=req.user?.role;
+  if(!req.user || !["super_admin","company_admin","company_user","company_read_only"].includes(role||"")){
+    res.status(403).json({error:"Authenticated company access required"});return;
+  }
+  const isSuper=role==="super_admin";
+  const companyId=isSuper?Number(req.query.companyId):req.user?.companyId;
+  if(!Number.isSafeInteger(companyId)||companyId<=0){
+    res.status(400).json({error:"Valid company ID required"});return;
+  }
+  try{
+    const result=await pool.query(`
+      SELECT c.id AS company_id, c.name AS company_name,
+        s.plan_slug,s.status,s.current_period_end,
+        p.monthly_minutes,p.included_numbers,p.features,
+        (SELECT COUNT(*)::integer FROM phone_numbers n WHERE n.company_id=c.id) AS assigned_numbers,
+        (SELECT COUNT(*)::integer FROM phone_numbers n WHERE n.company_id=c.id AND n.is_active IS TRUE) AS active_numbers
+      FROM companies c
+      LEFT JOIN ca_stripe_subscriptions s ON s.company_id=c.id
+      LEFT JOIN ca_plans p ON p.slug=s.plan_slug
+      WHERE c.id=$1
+    `,[companyId]);
+    const row=result.rows[0];
+    if(!row){res.status(404).json({error:"Company not found"});return;}
+    const hasSubscription=Boolean(row.plan_slug);
+    const numberLimit=hasSubscription?Number(row.included_numbers):null;
+    const assigned=Number(row.assigned_numbers);
+    // This is an internal call-log estimate, not Stripe/carrier-rated minutes:
+    // forward legs may be billed separately, and missing durations are not free.
+    const usage=await pool.query(`
+      SELECT COUNT(*)::integer AS calls,
+        COUNT(*) FILTER (WHERE l.duration IS NULL OR l.duration < 0)::integer AS unmetered_calls,
+        COALESCE(SUM(CASE WHEN l.duration >= 0
+          THEN CEIL(l.duration::numeric / 60) ELSE 0 END),0)::integer AS logged_rounded_minutes
+      FROM call_logs l
+      JOIN phone_numbers n ON n.id=l.phone_number_id
+      WHERE n.company_id=$1
+        AND l.created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+    `,[companyId]);
+    const approximate=usage.rows[0];
+    const telnyxEvidence=await pool.query(`SELECT
+      COUNT(*)::integer AS leg_records,
+      COUNT(*) FILTER(WHERE billed_duration_secs IS NULL)::integer AS missing_billed_duration,
+      COALESCE(SUM(billed_duration_secs),0)::bigint AS billed_leg_seconds
+      FROM ca_telnyx_cost_legs
+      WHERE company_id=$1 AND occurred_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+    `,[companyId]);
+    const leg=telnyxEvidence.rows[0];
+    res.set("Cache-Control","no-store");
+    res.json({
+      companyId:row.company_id,companyName:row.company_name,
+      billingType:hasSubscription?"stripe":"legacy_unassigned",
+      subscription:hasSubscription?{plan:row.plan_slug,status:row.status,currentPeriodEnd:row.current_period_end}:null,
+      numbers:{assigned,active:Number(row.active_numbers),included:numberLimit,
+        withinAllowance:numberLimit===null?null:assigned<=numberLimit},
+      monthlyMinutes:row.monthly_minutes===null?null:Number(row.monthly_minutes),
+      enabledFeatures:row.features||[],
+      carrierUsageVerified:false,
+      telnyxCarrierEvidence:{
+        period:"current UTC calendar month",
+        signedCostLegRecords:Number(leg.leg_records),
+        missingBilledDurations:Number(leg.missing_billed_duration),
+        sumBilledLegSeconds:Number(leg.billed_leg_seconds),
+        notYetReconciled:true
+      },
+      internalLogEstimate:{
+        period:"current UTC calendar month",
+        callRecords:Number(approximate.calls),
+        callsWithMissingDuration:Number(approximate.unmetered_calls),
+        roundedCallMinutes:Number(approximate.logged_rounded_minutes),
+        notForBilling:true
+      },
+      automaticProvisioningCertified:false,
+      note:hasSubscription?"Allowances are catalog limits, not verified carrier usage.":"Existing line preserved; no Stripe subscription assigned.",
+    });
+  }catch(error:any){
+    req.log.error({message:error?.message},"Failed to audit company entitlements");
+    res.status(503).json({error:"Entitlement audit unavailable"});
+  }
+});
+// Company-only subscription reporting; never rely on the public package query
+// to decide whether a company has paid entitlements.
+router.get("/billing/status", async (req, res) => {
+  if (!req.user || !["company_admin","company_user","company_read_only"].includes(req.user.role) || !Number.isInteger(req.user.companyId)) {
+    res.status(403).json({error:"Company access required"}); return;
+  }
+  try {
+    const result = await pool.query("SELECT plan_slug,status,current_period_end,updated_at,last_payment_status,last_payment_at FROM ca_stripe_subscriptions WHERE company_id=$1",[req.user.companyId]);
+    const row=result.rows[0] || null;
+    res.set("Cache-Control","no-store");
+    // This reports contractual limits, NOT metered consumption or provisioning.
+    // Never call these numbers "remaining minutes" until carrier-leg CDR
+    // reconciliation and hard-stop policy are independently certified.
+    const plan = row ? await pool.query(
+      "SELECT monthly_minutes,included_numbers,features FROM ca_plans WHERE slug=$1",
+      [row.plan_slug]
+    ) : null;
+    const limits = plan?.rows[0] || null;
+    res.json({ subscription:row ? {
+      plan:row.plan_slug,status:row.status,currentPeriodEnd:row.current_period_end,
+      updatedAt:row.updated_at,lastPaymentStatus:row.last_payment_status,lastPaymentAt:row.last_payment_at
+    } : null, planLimits:limits ? {
+      includedMonthlyMinutes:limits.monthly_minutes,
+      includedNumbers:limits.included_numbers,
+      features:limits.features
+    } : null, usageCertified:false, provisioningCertified:false,
+      checkoutEnabled:billingEnabled() });
+  } catch(err:any) {
+    req.log.error({error:err.message},"Failed to retrieve company billing status");
+    res.status(503).json({error:"Billing status unavailable"});
+  }
+});
+router.post("/billing/portal", async (req, res) => {
+  if (req.user?.role !== "company_admin" || !Number.isInteger(req.user.companyId)) {
+    res.status(403).json({error:"Company administrator access required"}); return;
+  }
+  try {
+    const result=await pool.query("SELECT stripe_customer_id FROM ca_stripe_subscriptions WHERE company_id=$1",[req.user.companyId]);
+    if(!result.rowCount){res.status(404).json({error:"No Stripe subscription found for this company"});return;}
+    await confirmCallingAgentMerchant();
+    const params=new URLSearchParams({customer:result.rows[0].stripe_customer_id,return_url:"https://callingagent.ca/"});
+    const session=await stripeRequest("billing_portal/sessions",params);
+    if(!session?.url)throw Error("Stripe portal URL unavailable");
+    res.json({url:session.url});
+  }catch(err:any){
+    req.log.error({error:err.message},"Failed to create company billing portal session");
+    res.status(502).json({error:"Billing portal unavailable"});
+  }
+});
+// Billing events update an internal status ledger only. They never provision, suspend,
+// purchase or release a phone number; that requires separately certified enforcement.
+function subscriptionPriceId(subscription: any): string | null {
+  return subscription?.items?.data?.[0]?.price?.id || null;
+}
+async function applyStripeEvent(event: any, client: Awaited<ReturnType<typeof pool.connect>>): Promise<void> {
+  const kind = String(event.type || "");
+  const object = event?.data?.object;
+  if (!object?.id) return;
+  if (kind === "checkout.session.completed") {
+    if (object.mode !== "subscription" || !object.subscription || !object.customer) return;
+    const pending = await client.query("SELECT company_id,plan_slug,subscription_id FROM ca_stripe_checkout_intents WHERE session_id=$1", [object.id]);
+    const intent = pending.rows[0];
+    if (!intent || (intent.subscription_id && intent.subscription_id !== object.subscription)) return;
+    const expected = prices[String(intent.plan_slug)];
+    if (!expected) return;
+    // Retrieve the subscription directly from Stripe rather than trust browser redirects or client metadata.
+    const key = stripeKey();
+    if (!key) throw new Error("Stripe secret key unavailable for subscription verification");
+    const response = await fetch("https://api.stripe.com/v1/subscriptions/" + encodeURIComponent(object.subscription) + "?expand[]=items.data.price&expand[]=latest_invoice", {
+      headers: { Authorization: "Bearer " + key }, signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) throw new Error("Unable to verify subscription with Stripe");
+    const sub: any = await response.json();
+    if (sub.livemode !== true || sub.customer !== object.customer || subscriptionPriceId(sub) !== expected) throw new Error("Checkout subscription did not match selected live plan");
+    const latestInvoice = typeof sub.latest_invoice==="object" ? sub.latest_invoice : null;
+    const latestPayment = latestInvoice?.paid===true ? "paid" :
+      latestInvoice?.status==="open" ? "pending" :
+      latestInvoice?.status==="uncollectible" ? "failed" : null;
+    await client.query(`INSERT INTO ca_stripe_subscriptions(company_id,stripe_customer_id,stripe_subscription_id,plan_slug,status,current_period_end,last_event_created,last_payment_status,last_payment_at)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      ON CONFLICT(company_id) DO UPDATE SET
+      stripe_customer_id=EXCLUDED.stripe_customer_id,
+      stripe_subscription_id=EXCLUDED.stripe_subscription_id,
+      plan_slug=EXCLUDED.plan_slug,status=EXCLUDED.status,current_period_end=EXCLUDED.current_period_end,
+      last_event_created=EXCLUDED.last_event_created,
+      last_payment_status=CASE WHEN ca_stripe_subscriptions.last_invoice_event_created=0
+        THEN COALESCE(EXCLUDED.last_payment_status,ca_stripe_subscriptions.last_payment_status)
+        ELSE ca_stripe_subscriptions.last_payment_status END,
+      last_payment_at=CASE WHEN ca_stripe_subscriptions.last_invoice_event_created=0
+        THEN COALESCE(EXCLUDED.last_payment_at,ca_stripe_subscriptions.last_payment_at)
+        ELSE ca_stripe_subscriptions.last_payment_at END,
+      updated_at=now()
+      WHERE ca_stripe_subscriptions.last_event_created <= EXCLUDED.last_event_created`, [
+      intent.company_id,sub.customer,sub.id,intent.plan_slug,sub.status,
+      Number.isFinite(sub.current_period_end) ? new Date(sub.current_period_end*1000) : null,
+      event.created || 0,latestPayment,latestPayment==="paid" ? new Date() : null,
+    ]);
+    await client.query("UPDATE ca_stripe_checkout_intents SET subscription_id=$2 WHERE session_id=$1", [object.id,sub.id]);
+    if(latestPayment==="paid" && sub.status==="active"){
+      await client.query(`INSERT INTO ca_billing_fulfillment(stripe_subscription_id,company_id,plan_slug)
+        VALUES($1,$2,$3) ON CONFLICT(stripe_subscription_id) DO NOTHING`,[sub.id,intent.company_id,intent.plan_slug]);
+    }
+    return;
+  }
+  if (kind === "invoice.paid" || kind === "invoice.payment_failed") {
+    // Status is reported independently of the subscription's entitlement state.
+    const subscriptionId = typeof object.subscription === "string" ? object.subscription :
+      object.parent?.subscription_details?.subscription;
+    if (typeof subscriptionId !== "string") return;
+    const eventCreated=Number(event.created);
+    // Stripe timestamps have second precision. Reject older events, and never
+    // let a failed-payment notification reverse a paid event at the same second.
+    if(!Number.isSafeInteger(eventCreated)||eventCreated<=0)throw new Error("Invalid Stripe invoice event timestamp");
+    const paymentStatus=kind==="invoice.paid"?"paid":"failed";
+    // Even a signed failed-payment event can refer to an older invoice.
+    // Only the latest invoice for the CURRENT Stripe package can change
+    // this company's paid status or put its fulfillment on hold.
+    const assigned=await client.query(
+      "SELECT plan_slug FROM ca_stripe_subscriptions WHERE stripe_subscription_id=$1",
+      [subscriptionId]);
+    if(!assigned.rowCount)return; // Checkout completion reconciles the initial invoice.
+    const expectedPrice=prices[String(assigned.rows[0].plan_slug)];
+    if(!expectedPrice)return;
+    const key=stripeKey();
+    if(!key)throw Error("Stripe API unavailable for invoice verification");
+    const [invoiceResponse,subResponse]=await Promise.all([
+      fetch("https://api.stripe.com/v1/invoices/"+encodeURIComponent(object.id),{
+        headers:{Authorization:"Bearer "+key},signal:AbortSignal.timeout(15000)
+      }),
+      fetch("https://api.stripe.com/v1/subscriptions/"+encodeURIComponent(subscriptionId),{
+        headers:{Authorization:"Bearer "+key},signal:AbortSignal.timeout(15000)
+      })
+    ]);
+    if(!invoiceResponse.ok || !subResponse.ok)
+      throw Error("Unable to fetch verified Stripe invoice/subscription evidence");
+    const invoice:any=await invoiceResponse.json();
+    const subscription:any=await subResponse.json();
+    if(kind==="invoice.paid"){
+      if(!verifiedCurrentPaidInvoice(invoice,subscription,subscriptionId,expectedPrice))return;
+    }else{
+      if(!verifiedCurrentFailedInvoice(invoice,subscription,subscriptionId,expectedPrice))return;
+    }
+    const updated=await client.query(`UPDATE ca_stripe_subscriptions
+      SET last_payment_status=$2,
+          last_payment_at=now(),
+          last_invoice_event_created=$3,
+          updated_at=now()
+      WHERE stripe_subscription_id=$1
+        AND (last_invoice_event_created<$3
+          OR (last_invoice_event_created=$3 AND ($2='paid' OR last_payment_status IS DISTINCT FROM 'paid')))
+      RETURNING company_id,plan_slug,status`, [
+      subscriptionId,paymentStatus,eventCreated
+    ]);
+    if(kind==="invoice.paid" && updated.rows[0]?.status==="active"){
+      await client.query(`INSERT INTO ca_billing_fulfillment(stripe_subscription_id,company_id,plan_slug)
+        VALUES($1,$2,$3) ON CONFLICT(stripe_subscription_id)
+        DO UPDATE SET status='awaiting_review',updated_at=now()
+        WHERE ca_billing_fulfillment.status='payment_hold'`,[
+        subscriptionId,updated.rows[0].company_id,updated.rows[0].plan_slug
+      ]);
+    }
+    if(kind==="invoice.payment_failed" && updated.rowCount){
+      // Hold requests still awaiting operator fulfillment. Existing lines
+      // are unchanged; no automatic suspension or deprovisioning.
+      await client.query(`UPDATE ca_billing_fulfillment
+        SET status='payment_hold',updated_at=now()
+        WHERE stripe_subscription_id=$1 AND status='awaiting_review'`,[subscriptionId]);
+    }
+    return;
+  }
+  if (kind.startsWith("customer.subscription.")) {
+    const current = await client.query("SELECT company_id,last_event_created FROM ca_stripe_subscriptions WHERE stripe_subscription_id=$1", [object.id]);
+    if (!current.rowCount || Number(current.rows[0].last_event_created) > Number(event.created || 0)) return;
+    const nextSlug = Object.entries(prices).find(([,id])=>id===subscriptionPriceId(object))?.[0];
+    if (!nextSlug) return;
+    const subscriptionUpdate=await client.query(`UPDATE ca_stripe_subscriptions
+      SET status=$2,plan_slug=$3,current_period_end=$4,
+      last_event_created=$5,updated_at=now(),
+      -- A previously paid invoice does not prove that a newly selected
+      -- package has been paid. Require new invoice evidence on plan changes.
+      last_payment_status=CASE WHEN plan_slug IS DISTINCT FROM $3 THEN NULL ELSE last_payment_status END,
+      last_invoice_event_created=CASE WHEN plan_slug IS DISTINCT FROM $3 THEN GREATEST(last_invoice_event_created,$5) ELSE last_invoice_event_created END
+      WHERE stripe_subscription_id=$1 AND last_event_created<=$5
+      RETURNING stripe_subscription_id`,[
+      object.id,object.status,nextSlug,
+      Number.isFinite(object.current_period_end) ? new Date(object.current_period_end*1000) : null,
+      event.created || 0,
+    ]);
+    if(subscriptionUpdate.rowCount && ["canceled","unpaid","incomplete_expired"].includes(String(object.status))){
+      await client.query(`UPDATE ca_billing_fulfillment
+        SET status='payment_hold',updated_at=now()
+        WHERE stripe_subscription_id=$1 AND status='awaiting_review'`,[object.id]);
+    }
+  }
+}
+
+router.post("/billing/stripe-webhook", async (req, res) => {
+  const secret = process.env.CALLINGAGENT_STRIPE_WEBHOOK_SECRET;
+  const raw = (req as typeof req & {rawBody?: Buffer}).rawBody;
+  if (!secret || !raw || !verifyStripeWebhookSignature(raw, String(req.headers["stripe-signature"] || ""), secret)) {
+    res.status(400).json({error:"Invalid signature"}); return;
+  }
+  try {
+    const event = JSON.parse(raw.toString("utf8"));
+    if (typeof event.id !== "string" || !supported.has(event.type) || event.livemode !== true) {
+      res.json({received:true}); return;
+    }
+    // Serialize Stripe deliveries in a single DB transaction: a crash cannot
+    // persist only the subscription status or only the idempotency receipt.
+    // Transaction-scoped lock is automatically released on commit/rollback.
+    const client = await pool.connect();
+    try {
+      await applyStripeEventAtomically(client,event.id,()=>applyStripeEvent(event,client));
+    } finally {
+      client.release();
+    }
+    req.log.info({ eventType:event.type, eventId:event.id }, "Verified Stripe billing event processed");
+    res.json({received:true});
+  } catch (err: any) {
+    req.log.error({error:err.message}, "Stripe webhook processing failed");
+    res.status(500).json({error:"Webhook failed"});
+  }
+});
+export default router;
+
+        AND status IN ('completed','failed','busy','no-answer','canceled')
+        AND created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+      ORDER BY created_at DESC,id DESC LIMIT $1`,[MAX_BATCH]);
+    const client=twilio(sid,token);
+    let repaired=0,unavailable=0,errors=0,unchanged=0;
+    // Sequential carrier calls bound provider rate and operational impact.
+    for(const log of rows.rows){
+      try{
+        const call=await client.calls(log.twilio_call_sid).fetch();
+        const secs=call.duration==null?NaN:Number(call.duration);
+        if(!["completed","busy","failed","no-answer","canceled"].includes(String(call.status)) ||
+          !Number.isSafeInteger(secs)||secs<0||secs>86400){
+          unavailable++;continue;
+        }
+        const result=await pool.query(`UPDATE call_logs
+          SET duration=$1
+          WHERE id=$2 AND twilio_call_sid=$3 AND duration IS NULL
+          RETURNING id`,[secs,log.id,log.twilio_call_sid]);
+        if(result.rowCount)repaired++;
+        else unchanged++;
+      }catch(error:any){
+        errors++;
+        req.log.warn({callLogId:log.id,message:error?.message},"Twilio historical duration lookup failed");
+      }
+    }
+    res.set("Cache-Control","no-store");
+    res.json({
+      fetched:rows.rows.length,limit:MAX_BATCH,repaired,unavailable,errors,unchanged,
+      moreCandidatesPossible:rows.rows.length===MAX_BATCH,
+      certifiedForBilling:false,
+      message:"Only carrier-reported parent-call durations are copied to empty internal records. Forwarding legs, Telnyx evidence and billable AI usage remain uncertified. No charges or account changes."
+    });
+  }catch(error:any){
+    req.log.error({message:error?.message},"Twilio duration reconciliation failed");
+    res.status(503).json({error:"Carrier reconciliation unavailable; subscription checkout unchanged"});
+  }
+});
 router.get("/billing/readiness", async(req,res)=>{
   if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
   try{
