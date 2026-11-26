@@ -4,6 +4,7 @@ import AiMarginSimulator from "@/components/ai-margin-simulator";
 
 type Plan={id:number;slug:string;name:string;priceCents:number;monthlyMinutes:number;includedNumbers:number;features:string[];description:string;isPublished:boolean;isEnabled:boolean;checkoutEnabled:boolean;sortOrder:number};
 type BillingReadiness={stripePriceVerificationIssues?:string[];telnyxCallCostWebhookEnabled:boolean|null;telnyxVoiceWebhookCorrect:boolean|null;telnyxConfigurationWarning:string|null;liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;liveMerchantVerified:boolean;merchantVerificationWarning:string|null;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;carrierUsageVerified:boolean;automaticProvisioningCertified:boolean;productionSnapshot:{existingCompanies:number;subscriptionsRecorded:number;activePhoneLines:number;activeTwilioLines:number;activeUnattributedLines:number;currentMonthCallRecords:number;currentMonthCallsMissingDuration:number;callDurationCoverage?:{total:number;measured:number;missing:number;missingWithTwilioSid:number;missingWithoutTwilioSid:number;missingTerminal:number;missingNonterminal:number};telnyxCarrierEvidence?:{costLegs:number;measuredLegs:number;missingLegDurations:number;unattributedLegs:number;attributedMeasuredLegs:number}};plans:{slug:string;checkoutEnabled:boolean}[]};
+type MonthlyAiEvidence={companies:number;calls:number;measuredCalls:number;unmeasuredCalls:number;roundedMeasuredMinutes:number;entitlementActive:boolean;topupsActive:boolean;hardCapEnforced:boolean;billableUsageCertified:boolean};
 type InboundAiMonitor={incomingAiCalls:number;measuredCalls:number;missingDurations:number;roundedParentMinutes:number;terminalCalls:number;terminalMissingDuration:number;billableUsageCertified:boolean;hardCapEnforced:boolean;note:string};
 type LaunchInterest={id:number;plan_slug:string;contact_name:string;email:string;phone:string|null;company_name:string|null;created_at:string;sales_status:"new"|"contacted"|"qualified"|"closed_won"|"closed_lost";sales_notes:string;sales_updated_at:string|null};
 type FulfillmentItem={company_id:number;company_name:string;plan_slug:string;fulfillment_status:string;created_at:string;subscription_status:string|null;last_payment_status:string|null;active_numbers:number;included_numbers:number|null};
@@ -23,6 +24,8 @@ export default function PlanManagement(){
  const [readinessMessage,setReadinessMessage]=useState("");
  const [inboundAiMonitor,setInboundAiMonitor]=useState<InboundAiMonitor|null>(null);
  const [inboundAiError,setInboundAiError]=useState("");
+ const [monthlyAiEvidence,setMonthlyAiEvidence]=useState<MonthlyAiEvidence|null>(null);
+ const [monthlyAiEvidenceError,setMonthlyAiEvidenceError]=useState("");
  const [durationRepairBusy,setDurationRepairBusy]=useState(false);
  const [durationRepairReport,setDurationRepairReport]=useState("");
  const [telnyxRepairBusy,setTelnyxRepairBusy]=useState(false);
@@ -83,6 +86,14 @@ export default function PlanManagement(){
   }catch(e:any){setLaunchAuditError(e?.message||"Launch audit unavailable");}
   finally{setLaunchAuditBusy(false);}
  }
+ async function loadMonthlyAiEvidence(){
+    try {
+      const r=await fetch("/api/billing/inbound-ai-monthly-evidence",{credentials:"include",cache:"no-store"});
+      const data=await r.json();
+      if(!r.ok||typeof data.calls!=="number")throw Error(data.error||"Monthly AI usage evidence unavailable");
+      setMonthlyAiEvidence(data);setMonthlyAiEvidenceError("");
+    }catch(error:any){setMonthlyAiEvidenceError(error?.message||"Monthly evidence unavailable")}
+ }
  async function loadInboundAiMonitor(){
     try{
       const r=await fetch("/api/billing/inbound-ai-usage-monitor",{credentials:"include",cache:"no-store"});
@@ -139,7 +150,7 @@ export default function PlanManagement(){
    finally{setDurationRepairBusy(false)}
  }
  async function load(){try{const r=await fetch("/api/admin/plans",{credentials:"include"});const j=await r.json();if(!r.ok)throw Error(j.error||"Unable to fetch plans");setPlans(j);}catch(e:any){setError(e.message)}}
- useEffect(()=>{void load();void loadReadiness();void loadInterestRequests();void loadInboundAiMonitor()},[]);
+ useEffect(()=>{void load();void loadReadiness();void loadInterestRequests();void loadInboundAiMonitor();void loadMonthlyAiEvidence()},[]);
  async function save(plan:Plan){
   setBusy(true);setError("");setNotice("");
   try {
@@ -164,6 +175,17 @@ export default function PlanManagement(){
      {inboundAiMonitor&&<p className="mt-3 text-sm font-medium text-slate-700">Terminal calls still missing measured duration: <strong>{inboundAiMonitor.terminalMissingDuration}</strong>. Hard usage cap: <strong>Not enabled</strong>. Customer AI billing: <strong>Not certified</strong>.</p>}
      {inboundAiError&&<p role="alert" className="mt-3 text-sm text-red-700">{inboundAiError}</p>}
      <p className="mt-3 text-xs leading-5 text-slate-600">This is operational monitoring, not a verified billable-minutes ledger. The 80 incoming minute offer is still proposed. We must validate provider AI costs and implement an enforceable prepaid reservation/cutoff flow before activating paid AI usage. Outgoing calls, forwarding legs, and ordinary VoIP are not counted here.</p>
+   </section>
+   <section className="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Incoming AI monthly usage ledger">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+       <div><h2 className="text-xl font-black text-slate-900">Incoming AI · monthly usage evidence</h2><p className="mt-1 text-xs text-slate-600">Current UTC calendar month · persisted provider-call evidence</p></div>
+       <button type="button" onClick={()=>void loadMonthlyAiEvidence()} className="min-h-11 rounded-lg border border-indigo-200 px-4 py-2 text-sm font-bold text-indigo-800">Refresh monthly evidence</button>
+      </div>
+      {monthlyAiEvidence&&<div className="mt-4 grid gap-3 sm:grid-cols-4">
+       {([["Incoming AI calls",monthlyAiEvidence.calls],["Measured calls",monthlyAiEvidence.measuredCalls],["Measured rounded minutes",monthlyAiEvidence.roundedMeasuredMinutes],["Unmeasured calls",monthlyAiEvidence.unmeasuredCalls]] as [string,number][]).map(([name,value])=><div key={name} className="rounded-lg bg-indigo-50 p-4"><p className="text-xs font-semibold text-slate-600">{name}</p><p className="mt-2 text-2xl font-black text-slate-900 tabular-nums">{value}</p></div>)}
+      </div>}
+      <p className="mt-3 text-xs leading-5 text-amber-900">Launch protection: paid AI entitlement OFF · prepaid top-ups OFF · hard usage cutoff OFF · carrier billing certification PENDING. This ledger does not assert that the proposed 80 minutes are active or that missing minutes are free.</p>
+      {monthlyAiEvidenceError&&<p role="alert" className="mt-2 text-xs text-red-700">{monthlyAiEvidenceError}</p>}
    </section>
    <AiMarginSimulator />
    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
