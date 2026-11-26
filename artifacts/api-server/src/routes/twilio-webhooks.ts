@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { captureInboundAiCallEvidence } from "../lib/inbound-ai-usage";
 import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable, contactsTable, smsMessagesTable, extensionsTable, appointmentsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
@@ -1685,6 +1686,13 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
     await db.update(callLogsTable)
       .set(updateData)
       .where(eq(callLogsTable.twilioCallSid, CallSid));
+    // Account only for incoming AI calls on terminal status. Missing duration
+    // stays unmeasured, never free; no customer charges or limits are applied.
+    if (isTerminal && /^CA[a-fA-F0-9]{32}$/.test(String(CallSid || ""))) {
+      try { await captureInboundAiCallEvidence(CallSid,"twilio_status_callback"); }
+      catch(error:any) { req.log.warn({message:error?.message},"Inbound AI call evidence unavailable"); }
+    }
+
 
     // If Twilio omitted the measured duration, retrieve the parent call's
     // recorded duration directly from Twilio after a terminal status.
@@ -1699,6 +1707,9 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
             if (call.duration == null || !Number.isSafeInteger(measured) || measured < 0) return;
             await db.update(callLogsTable).set({ duration:measured })
               .where(and(eq(callLogsTable.twilioCallSid,CallSid),sql`${callLogsTable.duration} IS NULL`));
+            try { await captureInboundAiCallEvidence(CallSid,"twilio_api_lookup"); }
+            catch(error:any) { req.log.warn({message:error?.message},"AI duration evidence API fallback unavailable"); }
+
           } catch (error:any) {
             req.log.warn({ message:error?.message, callSid:CallSid }, "Twilio duration fallback unavailable");
           }
