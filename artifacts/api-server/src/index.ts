@@ -4,7 +4,7 @@ import { ensureStripeBillingSchema } from "./routes/stripe-billing";
 import { ensureCompanySignupSchema } from "./routes/company-signup";
 import { ensureCompanyFullAccessSchema } from "./lib/company-full-access";
 import { ensureAiCreditSchema } from "./lib/ai-credit-wallet";
-import { ensureTelnyxUsageSchema } from "./lib/telnyx-carrier-usage";
+import { ensureTelnyxUsageSchema, reconcileVerifiedTelnyxInboundDurations } from "./lib/telnyx-carrier-usage";
 import { ensureTelnyxCpsSchema } from "./lib/telnyx-cps-guard";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -40,6 +40,15 @@ async function start(): Promise<void> {
   await ensureCompanyFullAccessSchema();
   await ensureAiCreditSchema();
   await ensureTelnyxUsageSchema();
+  // Safe, idempotent historical duration repair. Failure cannot interrupt VoIP:
+  // signed carrier evidence may arrive late or some records may be unmatched.
+  try {
+    const repaired = await reconcileVerifiedTelnyxInboundDurations();
+    logger.info({ repaired, billingCertified:false }, "Verified Telnyx inbound duration recovery completed");
+  } catch(error:any) {
+    logger.warn({ message:error?.message }, "Telnyx history recovery unavailable; retaining missing durations");
+  }
+
   await ensureTelnyxCpsSchema();
   await db.execute(sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS google_site text`);
   await ensureBookingSchema();

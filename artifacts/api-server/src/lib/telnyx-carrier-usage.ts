@@ -46,3 +46,29 @@ export async function recordSignedTelnyxCost(event:any):Promise<void>{
       typeof event.id==="string"?event.id:null,duration,date
     ]);
 }
+
+/**
+ * Idempotent internal call-history recovery, NOT rated customer billing.
+ * Each repaired inbound call has exactly one matching signed Telnyx cost leg,
+ * a carrier billed duration, and matching line/company ownership.
+ * Unknown or ambiguous calls remain null, never assumed free.
+ */
+export async function reconcileVerifiedTelnyxInboundDurations():Promise<number>{
+  const result=await pool.query(`WITH uniquely_verified AS (
+    SELECT l.id AS log_id,MIN(c.billed_duration_secs)::integer AS carrier_seconds
+    FROM call_logs l
+    JOIN phone_numbers n ON n.id=l.phone_number_id
+    JOIN ca_telnyx_cost_legs c ON l.twilio_call_sid='telnyx:' || c.call_control_id
+    WHERE l.duration IS NULL AND l.direction=$1
+      AND c.company_id=n.company_id
+      AND c.billed_duration_secs IS NOT NULL
+      AND c.billed_duration_secs BETWEEN 0 AND 86400
+      AND l.created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+    GROUP BY l.id HAVING COUNT(*)=1
+  ), updated AS (
+    UPDATE call_logs l SET duration=v.carrier_seconds
+    FROM uniquely_verified v WHERE l.id=v.log_id AND l.duration IS NULL
+    RETURNING l.id
+  ) SELECT COUNT(*)::integer AS recovered FROM updated`,["inbound"]);
+  return Number(result.rows[0]?.recovered||0);
+}
