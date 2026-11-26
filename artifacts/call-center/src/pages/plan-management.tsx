@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, Save, Trash2, ShieldCheck, AlertTriangle, RefreshCw } from "lucide-react";
+import AiMarginSimulator from "@/components/ai-margin-simulator";
 
 type Plan={id:number;slug:string;name:string;priceCents:number;monthlyMinutes:number;includedNumbers:number;features:string[];description:string;isPublished:boolean;isEnabled:boolean;checkoutEnabled:boolean;sortOrder:number};
 type BillingReadiness={stripePriceVerificationIssues?:string[];telnyxCallCostWebhookEnabled:boolean|null;telnyxVoiceWebhookCorrect:boolean|null;telnyxConfigurationWarning:string|null;liveStripePricesMapped:boolean;secretKeyConfigured:boolean;liveKeyFormatValid:boolean;liveMerchantVerified:boolean;merchantVerificationWarning:string|null;webhookSecretConfigured:boolean;entitlementEnforcementCertified:boolean;globalCheckoutApproved:boolean;checkoutEnabled:boolean;carrierUsageVerified:boolean;automaticProvisioningCertified:boolean;productionSnapshot:{existingCompanies:number;subscriptionsRecorded:number;activePhoneLines:number;activeTwilioLines:number;activeUnattributedLines:number;currentMonthCallRecords:number;currentMonthCallsMissingDuration:number};plans:{slug:string;checkoutEnabled:boolean}[]};
@@ -113,6 +114,7 @@ export default function PlanManagement(){
  }
  return <div className="space-y-6">
    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-3xl font-bold">Package Manager</h1><p className="mt-1 text-sm text-muted-foreground">Create, edit, publish, disable, or remove CallingAgent packages.</p></div><button onClick={()=>setEditing({...empty})} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white"><Plus className="h-4 w-4"/>New plan</button></div>
+   <AiMarginSimulator />
    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
      <div className="flex items-center gap-2 font-bold"><AlertTriangle className="h-5 w-5 shrink-0"/>Live billing readiness</div>
      <p className="mt-2">Publishing a package does not activate customer checkout. Carrier usage and automatic provisioning must be independently certified before live payments are allowed.</p>
