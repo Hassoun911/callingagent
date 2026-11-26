@@ -6,6 +6,7 @@ export default function AiMarginSimulator() {
   const [includedMinutes, setIncludedMinutes] = useState(150);
   const [costPerMinute, setCostPerMinute] = useState(0.25);
   const [extraMinutePrice, setExtraMinutePrice] = useState(0.45);
+  const [costEvidenceVerified, setCostEvidenceVerified] = useState(false);
   const [monthlyOverhead, setMonthlyOverhead] = useState(9);
   const [minutesUsed, setMinutesUsed] = useState(150);
   const [targetMargin, setTargetMargin] = useState(70);
@@ -24,6 +25,16 @@ export default function AiMarginSimulator() {
   const breakevenIncluded = costPerMinute > 0 ? Math.max(0,Math.floor((monthlyPrice - monthlyOverhead)/costPerMinute)) : null;
   const marginCap = costPerMinute > 0 ? Math.max(0,Math.floor((monthlyPrice * (1-targetMargin/100) - monthlyOverhead)/costPerMinute)) : null;
   const floorCap = costPerMinute > 0 ? Math.max(0,Math.floor((monthlyPrice * (1-minimumMargin/100) - monthlyOverhead)/costPerMinute)) : null;
+  // This is the long-run top-up price floor at the chosen contribution target.
+  // At higher usage the overage portion dominates the fixed subscription.
+  const recommendedTopupPrice = targetMargin < 100 ? costPerMinute / (1 - targetMargin/100) : Infinity;
+  const proposedBaseAtTarget = marginCap !== null && includedMinutes <= marginCap;
+  const topupsMeetTarget = extraMinutePrice + 0.000001 >= recommendedTopupPrice;
+  const modelMeetsTarget = proposedBaseAtTarget && topupsMeetTarget && monthlyPrice > 0;
+  const recommendedSafeMinutes = marginCap === null ? null : Math.max(0,Math.floor(marginCap/5)*5);
+  const highUsage = compute(Math.max(500,includedMinutes + 500));
+  const moneyUp = (value:number) => `CA${(Math.ceil(value*100)/100).toFixed(2)}`;
+
   const numInput = (title:string,value:number,set:(v:number)=>void,min:number,max:number,step:number) =>
     <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-700">{title}
       <input type="number" min={min} max={max} step={step} value={value}
@@ -33,8 +44,26 @@ export default function AiMarginSimulator() {
   return <section aria-label="AI pricing profitability planner" className="rounded-2xl border border-blue-200 bg-gradient-to-br from-[#f2f8ff] to-white p-4 shadow-sm sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="text-xl font-black text-[#0d2c58]">AI receptionist · margin simulator</h2>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-700">Read-only internal planning. Default goal: 70% contribution margin, with a 50% warning floor. Enter reconciled all-in costs before approving customer allowances. These defaults are assumptions, not observed costs.</p></div>
+        <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-700">Read-only internal planning. Default goal: 70% contribution margin, with a 50% warning floor. Enter reconciled all-in costs before approving customer allowances. These defaults are assumptions, not observed costs. The launch gate below evaluates both included usage and extra-minute pricing.</p></div>
       <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">Not connected to billing</span>
+    </div>
+    <div className="mt-5 rounded-2xl border border-blue-200 bg-white p-4 sm:p-5">
+      <h3 className="text-lg font-black text-[#0d2c58]">70% pricing launch gate</h3>
+      <p className="mt-1 text-xs leading-5 text-slate-600">A pricing planning checklist—not an authorization to enable Stripe, recurring AI credits or live call limits.</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-600">Suggested maximum included allowance</p><p className="mt-1 text-2xl font-black tabular-nums">{recommendedSafeMinutes===null?"Unbounded model":recommendedSafeMinutes+" min"}</p><p className="mt-1 text-xs text-slate-600">Based on your assumptions, rounded down to 5-minute increments</p></div>
+        <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-600">Minimum extra-minute charge for {targetMargin}%</p><p className="mt-1 text-2xl font-black tabular-nums">{moneyUp(recommendedTopupPrice)}</p><p className="mt-1 text-xs text-slate-600">Assumes all extra minutes are explicitly prepaid and billed</p></div>
+        <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold text-slate-600">Heavy-use case ({Math.max(500,includedMinutes + 500)} min)</p><p className="mt-1 text-2xl font-black tabular-nums">{highUsage.marginPercent.toFixed(1)}%</p><p className="mt-1 text-xs text-slate-600">Checks risk beyond the included usage allowance</p></div>
+      </div>
+      <div className="mt-4 space-y-2 text-sm">
+        <p className={proposedBaseAtTarget?"font-semibold text-emerald-700":"font-semibold text-red-700"}>{proposedBaseAtTarget?"✓":"✕"} Included minutes {proposedBaseAtTarget?"meet":"do not meet"} the {targetMargin}% margin target at full use</p>
+        <p className={topupsMeetTarget?"font-semibold text-emerald-700":"font-semibold text-red-700"}>{topupsMeetTarget?"✓":"✕"} Proposed additional-minute price {topupsMeetTarget?"meets":"does not meet"} the {targetMargin}% incremental margin target</p>
+        <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          <input type="checkbox" checked={costEvidenceVerified} onChange={e=>setCostEvidenceVerified(e.target.checked)} className="mt-1"/>
+          <span><strong>I have reconciled all provider and operating costs outside this calculator.</strong> This checkbox is temporary for my review only and is not saved, audited, or a launch approval.</span>
+        </label>
+        <p role="status" className={modelMeetsTarget&&costEvidenceVerified?"rounded-lg bg-emerald-50 p-3 font-semibold text-emerald-800":"rounded-lg bg-amber-50 p-3 font-semibold text-amber-950"}>{modelMeetsTarget&&costEvidenceVerified?"Pricing assumptions meet target; separate billing and metering certification is still required.":"NOT READY FOR PRICING APPROVAL: fix the red conditions and independently verify true costs, metering, caps, refunds and charging before live checkout."}</p>
+      </div>
     </div>
     <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {numInput("Base plan (CAD/month)",monthlyPrice,setMonthlyPrice,0,1000,1)}
