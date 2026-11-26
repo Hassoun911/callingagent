@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { captureInboundAiCallEvidence } from "../lib/inbound-ai-usage";
+import { reserveIncomingAiMinutes, settleIncomingAiMinutes } from "../lib/inbound-ai-reservations";
 import { db, phoneNumbersTable, callLogsTable, aiVoiceConfigTable, companiesTable, contactsTable, smsMessagesTable, extensionsTable, appointmentsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
@@ -686,6 +687,14 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
 </Response>`;
 
   } else if (answerMode === "ai_voice") {
+    // Only certified, opted-in, incoming AI companies enter this reservation
+    // path. The global switch and all existing enrollment rows default OFF.
+    const aiAdmission=await reserveIncomingAiMinutes(phoneNumber?.companyId,CallSid);
+    if(aiAdmission.decision==="exhausted"){
+      res.set("Content-Type","text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say>Our automated receptionist is temporarily unavailable. Please try again later.</Say><Hangup/></Response>`);
+      return;
+    }
     const [aiConfig] = await db.select().from(aiVoiceConfigTable);
     // Per-number settings take priority over global defaults
     const language = phoneNumber?.aiLanguage || "en-US";
@@ -694,7 +703,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
     const voiceEngine = phoneNumber?.aiVoiceEngine || "openai";
     const elevenLabsVoiceId = phoneNumber?.aiElevenLabsVoiceId || null;
     const engineOpts: TtsEngineOpts = { engine: voiceEngine, elevenLabsVoiceId };
-    const maxDuration = aiConfig?.maxCallDuration ?? 300;
+    const maxDuration = Math.min(aiConfig?.maxCallDuration ?? 300, aiAdmission.maxCallSeconds ?? Infinity);
     const speechTimeout = aiConfig?.speechTimeout ?? 1.0;
     const maxTokens = aiConfig?.maxTokens ?? 100;
     const greetingText = phoneNumber?.aiGreeting?.trim() || "Hello, thank you for calling. How can I help you today?";
@@ -1429,6 +1438,12 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
   }
 
   if (mode === "ai_voice") {
+    const aiAdmission=await reserveIncomingAiMinutes(phoneNumber?.companyId,CallSid);
+    if(aiAdmission.decision==="exhausted"){
+      res.set("Content-Type","text/xml");
+      res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say>Our automated receptionist is temporarily unavailable. Please try again later.</Say><Hangup/></Response>`);
+      return;
+    }
     const [aiConfig] = await db.select().from(aiVoiceConfigTable);
     const language = aiConfig?.language ?? "en-US";
     const ttsVoice = phoneNumber?.aiVoice || aiConfig?.voice || "nova";
@@ -1436,7 +1451,7 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
     const voiceEngine2 = phoneNumber?.aiVoiceEngine || aiConfig?.aiVoiceEngine || "openai";
     const elevenLabsVoiceId2 = phoneNumber?.aiElevenLabsVoiceId || aiConfig?.elevenLabsVoiceId || null;
     const engineOpts2: TtsEngineOpts = { engine: voiceEngine2, elevenLabsVoiceId: elevenLabsVoiceId2 };
-    const maxDuration = aiConfig?.maxCallDuration ?? 300;
+    const maxDuration = Math.min(aiConfig?.maxCallDuration ?? 300, aiAdmission.maxCallSeconds ?? Infinity);
     const speechTimeout = aiConfig?.speechTimeout ?? 1.0;
     const maxTokens = aiConfig?.maxTokens ?? 250;
     const greetingText = aiConfig?.greeting?.trim() || "Hello, thank you for calling. How can I help you today?";
@@ -1689,6 +1704,10 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
     // Account only for incoming AI calls on terminal status. Missing duration
     // stays unmeasured, never free; no customer charges or limits are applied.
     if (isTerminal && /^CA[a-fA-F0-9]{32}$/.test(String(CallSid || ""))) {
+      if(parsedDuration!==null){
+        try { await settleIncomingAiMinutes(CallSid,parsedDuration); }
+        catch(error:any){req.log.warn({message:error?.message},"Incoming AI minute reservation settlement unavailable");}
+      }
       try { await captureInboundAiCallEvidence(CallSid,"twilio_status_callback"); }
       catch(error:any) { req.log.warn({message:error?.message},"Inbound AI call evidence unavailable"); }
     }
@@ -1707,6 +1726,8 @@ router.post("/twilio/status", async (req, res): Promise<void> => {
             if (call.duration == null || !Number.isSafeInteger(measured) || measured < 0) return;
             await db.update(callLogsTable).set({ duration:measured })
               .where(and(eq(callLogsTable.twilioCallSid,CallSid),sql`${callLogsTable.duration} IS NULL`));
+            try { await settleIncomingAiMinutes(CallSid,measured); }
+            catch(error:any){req.log.warn({message:error?.message},"AI reservation fallback settlement unavailable");}
             try { await captureInboundAiCallEvidence(CallSid,"twilio_api_lookup"); }
             catch(error:any) { req.log.warn({message:error?.message},"AI duration evidence API fallback unavailable"); }
 
