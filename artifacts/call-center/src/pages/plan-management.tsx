@@ -22,6 +22,8 @@ export default function PlanManagement(){
  const [readinessMessage,setReadinessMessage]=useState("");
  const [durationRepairBusy,setDurationRepairBusy]=useState(false);
  const [durationRepairReport,setDurationRepairReport]=useState("");
+ const [telnyxRepairBusy,setTelnyxRepairBusy]=useState(false);
+ const [telnyxRepairReport,setTelnyxRepairReport]=useState("");
 
  const [launchAudit,setLaunchAudit]=useState<LaunchAudit|null>(null);
  const [launchAuditError,setLaunchAuditError]=useState("");
@@ -99,6 +101,19 @@ export default function PlanManagement(){
    setReadinessMessage("");
   }finally{setReadinessLoading(false)}
  }
+ async function repairVerifiedTelnyxDurations(){
+   setTelnyxRepairBusy(true);setTelnyxRepairReport("");
+   try{
+     const r=await fetch("/api/billing/reconcile-telnyx-durations",{
+       method:"POST",credentials:"include",headers:{"Accept":"application/json","Content-Type":"application/json"},body:"{}"
+     });
+     const data=await r.json();
+     if(!r.ok)throw Error(data.error||"Telnyx reconciliation unavailable");
+     setTelnyxRepairReport("Restored "+data.recovered+" inbound call durations from uniquely matched signed Telnyx cost events. No charges or active phone settings changed.");
+     await loadReadiness();
+   }catch(e:any){setTelnyxRepairReport(e?.message||"Telnyx reconciliation unavailable")}
+   finally{setTelnyxRepairBusy(false)}
+ }
  async function repairTwilioDurations(){
    setDurationRepairBusy(true);setDurationRepairReport("");
    try{
@@ -169,6 +184,12 @@ export default function PlanManagement(){
             <p className="mt-1 text-xs">Attributed events with duration: <strong>{readiness.productionSnapshot.telnyxCarrierEvidence?.attributedMeasuredLegs??"—"}</strong></p>
           </div>
         </div>}
+        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+          <p className="text-sm font-bold text-emerald-950">Recover verified Telnyx inbound durations</p>
+          <p className="mt-1 text-xs leading-5 text-emerald-950">Copy only uniquely matched, signed Telnyx carrier-rated duration into empty call logs when company ownership is verified. This can restore records from the reported missing-duration backlog; it never fabricates missing carrier information, changes calling routes, activates service or charges any customer.</p>
+          <button type="button" disabled={telnyxRepairBusy} onClick={()=>void repairVerifiedTelnyxDurations()} className="mt-3 min-h-11 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{telnyxRepairBusy?"Reconciling evidence…":"Restore verified Telnyx durations"}</button>
+          {telnyxRepairReport&&<p role="status" className="mt-2 text-xs font-semibold text-emerald-950">{telnyxRepairReport}</p>}
+        </div>
         <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
           <p className="text-sm font-bold text-blue-950">Repair known Twilio durations</p>
           <p className="mt-1 text-xs leading-5 text-blue-950">Look up up to 15 recent terminal calls using Twilio and copy exact carrier-reported parent-call seconds into missing internal records. Does not alter active lines, forwarding, billing, AI minute balances, or Telnyx records. Repeat only when necessary.</p>
