@@ -411,6 +411,45 @@ router.post("/billing/checkout", async (req, res) => {
     res.status(502).json({ error: "Checkout could not be started" });
   }
 });
+// Super-admin-only, bounded recovery from carrier-reported Twilio call durations.
+// No guessed minutes, carrier changes, AI allowance grants or customer charges.
+router.post("/billing/reconcile-twilio-durations", async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
+  const sid=process.env.TWILIO_ACCOUNT_SID,token=process.env.TWILIO_AUTH_TOKEN;
+  if(!sid||!token){res.status(503).json({error:"Twilio credentials unavailable; no records changed"});return;}
+  const MAX_BATCH=15;
+  try{
+    const rows=await pool.query<{id:number;twilio_call_sid:string}>(`SELECT id,twilio_call_sid
+      FROM call_logs WHERE duration IS NULL
+        AND twilio_call_sid ~ '^CA[0-9a-fA-F]{32}$'
+        AND status IN ('completed','failed','busy','no-answer','canceled')
+        AND created_at >= date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+      ORDER BY created_at DESC,id DESC LIMIT $1`,[MAX_BATCH]);
+    const client=twilio(sid,token);
+    let repaired=0,unavailable=0,errors=0,unchanged=0;
+    for(const log of rows.rows){
+      try{
+        const call=await client.calls(log.twilio_call_sid).fetch();
+        const secs=call.duration==null?NaN:Number(call.duration);
+        if(!["completed","busy","failed","no-answer","canceled"].includes(String(call.status)) ||
+          !Number.isSafeInteger(secs)||secs<0||secs>86400){unavailable++;continue;}
+        const result=await pool.query(`UPDATE call_logs SET duration=$1
+          WHERE id=$2 AND twilio_call_sid=$3 AND duration IS NULL
+          RETURNING id`,[secs,log.id,log.twilio_call_sid]);
+        if(result.rowCount)repaired++;else unchanged++;
+      }catch(error:any){
+        errors++;req.log.warn({callLogId:log.id,message:error?.message},"Twilio duration lookup failed");
+      }
+    }
+    res.set("Cache-Control","no-store");
+    res.json({fetched:rows.rows.length,limit:MAX_BATCH,repaired,unavailable,errors,unchanged,
+      moreCandidatesPossible:rows.rows.length===MAX_BATCH,certifiedForBilling:false,
+      message:"Only provider-reported parent-call durations are copied into missing internal logs. Telnyx and forwarded legs are not certified. No charges or account changes."});
+  }catch(error:any){
+    req.log.error({message:error?.message},"Twilio duration reconciliation failed");
+    res.status(503).json({error:"Carrier reconciliation unavailable; checkout unchanged"});
+  }
+});
 router.get("/billing/readiness", async(req,res)=>{
   if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
   try{
