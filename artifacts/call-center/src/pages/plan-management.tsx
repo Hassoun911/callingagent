@@ -20,6 +20,9 @@ export default function PlanManagement(){
  const [readinessLoading,setReadinessLoading]=useState(false);
  const [readinessCheckedAt,setReadinessCheckedAt]=useState("");
  const [readinessMessage,setReadinessMessage]=useState("");
+ const [durationRepairBusy,setDurationRepairBusy]=useState(false);
+ const [durationRepairReport,setDurationRepairReport]=useState("");
+
  const [launchAudit,setLaunchAudit]=useState<LaunchAudit|null>(null);
  const [launchAuditError,setLaunchAuditError]=useState("");
  const [launchAuditBusy,setLaunchAuditBusy]=useState(false);
@@ -96,6 +99,19 @@ export default function PlanManagement(){
    setReadinessMessage("");
   }finally{setReadinessLoading(false)}
  }
+ async function repairTwilioDurations(){
+   setDurationRepairBusy(true);setDurationRepairReport("");
+   try{
+     const r=await fetch("/api/billing/reconcile-twilio-durations",{
+       method:"POST",credentials:"include",headers:{"Accept":"application/json","Content-Type":"application/json"},body:"{}"
+     });
+     const data=await r.json();
+     if(!r.ok)throw Error(data.error||"Reconciliation failed");
+     setDurationRepairReport(`Checked ${data.fetched} terminal Twilio call records, restored ${data.repaired} measured durations, unavailable ${data.unavailable}, lookup errors ${data.errors}. ${data.moreCandidatesPossible?"Another batch may remain.":""} No billing or phone operations were changed.`);
+     await loadReadiness();
+   }catch(e:any){setDurationRepairReport(e?.message||"Reconciliation unavailable");}
+   finally{setDurationRepairBusy(false)}
+ }
  async function load(){try{const r=await fetch("/api/admin/plans",{credentials:"include"});const j=await r.json();if(!r.ok)throw Error(j.error||"Unable to fetch plans");setPlans(j);}catch(e:any){setError(e.message)}}
  useEffect(()=>{void load();void loadReadiness();void loadInterestRequests()},[]);
  async function save(plan:Plan){
@@ -153,6 +169,12 @@ export default function PlanManagement(){
             <p className="mt-1 text-xs">Attributed events with duration: <strong>{readiness.productionSnapshot.telnyxCarrierEvidence?.attributedMeasuredLegs??"—"}</strong></p>
           </div>
         </div>}
+        <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
+          <p className="text-sm font-bold text-blue-950">Repair known Twilio durations</p>
+          <p className="mt-1 text-xs leading-5 text-blue-950">Look up up to 15 recent terminal calls using Twilio and copy exact carrier-reported parent-call seconds into missing internal records. Does not alter active lines, forwarding, billing, AI minute balances, or Telnyx records. Repeat only when necessary.</p>
+          <button type="button" disabled={durationRepairBusy} onClick={()=>void repairTwilioDurations()} className="mt-3 min-h-11 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{durationRepairBusy?"Checking Twilio…":"Reconcile up to 15 Twilio calls"}</button>
+          {durationRepairReport&&<p role="status" className="mt-2 text-xs font-semibold text-blue-950">{durationRepairReport}</p>}
+        </div>
         <p className="mt-3 text-xs font-semibold text-amber-900">Next checks: verify terminal Twilio callbacks and their matching call SIDs; reconcile Telnyx cost legs to companies; validate historical carrier CDRs and forwarding legs before enabling minute caps, customer charges or subscriptions.</p>
       </div>
 
