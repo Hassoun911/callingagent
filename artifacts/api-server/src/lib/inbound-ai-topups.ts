@@ -52,6 +52,8 @@ export async function fulfillVerifiedIncomingAiTopup(
   if(intent.rows[0].status!=="pending")throw Error("Top-up intent already closed");
 
   const companyId=Number(intent.rows[0].company_id);
+  // Serialize paid top-up grants with concurrent incoming AI reservations.
+  await client.query("SELECT pg_advisory_xact_lock($1,$2)",[714095,companyId]);
   // Never fund an unenrolled account or a current-period amount in another month.
   const eligible=await client.query(`SELECT company_id FROM ca_inbound_ai_enrollment
     WHERE company_id=$1 AND enabled IS TRUE AND billing_certified IS TRUE`,[companyId]);
@@ -120,9 +122,12 @@ export async function revokeRefundedIncomingAiTopup(
     !/^pi_[a-zA-Z0-9_]{8,255}$/.test(paymentIntentId))return "ignored";
   // Most charge refunds are unrelated to prepaid AI. Avoid external requests
   // and changes to existing billing for those unrelated verified webhooks.
-  const pending=await client.query(`SELECT session_id FROM ca_inbound_ai_topup_intents
+  const pending=await client.query(`SELECT session_id,company_id FROM ca_inbound_ai_topup_intents
     WHERE stripe_payment_intent_id=$1 AND status='paid' FOR UPDATE`,[paymentIntentId]);
   if(!pending.rowCount)return "ignored";
+  // A concurrent reservation must see either the pre-refund or post-refund
+  // balance, never a partially revoked balance.
+  await client.query("SELECT pg_advisory_xact_lock($1,$2)",[714095,Number(pending.rows[0].company_id)]);
   const response=await fetch("https://api.stripe.com/v1/charges/"+encodeURIComponent(chargeId),{
     headers:{Authorization:"Bearer "+stripeKey},signal:AbortSignal.timeout(15000)
   });
