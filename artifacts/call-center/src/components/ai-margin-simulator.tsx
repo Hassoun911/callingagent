@@ -66,3 +66,4 @@ export default function AiMarginSimulator() {
     </div>
     <p className="mt-4 text-xs leading-5 text-slate-600">Costs must include telephony, speech-to-text, model inference, text-to-speech, phone rentals, SMS/email, hosting, Stripe fees, support and currency conversion as applicable. This simple contribution model does not validate any actual cost, include Canadian sales tax, or activate recurring credit grants, top-ups, service limits, customer charges, or Stripe products.</p>
   </section>;
+}
