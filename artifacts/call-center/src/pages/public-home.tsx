@@ -201,6 +201,7 @@ function AiLanding(){
           </div>
           {menuOpen&&<nav id="ca-hero-menu" aria-label="Website navigation" className="absolute right-5 top-[76px] flex w-[min(310px,calc(100vw-40px))] flex-col gap-1 rounded-2xl border border-blue-100 bg-white p-3 text-sm font-semibold text-[#12284b] shadow-2xl sm:right-8 lg:top-[88px]">
             <a href="#benefits" onClick={()=>setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-blue-50">Features</a>
+            <a href="#realtor-demo" onClick={()=>setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-blue-50">Watch demo</a>
             <a href="#how-ai-works" onClick={()=>setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-blue-50">How it works</a>
             <a href="/business-phone" className="rounded-xl px-4 py-3 hover:bg-blue-50">Business Phone</a>
             <a href="#ai-inquiry" onClick={()=>setMenuOpen(false)} className="rounded-xl px-4 py-3 hover:bg-blue-50">Pricing / Early access</a>
@@ -219,7 +220,7 @@ function AiLanding(){
             <span className="inline-flex items-center gap-2 rounded-full bg-[#e7f1ff]/95 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[.12em] text-[#1253a9]"><span className="h-2 w-2 rounded-full bg-blue-500"/> AI phone answering for businesses</span>
             <h1 className="mt-5 text-[clamp(2.45rem,5.2vw,5.7rem)] font-black leading-[1.06] tracking-[-.055em] text-[#091d43]">Your AI receptionist that never misses <span className="text-[#0876ed]">a call.</span></h1>
             <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">Designed to help answer customers, collect inquiries and appointment requests, and give your team more time to focus on business.</p>
-            <div className="mt-6 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#0a9efe] to-[#0757e5] px-6 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(22,104,226,.18)] hover:brightness-110">Request early access <ArrowRight className="h-5 w-5"/></a><a href="#how-ai-works" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#aac0df] bg-white px-5 py-3.5 text-sm font-bold text-[#102549] hover:bg-blue-50">See how it works</a></div>
+            <div className="mt-6 flex flex-wrap gap-3"><a href="#ai-inquiry" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#0a9efe] to-[#0757e5] px-6 py-3.5 text-sm font-extrabold text-white shadow-[0_12px_28px_rgba(22,104,226,.18)] hover:brightness-110">Request early access <ArrowRight className="h-5 w-5"/></a><a href="#realtor-demo" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#aac0df] bg-white px-5 py-3.5 text-sm font-bold text-[#102549] hover:bg-blue-50">Watch demo</a></div>
             <div className="mt-6 grid max-w-lg grid-cols-3 gap-3 border-t border-blue-100 pt-4">{[[PhoneCall,"Answer calls"],[Clock3,"Appointments"],[Sparkles,"Capture leads"]].map(([Icon,title])=><div key={String(title)} className="flex flex-col gap-2 text-blue-600"><Icon className="h-6 w-6"/><span className="text-[11px] font-bold leading-4 text-[#14284d]">{title}</span></div>)}</div>
             <p className="mt-4 max-w-lg text-xs leading-5 text-slate-500">Early-access inquiries only. Standalone AI planned from $99 CAD/month, plus taxes and usage credits. No payment is taken yet.</p>
           </div>
@@ -232,6 +233,26 @@ function AiLanding(){
       <div className="border-y border-blue-100 bg-[#eaf4ff] px-5 py-4 text-center text-sm font-semibold text-[#123963] sm:px-8">
         <p>Explore the AI receptionist concept below. <strong>Early access is open; paid AI activation is not yet available.</strong></p>
       </div>
+      <section id="realtor-demo" className="scroll-mt-20 bg-[#071b3b] py-14 text-white sm:py-20">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8">
+          <div className="flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
+            <div className="max-w-3xl">
+              <p className="text-xs font-black uppercase tracking-[.2em] text-sky-300">Watch the receptionist experience</p>
+              <h2 className="mt-3 text-[clamp(2.2rem,4vw,4.2rem)] font-black leading-tight tracking-tight">From incoming call to <span className="text-sky-300">qualified real estate lead.</span></h2>
+              <p className="mt-4 text-base leading-7 text-blue-100">See a sample buyer inquiry, a showing request, appointment confirmation by text and email, and the information organized for an agent.</p>
+            </div>
+            <a href="#ai-inquiry" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-[#1687ff] px-6 py-3 text-sm font-extrabold text-white hover:bg-blue-500">Request early access <ArrowRight className="h-4 w-4"/></a>
+          </div>
+          <div className="mt-8 overflow-hidden rounded-[1.6rem] border border-white/15 bg-[#102c58] shadow-[0_30px_90px_rgba(0,0,0,.22)]">
+            <video controls playsInline preload="none" poster="/callingagent-approved-appointments.webp" className="block aspect-video w-full bg-[#08172e] object-contain" aria-label="Illustrative CallingAgent realtor lead conversion demo: call, showing request, confirmation, agent follow-up">
+              <source src="/callingagent-realtor-lead-demo.mp4" type="video/mp4"/>
+              Your browser does not support video playback.
+            </video>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-4">{["Buyer calls","Showing requested","Text + email confirmed","Lead sent to agent"].map((item,i)=><div key={item} className="flex items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-4 py-3"><span className="text-xl font-black text-sky-300">{String(i+1).padStart(2,"0")}</span><span className="text-sm font-semibold">{item}</span></div>)}</div>
+          <p className="mt-4 text-xs leading-6 text-blue-200">Illustrative demonstration of a planned workflow. Availability of booking, text and email integrations must be confirmed during setup. This video does not show a live customer account.</p>
+        </div>
+      </section>
       <section id="benefits" className="scroll-mt-20 bg-white py-14 sm:py-20">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
           <div data-ca-reveal className="max-w-3xl"><p className="text-xs font-black uppercase tracking-[.2em] text-blue-600">Make every call count</p><h2 className="mt-3 text-[clamp(2.2rem,4.3vw,4.4rem)] font-black leading-[1.08] tracking-[-.05em] text-[#09204a]">Missed calls shouldn't mean <span className="text-blue-600">missed opportunities.</span></h2><p className="mt-4 text-base leading-7 text-slate-600">See how a caller's request could become a clear next action.</p></div>
@@ -293,7 +314,7 @@ function AiLanding(){
         </div>
       </section>
     </main>
-    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-P</p></div>
+    <div className="border-t border-slate-200 bg-white px-5 py-6 text-center text-xs text-slate-500"><p>© {new Date().getFullYear()} CallingAgent · <a href="/business-phone" className="text-sky-700 underline">Business Phone</a> · <a href="/login" className="text-sky-700 underline">Account sign in</a></p><p className="mt-2">Visual concepts illustrate planned AI functionality. Features and paid activation are subject to availability. · Website design 2026-11-25-Q</p></div>
   </div>;
 }
 
