@@ -480,6 +480,35 @@ router.post("/billing/reconcile-telnyx-durations", async(req,res)=>{
     res.status(503).json({error:"Telnyx duration recovery unavailable; checkout unchanged"});
   }
 });
+// Forward-looking inbound AI evidence; strictly reporting-only, not a billable wallet.
+router.get("/billing/inbound-ai-usage-monitor",async(req,res)=>{
+  if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
+  try {
+    const usage=await pool.query(`SELECT
+      COUNT(*)::integer AS incoming_ai_calls,
+      COUNT(*) FILTER(WHERE duration IS NOT NULL AND duration>=0)::integer AS measured_calls,
+      COUNT(*) FILTER(WHERE duration IS NULL)::integer AS missing_durations,
+      COALESCE(SUM(CASE WHEN duration>=0 THEN CEIL(duration::numeric/60) ELSE 0 END),0)::integer AS rounded_parent_minutes,
+      COUNT(*) FILTER(WHERE status IN ('completed','failed','no-answer','busy','canceled'))::integer AS terminal_calls,
+      COUNT(*) FILTER(WHERE status IN ('completed','failed','no-answer','busy','canceled') AND duration IS NULL)::integer AS terminal_missing_duration
+      FROM call_logs
+      WHERE direction='inbound' AND answer_mode='ai_voice'
+        AND created_at >= now()-interval '24 hours'`);
+    res.set("Cache-Control","no-store");
+    res.json({window:"rolling_24_hours",direction:"inbound",mode:"ai_voice",
+      incomingAiCalls:Number(usage.rows[0].incoming_ai_calls),
+      measuredCalls:Number(usage.rows[0].measured_calls),
+      missingDurations:Number(usage.rows[0].missing_durations),
+      roundedParentMinutes:Number(usage.rows[0].rounded_parent_minutes),
+      terminalCalls:Number(usage.rows[0].terminal_calls),
+      terminalMissingDuration:Number(usage.rows[0].terminal_missing_duration),
+      billableUsageCertified:false,hardCapEnforced:false,
+      note:"Operational evidence only: rounded measured parent call logs; excludes forwarding legs, AI inference costs and all outgoing calls. Missing duration never means free."});
+  } catch(error:any){
+    req.log.error({message:error?.message},"Inbound AI usage monitor unavailable");
+    res.status(503).json({error:"Incoming AI usage evidence unavailable"});
+  }
+});
 router.get("/billing/readiness", async(req,res)=>{
   if(req.user?.role!=="super_admin"){res.status(403).json({error:"Administrator access required"});return;}
   try{
