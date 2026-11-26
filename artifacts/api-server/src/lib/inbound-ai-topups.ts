@@ -112,21 +112,25 @@ export async function fulfillVerifiedIncomingAiTopup(
  */
 export async function revokeRefundedIncomingAiTopup(
   chargeId:string,
+  paymentIntentId:string,
   client:{query:(sql:string,params?:unknown[])=>Promise<{rows:any[];rowCount:number|null}>},
   stripeKey:string,
 ):Promise<"ignored"|"revoked"> {
-  if(!/^ch_[a-zA-Z0-9_]{8,255}$/.test(chargeId))return "ignored";
+  if(!/^ch_[a-zA-Z0-9_]{8,255}$/.test(chargeId)||
+    !/^pi_[a-zA-Z0-9_]{8,255}$/.test(paymentIntentId))return "ignored";
+  // Most charge refunds are unrelated to prepaid AI. Avoid external requests
+  // and changes to existing billing for those unrelated verified webhooks.
+  const pending=await client.query(`SELECT session_id FROM ca_inbound_ai_topup_intents
+    WHERE stripe_payment_intent_id=$1 AND status='paid' FOR UPDATE`,[paymentIntentId]);
+  if(!pending.rowCount)return "ignored";
   const response=await fetch("https://api.stripe.com/v1/charges/"+encodeURIComponent(chargeId),{
     headers:{Authorization:"Bearer "+stripeKey},signal:AbortSignal.timeout(15000)
   });
   if(!response.ok)throw Error("Charge refund verification unavailable");
   const charge:any=await response.json();
-  if(charge.livemode!==true||typeof charge.payment_intent!=="string"||
+  if(charge.livemode!==true||charge.payment_intent!==paymentIntentId||
     !Number.isSafeInteger(charge.amount_refunded)||charge.amount_refunded<=0)return "ignored";
-  const row=await client.query(`SELECT session_id FROM ca_inbound_ai_topup_intents
-    WHERE stripe_payment_intent_id=$1 AND status='paid' FOR UPDATE`,[charge.payment_intent]);
-  if(!row.rowCount)return "ignored";
   const updated=await client.query(`UPDATE ca_inbound_ai_topup_intents SET status='refunded'
-    WHERE session_id=$1 AND status='paid' RETURNING session_id`,[row.rows[0].session_id]);
+    WHERE session_id=$1 AND status='paid' RETURNING session_id`,[pending.rows[0].session_id]);
   return updated.rowCount?"revoked":"ignored";
 }
