@@ -59,7 +59,7 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
     await client.query("SELECT pg_advisory_xact_lock($1,$2)",[714095,companyId]);
     const plan=await client.query(`SELECT included_minutes,cycle_start,cycle_end
       FROM ca_inbound_ai_enrollment
-      WHERE company_id=$1 AND enabled IS TRUE AND billing_certified IS TRUE`,[companyId,start]);
+      WHERE company_id=$1 AND enabled IS TRUE AND billing_certified IS TRUE`,[companyId]);
     if(!plan.rowCount){await client.query("COMMIT");return {decision:"not_enrolled",maxCallSeconds:null};}
     // No automatic calendar-month renewals or VoIP-subscription inference.
     // A certified AI billing period must be explicitly set from real payment
@@ -86,11 +86,11 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
     const used=await client.query(`SELECT COALESCE(SUM(COALESCE(consumed_minutes,reserved_minutes)),0)::integer AS minutes
       FROM ca_inbound_ai_reservations WHERE company_id=$1
         AND period_start=$2::timestamptz`,[companyId,start]);
-    // Only verified paid top-ups from the CURRENT UTC month count here.
-    // Paid top-ups cannot accidentally carry into a future subscription month.
+    // Only verified paid top-ups from the SAME certified AI billing cycle count.
+    // Historical or future subscription periods never grant current usage.
     const topups=await client.query(`SELECT COALESCE(SUM(minutes),0)::integer AS minutes
       FROM ca_inbound_ai_topup_intents WHERE company_id=$1 AND status='paid'
-      AND period_start=date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`,[companyId,start]);
+      AND period_start=$2::timestamptz`,[companyId,start]);
     // The legacy verified_prepaid_minutes column is not period-scoped.
     // Do NOT include it; only verified Stripe purchases for this month grant
     // extra minutes. Otherwise a one-time grant could recur indefinitely.
@@ -99,7 +99,7 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
     if(remaining<=0){await client.query("COMMIT");return {decision:"exhausted",maxCallSeconds:0};}
     const reserved=Math.min(5,remaining);
     await client.query(`INSERT INTO ca_inbound_ai_reservations(call_sid,company_id,period_start,reserved_minutes,route_type)
-       VALUES($1,$2,date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',$3,$4)`,[callSid,companyId,reserved,routeType]);
+       VALUES($1,$2,$3,$4,$5)`,[callSid,companyId,start,reserved,routeType]);
     await client.query("COMMIT");
     const cutoff=certifiedAiCycleCutoffSeconds(incomingAiStopAfterSeconds(reserved),end,now);
     return cutoff>0?{decision:"reserved",maxCallSeconds:cutoff,reservedMinutes:reserved}:{decision:"exhausted",maxCallSeconds:0};
