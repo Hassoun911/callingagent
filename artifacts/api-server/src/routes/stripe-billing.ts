@@ -557,18 +557,20 @@ router.post("/billing/inbound-ai-topup-checkout",async(req,res)=>{
   try {
     await confirmCallingAgentMerchant();
     await requireCanadianTaxCheckoutReady();
-    const company=await pool.query(`SELECT e.company_id,s.stripe_customer_id
+    const company=await pool.query(`SELECT e.company_id,e.cycle_start,e.cycle_end,s.stripe_customer_id
       FROM ca_inbound_ai_enrollment e
       JOIN ca_stripe_subscriptions s ON s.company_id=e.company_id
       WHERE e.company_id=$1 AND e.enabled IS TRUE AND e.billing_certified IS TRUE
-      AND s.status='active' AND s.last_payment_status='paid'`,[companyId]);
+      AND s.status='active' AND s.last_payment_status='paid'
+      AND e.cycle_start IS NOT NULL AND e.cycle_end IS NOT NULL
+      AND e.cycle_start <= now() AND e.cycle_end > now()`,[companyId]);
     if(!company.rowCount){res.status(403).json({error:"A certified active and paid AI subscription is required"});return;}
-    // Avoid charging for a current-month allowance just before UTC rollover.
-    // Sessions expire within 30 minutes, so reserve a 60-minute safety margin.
+    // Ensure a 30-minute Checkout session cannot cross the certified paid
+    // subscription boundary. No automatic calendar-month credit rollover.
     const now=new Date();
-    const monthEnd=Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+1,1);
-    if(monthEnd-now.getTime()<60*60*1000){
-      res.status(409).json({error:"Current-month top-ups pause during the final hour of the month"});return;
+    const cycleEnd=new Date(company.rows[0].cycle_end).getTime();
+    if(!Number.isFinite(cycleEnd)||cycleEnd-now.getTime()<60*60*1000){
+      res.status(409).json({error:"Incoming AI top-ups pause during the final hour of this subscription cycle"});return;
     }
     const subtotal=PROPOSED_INBOUND_TOPUPS[requested];
     const params=new URLSearchParams({
@@ -576,7 +578,7 @@ router.post("/billing/inbound-ai-topup-checkout",async(req,res)=>{
       "payment_method_types[0]":"card",
       "line_items[0][price_data][currency]":"cad",
       "line_items[0][price_data][unit_amount]":String(subtotal),
-      "line_items[0][price_data][product_data][name]":String(requested)+" incoming AI receptionist minutes (current month)",
+      "line_items[0][price_data][product_data][name]":String(requested)+" incoming AI receptionist minutes (current paid subscription cycle)",
       "line_items[0][quantity]":"1",
       "automatic_tax[enabled]":"true",
       billing_address_collection:"required",
@@ -592,8 +594,8 @@ router.post("/billing/inbound-ai-topup-checkout",async(req,res)=>{
     if(typeof checkout?.id!=="string"||typeof checkout?.url!=="string")throw Error("Top-up checkout session unavailable");
     await pool.query(`INSERT INTO ca_inbound_ai_topup_intents(
       session_id,company_id,period_start,minutes,subtotal_cents,stripe_customer_id)
-      VALUES($1,$2,date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',$3,$4,$5)`,[
-        checkout.id,companyId,requested,subtotal,company.rows[0].stripe_customer_id
+      VALUES($1,$2,$3,$4,$5,$6)`,[
+        checkout.id,companyId,company.rows[0].cycle_start,requested,subtotal,company.rows[0].stripe_customer_id
       ]);
     res.json({url:checkout.url});
   } catch(error:any) {
