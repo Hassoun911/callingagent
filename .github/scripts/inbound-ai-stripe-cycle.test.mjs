@@ -19,7 +19,7 @@ test("different VoIP price or wrong amount never renews AI",()=>{
  assert.equal(check(invoice,sub,"price_"+"V".repeat(18)),null);
  assert.equal(check(invoice,{...sub,items:{data:[{price:{...sub.items.data[0].price,unit_amount:3900}}]}}),null);
 });
-test("reject unpaid, stale, mismatched, test mode and altered subscription",()=>{
+test("reject partial payments and discounts below the CAD $99 base fee",()=>{\n for(const amount of [1, 5000, 9899])assert.equal(check({...invoice,amount_paid:amount}),null);\n assert.ok(check({...invoice,amount_paid:11187}),"full fee plus tax is allowed");\n});\ntest("reject unpaid, stale, mismatched, test mode and altered subscription",()=>{
  for(const bad of [{paid:false},{status:"open"},{livemode:false},{amount_paid:0},{currency:"usd"},{parent:{subscription_details:{subscription:"sub_other"}}}]){
    assert.equal(check({...invoice,...bad}),null,JSON.stringify(bad));
  }
