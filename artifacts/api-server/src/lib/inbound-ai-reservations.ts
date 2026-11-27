@@ -72,13 +72,16 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
       return {decision:"exhausted",maxCallSeconds:0};
     }
 
-    const previous=await client.query("SELECT company_id,reserved_minutes,route_type FROM ca_inbound_ai_reservations WHERE call_sid=$1",[callSid]);
+    const previous=await client.query("SELECT company_id,reserved_minutes,route_type,period_start,started_at FROM ca_inbound_ai_reservations WHERE call_sid=$1",[callSid]);
     if(previous.rowCount){
       if(Number(previous.rows[0].company_id)!==companyId)throw Error("Conflicting call SID ownership");
       if(previous.rows[0].route_type!==routeType)throw Error("Conflicting call SID AI route");
       await client.query("COMMIT");
+      if(new Date(previous.rows[0].period_start).getTime()!==start.getTime())return {decision:"exhausted",maxCallSeconds:0};
       const minutes=Number(previous.rows[0].reserved_minutes);
-      const cutoff=certifiedAiCycleCutoffSeconds(incomingAiStopAfterSeconds(minutes),end,now);
+      const elapsed=Math.ceil((now.getTime()-new Date(previous.rows[0].started_at).getTime())/1000);
+      const remainingReserved=Math.max(0,incomingAiStopAfterSeconds(minutes)-elapsed);
+      const cutoff=certifiedAiCycleCutoffSeconds(remainingReserved,end,now);
       return cutoff>0?{decision:"reserved",maxCallSeconds:cutoff,reservedMinutes:minutes}:{decision:"exhausted",maxCallSeconds:0};
     }
     // Consumed minutes for settled calls + worst-case outstanding reservations.
@@ -98,11 +101,12 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
     const remaining=total-Number(used.rows[0].minutes);
     if(remaining<=0){await client.query("COMMIT");return {decision:"exhausted",maxCallSeconds:0};}
     const reserved=Math.min(5,remaining);
+    const cutoff=certifiedAiCycleCutoffSeconds(incomingAiStopAfterSeconds(reserved),end,now);
+    if(cutoff<=0){await client.query("COMMIT");return {decision:"exhausted",maxCallSeconds:0};}
     await client.query(`INSERT INTO ca_inbound_ai_reservations(call_sid,company_id,period_start,reserved_minutes,route_type)
        VALUES($1,$2,$3,$4,$5)`,[callSid,companyId,start,reserved,routeType]);
     await client.query("COMMIT");
-    const cutoff=certifiedAiCycleCutoffSeconds(incomingAiStopAfterSeconds(reserved),end,now);
-    return cutoff>0?{decision:"reserved",maxCallSeconds:cutoff,reservedMinutes:reserved}:{decision:"exhausted",maxCallSeconds:0};
+    return {decision:"reserved",maxCallSeconds:cutoff,reservedMinutes:reserved};
   }catch(error){await client.query("ROLLBACK").catch(()=>{});throw error;}
   finally{client.release();}
 }
