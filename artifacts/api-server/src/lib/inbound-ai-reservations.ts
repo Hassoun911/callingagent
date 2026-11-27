@@ -52,7 +52,7 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
   try{
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock($1,$2)",[714095,companyId]);
-    const plan=await client.query(`SELECT included_minutes,verified_prepaid_minutes
+    const plan=await client.query(`SELECT included_minutes
       FROM ca_inbound_ai_enrollment
       WHERE company_id=$1 AND enabled IS TRUE AND billing_certified IS TRUE`,[companyId]);
     if(!plan.rowCount){await client.query("COMMIT");return {decision:"not_enrolled",maxCallSeconds:null};}
@@ -74,7 +74,10 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
     const topups=await client.query(`SELECT COALESCE(SUM(minutes),0)::integer AS minutes
       FROM ca_inbound_ai_topup_intents WHERE company_id=$1 AND status='paid'
       AND period_start=date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`,[companyId]);
-    const total=Number(plan.rows[0].included_minutes)+Number(plan.rows[0].verified_prepaid_minutes)+Number(topups.rows[0].minutes);
+    // The legacy verified_prepaid_minutes column is not period-scoped.
+    // Do NOT include it; only verified Stripe purchases for this month grant
+    // extra minutes. Otherwise a one-time grant could recur indefinitely.
+    const total=Number(plan.rows[0].included_minutes)+Number(topups.rows[0].minutes);
     const remaining=total-Number(used.rows[0].minutes);
     if(remaining<=0){await client.query("COMMIT");return {decision:"exhausted",maxCallSeconds:0};}
     const reserved=Math.min(5,remaining);
