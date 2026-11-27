@@ -1,4 +1,5 @@
 import { pool } from "@workspace/db";
+import { validPaidTopupSession, validPaidTopupPaymentIntent, validUnrefundedTopupCharge } from "./inbound-ai-topup-proof";
 
 /** The $0.85/min pricing is a proposal, NOT validated production cost. */
 export const INBOUND_AI_TOPUPS_CERTIFIED =
@@ -68,13 +69,8 @@ export async function fulfillVerifiedIncomingAiTopup(
   if(!response.ok)throw Error("Could not verify Stripe top-up session");
   const session:any=await response.json();
   const row=intent.rows[0];
-  if(session.id!==sessionId||session.livemode!==true||session.mode!=="payment" ||
-    session.status!=="complete"||session.payment_status!=="paid"||
-    session.currency!=="cad"||session.customer!==row.stripe_customer_id||
-    Number(session.amount_subtotal)!==Number(row.subtotal_cents)||
-    Number(session.amount_total)<Number(row.subtotal_cents)||
-    session.automatic_tax?.status!=="complete" ||
-    typeof session.payment_intent!=="string")
+  const expected={sessionId,customerId:String(row.stripe_customer_id),subtotalCents:Number(row.subtotal_cents)};
+  if(!validPaidTopupSession(session,expected))
     throw Error("Stripe top-up session does not match verified paid CAD order");
 
   const payment=await fetch("https://api.stripe.com/v1/payment_intents/"+encodeURIComponent(session.payment_intent),{
@@ -82,10 +78,7 @@ export async function fulfillVerifiedIncomingAiTopup(
   });
   if(!payment.ok)throw Error("Could not verify Stripe payment intent");
   const pi:any=await payment.json();
-  if(pi.id!==session.payment_intent||pi.livemode!==true||
-    pi.status!=="succeeded"||pi.currency!=="cad"||
-    pi.customer!==row.stripe_customer_id||
-    Number(pi.amount_received)!==Number(session.amount_total))
+  if(!validPaidTopupPaymentIntent(pi,session,expected))
     throw Error("Payment intent does not prove full top-up charge");
 
   // A payment already fully/partially refunded must NEVER create minutes.
@@ -95,10 +88,9 @@ export async function fulfillVerifiedIncomingAiTopup(
   });
   if(!chargeResponse.ok)throw Error("Charge verification unavailable");
   const charge:any=await chargeResponse.json();
-  if(charge.livemode!==true||charge.paid!==true||
-    charge.payment_intent!==pi.id||charge.currency!=="cad"||
-    Number(charge.amount_refunded)!==0||charge.refunded===true)
+  if(!validUnrefundedTopupCharge(charge,pi,session))
     throw Error("Top-up charge has not been verified as paid and unrefunded");
+
   // An intent row constitutes the month-scoped grant after this atomic update.
   // The existing Stripe event transaction serializes duplicate notifications.
   const updated=await client.query(`UPDATE ca_inbound_ai_topup_intents
