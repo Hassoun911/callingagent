@@ -6,6 +6,7 @@ import twilio from "twilio";
 import { verifiedCurrentPaidInvoice, verifiedCurrentFailedInvoice } from "../lib/stripe-paid-invoice-evidence";
 import { verifyStripeWebhookSignature } from "../lib/stripe-webhook-signature";
 import { applyStripeEventAtomically } from "../lib/stripe-event-atomic";
+import { syncLinkedIncomingAiPaidCycle } from "../lib/inbound-ai-stripe-cycle";
 import { fulfillVerifiedIncomingAiTopup, revokeRefundedIncomingAiTopup, INBOUND_AI_TOPUPS_CERTIFIED, PROPOSED_INBOUND_TOPUPS, validateInboundTopupMinutes } from "../lib/inbound-ai-topups";
 
 const router: IRouter = Router();
@@ -1014,6 +1015,16 @@ async function applyStripeEvent(event: any, client: Awaited<ReturnType<typeof po
         VALUES($1,$2,$3) ON CONFLICT(stripe_subscription_id) DO NOTHING`,[sub.id,intent.company_id,intent.plan_slug]);
     }
     return;
+  }
+  if(kind==="invoice.paid" && process.env.CALLINGAGENT_AI_BILLING_CERTIFIED==="true"){
+    // Dedicated AI invoice reconciliation is separate from the existing VoIP
+    // subscription ledger and cannot automatically enroll any company.
+    const aiSubId=typeof object.subscription==="string"?object.subscription:
+      object.parent?.subscription_details?.subscription;
+    if(typeof aiSubId==="string"){
+      await syncLinkedIncomingAiPaidCycle(String(object.id),aiSubId,client,
+        stripeKey(),process.env.CALLINGAGENT_AI_RECEPTIONIST_PRICE_ID||"");
+    }
   }
   if (kind === "invoice.paid" || kind === "invoice.payment_failed") {
     // Status is reported independently of the subscription's entitlement state.
