@@ -33,9 +33,7 @@ export async function ensureInboundAiReservationSchema():Promise<void>{
       OR (consumed_minutes IS NOT NULL AND settled_at IS NOT NULL))
   )`);
   await pool.query("ALTER TABLE ca_inbound_ai_reservations ADD COLUMN IF NOT EXISTS termination_requested_at timestamptz");
-  await pool.query("ALTER TABLE ca_inbound_ai_reservations ADD COLUMN IF NOT EXISTS route_type text NOT NULL DEFAULT 'direct'");
-  await pool.query("ALTER TABLE ca_inbound_ai_reservations DROP CONSTRAINT IF EXISTS ca_inbound_ai_reservations_route_type_check");
-  await pool.query("ALTER TABLE ca_inbound_ai_reservations ADD CONSTRAINT ca_inbound_ai_reservations_route_type_check CHECK(route_type IN ('direct','forward_fallback'))");
+  await pool.query("ALTER TABLE ca_inbound_ai_reservations ADD COLUMN IF NOT EXISTS route_type text NOT NULL DEFAULT 'direct' CHECK(route_type IN ('direct','forward_fallback'))");
 
   await pool.query("CREATE INDEX IF NOT EXISTS ca_inbound_ai_reservations_company_period_idx ON ca_inbound_ai_reservations(company_id,period_start)");
 }
