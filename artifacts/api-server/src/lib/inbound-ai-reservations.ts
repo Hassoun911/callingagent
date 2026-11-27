@@ -1,4 +1,5 @@
 import { pool } from "@workspace/db";
+import { incomingAiStopAfterSeconds } from "./inbound-ai-cutoff";
 
 /**
  * Reserved incoming AI minutes. IMPORTANT:
@@ -26,9 +27,11 @@ export async function ensureInboundAiReservationSchema():Promise<void>{
     consumed_minutes integer CHECK(consumed_minutes BETWEEN 0 AND 1440),
     started_at timestamptz NOT NULL DEFAULT now(),
     settled_at timestamptz,
+    termination_requested_at timestamptz,
     CHECK((consumed_minutes IS NULL AND settled_at IS NULL)
       OR (consumed_minutes IS NOT NULL AND settled_at IS NOT NULL))
   )`);
+  await pool.query("ALTER TABLE ca_inbound_ai_reservations ADD COLUMN IF NOT EXISTS termination_requested_at timestamptz");
   await pool.query("CREATE INDEX IF NOT EXISTS ca_inbound_ai_reservations_company_period_idx ON ca_inbound_ai_reservations(company_id,period_start)");
 }
 
@@ -55,7 +58,7 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
       if(Number(previous.rows[0].company_id)!==companyId)throw Error("Conflicting call SID ownership");
       await client.query("COMMIT");
       const minutes=Number(previous.rows[0].reserved_minutes);
-      return {decision:"reserved",maxCallSeconds:Math.max(1,minutes*60-15),reservedMinutes:minutes};
+      return {decision:"reserved",maxCallSeconds:incomingAiStopAfterSeconds(minutes),reservedMinutes:minutes};
     }
     // Consumed minutes for settled calls + worst-case outstanding reservations.
     // Unmeasured calls retain the entire reserved amount until reconciliation.
@@ -74,7 +77,7 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
     await client.query(`INSERT INTO ca_inbound_ai_reservations(call_sid,company_id,period_start,reserved_minutes)
        VALUES($1,$2,date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',$3)`,[callSid,companyId,reserved]);
     await client.query("COMMIT");
-    return {decision:"reserved",maxCallSeconds:Math.max(1,reserved*60-15),reservedMinutes:reserved};
+    return {decision:"reserved",maxCallSeconds:incomingAiStopAfterSeconds(reserved),reservedMinutes:reserved};
   }catch(error){await client.query("ROLLBACK").catch(()=>{});throw error;}
   finally{client.release();}
 }
