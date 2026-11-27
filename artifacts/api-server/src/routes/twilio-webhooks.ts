@@ -689,7 +689,7 @@ router.post("/twilio/voice", async (req, res): Promise<void> => {
   } else if (answerMode === "ai_voice") {
     // Only certified, opted-in, incoming AI companies enter this reservation
     // path. The global switch and all existing enrollment rows default OFF.
-    const aiAdmission=await reserveIncomingAiMinutes(phoneNumber?.companyId,CallSid);
+    const aiAdmission=await reserveIncomingAiMinutes(phoneNumber?.companyId,CallSid,"direct");
     if(aiAdmission.decision==="exhausted"){
       res.set("Content-Type","text/xml");
       res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say>Our automated receptionist is temporarily unavailable. Please try again later.</Say><Hangup/></Response>`);
@@ -1438,7 +1438,7 @@ router.post("/twilio/screen-fallback", async (req, res): Promise<void> => {
   }
 
   if (mode === "ai_voice") {
-    const aiAdmission=await reserveIncomingAiMinutes(phoneNumber?.companyId,CallSid);
+    const aiAdmission=await reserveIncomingAiMinutes(phoneNumber?.companyId,CallSid,"forward_fallback");
     if(aiAdmission.decision==="exhausted"){
       res.set("Content-Type","text/xml");
       res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Say>Our automated receptionist is temporarily unavailable. Please try again later.</Say><Hangup/></Response>`);
