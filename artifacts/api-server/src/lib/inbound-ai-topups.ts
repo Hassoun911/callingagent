@@ -56,12 +56,15 @@ export async function fulfillVerifiedIncomingAiTopup(
   // Serialize paid top-up grants with concurrent incoming AI reservations.
   await client.query("SELECT pg_advisory_xact_lock($1,$2)",[714095,companyId]);
   // Never fund an unenrolled account or a current-period amount in another month.
-  const eligible=await client.query(`SELECT company_id FROM ca_inbound_ai_enrollment
+  const eligible=await client.query(`SELECT company_id,cycle_start,cycle_end FROM ca_inbound_ai_enrollment
     WHERE company_id=$1 AND enabled IS TRUE AND billing_certified IS TRUE`,[companyId]);
   if(!eligible.rowCount)throw Error("AI top-up company is not certified and enrolled");
-  const currentPeriod=await client.query(`SELECT date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS start`);
-  if(new Date(intent.rows[0].period_start).getTime()!==new Date(currentPeriod.rows[0].start).getTime())
-    throw Error("Top-up purchase period is not current; manual review required");
+  const cycle=eligible.rows[0];
+  if(!cycle.cycle_start || !cycle.cycle_end ||
+    new Date(cycle.cycle_start).getTime()!==new Date(intent.rows[0].period_start).getTime() ||
+    Date.now()<new Date(cycle.cycle_start).getTime() ||
+    Date.now()>=new Date(cycle.cycle_end).getTime())
+    throw Error("Top-up purchase period no longer matches a paid certified AI cycle; manual review required");
 
   const response=await fetch("https://api.stripe.com/v1/checkout/sessions/"+encodeURIComponent(sessionId),{
     headers:{Authorization:"Bearer "+stripeKey},signal:AbortSignal.timeout(15000)
