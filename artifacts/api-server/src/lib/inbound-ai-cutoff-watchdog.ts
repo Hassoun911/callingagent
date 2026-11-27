@@ -21,7 +21,10 @@ export async function sweepOverdueIncomingAiCalls():Promise<{attempted:number;co
     JOIN ca_inbound_ai_enrollment e ON e.company_id=r.company_id
     WHERE e.enabled=TRUE AND e.billing_certified=TRUE
       AND r.settled_at IS NULL
-      AND r.started_at + make_interval(secs=>GREATEST(15,r.reserved_minutes*60-25))<=now()
+      AND (
+        r.started_at + make_interval(secs=>GREATEST(15,r.reserved_minutes*60-25))<=now()
+        OR (e.cycle_end IS NOT NULL AND e.cycle_end-interval '25 seconds'<=now())
+      )
       AND (r.termination_requested_at IS NULL OR r.termination_requested_at<now()-interval '45 seconds')
     ORDER BY r.started_at ASC LIMIT 10 FOR UPDATE OF r SKIP LOCKED
   )
