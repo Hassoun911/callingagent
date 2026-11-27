@@ -6,6 +6,7 @@ import { ensureCompanyFullAccessSchema } from "./lib/company-full-access";
 import { ensureAiCreditSchema } from "./lib/ai-credit-wallet";
 import { ensureInboundAiUsageSchema } from "./lib/inbound-ai-usage";
 import { ensureInboundAiReservationSchema } from "./lib/inbound-ai-reservations";
+import { startIncomingAiCutoffWatchdog } from "./lib/inbound-ai-cutoff-watchdog";
 import { ensureInboundAiTopupSchema } from "./lib/inbound-ai-topups";
 import { ensureTelnyxUsageSchema, reconcileVerifiedTelnyxInboundDurations } from "./lib/telnyx-carrier-usage";
 import { ensureTelnyxCpsSchema } from "./lib/telnyx-cps-guard";
@@ -69,6 +70,7 @@ async function start(): Promise<void> {
     logger.info({ port, timezone: process.env.TZ }, "Server listening");
     startWatchPoller();
     startReminderPoller();
+    startIncomingAiCutoffWatchdog();
     warmTtsCache();
   });
 }
