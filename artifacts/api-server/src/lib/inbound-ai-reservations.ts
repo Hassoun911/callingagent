@@ -1,5 +1,6 @@
 import { pool } from "@workspace/db";
 import { incomingAiStopAfterSeconds } from "./inbound-ai-cutoff";
+import { certifiedAiCycleCutoffSeconds, validCertifiedAiPeriod } from "./inbound-ai-period";
 
 /**
  * Reserved incoming AI minutes. IMPORTANT:
@@ -15,6 +16,8 @@ export async function ensureInboundAiReservationSchema():Promise<void>{
     enabled boolean NOT NULL DEFAULT false,
     billing_certified boolean NOT NULL DEFAULT false,
     included_minutes integer NOT NULL DEFAULT 80 CHECK(included_minutes BETWEEN 0 AND 100000),
+    cycle_start timestamptz,
+    cycle_end timestamptz,
     verified_prepaid_minutes integer NOT NULL DEFAULT 0 CHECK(verified_prepaid_minutes BETWEEN 0 AND 100000),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CHECK(NOT enabled OR billing_certified)
@@ -32,6 +35,8 @@ export async function ensureInboundAiReservationSchema():Promise<void>{
     CHECK((consumed_minutes IS NULL AND settled_at IS NULL)
       OR (consumed_minutes IS NOT NULL AND settled_at IS NOT NULL))
   )`);
+  await pool.query("ALTER TABLE ca_inbound_ai_enrollment ADD COLUMN IF NOT EXISTS cycle_start timestamptz");
+  await pool.query("ALTER TABLE ca_inbound_ai_enrollment ADD COLUMN IF NOT EXISTS cycle_end timestamptz");
   await pool.query("ALTER TABLE ca_inbound_ai_reservations ADD COLUMN IF NOT EXISTS termination_requested_at timestamptz");
   await pool.query("ALTER TABLE ca_inbound_ai_reservations ADD COLUMN IF NOT EXISTS route_type text NOT NULL DEFAULT 'direct' CHECK(route_type IN ('direct','forward_fallback'))");
 
@@ -52,28 +57,40 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
   try{
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock($1,$2)",[714095,companyId]);
-    const plan=await client.query(`SELECT included_minutes
+    const plan=await client.query(`SELECT included_minutes,cycle_start,cycle_end
       FROM ca_inbound_ai_enrollment
-      WHERE company_id=$1 AND enabled IS TRUE AND billing_certified IS TRUE`,[companyId]);
+      WHERE company_id=$1 AND enabled IS TRUE AND billing_certified IS TRUE`,[companyId,start]);
     if(!plan.rowCount){await client.query("COMMIT");return {decision:"not_enrolled",maxCallSeconds:null};}
+    // No automatic calendar-month renewals or VoIP-subscription inference.
+    // A certified AI billing period must be explicitly set from real payment
+    // evidence before any existing company can receive restricted AI usage.
+    const now=new Date();
+    const start=plan.rows[0].cycle_start?new Date(plan.rows[0].cycle_start):new Date(NaN);
+    const end=plan.rows[0].cycle_end?new Date(plan.rows[0].cycle_end):new Date(NaN);
+    if(!validCertifiedAiPeriod(start,end,now)){
+      await client.query("COMMIT");
+      return {decision:"exhausted",maxCallSeconds:0};
+    }
+
     const previous=await client.query("SELECT company_id,reserved_minutes,route_type FROM ca_inbound_ai_reservations WHERE call_sid=$1",[callSid]);
     if(previous.rowCount){
       if(Number(previous.rows[0].company_id)!==companyId)throw Error("Conflicting call SID ownership");
       if(previous.rows[0].route_type!==routeType)throw Error("Conflicting call SID AI route");
       await client.query("COMMIT");
       const minutes=Number(previous.rows[0].reserved_minutes);
-      return {decision:"reserved",maxCallSeconds:incomingAiStopAfterSeconds(minutes),reservedMinutes:minutes};
+      const cutoff=certifiedAiCycleCutoffSeconds(incomingAiStopAfterSeconds(minutes),end,now);
+      return cutoff>0?{decision:"reserved",maxCallSeconds:cutoff,reservedMinutes:minutes}:{decision:"exhausted",maxCallSeconds:0};
     }
     // Consumed minutes for settled calls + worst-case outstanding reservations.
     // Unmeasured calls retain the entire reserved amount until reconciliation.
     const used=await client.query(`SELECT COALESCE(SUM(COALESCE(consumed_minutes,reserved_minutes)),0)::integer AS minutes
       FROM ca_inbound_ai_reservations WHERE company_id=$1
-        AND period_start=date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`,[companyId]);
+        AND period_start=$2::timestamptz`,[companyId,start]);
     // Only verified paid top-ups from the CURRENT UTC month count here.
     // Paid top-ups cannot accidentally carry into a future subscription month.
     const topups=await client.query(`SELECT COALESCE(SUM(minutes),0)::integer AS minutes
       FROM ca_inbound_ai_topup_intents WHERE company_id=$1 AND status='paid'
-      AND period_start=date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`,[companyId]);
+      AND period_start=date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`,[companyId,start]);
     // The legacy verified_prepaid_minutes column is not period-scoped.
     // Do NOT include it; only verified Stripe purchases for this month grant
     // extra minutes. Otherwise a one-time grant could recur indefinitely.
@@ -84,7 +101,8 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
     await client.query(`INSERT INTO ca_inbound_ai_reservations(call_sid,company_id,period_start,reserved_minutes,route_type)
        VALUES($1,$2,date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',$3,$4)`,[callSid,companyId,reserved,routeType]);
     await client.query("COMMIT");
-    return {decision:"reserved",maxCallSeconds:incomingAiStopAfterSeconds(reserved),reservedMinutes:reserved};
+    const cutoff=certifiedAiCycleCutoffSeconds(incomingAiStopAfterSeconds(reserved),end,now);
+    return cutoff>0?{decision:"reserved",maxCallSeconds:cutoff,reservedMinutes:reserved}:{decision:"exhausted",maxCallSeconds:0};
   }catch(error){await client.query("ROLLBACK").catch(()=>{});throw error;}
   finally{client.release();}
 }
