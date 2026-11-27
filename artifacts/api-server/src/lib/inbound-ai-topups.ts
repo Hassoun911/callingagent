@@ -1,4 +1,5 @@
 import { pool } from "@workspace/db";
+import { validPaidTopupSession, validPaidTopupPaymentIntent, validUnrefundedTopupCharge } from "./inbound-ai-topup-proof";
 
 /** The $0.85/min pricing is a proposal, NOT validated production cost. */
 export const INBOUND_AI_TOPUPS_CERTIFIED =
@@ -52,6 +53,8 @@ export async function fulfillVerifiedIncomingAiTopup(
   if(intent.rows[0].status!=="pending")throw Error("Top-up intent already closed");
 
   const companyId=Number(intent.rows[0].company_id);
+  // Serialize paid top-up grants with concurrent incoming AI reservations.
+  await client.query("SELECT pg_advisory_xact_lock($1,$2)",[714095,companyId]);
   // Never fund an unenrolled account or a current-period amount in another month.
   const eligible=await client.query(`SELECT company_id FROM ca_inbound_ai_enrollment
     WHERE company_id=$1 AND enabled IS TRUE AND billing_certified IS TRUE`,[companyId]);
@@ -66,13 +69,8 @@ export async function fulfillVerifiedIncomingAiTopup(
   if(!response.ok)throw Error("Could not verify Stripe top-up session");
   const session:any=await response.json();
   const row=intent.rows[0];
-  if(session.id!==sessionId||session.livemode!==true||session.mode!=="payment" ||
-    session.status!=="complete"||session.payment_status!=="paid"||
-    session.currency!=="cad"||session.customer!==row.stripe_customer_id||
-    Number(session.amount_subtotal)!==Number(row.subtotal_cents)||
-    Number(session.amount_total)<Number(row.subtotal_cents)||
-    session.automatic_tax?.status!=="complete" ||
-    typeof session.payment_intent!=="string")
+  const expected={sessionId,customerId:String(row.stripe_customer_id),subtotalCents:Number(row.subtotal_cents)};
+  if(!validPaidTopupSession(session,expected))
     throw Error("Stripe top-up session does not match verified paid CAD order");
 
   const payment=await fetch("https://api.stripe.com/v1/payment_intents/"+encodeURIComponent(session.payment_intent),{
@@ -80,10 +78,7 @@ export async function fulfillVerifiedIncomingAiTopup(
   });
   if(!payment.ok)throw Error("Could not verify Stripe payment intent");
   const pi:any=await payment.json();
-  if(pi.id!==session.payment_intent||pi.livemode!==true||
-    pi.status!=="succeeded"||pi.currency!=="cad"||
-    pi.customer!==row.stripe_customer_id||
-    Number(pi.amount_received)!==Number(session.amount_total))
+  if(!validPaidTopupPaymentIntent(pi,session,expected))
     throw Error("Payment intent does not prove full top-up charge");
 
   // A payment already fully/partially refunded must NEVER create minutes.
@@ -93,10 +88,9 @@ export async function fulfillVerifiedIncomingAiTopup(
   });
   if(!chargeResponse.ok)throw Error("Charge verification unavailable");
   const charge:any=await chargeResponse.json();
-  if(charge.livemode!==true||charge.paid!==true||
-    charge.payment_intent!==pi.id||charge.currency!=="cad"||
-    Number(charge.amount_refunded)!==0||charge.refunded===true)
+  if(!validUnrefundedTopupCharge(charge,pi,session))
     throw Error("Top-up charge has not been verified as paid and unrefunded");
+
   // An intent row constitutes the month-scoped grant after this atomic update.
   // The existing Stripe event transaction serializes duplicate notifications.
   const updated=await client.query(`UPDATE ca_inbound_ai_topup_intents
@@ -120,9 +114,12 @@ export async function revokeRefundedIncomingAiTopup(
     !/^pi_[a-zA-Z0-9_]{8,255}$/.test(paymentIntentId))return "ignored";
   // Most charge refunds are unrelated to prepaid AI. Avoid external requests
   // and changes to existing billing for those unrelated verified webhooks.
-  const pending=await client.query(`SELECT session_id FROM ca_inbound_ai_topup_intents
+  const pending=await client.query(`SELECT session_id,company_id FROM ca_inbound_ai_topup_intents
     WHERE stripe_payment_intent_id=$1 AND status='paid' FOR UPDATE`,[paymentIntentId]);
   if(!pending.rowCount)return "ignored";
+  // A concurrent reservation must see either the pre-refund or post-refund
+  // balance, never a partially revoked balance.
+  await client.query("SELECT pg_advisory_xact_lock($1,$2)",[714095,Number(pending.rows[0].company_id)]);
   const response=await fetch("https://api.stripe.com/v1/charges/"+encodeURIComponent(chargeId),{
     headers:{Authorization:"Bearer "+stripeKey},signal:AbortSignal.timeout(15000)
   });
