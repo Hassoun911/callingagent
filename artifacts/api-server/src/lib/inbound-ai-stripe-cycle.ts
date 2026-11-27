@@ -1,5 +1,5 @@
-import { verifiedCurrentPaidInvoice } from "./stripe-paid-invoice-evidence";
-import { validCertifiedAiPeriod } from "./inbound-ai-period";
+import { verifiedCurrentPaidInvoice } from "./stripe-paid-invoice-evidence.ts";
+import { validCertifiedAiPeriod } from "./inbound-ai-period.ts";
 
 /**
  * Dedicated AI Receptionist billing proof. Existing VoIP subscription prices
