@@ -18,6 +18,8 @@ export async function ensureInboundAiReservationSchema():Promise<void>{
     included_minutes integer NOT NULL DEFAULT 80 CHECK(included_minutes BETWEEN 0 AND 100000),
     cycle_start timestamptz,
     cycle_end timestamptz,
+    ai_stripe_subscription_id text UNIQUE,
+    ai_last_paid_invoice_id text,
     verified_prepaid_minutes integer NOT NULL DEFAULT 0 CHECK(verified_prepaid_minutes BETWEEN 0 AND 100000),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CHECK(NOT enabled OR billing_certified)
@@ -37,6 +39,9 @@ export async function ensureInboundAiReservationSchema():Promise<void>{
   )`);
   await pool.query("ALTER TABLE ca_inbound_ai_enrollment ADD COLUMN IF NOT EXISTS cycle_start timestamptz");
   await pool.query("ALTER TABLE ca_inbound_ai_enrollment ADD COLUMN IF NOT EXISTS cycle_end timestamptz");
+  await pool.query("ALTER TABLE ca_inbound_ai_enrollment ADD COLUMN IF NOT EXISTS ai_stripe_subscription_id text");
+  await pool.query("ALTER TABLE ca_inbound_ai_enrollment ADD COLUMN IF NOT EXISTS ai_last_paid_invoice_id text");
+  await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS ca_inbound_ai_enrollment_subscription_unique ON ca_inbound_ai_enrollment(ai_stripe_subscription_id) WHERE ai_stripe_subscription_id IS NOT NULL");
   await pool.query("ALTER TABLE ca_inbound_ai_reservations ADD COLUMN IF NOT EXISTS termination_requested_at timestamptz");
   await pool.query("ALTER TABLE ca_inbound_ai_reservations ADD COLUMN IF NOT EXISTS route_type text NOT NULL DEFAULT 'direct' CHECK(route_type IN ('direct','forward_fallback'))");
 
@@ -59,7 +64,8 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
     await client.query("SELECT pg_advisory_xact_lock($1,$2)",[714095,companyId]);
     const plan=await client.query(`SELECT included_minutes,cycle_start,cycle_end
       FROM ca_inbound_ai_enrollment
-      WHERE company_id=$1 AND enabled IS TRUE AND billing_certified IS TRUE`,[companyId]);
+      WHERE company_id=$1 AND enabled IS TRUE AND billing_certified IS TRUE
+      AND ai_stripe_subscription_id IS NOT NULL AND ai_last_paid_invoice_id IS NOT NULL`,[companyId]);
     if(!plan.rowCount){await client.query("COMMIT");return {decision:"not_enrolled",maxCallSeconds:null};}
     // No automatic calendar-month renewals or VoIP-subscription inference.
     // A certified AI billing period must be explicitly set from real payment
