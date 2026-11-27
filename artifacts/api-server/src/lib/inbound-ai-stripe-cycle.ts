@@ -35,7 +35,7 @@ export function verifiedAiPaidBillingCycle(
   if(invoice.currency!=="cad")return null;
   // Avoid accidentally treating a zero-cost coupon or a refunded free trial
   // as payment for a full-price monthly AI subscription.
-  if(!Number.isSafeInteger(invoice.amount_paid)||invoice.amount_paid<=0)return null;
+  // Full base fee must be collected; a partially paid or heavily discounted\n  // invoice cannot silently grant the complete 80-minute paid allowance.\n  // Tax may be added, so amounts above CAD $99 are valid.\n  if(!Number.isSafeInteger(invoice.amount_paid)||invoice.amount_paid<9900)return null;
   return {start,end};
 }
 
