@@ -22,6 +22,7 @@ export async function ensureInboundAiReservationSchema():Promise<void>{
   await pool.query(`CREATE TABLE IF NOT EXISTS ca_inbound_ai_reservations(
     call_sid text PRIMARY KEY CHECK(call_sid ~ '^CA[0-9a-fA-F]{32}$'),
     company_id integer NOT NULL REFERENCES companies(id),
+    route_type text NOT NULL DEFAULT 'direct' CHECK(route_type IN ('direct','forward_fallback')),
     period_start timestamptz NOT NULL,
     reserved_minutes integer NOT NULL CHECK(reserved_minutes BETWEEN 1 AND 5),
     consumed_minutes integer CHECK(consumed_minutes BETWEEN 0 AND 1440),
@@ -32,6 +33,10 @@ export async function ensureInboundAiReservationSchema():Promise<void>{
       OR (consumed_minutes IS NOT NULL AND settled_at IS NOT NULL))
   )`);
   await pool.query("ALTER TABLE ca_inbound_ai_reservations ADD COLUMN IF NOT EXISTS termination_requested_at timestamptz");
+  await pool.query("ALTER TABLE ca_inbound_ai_reservations ADD COLUMN IF NOT EXISTS route_type text NOT NULL DEFAULT 'direct'");
+  await pool.query("ALTER TABLE ca_inbound_ai_reservations DROP CONSTRAINT IF EXISTS ca_inbound_ai_reservations_route_type_check");
+  await pool.query("ALTER TABLE ca_inbound_ai_reservations ADD CONSTRAINT ca_inbound_ai_reservations_route_type_check CHECK(route_type IN ('direct','forward_fallback'))");
+
   await pool.query("CREATE INDEX IF NOT EXISTS ca_inbound_ai_reservations_company_period_idx ON ca_inbound_ai_reservations(company_id,period_start)");
 }
 
@@ -41,7 +46,7 @@ export type IncomingAiAdmission =
   | {decision:"exhausted";maxCallSeconds:0};
 
 /** Strictly for inbound AI Twilio voice paths; never run for VoIP or outbound. */
-export async function reserveIncomingAiMinutes(companyId:number|null|undefined,callSid:string):Promise<IncomingAiAdmission>{
+export async function reserveIncomingAiMinutes(companyId:number|null|undefined,callSid:string,routeType:"direct"|"forward_fallback"="direct"):Promise<IncomingAiAdmission>{
   if(!INBOUND_AI_RESERVATIONS_ENABLED)return {decision:"not_enrolled",maxCallSeconds:null};
   if(!Number.isSafeInteger(companyId)||!companyId||companyId<=0||!/^CA[a-fA-F0-9]{32}$/.test(callSid))
     throw new Error("Verified company and Twilio CallSid required");
@@ -53,9 +58,10 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
       FROM ca_inbound_ai_enrollment
       WHERE company_id=$1 AND enabled IS TRUE AND billing_certified IS TRUE`,[companyId]);
     if(!plan.rowCount){await client.query("COMMIT");return {decision:"not_enrolled",maxCallSeconds:null};}
-    const previous=await client.query("SELECT company_id,reserved_minutes FROM ca_inbound_ai_reservations WHERE call_sid=$1",[callSid]);
+    const previous=await client.query("SELECT company_id,reserved_minutes,route_type FROM ca_inbound_ai_reservations WHERE call_sid=$1",[callSid]);
     if(previous.rowCount){
       if(Number(previous.rows[0].company_id)!==companyId)throw Error("Conflicting call SID ownership");
+      if(previous.rows[0].route_type!==routeType)throw Error("Conflicting call SID AI route");
       await client.query("COMMIT");
       const minutes=Number(previous.rows[0].reserved_minutes);
       return {decision:"reserved",maxCallSeconds:incomingAiStopAfterSeconds(minutes),reservedMinutes:minutes};
@@ -74,8 +80,8 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
     const remaining=total-Number(used.rows[0].minutes);
     if(remaining<=0){await client.query("COMMIT");return {decision:"exhausted",maxCallSeconds:0};}
     const reserved=Math.min(5,remaining);
-    await client.query(`INSERT INTO ca_inbound_ai_reservations(call_sid,company_id,period_start,reserved_minutes)
-       VALUES($1,$2,date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',$3)`,[callSid,companyId,reserved]);
+    await client.query(`INSERT INTO ca_inbound_ai_reservations(call_sid,company_id,period_start,reserved_minutes,route_type)
+       VALUES($1,$2,date_trunc('month',now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',$3,$4)`,[callSid,companyId,reserved,routeType]);
     await client.query("COMMIT");
     return {decision:"reserved",maxCallSeconds:incomingAiStopAfterSeconds(reserved),reservedMinutes:reserved};
   }catch(error){await client.query("ROLLBACK").catch(()=>{});throw error;}
@@ -84,13 +90,14 @@ export async function reserveIncomingAiMinutes(companyId:number|null|undefined,c
 
 /**
  * Provider-measured terminal call seconds only. No evidence = reserve stays
- * occupied as a fail-closed protection. Overage is recorded, never erased.
+ * occupied as a fail-closed protection. Forwarded-fallback parent calls
+ * include non-AI time and cannot be settled from total parent duration.
  */
 export async function settleIncomingAiMinutes(callSid:string,seconds:number):Promise<boolean>{
   if(!INBOUND_AI_RESERVATIONS_ENABLED)return false;
   if(!/^CA[a-fA-F0-9]{32}$/.test(callSid)||!Number.isSafeInteger(seconds)||seconds<0||seconds>86400)return false;
   const result=await pool.query(`UPDATE ca_inbound_ai_reservations
     SET consumed_minutes=CEIL($2::numeric/60)::integer,settled_at=now()
-    WHERE call_sid=$1 AND consumed_minutes IS NULL RETURNING call_sid`,[callSid,seconds]);
+    WHERE call_sid=$1 AND consumed_minutes IS NULL AND route_type='direct' RETURNING call_sid`,[callSid,seconds]);
   return Boolean(result.rowCount);
 }
